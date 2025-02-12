@@ -1,5 +1,7 @@
 // models/Supplier.js
 const db = require('../config/database');
+const path = require('path');
+const fs = require('fs/promises');
 
 class Supplier {
   static create(supplierData) {
@@ -38,13 +40,30 @@ class Supplier {
     });
   }
 
-  static delete(id) {
-    return new Promise((resolve, reject) => {
-      db.suppliers.remove({ _id: id }, {}, (err, numRemoved) => {
-        if (err) reject(err);
-        resolve(numRemoved);
+  static async delete(id) {
+    try {
+      const supplier = await this.findById(id);
+      if (!supplier) return 0;
+
+      if (supplier.image?.local_path) {
+        const projectRoot = path.resolve(__dirname, '../../');
+        const imageDir = path.join(projectRoot, 'public', 'suppliers', id);
+        try {
+          await fs.rm(imageDir, { recursive: true, force: true });
+        } catch (err) {
+          console.error('Erreur suppression dossier:', err);
+        }
+      }
+
+      return new Promise((resolve, reject) => {
+        db.suppliers.remove({ _id: id }, {}, (err, numRemoved) => {
+          if (err) reject(err);
+          resolve(numRemoved);
+        });
       });
-    });
+    } catch (error) {
+      throw error;
+    }
   }
 }
 

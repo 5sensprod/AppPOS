@@ -1,5 +1,7 @@
 // models/Product.js
 const db = require('../config/database');
+const path = require('path');
+const fs = require('fs/promises');
 
 class Product {
   static create(productData) {
@@ -38,13 +40,30 @@ class Product {
     });
   }
 
-  static delete(id) {
-    return new Promise((resolve, reject) => {
-      db.products.remove({ _id: id }, {}, (err, numRemoved) => {
-        if (err) reject(err);
-        resolve(numRemoved);
+  static async delete(id) {
+    try {
+      const product = await this.findById(id);
+      if (!product) return 0;
+
+      if (product.image?.local_path) {
+        const projectRoot = path.resolve(__dirname, '../../');
+        const imageDir = path.join(projectRoot, 'public', 'products', id);
+        try {
+          await fs.rm(imageDir, { recursive: true, force: true });
+        } catch (err) {
+          console.error('Erreur suppression dossier:', err);
+        }
+      }
+
+      return new Promise((resolve, reject) => {
+        db.products.remove({ _id: id }, {}, (err, numRemoved) => {
+          if (err) reject(err);
+          resolve(numRemoved);
+        });
       });
-    });
+    } catch (error) {
+      throw error;
+    }
   }
 }
 

@@ -1,5 +1,7 @@
 // models/Category.js
 const db = require('../config/database');
+const path = require('path');
+const fs = require('fs/promises');
 
 class Category {
   static create(categoryData) {
@@ -38,13 +40,30 @@ class Category {
     });
   }
 
-  static delete(id) {
-    return new Promise((resolve, reject) => {
-      db.categories.remove({ _id: id }, {}, (err, numRemoved) => {
-        if (err) reject(err);
-        resolve(numRemoved);
+  static async delete(id) {
+    try {
+      const category = await this.findById(id);
+      if (!category) return 0;
+
+      if (category.image?.local_path) {
+        const projectRoot = path.resolve(__dirname, '../../');
+        const imageDir = path.join(projectRoot, 'public', 'categories', id);
+        try {
+          await fs.rm(imageDir, { recursive: true, force: true });
+        } catch (err) {
+          console.error('Erreur suppression dossier:', err);
+        }
+      }
+
+      return new Promise((resolve, reject) => {
+        db.categories.remove({ _id: id }, {}, (err, numRemoved) => {
+          if (err) reject(err);
+          resolve(numRemoved);
+        });
       });
-    });
+    } catch (error) {
+      throw error;
+    }
   }
 }
 

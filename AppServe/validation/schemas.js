@@ -1,6 +1,16 @@
 // validation/schemas.js
 const Joi = require('joi');
 
+const imageSchema = Joi.object({
+  id: Joi.number(),
+  src: Joi.string().uri(),
+  local_path: Joi.string(),
+  hash: Joi.string(),
+  status: Joi.string().valid('pending', 'active', 'deleted'),
+  type: Joi.string().valid('jpg', 'jpeg', 'png', 'gif', 'webp'),
+  position: Joi.number().min(0),
+});
+
 const productSchema = Joi.object({
   name: Joi.string().required(),
   sku: Joi.string().required(),
@@ -29,17 +39,7 @@ const productSchema = Joi.object({
   woo_id: Joi.number(),
   status: Joi.string(),
   manage_stock: Joi.boolean(),
-  images: Joi.array().items(
-    Joi.object({
-      id: Joi.number(),
-      src: Joi.string(),
-      local_path: Joi.string(),
-      hash: Joi.string(),
-      status: Joi.string(),
-      type: Joi.string(),
-      position: Joi.number(),
-    })
-  ),
+  images: Joi.array().items(imageSchema),
   specifications: Joi.object(),
   meta_data: Joi.array().items(
     Joi.object({
@@ -57,11 +57,7 @@ const categorySchema = Joi.object({
   woo_id: Joi.number(),
   slug: Joi.string(),
   description: Joi.string(),
-  image: Joi.object({
-    id: Joi.number(),
-    src: Joi.string(),
-    local_path: Joi.string(),
-  }),
+  image: imageSchema,
   website_url: Joi.string().uri(),
 });
 
@@ -71,11 +67,7 @@ const brandSchema = Joi.object({
   description: Joi.string(),
   supplier_id: Joi.string().required(),
   woo_id: Joi.number(),
-  image: Joi.object({
-    id: Joi.number(),
-    src: Joi.string(),
-    local_path: Joi.string(),
-  }),
+  image: imageSchema,
   meta_data: Joi.array().items(
     Joi.object({
       key: Joi.string(),
@@ -99,10 +91,7 @@ const supplierSchema = Joi.object({
     bic: Joi.string(),
   }),
   brands: Joi.array().items(Joi.string()),
-  logo: Joi.object({
-    src: Joi.string(),
-    local_path: Joi.string(),
-  }),
+  image: imageSchema,
   payment_terms: Joi.object({
     type: Joi.string(),
     discount: Joi.number(),
