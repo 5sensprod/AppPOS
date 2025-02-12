@@ -24,6 +24,7 @@
 **/data/*.nedb
 **/data/*.db
 **/data/backups/
+AppServe/data
 
 # Build
 **/build/

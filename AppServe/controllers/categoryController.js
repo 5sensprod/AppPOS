@@ -1,5 +1,6 @@
 // controllers/categoryController.js
 const Category = require('../models/Category');
+const { calculateLevel } = require('../utils/categoryHelpers');
 
 const categoryController = {
   async getAll(req, res) {
@@ -23,7 +24,8 @@ const categoryController = {
 
   async create(req, res) {
     try {
-      const newCategory = await Category.create(req.body);
+      const level = await calculateLevel(req.body.parent_id);
+      const newCategory = await Category.create({ ...req.body, level });
       res.status(201).json(newCategory);
     } catch (error) {
       res.status(500).json({ error: error.message });
