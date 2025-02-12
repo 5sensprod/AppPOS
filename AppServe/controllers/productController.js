@@ -28,7 +28,12 @@ const productController = {
       if (!req.file) return res.status(400).json({ message: 'No image provided' });
 
       const imagePath = `/public/products/${req.params.id}/${req.file.filename}`;
-      const localPath = path.join('public', imagePath);
+      const localPath = path.join(
+        path.resolve(__dirname, '../public'),
+        'products',
+        req.params.id,
+        req.file.filename
+      );
 
       await Product.update(req.params.id, { image: { local_path: localPath, src: imagePath } });
 

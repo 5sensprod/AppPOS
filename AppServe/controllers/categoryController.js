@@ -28,7 +28,12 @@ const categoryController = {
       if (!req.file) return res.status(400).json({ message: 'No image provided' });
 
       const imagePath = `/public/categories/${req.params.id}/${req.file.filename}`;
-      const localPath = path.join('public', imagePath);
+      const localPath = path.join(
+        path.resolve(__dirname, '../public'),
+        'categories',
+        req.params.id,
+        req.file.filename
+      );
 
       await Category.update(req.params.id, { image: { local_path: localPath, src: imagePath } });
 
