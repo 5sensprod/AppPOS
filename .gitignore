@@ -1,0 +1,61 @@
+# Dépendances
+**/node_modules/
+**/npm-debug.log
+**/yarn-debug.log
+**/yarn-error.log
+**/package-lock.json
+
+# Environnement
+**/.env
+**/.env.local
+**/.env.*.local
+**/config/local.js
+
+# Logs
+**/logs/
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+
+# Base de données
+**/data/*.sqlite
+**/data/*.sqlite-journal
+**/data/*.nedb
+**/data/backups/
+
+# Build
+**/build/
+**/dist/
+**/release/
+
+# Système
+**/.DS_Store
+**/Thumbs.db
+**/desktop.ini
+
+# IDE et éditeurs
+.idea/
+.vscode/
+**/*.swp
+**/*.swo
+**/*.swn
+**/*.bak
+
+# Fichiers temporaires
+**/tmp/
+**/temp/
+**/.tmp/
+**/*.tmp
+**/*~
+
+# Certificats et clés
+**/*.pem
+**/*.key
+**/*.cert
+
+# ESLint
+.eslintcache
+
+# Prettier
+**/.prettierignore

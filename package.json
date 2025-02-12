@@ -1,0 +1,31 @@
+{
+  "name": "app-pos",
+  "version": "1.0.0",
+  "description": "Système de Point Vente",
+  "private": true,
+  "workspaces": [
+    "AppServe",
+    "AppTools"
+  ],
+  "scripts": {
+    "start": "concurrently \"cd AppServe && npm start\" \"cd AppTools && npm start\"",
+    "dev": "concurrently \"cd AppServe && npm run dev\" \"cd AppTools && npm run dev\"",
+    "install:all": "npm install && cd AppServe && npm install && cd ../AppTools && npm install",
+    "build": "cd AppTools && npm run build",
+    "test": "cd AppServe && npm test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,jsx,json,md}\"",
+    "clean": "rm -rf node_modules && cd AppServe && rm -rf node_modules && cd ../AppTools && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.7",
+    "@babel/eslint-parser": "^7.23.3",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.2",
+    "prettier": "^3.1.1"
+  }
+}
