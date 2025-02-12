@@ -1,6 +1,8 @@
 // controllers/categoryController.js
 const Category = require('../models/Category');
 const { calculateLevel } = require('../utils/categoryHelpers');
+const fs = require('fs').promises;
+const path = require('path');
 
 const categoryController = {
   async getAll(req, res) {
@@ -17,6 +19,20 @@ const categoryController = {
       const category = await Category.findById(req.params.id);
       if (!category) return res.status(404).json({ message: 'Catégorie non trouvée' });
       res.json(category);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+  async uploadImage(req, res) {
+    try {
+      if (!req.file) return res.status(400).json({ message: 'No image provided' });
+
+      const imagePath = `/public/categories/${req.params.id}/${req.file.filename}`;
+      const localPath = path.join('public', imagePath);
+
+      await Category.update(req.params.id, { image: { local_path: localPath, src: imagePath } });
+
+      res.json({ message: 'Image uploaded successfully', src: imagePath });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

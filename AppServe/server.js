@@ -2,9 +2,13 @@
 const express = require('express');
 const app = express();
 const port = 3000;
+const path = require('path');
 
 // Middleware
 app.use(express.json());
+
+// Fichiers statiques (ex: images des catégories, produits, etc.)
+app.use('/public', express.static(path.resolve(__dirname, '../public')));
 
 // Routes
 const categoryRoutes = require('./routes/categoryRoutes');

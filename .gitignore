@@ -61,3 +61,6 @@ AppServe/data
 
 # Prettier
 **/.prettierignore
+
+# Resource
+public
