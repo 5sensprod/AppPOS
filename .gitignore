@@ -22,6 +22,7 @@
 **/data/*.sqlite
 **/data/*.sqlite-journal
 **/data/*.nedb
+**/data/*.db
 **/data/backups/
 
 # Build
