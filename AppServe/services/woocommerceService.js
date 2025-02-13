@@ -236,6 +236,11 @@ async function deleteCategory(categoryId) {
   const category = await Category.findById(categoryId);
   if (!category) throw new Error('Category not found');
 
+  // Vérifier si la catégorie est "non-classe"
+  if (category.slug === 'non-classe') {
+    throw new Error('Impossible de supprimer la catégorie par défaut WooCommerce.');
+  }
+
   if (category.woo_id) {
     try {
       // Supprimer l'image dans WordPress si elle existe

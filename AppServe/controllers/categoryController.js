@@ -92,6 +92,13 @@ const categoryController = {
       const category = await Category.findById(req.params.id);
       if (!category) return res.status(404).json({ message: 'Catégorie non trouvée' });
 
+      // Vérifier si la catégorie est "non-classe"
+      if (category.slug === 'non-classe') {
+        return res
+          .status(403)
+          .json({ message: 'Impossible de supprimer la catégorie par défaut WooCommerce.' });
+      }
+
       if (process.env.SYNC_ON_CHANGE === 'true') {
         await woocommerceService.deleteCategory(req.params.id);
       } else {
