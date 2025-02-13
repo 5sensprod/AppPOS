@@ -1,4 +1,4 @@
-//AppServe\jest.config.js
+// AppServe\jest.config.js
 module.exports = {
   testEnvironment: 'node',
   modulePathIgnorePatterns: ['<rootDir>/data/'],
@@ -6,4 +6,5 @@ module.exports = {
     '^@models/(.*)$': '<rootDir>/models/$1',
     '^@services/(.*)$': '<rootDir>/services/$1',
   },
+  setupFilesAfterEnv: ['<rootDir>/tests/setupTests.js'],
 };
