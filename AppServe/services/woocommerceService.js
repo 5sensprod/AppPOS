@@ -3,7 +3,8 @@ const WooCommerceRestApi = require('@woocommerce/woocommerce-rest-api').default;
 const Category = require('../models/Category');
 const FormData = require('form-data');
 const axios = require('axios');
-const fs = require('fs');
+const fs = require('fs').promises;
+const { createWriteStream } = require('fs');
 const path = require('path');
 
 const wcApi = new WooCommerceRestApi({
@@ -40,6 +41,18 @@ async function uploadToWordPress(categoryId, filename) {
   }
 }
 
+async function cleanTempDirectory() {
+  const tempDir = path.join('I:', 'AppPOS', 'public', 'categories', 'temp');
+  if (
+    await fs
+      .access(tempDir)
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    await fs.rm(tempDir, { recursive: true });
+  }
+}
+
 // Synchronisation WooCommerce → Local
 async function syncFromWooCommerce() {
   try {
@@ -49,43 +62,43 @@ async function syncFromWooCommerce() {
 
     for (const wcCategory of wcCategories.data) {
       try {
-        const localCategory = existingCategories.find((cat) => cat.woo_id === wcCategory.id);
+        let localCategory = existingCategories.find((cat) => cat.woo_id === wcCategory.id);
 
-        const categoryData = {
-          name: wcCategory.name,
-          description: wcCategory.description,
-          woo_id: wcCategory.id,
-          parent_id: wcCategory.parent,
-          slug: wcCategory.slug,
-          last_sync: new Date(),
-        };
-
-        if (wcCategory.image) {
-          // Télécharger l'image si elle n'existe pas en local
-          const localPath = path.join(
-            path.resolve(__dirname, '../../../public/categories'),
-            localCategory?._id || 'temp',
-            path.basename(wcCategory.image.src)
-          );
-
-          if (!fs.existsSync(localPath)) {
-            const response = await axios.get(wcCategory.image.src, { responseType: 'stream' });
-            response.data.pipe(fs.createWriteStream(localPath));
-          }
-
-          categoryData.image = {
-            id: wcCategory.image.id,
-            src: wcCategory.image.src,
-            local_path: localPath,
-          };
+        if (!localCategory) {
+          localCategory = await Category.create({
+            name: wcCategory.name,
+            description: wcCategory.description,
+            woo_id: wcCategory.id,
+            parent_id: wcCategory.parent,
+            slug: wcCategory.slug,
+          });
+          results.created++;
         }
 
-        if (localCategory) {
-          await Category.update(localCategory._id, categoryData);
+        if (wcCategory.image) {
+          const dirPath = path.join('I:', 'AppPOS', 'public', 'categories', localCategory._id);
+          await fs.mkdir(dirPath, { recursive: true });
+
+          const localPath = path.join(dirPath, path.basename(wcCategory.image.src));
+          const response = await axios.get(wcCategory.image.src, { responseType: 'stream' });
+
+          const fileStream = createWriteStream(localPath);
+          response.data.pipe(fileStream);
+
+          await new Promise((resolve, reject) => {
+            fileStream.on('finish', resolve);
+            fileStream.on('error', reject);
+          });
+
+          await Category.update(localCategory._id, {
+            image: {
+              id: wcCategory.image.id,
+              src: wcCategory.image.src,
+              local_path: localPath,
+            },
+            last_sync: new Date(),
+          });
           results.updated++;
-        } else {
-          await Category.create(categoryData);
-          results.created++;
         }
       } catch (error) {
         results.errors.push({
@@ -94,6 +107,7 @@ async function syncFromWooCommerce() {
         });
       }
     }
+    await cleanTempDirectory();
     return results;
   } catch (error) {
     throw new Error(`Sync from WC failed: ${error.message}`);
@@ -186,6 +200,7 @@ module.exports = {
   syncFromWooCommerce,
   syncToWooCommerce,
   deleteCategory,
+  cleanTempDirectory,
   testConnection: async () => {
     try {
       await wcApi.get('products/categories');
