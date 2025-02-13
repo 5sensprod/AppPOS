@@ -1,60 +1,197 @@
 // services/woocommerceService.js
 const WooCommerceRestApi = require('@woocommerce/woocommerce-rest-api').default;
 const Category = require('../models/Category');
+const FormData = require('form-data');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 const wcApi = new WooCommerceRestApi({
-  url: 'https://axemusique.shop',
+  url: process.env.WC_URL,
   consumerKey: process.env.WC_CONSUMER_KEY,
   consumerSecret: process.env.WC_CONSUMER_SECRET,
   version: 'wc/v3',
 });
 
-exports.syncCategories = async () => {
-  const localCategories = await Category.find({});
-  const syncResults = [];
+// Upload d'image vers WordPress
+async function uploadToWordPress(categoryId, filename) {
+  const imagePath = path.join('I:', 'AppPOS', 'public', 'categories', categoryId, filename);
+  if (!fs.existsSync(imagePath)) {
+    throw new Error(`Image not found at ${imagePath}`);
+  }
+  const form = new FormData();
+  form.append('file', fs.createReadStream(imagePath));
 
-  for (const category of localCategories) {
-    try {
-      const wcData = {
-        name: category.name,
-        parent: category.parentId || 0,
-        image: category.image
-          ? {
-              src: `${process.env.API_URL}/public/categories/${category.image}`,
-            }
-          : null,
-      };
+  const credentials = Buffer.from(`${process.env.WP_USER}:${process.env.WP_APP_PASSWORD}`).toString(
+    'base64'
+  );
 
-      let wcResponse;
-      if (category.wcId) {
-        wcResponse = await wcApi.put(`products/categories/${category.wcId}`, wcData);
-      } else {
-        wcResponse = await wcApi.post('products/categories', wcData);
-        await Category.findByIdAndUpdate(category._id, { wcId: wcResponse.data.id });
+  try {
+    const response = await axios.post(`${process.env.WC_URL}/wp-json/wp/v2/media`, form, {
+      headers: {
+        ...form.getHeaders(),
+        Authorization: `Basic ${credentials}`,
+      },
+    });
+    return response.data.id;
+  } catch (error) {
+    console.error('Erreur upload WordPress:', error.message);
+    throw error;
+  }
+}
+
+// Synchronisation WooCommerce → Local
+async function syncFromWooCommerce() {
+  try {
+    const wcCategories = await wcApi.get('products/categories', { per_page: 100 });
+    const existingCategories = await Category.findAll();
+    const results = { created: 0, updated: 0, errors: [] };
+
+    for (const wcCategory of wcCategories.data) {
+      try {
+        const localCategory = existingCategories.find((cat) => cat.woo_id === wcCategory.id);
+
+        const categoryData = {
+          name: wcCategory.name,
+          description: wcCategory.description,
+          woo_id: wcCategory.id,
+          parent_id: wcCategory.parent,
+          slug: wcCategory.slug,
+          last_sync: new Date(),
+        };
+
+        if (wcCategory.image) {
+          // Télécharger l'image si elle n'existe pas en local
+          const localPath = path.join(
+            path.resolve(__dirname, '../../../public/categories'),
+            localCategory?._id || 'temp',
+            path.basename(wcCategory.image.src)
+          );
+
+          if (!fs.existsSync(localPath)) {
+            const response = await axios.get(wcCategory.image.src, { responseType: 'stream' });
+            response.data.pipe(fs.createWriteStream(localPath));
+          }
+
+          categoryData.image = {
+            id: wcCategory.image.id,
+            src: wcCategory.image.src,
+            local_path: localPath,
+          };
+        }
+
+        if (localCategory) {
+          await Category.update(localCategory._id, categoryData);
+          results.updated++;
+        } else {
+          await Category.create(categoryData);
+          results.created++;
+        }
+      } catch (error) {
+        results.errors.push({
+          category_id: wcCategory.id,
+          error: error.message,
+        });
       }
+    }
+    return results;
+  } catch (error) {
+    throw new Error(`Sync from WC failed: ${error.message}`);
+  }
+}
 
-      syncResults.push({
-        local_id: category._id,
-        wc_id: wcResponse.data.id,
-        status: 'success',
-      });
+// Synchronisation Local → WooCommerce
+async function syncToWooCommerce() {
+  const localCategories = await Category.findAll();
+  const results = { created: 0, updated: 0, errors: [], pending: [] };
+
+  // Premier passage : catégories sans parent
+  for (const category of localCategories.filter((c) => !c.parent_id)) {
+    try {
+      await syncCategoryToWC(category, results);
     } catch (error) {
-      syncResults.push({
-        local_id: category._id,
-        status: 'error',
+      results.errors.push({
+        category_id: category._id,
         error: error.message,
       });
     }
   }
 
-  return syncResults;
-};
-
-exports.testConnection = async () => {
-  try {
-    const response = await wcApi.get('products');
-    return { status: 'success', data: response.data };
-  } catch (error) {
-    throw new Error(`WooCommerce connection failed: ${error.message}`);
+  // Second passage : catégories avec parent
+  for (const category of localCategories.filter((c) => c.parent_id)) {
+    try {
+      const parent = localCategories.find((c) => c._id === category.parent_id);
+      if (!parent?.woo_id) {
+        results.pending.push(category._id);
+        continue;
+      }
+      await syncCategoryToWC(category, results);
+    } catch (error) {
+      results.errors.push({
+        category_id: category._id,
+        error: error.message,
+      });
+    }
   }
+
+  return results;
+}
+
+async function syncCategoryToWC(category, results) {
+  const wcData = {
+    name: category.name,
+    description: category.description || '',
+    parent: category.parent_id ? (await Category.findById(category.parent_id))?.woo_id || 0 : 0,
+  };
+
+  if (category.image?.local_path) {
+    const filename = path.basename(category.image.local_path);
+    const imageId = await uploadToWordPress(category._id, filename);
+    wcData.image = { id: imageId };
+  }
+
+  if (category.woo_id) {
+    await wcApi.put(`products/categories/${category.woo_id}`, wcData);
+    results.updated++;
+  } else {
+    const response = await wcApi.post('products/categories', wcData);
+    await Category.update(category._id, {
+      woo_id: response.data.id,
+      last_sync: new Date(),
+    });
+    results.created++;
+  }
+}
+
+// Suppression d'une catégorie
+async function deleteCategory(categoryId) {
+  const category = await Category.findById(categoryId);
+  if (!category) throw new Error('Category not found');
+
+  if (category.woo_id) {
+    try {
+      await wcApi.delete(`products/categories/${category.woo_id}`);
+    } catch (error) {
+      if (error.response?.status !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  await Category.delete(categoryId);
+  return { success: true };
+}
+
+module.exports = {
+  syncFromWooCommerce,
+  syncToWooCommerce,
+  deleteCategory,
+  testConnection: async () => {
+    try {
+      await wcApi.get('products/categories');
+      return { status: 'success' };
+    } catch (error) {
+      throw new Error(`WC connection failed: ${error.message}`);
+    }
+  },
 };

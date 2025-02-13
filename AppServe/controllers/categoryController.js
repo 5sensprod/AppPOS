@@ -1,5 +1,6 @@
 // controllers/categoryController.js
 const Category = require('../models/Category');
+const woocommerceService = require('../services/woocommerceService');
 const { calculateLevel } = require('../utils/categoryHelpers');
 const fs = require('fs').promises;
 const path = require('path');
@@ -23,9 +24,10 @@ const categoryController = {
       res.status(500).json({ error: error.message });
     }
   },
+
   async uploadImage(req, res) {
     try {
-      if (!req.file) return res.status(400).json({ message: 'No image provided' });
+      if (!req.file) return res.status(400).json({ message: 'Aucune image fournie' });
 
       const imagePath = `/public/categories/${req.params.id}/${req.file.filename}`;
       const localPath = path.join(
@@ -35,9 +37,18 @@ const categoryController = {
         req.file.filename
       );
 
-      await Category.update(req.params.id, { image: { local_path: localPath, src: imagePath } });
+      await Category.update(req.params.id, {
+        image: {
+          local_path: localPath,
+          src: imagePath,
+        },
+      });
 
-      res.json({ message: 'Image uploaded successfully', src: imagePath });
+      if (process.env.SYNC_ON_CHANGE === 'true') {
+        await woocommerceService.syncToWooCommerce([await Category.findById(req.params.id)]);
+      }
+
+      res.json({ message: 'Image téléversée avec succès', src: imagePath });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -47,6 +58,11 @@ const categoryController = {
     try {
       const level = await calculateLevel(req.body.parent_id);
       const newCategory = await Category.create({ ...req.body, level });
+
+      if (process.env.SYNC_ON_CHANGE === 'true') {
+        await woocommerceService.syncToWooCommerce([newCategory]);
+      }
+
       res.status(201).json(newCategory);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -55,8 +71,16 @@ const categoryController = {
 
   async update(req, res) {
     try {
-      const updated = await Category.update(req.params.id, req.body);
+      const level = req.body.parent_id ? await calculateLevel(req.body.parent_id) : undefined;
+      const updateData = level ? { ...req.body, level } : req.body;
+
+      const updated = await Category.update(req.params.id, updateData);
       if (!updated) return res.status(404).json({ message: 'Catégorie non trouvée' });
+
+      if (process.env.SYNC_ON_CHANGE === 'true') {
+        await woocommerceService.syncToWooCommerce([await Category.findById(req.params.id)]);
+      }
+
       res.json({ message: 'Catégorie mise à jour' });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -65,8 +89,15 @@ const categoryController = {
 
   async delete(req, res) {
     try {
-      const deleted = await Category.delete(req.params.id);
-      if (!deleted) return res.status(404).json({ message: 'Catégorie non trouvée' });
+      const category = await Category.findById(req.params.id);
+      if (!category) return res.status(404).json({ message: 'Catégorie non trouvée' });
+
+      if (process.env.SYNC_ON_CHANGE === 'true') {
+        await woocommerceService.deleteCategory(req.params.id);
+      } else {
+        await Category.delete(req.params.id);
+      }
+
       res.json({ message: 'Catégorie supprimée' });
     } catch (error) {
       res.status(500).json({ error: error.message });
