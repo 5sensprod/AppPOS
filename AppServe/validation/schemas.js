@@ -11,6 +11,32 @@ const imageSchema = Joi.object({
   position: Joi.number().min(0),
 });
 
+// Schéma pour les métadonnées d'image
+const imageMetadataSchema = Joi.object({
+  status: Joi.string().valid('pending', 'active', 'deleted'),
+  type: Joi.string().valid('jpg', 'jpeg', 'png', 'gif', 'webp'),
+  position: Joi.number().min(0),
+});
+
+// Schéma pour la création d'une catégorie
+const createCategorySchema = Joi.object({
+  name: Joi.string().required(),
+  parent_id: Joi.string(),
+  slug: Joi.string(),
+  description: Joi.string(),
+  website_url: Joi.string().uri(),
+});
+
+// Schéma pour la mise à jour d'une catégorie
+const updateCategorySchema = Joi.object({
+  name: Joi.string(),
+  parent_id: Joi.string(),
+  slug: Joi.string(),
+  description: Joi.string(),
+  website_url: Joi.string().uri(),
+  image: imageSchema,
+});
+
 const productSchema = Joi.object({
   name: Joi.string().required(),
   sku: Joi.string().required(),
@@ -110,4 +136,7 @@ module.exports = {
   categorySchema,
   brandSchema,
   supplierSchema,
+  imageMetadataSchema,
+  createCategorySchema,
+  updateCategorySchema,
 };

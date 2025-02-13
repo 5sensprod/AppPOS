@@ -37,6 +37,7 @@ const categoryController = {
         req.file.filename
       );
 
+      // Mettre à jour la catégorie avec le chemin de l'image
       await Category.update(req.params.id, {
         image: {
           local_path: localPath,
@@ -45,10 +46,53 @@ const categoryController = {
       });
 
       if (process.env.SYNC_ON_CHANGE === 'true') {
-        await woocommerceService.syncToWooCommerce([await Category.findById(req.params.id)]);
+        const category = await Category.findById(req.params.id);
+        const syncResult = await woocommerceService.syncToWooCommerce([category]);
+
+        if (syncResult.errors.length > 0) {
+          return res.status(207).json({
+            message: 'Image téléversée mais erreur de synchronisation',
+            src: imagePath,
+            sync_errors: syncResult.errors,
+          });
+        }
       }
 
       res.json({ message: 'Image téléversée avec succès', src: imagePath });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  async updateImageMetadata(req, res) {
+    try {
+      const category = await Category.findById(req.params.id);
+      if (!category) {
+        return res.status(404).json({ message: 'Catégorie non trouvée' });
+      }
+
+      if (!category.image) {
+        return res.status(400).json({ message: "Cette catégorie n'a pas d'image" });
+      }
+
+      // Mise à jour des métadonnées tout en conservant les chemins
+      const updatedImage = {
+        ...category.image,
+        ...req.body,
+      };
+
+      const updated = await Category.update(req.params.id, {
+        image: updatedImage,
+      });
+
+      if (process.env.SYNC_ON_CHANGE === 'true') {
+        await woocommerceService.syncToWooCommerce([updated]);
+      }
+
+      res.json({
+        message: "Métadonnées de l'image mises à jour",
+        image: updatedImage,
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -60,7 +104,25 @@ const categoryController = {
       const newCategory = await Category.create({ ...req.body, level });
 
       if (process.env.SYNC_ON_CHANGE === 'true') {
-        await woocommerceService.syncToWooCommerce([newCategory]);
+        try {
+          const syncResult = await woocommerceService.syncToWooCommerce([newCategory]);
+
+          if (syncResult.errors.length > 0) {
+            // La catégorie est créée en local mais la synchro a échoué
+            return res.status(207).json({
+              category: newCategory,
+              sync_status: 'failed',
+              sync_errors: syncResult.errors,
+            });
+          }
+        } catch (syncError) {
+          // La catégorie est créée en local mais la synchro a échoué
+          return res.status(207).json({
+            category: newCategory,
+            sync_status: 'failed',
+            sync_error: syncError.message,
+          });
+        }
       }
 
       res.status(201).json(newCategory);

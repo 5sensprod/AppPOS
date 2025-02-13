@@ -115,12 +115,26 @@ async function syncFromWooCommerce() {
 }
 
 // Synchronisation Local → WooCommerce
-async function syncToWooCommerce(categoryId = null) {
+async function syncToWooCommerce(input = null) {
   const results = { created: 0, updated: 0, deleted: 0, errors: [], pending: [] };
 
-  // Mode single category
-  if (categoryId) {
-    const category = await Category.findById(categoryId);
+  if (Array.isArray(input)) {
+    for (const category of input) {
+      try {
+        await syncCategoryToWC(category, results);
+      } catch (error) {
+        results.errors.push({
+          category_id: category._id,
+          error: error.message,
+        });
+      }
+    }
+    return results;
+  }
+
+  // Si c'est un ID
+  if (typeof input === 'string') {
+    const category = await Category.findById(input);
     if (!category) throw new Error('Catégorie non trouvée');
 
     try {
@@ -128,7 +142,7 @@ async function syncToWooCommerce(categoryId = null) {
       return results;
     } catch (error) {
       results.errors.push({
-        category_id: categoryId,
+        category_id: input,
         error: error.message,
       });
       return results;
@@ -209,10 +223,30 @@ async function syncCategoryToWC(category, results) {
     parent: category.parent_id ? (await Category.findById(category.parent_id))?.woo_id || 0 : 0,
   };
 
-  if (category.image?.local_path) {
-    const filename = path.basename(category.image.local_path);
-    const imageId = await uploadToWordPress(category._id, filename);
-    wcData.image = { id: imageId };
+  // Ne gérer l'image que si :
+  // 1. L'image existe ET
+  // 2. Soit elle n'a pas d'ID WordPress (nouvelle image)
+  // 3. Soit elle a été modifiée (à implémenter avec un flag ou timestamp)
+  if (category.image?.local_path && !category.image.wp_id) {
+    try {
+      const filename = path.basename(category.image.local_path);
+      const imageId = await uploadToWordPress(category._id, filename);
+      wcData.image = { id: imageId };
+
+      // Mettre à jour la catégorie locale avec l'ID de l'image WordPress
+      await Category.update(category._id, {
+        image: {
+          ...category.image,
+          wp_id: imageId,
+        },
+      });
+    } catch (error) {
+      console.error('Erreur upload image:', error);
+      throw error;
+    }
+  } else if (category.image?.wp_id) {
+    // Si l'image existe déjà sur WordPress, on conserve son ID
+    wcData.image = { id: category.image.wp_id };
   }
 
   if (category.woo_id) {
@@ -235,19 +269,29 @@ async function deleteCategory(categoryId) {
 
   if (category.woo_id) {
     try {
-      // Supprimer l'image dans WordPress si elle existe
-      if (category.image?.id) {
+      // Supprimer l'image WordPress si elle existe
+      if (category.image?.wp_id) {
         const credentials = Buffer.from(
           `${process.env.WP_USER}:${process.env.WP_APP_PASSWORD}`
         ).toString('base64');
-        await axios.delete(
-          `${process.env.WC_URL}/wp-json/wp/v2/media/${category.image.id}?force=true`,
-          {
-            headers: { Authorization: `Basic ${credentials}` },
+
+        try {
+          const response = await axios.delete(
+            `${process.env.WC_URL}/wp-json/wp/v2/media/${category.image.wp_id}?force=true`,
+            {
+              headers: { Authorization: `Basic ${credentials}` },
+            }
+          );
+          console.log(`Image WordPress ${category.image.wp_id} supprimée`);
+        } catch (error) {
+          if (error.response?.status !== 404) {
+            console.error(`Erreur suppression image WordPress:`, error);
+            throw error;
           }
-        );
+        }
       }
-      // Supprimer la catégorie dans WooCommerce
+
+      // Supprimer la catégorie WooCommerce
       await wcApi.delete(`products/categories/${category.woo_id}`, { force: true });
     } catch (error) {
       if (error.response?.status !== 404) {
@@ -256,7 +300,7 @@ async function deleteCategory(categoryId) {
     }
   }
 
-  // Supprimer la catégorie en local
+  // Supprimer la catégorie en local (y compris les images)
   await Category.delete(categoryId);
   return { success: true };
 }
