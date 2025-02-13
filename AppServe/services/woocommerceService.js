@@ -117,9 +117,44 @@ async function syncFromWooCommerce() {
 // Synchronisation Local → WooCommerce
 async function syncToWooCommerce() {
   const localCategories = await Category.findAll();
-  const results = { created: 0, updated: 0, errors: [], pending: [] };
+  const results = { created: 0, updated: 0, deleted: 0, errors: [], pending: [] };
 
-  // Premier passage : catégories sans parent
+  // Récupérer toutes les catégories WooCommerce
+  const wcResponse = await wcApi.get('products/categories', { per_page: 100 });
+  const wcCategories = wcResponse.data;
+
+  // Supprimer les catégories WooCommerce qui n'existent plus en local
+  for (const wcCategory of wcCategories) {
+    const localExists = localCategories.some((cat) => cat.woo_id === wcCategory.id);
+    if (!localExists) {
+      try {
+        if (wcCategory.image?.id) {
+          try {
+            const credentials = Buffer.from(
+              `${process.env.WP_USER}:${process.env.WP_APP_PASSWORD}`
+            ).toString('base64');
+            await axios.delete(
+              `${process.env.WC_URL}/wp-json/wp/v2/media/${wcCategory.image.id}?force=true`,
+              {
+                headers: { Authorization: `Basic ${credentials}` },
+              }
+            );
+          } catch (error) {
+            console.error(`Erreur suppression media ${wcCategory.image.id}:`, error.message);
+          }
+        }
+        await wcApi.delete(`products/categories/${wcCategory.id}`, { force: true });
+        results.deleted++;
+      } catch (error) {
+        results.errors.push({
+          category_id: wcCategory.id,
+          error: `Erreur suppression WC: ${error.message}`,
+        });
+      }
+    }
+  }
+
+  // Synchroniser les catégories existantes
   for (const category of localCategories.filter((c) => !c.parent_id)) {
     try {
       await syncCategoryToWC(category, results);
@@ -131,7 +166,6 @@ async function syncToWooCommerce() {
     }
   }
 
-  // Second passage : catégories avec parent
   for (const category of localCategories.filter((c) => c.parent_id)) {
     try {
       const parent = localCategories.find((c) => c._id === category.parent_id);
@@ -184,7 +218,20 @@ async function deleteCategory(categoryId) {
 
   if (category.woo_id) {
     try {
-      await wcApi.delete(`products/categories/${category.woo_id}`);
+      // Supprimer l'image dans WordPress si elle existe
+      if (category.image?.id) {
+        const credentials = Buffer.from(
+          `${process.env.WP_USER}:${process.env.WP_APP_PASSWORD}`
+        ).toString('base64');
+        await axios.delete(
+          `${process.env.WC_URL}/wp-json/wp/v2/media/${category.image.id}?force=true`,
+          {
+            headers: { Authorization: `Basic ${credentials}` },
+          }
+        );
+      }
+      // Supprimer la catégorie dans WooCommerce
+      await wcApi.delete(`products/categories/${category.woo_id}`, { force: true });
     } catch (error) {
       if (error.response?.status !== 404) {
         throw error;
@@ -192,6 +239,7 @@ async function deleteCategory(categoryId) {
     }
   }
 
+  // Supprimer la catégorie en local
   await Category.delete(categoryId);
   return { success: true };
 }
