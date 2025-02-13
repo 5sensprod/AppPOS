@@ -46,16 +46,13 @@ async function uploadToWordPress(categoryId, filename) {
 
 async function cleanTempDirectory() {
   const tempDir = path.join('I:', 'AppPOS', 'public', 'categories', 'temp');
-  if (
-    await fs
-      .access(tempDir)
-      .then(() => true)
-      .catch(() => false)
-  ) {
+  try {
+    await fs.access(tempDir);
     await fs.rm(tempDir, { recursive: true });
+  } catch (error) {
+    // Le dossier n'existe pas, on ignore l'erreur
   }
 }
-
 // Synchronisation WooCommerce → Local
 async function syncFromWooCommerce() {
   try {
@@ -236,11 +233,6 @@ async function deleteCategory(categoryId) {
   const category = await Category.findById(categoryId);
   if (!category) throw new Error('Category not found');
 
-  // Vérifier si la catégorie est "non-classe"
-  if (category.slug === 'non-classe') {
-    throw new Error('Impossible de supprimer la catégorie par défaut WooCommerce.');
-  }
-
   if (category.woo_id) {
     try {
       // Supprimer l'image dans WordPress si elle existe
@@ -274,4 +266,12 @@ module.exports = {
   syncToWooCommerce,
   deleteCategory,
   cleanTempDirectory,
+  testConnection: async () => {
+    try {
+      await wcApi.get('products/categories');
+      return { status: 'success' };
+    } catch (error) {
+      throw new Error(`WC connection failed: ${error.message}`);
+    }
+  },
 };
