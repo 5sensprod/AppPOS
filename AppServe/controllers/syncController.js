@@ -45,6 +45,20 @@ exports.syncSuppliers = async (req, res) => {
   res.status(501).json({ message: 'Synchronisation fournisseurs pas encore implémentée' });
 };
 
+exports.syncSingleCategory = async (req, res) => {
+  try {
+    const results = await woocommerceService.syncToWooCommerce(req.params.id);
+    res.json({
+      success: true,
+      timestamp: new Date(),
+      results,
+      summary: `${results.created} créées, ${results.updated} mises à jour`,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 exports.syncAll = async (req, res) => {
   res.status(501).json({ message: 'Synchronisation complète pas encore implémentée' });
 };

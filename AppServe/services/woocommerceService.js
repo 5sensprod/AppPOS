@@ -4,7 +4,7 @@ const Category = require('../models/Category');
 const FormData = require('form-data');
 const axios = require('axios');
 const fs = require('fs').promises;
-const { createWriteStream } = require('fs');
+const { createWriteStream, createReadStream } = require('fs');
 const path = require('path');
 
 const wcApi = new WooCommerceRestApi({
@@ -17,11 +17,14 @@ const wcApi = new WooCommerceRestApi({
 // Upload d'image vers WordPress
 async function uploadToWordPress(categoryId, filename) {
   const imagePath = path.join('I:', 'AppPOS', 'public', 'categories', categoryId, filename);
-  if (!fs.existsSync(imagePath)) {
+  try {
+    await fs.access(imagePath);
+  } catch {
     throw new Error(`Image not found at ${imagePath}`);
   }
+
   const form = new FormData();
-  form.append('file', fs.createReadStream(imagePath));
+  form.append('file', createReadStream(imagePath));
 
   const credentials = Buffer.from(`${process.env.WP_USER}:${process.env.WP_APP_PASSWORD}`).toString(
     'base64'
@@ -115,11 +118,28 @@ async function syncFromWooCommerce() {
 }
 
 // Synchronisation Local → WooCommerce
-async function syncToWooCommerce() {
-  const localCategories = await Category.findAll();
+async function syncToWooCommerce(categoryId = null) {
   const results = { created: 0, updated: 0, deleted: 0, errors: [], pending: [] };
 
+  // Mode single category
+  if (categoryId) {
+    const category = await Category.findById(categoryId);
+    if (!category) throw new Error('Catégorie non trouvée');
+
+    try {
+      await syncCategoryToWC(category, results);
+      return results;
+    } catch (error) {
+      results.errors.push({
+        category_id: categoryId,
+        error: error.message,
+      });
+      return results;
+    }
+  }
+
   // Récupérer toutes les catégories WooCommerce
+  const localCategories = await Category.findAll();
   const wcResponse = await wcApi.get('products/categories', { per_page: 100 });
   const wcCategories = wcResponse.data;
 

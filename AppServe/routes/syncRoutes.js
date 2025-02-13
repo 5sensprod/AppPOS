@@ -7,6 +7,7 @@ const syncController = require('../controllers/syncController');
 router.get('/woocommerce/test', syncController.testConnection);
 router.get('/woocommerce/categories', syncController.syncCategories);
 router.put('/woocommerce/categories', syncController.syncCategories);
+router.put('/woocommerce/categories/:id', syncController.syncSingleCategory);
 
 // Routes de synchronisation
 router.get('/woocommerce/products', syncController.syncProducts);
