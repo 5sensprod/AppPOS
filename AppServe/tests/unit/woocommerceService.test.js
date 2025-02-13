@@ -1,6 +1,6 @@
 require('dotenv').config();
-const woocommerceService = require('../../services/woocommerceService'); // Chemin correct vers woocommerceService
-const Category = require('@models/Category'); // Utilisation de l'alias Jest
+const woocommerceService = require('../../services/woocommerceService');
+const Category = require('@models/Category');
 
 // Mock de la base de données
 jest.mock('@models/Category');

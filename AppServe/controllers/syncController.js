@@ -47,12 +47,19 @@ exports.syncSuppliers = async (req, res) => {
 
 exports.syncSingleCategory = async (req, res) => {
   try {
+    // Vérifier si la catégorie existe
+    const category = await Category.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ success: false, error: 'Catégorie non trouvée' });
+    }
+
+    // Synchronisation
     const results = await woocommerceService.syncToWooCommerce(req.params.id);
     res.json({
       success: true,
       timestamp: new Date(),
       results,
-      summary: `${results.created} créées, ${results.updated} mises à jour`,
+      summary: `${results.created || 0} créées, ${results.updated || 0} mises à jour`,
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
