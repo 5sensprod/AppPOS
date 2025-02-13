@@ -69,12 +69,3 @@ exports.syncSingleCategory = async (req, res) => {
 exports.syncAll = async (req, res) => {
   res.status(501).json({ message: 'Synchronisation complète pas encore implémentée' });
 };
-
-exports.testConnection = async (req, res) => {
-  try {
-    const result = await woocommerceService.testConnection();
-    res.json({ success: true, ...result });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-};

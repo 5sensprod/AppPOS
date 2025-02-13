@@ -4,7 +4,6 @@ const router = express.Router();
 const syncController = require('../controllers/syncController');
 
 // Routes de test et catégories
-router.get('/woocommerce/test', syncController.testConnection);
 router.get('/woocommerce/categories', syncController.syncCategories);
 router.put('/woocommerce/categories', syncController.syncCategories);
 router.put('/woocommerce/categories/:id', syncController.syncSingleCategory);

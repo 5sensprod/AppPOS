@@ -274,12 +274,4 @@ module.exports = {
   syncToWooCommerce,
   deleteCategory,
   cleanTempDirectory,
-  testConnection: async () => {
-    try {
-      await wcApi.get('products/categories');
-      return { status: 'success' };
-    } catch (error) {
-      throw new Error(`WC connection failed: ${error.message}`);
-    }
-  },
 };
