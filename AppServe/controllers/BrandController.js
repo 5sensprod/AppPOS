@@ -1,12 +1,12 @@
-// controllers/brandController.js
+// controllers/BrandController.js
 const BaseController = require('./base/BaseController');
 const Brand = require('../models/Brand');
-const woocommerceService = require('../services/woocommerceService');
+const brandWooCommerceService = require('../services/BrandWooCommerceService');
 const BaseImageController = require('./image/BaseImageController');
 
 class BrandController extends BaseController {
   constructor() {
-    super(Brand, woocommerceService);
+    super(Brand, brandWooCommerceService);
     this.imageController = new BaseImageController('brands');
     this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
     this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);

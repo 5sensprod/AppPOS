@@ -1,12 +1,13 @@
+// controllers/categoryController.js
 const BaseController = require('./base/BaseController');
 const Category = require('../models/Category');
-const woocommerceService = require('../services/woocommerceService');
+const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
 const { calculateLevel } = require('../utils/categoryHelpers');
 const BaseImageController = require('./image/BaseImageController');
 
 class CategoryController extends BaseController {
   constructor() {
-    super(Category, woocommerceService);
+    super(Category, categoryWooCommerceService);
     this.imageController = new BaseImageController('categories');
     this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
     this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
