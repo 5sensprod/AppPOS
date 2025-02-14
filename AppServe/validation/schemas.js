@@ -90,6 +90,47 @@ const brandSchema = Joi.object({
   ),
 });
 
+const createSupplierSchema = Joi.object({
+  supplier_code: Joi.string().required(),
+  customer_code: Joi.string(),
+  name: Joi.string().required(),
+  contact: Joi.object({
+    name: Joi.string(),
+    email: Joi.string().email(),
+    phone: Joi.string(),
+    address: Joi.string(),
+  }),
+  banking: Joi.object({
+    iban: Joi.string(),
+    bic: Joi.string(),
+  }),
+  payment_terms: Joi.object({
+    type: Joi.string(),
+    discount: Joi.number(),
+  }),
+});
+
+const updateSupplierSchema = Joi.object({
+  supplier_code: Joi.string(),
+  customer_code: Joi.string(),
+  name: Joi.string(),
+  contact: Joi.object({
+    name: Joi.string(),
+    email: Joi.string().email(),
+    phone: Joi.string(),
+    address: Joi.string(),
+  }),
+  banking: Joi.object({
+    iban: Joi.string(),
+    bic: Joi.string(),
+  }),
+  image: imageSchema,
+  payment_terms: Joi.object({
+    type: Joi.string(),
+    discount: Joi.number(),
+  }),
+});
+
 const supplierSchema = Joi.object({
   supplier_code: Joi.string().required(),
   customer_code: Joi.string(),
@@ -166,6 +207,8 @@ module.exports = {
   createBrandSchema,
   updateBrandSchema,
   supplierSchema,
+  createSupplierSchema,
+  updateSupplierSchema,
   imageMetadataSchema,
   productSchema,
 };

@@ -1,76 +1,27 @@
 // controllers/supplierController.js
+const BaseController = require('./base/BaseController');
 const Supplier = require('../models/Supplier');
-const fs = require('fs').promises;
-const path = require('path');
+const BaseImageController = require('./image/BaseImageController');
 
-const supplierController = {
-  async getAll(req, res) {
-    try {
-      const suppliers = await Supplier.findAll();
-      res.json(suppliers);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
+class SupplierController extends BaseController {
+  constructor() {
+    super(Supplier, null); // null car pas de WooCommerce
+    this.imageController = new BaseImageController('suppliers');
+    this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
+    this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
+    this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
+  }
+}
 
-  async getById(req, res) {
-    try {
-      const supplier = await Supplier.findById(req.params.id);
-      if (!supplier) return res.status(404).json({ message: 'Fournisseur non trouvé' });
-      res.json(supplier);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
+const supplierController = new SupplierController();
 
-  async uploadImage(req, res) {
-    try {
-      if (!req.file) return res.status(400).json({ message: 'No image provided' });
-
-      const imagePath = `/public/suppliers/${req.params.id}/${req.file.filename}`;
-      const localPath = path.join(
-        path.resolve(__dirname, '../public'),
-        'suppliers',
-        req.params.id,
-        req.file.filename
-      );
-
-      await Product.update(req.params.id, { image: { local_path: localPath, src: imagePath } });
-
-      res.json({ message: 'Image uploaded successfully', src: imagePath });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
-
-  async create(req, res) {
-    try {
-      const newSupplier = await Supplier.create(req.body);
-      res.status(201).json(newSupplier);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
-
-  async update(req, res) {
-    try {
-      const updated = await Supplier.update(req.params.id, req.body);
-      if (!updated) return res.status(404).json({ message: 'Fournisseur non trouvé' });
-      res.json({ message: 'Fournisseur mis à jour' });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
-
-  async delete(req, res) {
-    try {
-      const deleted = await Supplier.delete(req.params.id);
-      if (!deleted) return res.status(404).json({ message: 'Fournisseur non trouvé' });
-      res.json({ message: 'Fournisseur supprimé' });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
+module.exports = {
+  getAll: supplierController.getAll.bind(supplierController),
+  getById: supplierController.getById.bind(supplierController),
+  create: supplierController.create.bind(supplierController),
+  update: supplierController.update.bind(supplierController),
+  delete: supplierController.delete.bind(supplierController),
+  uploadImage: supplierController.uploadImage,
+  updateImageMetadata: supplierController.updateImageMetadata,
+  deleteImage: supplierController.deleteImage,
 };
-
-module.exports = supplierController;

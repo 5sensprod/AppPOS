@@ -16,7 +16,8 @@ class ImageService {
     try {
       const imageData = await this.imageHandler.upload(file, entityId);
 
-      if (options.syncToWordPress) {
+      // Skip WordPress sync for suppliers
+      if (this.entity !== 'suppliers' && options.syncToWordPress) {
         const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
         const updatedImageData = {
           ...imageData,
@@ -28,13 +29,11 @@ class ImageService {
         if (this.entity === 'categories') {
           const Category = require('../../models/Category');
           const category = await Category.findById(entityId);
-
           if (category) {
             await Category.update(entityId, {
               ...category,
               image: updatedImageData,
             });
-
             await woocommerceService.syncToWooCommerce([
               {
                 ...category,
