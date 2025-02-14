@@ -37,45 +37,6 @@ const updateCategorySchema = Joi.object({
   image: imageSchema,
 });
 
-const productSchema = Joi.object({
-  name: Joi.string().required(),
-  sku: Joi.string().required(),
-  description: Joi.string(),
-  purchase_price: Joi.number().min(0),
-  regular_price: Joi.number().min(0),
-  price: Joi.number().min(0).required(),
-  sale_price: Joi.number().min(0),
-  on_sale: Joi.boolean(),
-  margins: Joi.object({
-    amount: Joi.number(),
-    margin_rate: Joi.number(),
-    markup_rate: Joi.number(),
-    coefficient: Joi.number(),
-  }),
-  tax: Joi.object({
-    rate: Joi.number(),
-    included: Joi.boolean(),
-  }),
-  stock: Joi.number().min(0).required(),
-  min_stock: Joi.number().min(0),
-  category_id: Joi.string().required(),
-  category_path: Joi.array().items(Joi.string()),
-  supplier_id: Joi.string().required(),
-  brand_id: Joi.string().required(),
-  woo_id: Joi.number(),
-  status: Joi.string(),
-  manage_stock: Joi.boolean(),
-  images: Joi.array().items(imageSchema),
-  specifications: Joi.object(),
-  meta_data: Joi.array().items(
-    Joi.object({
-      key: Joi.string(),
-      value: Joi.string(),
-    })
-  ),
-  website_url: Joi.string().uri(),
-});
-
 const categorySchema = Joi.object({
   name: Joi.string().required(),
   parent_id: Joi.string(),
@@ -85,6 +46,33 @@ const categorySchema = Joi.object({
   description: Joi.string(),
   image: imageSchema,
   website_url: Joi.string().uri(),
+});
+
+const createBrandSchema = Joi.object({
+  name: Joi.string().required(),
+  slug: Joi.string(),
+  description: Joi.string(),
+  supplier_id: Joi.string().required(),
+  meta_data: Joi.array().items(
+    Joi.object({
+      key: Joi.string(),
+      value: Joi.string(),
+    })
+  ),
+});
+
+const updateBrandSchema = Joi.object({
+  name: Joi.string(),
+  slug: Joi.string(),
+  description: Joi.string(),
+  supplier_id: Joi.string(),
+  image: imageSchema,
+  meta_data: Joi.array().items(
+    Joi.object({
+      key: Joi.string(),
+      value: Joi.string(),
+    })
+  ),
 });
 
 const brandSchema = Joi.object({
@@ -131,12 +119,53 @@ const supplierSchema = Joi.object({
   ),
 });
 
+const productSchema = Joi.object({
+  name: Joi.string().required(),
+  sku: Joi.string().required(),
+  description: Joi.string(),
+  purchase_price: Joi.number().min(0),
+  regular_price: Joi.number().min(0),
+  price: Joi.number().min(0).required(),
+  sale_price: Joi.number().min(0),
+  on_sale: Joi.boolean(),
+  margins: Joi.object({
+    amount: Joi.number(),
+    margin_rate: Joi.number(),
+    markup_rate: Joi.number(),
+    coefficient: Joi.number(),
+  }),
+  tax: Joi.object({
+    rate: Joi.number(),
+    included: Joi.boolean(),
+  }),
+  stock: Joi.number().min(0).required(),
+  min_stock: Joi.number().min(0),
+  category_id: Joi.string().required(),
+  category_path: Joi.array().items(Joi.string()),
+  supplier_id: Joi.string().required(),
+  brand_id: Joi.string().required(),
+  woo_id: Joi.number(),
+  status: Joi.string(),
+  manage_stock: Joi.boolean(),
+  images: Joi.array().items(imageSchema),
+  specifications: Joi.object(),
+  meta_data: Joi.array().items(
+    Joi.object({
+      key: Joi.string(),
+      value: Joi.string(),
+    })
+  ),
+  website_url: Joi.string().uri(),
+});
+
 module.exports = {
-  productSchema,
   categorySchema,
-  brandSchema,
-  supplierSchema,
-  imageMetadataSchema,
   createCategorySchema,
   updateCategorySchema,
+  brandSchema,
+  createBrandSchema,
+  updateBrandSchema,
+  supplierSchema,
+  imageMetadataSchema,
+  productSchema,
 };
