@@ -4,48 +4,53 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-const createMulterConfig = (imageHandler) => {
-  // Création des dossiers nécessaires
-  const ensureDirectories = () => {
-    const config = imageHandler.getUploadConfig();
-    const tempPath = path.join(process.cwd(), 'public', 'categories', 'temp');
+class UploadConfig {
+  constructor(imageHandler) {
+    this.imageHandler = imageHandler;
+    this.basePath = process.cwd();
+    this.ensureDirectories();
+  }
 
-    // Créer le dossier temp s'il n'existe pas
+  ensureDirectories() {
+    const entityPath = path.join(this.basePath, 'public', this.imageHandler.entity);
+    const tempPath = path.join(entityPath, 'temp');
+
     if (!fs.existsSync(tempPath)) {
       fs.mkdirSync(tempPath, { recursive: true });
     }
-  };
+  }
 
-  // S'assurer que les dossiers existent
-  ensureDirectories();
+  getStorageConfig() {
+    return multer.diskStorage({
+      destination: (req, file, cb) => {
+        const tempPath = path.join(this.basePath, 'public', this.imageHandler.entity, 'temp');
+        cb(null, tempPath);
+      },
+      filename: (req, file, cb) => {
+        const uniqueId = uuidv4();
+        const extension = path.extname(file.originalname);
+        cb(null, `${uniqueId}${extension}`);
+      },
+    });
+  }
 
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      const tempPath = path.join(process.cwd(), 'public', 'categories', 'temp');
-      cb(null, tempPath);
-    },
-    filename: (req, file, cb) => {
-      const uniqueId = uuidv4();
-      const extension = path.extname(file.originalname);
-      cb(null, `${uniqueId}${extension}`);
-    },
-  });
+  getMulterConfig() {
+    return {
+      storage: this.getStorageConfig(),
+      limits: {
+        fileSize: this.imageHandler.maxSize,
+        files: this.imageHandler.maxFiles,
+      },
+      fileFilter: (req, file, cb) => {
+        try {
+          this.imageHandler.validateFile(file);
+          cb(null, true);
+        } catch (error) {
+          cb(new Error(error.message));
+        }
+      },
+    };
+  }
+}
 
-  return {
-    storage,
-    limits: {
-      fileSize: imageHandler.maxSize,
-      files: imageHandler.maxFiles,
-    },
-    fileFilter: (req, file, cb) => {
-      try {
-        imageHandler.validateFile(file);
-        cb(null, true);
-      } catch (error) {
-        cb(new Error(error.message));
-      }
-    },
-  };
-};
-
-module.exports = createMulterConfig;
+module.exports = (imageHandler) => new UploadConfig(imageHandler).getMulterConfig();

@@ -1,20 +1,10 @@
-// src/routes/image/categoryImageRoutes.js
-const express = require('express');
-const router = express.Router();
-const createImageUploadMiddleware = require('../../middleware/upload/handlers');
-const BaseImageController = require('../../controllers/image/BaseImageController');
+//routes/image/categoryImageRoutes.js
+const BaseImageRoutes = require('./base/BaseImageRoutes');
 
-const imageController = new BaseImageController('categories');
-const uploadMiddleware = createImageUploadMiddleware('categories');
+class CategoryImageRoutes extends BaseImageRoutes {
+  constructor() {
+    super('categories');
+  }
+}
 
-router.post(
-  '/:id/image',
-  uploadMiddleware.single,
-  imageController.uploadImage.bind(imageController)
-);
-
-router.put('/:id/image/metadata', imageController.updateImageMetadata.bind(imageController));
-
-router.delete('/:id/image', imageController.deleteImage.bind(imageController));
-
-module.exports = router;
+module.exports = new CategoryImageRoutes().getRouter();

@@ -1,25 +1,31 @@
 // src/middleware/upload/validators.js
-const validateImageUpload = (imageHandler) => {
-  return (req, res, next) => {
-    if (!req.file && !req.files) {
-      return res.status(400).json({ error: 'Aucun fichier fourni' });
-    }
+class ImageUploadValidator {
+  constructor(imageHandler) {
+    this.imageHandler = imageHandler;
+  }
 
-    try {
-      // Pour les uploads multiples (produits)
-      if (req.files) {
-        req.files.forEach((file) => imageHandler.validateFile(file));
+  validateSingle(file) {
+    this.imageHandler.validateFile(file);
+  }
+
+  validateMultiple(files) {
+    files.forEach((file) => this.imageHandler.validateFile(file));
+  }
+
+  getMiddleware() {
+    return (req, res, next) => {
+      if (!req.file && !req.files) {
+        return res.status(400).json({ error: 'Aucun fichier fourni' });
       }
-      // Pour les uploads uniques (catégories, marques)
-      else if (req.file) {
-        imageHandler.validateFile(req.file);
+
+      try {
+        req.files ? this.validateMultiple(req.files) : this.validateSingle(req.file);
+        next();
+      } catch (error) {
+        next(error);
       }
+    };
+  }
+}
 
-      next();
-    } catch (error) {
-      next(error);
-    }
-  };
-};
-
-module.exports = { validateImageUpload };
+module.exports = (imageHandler) => new ImageUploadValidator(imageHandler).getMiddleware();

@@ -1,18 +1,28 @@
-// src/middleware/upload/handlers.js
 const multer = require('multer');
 const createMulterConfig = require('./config');
-const { validateImageUpload } = require('./validators');
+const createImageValidator = require('./validators');
 const SingleImage = require('../../models/images/SingleImage');
+const GalleryImage = require('../../models/images/GalleryImage');
 
-const createImageUploadMiddleware = (entity) => {
-  const imageHandler = new SingleImage(entity);
-  const multerConfig = createMulterConfig(imageHandler);
-  const upload = multer(multerConfig);
+class ImageUploadHandler {
+  constructor(entity) {
+    this.entity = entity;
+    this.imageHandler = this.createImageHandler(entity);
+    this.multerConfig = createMulterConfig(this.imageHandler);
+    this.validator = createImageValidator(this.imageHandler);
+    this.uploader = multer(this.multerConfig);
+  }
 
-  return {
-    single: [upload.single('image'), validateImageUpload(imageHandler)],
-    array: [upload.array('images', imageHandler.maxFiles), validateImageUpload(imageHandler)],
-  };
-};
+  createImageHandler(entity) {
+    return entity === 'products' ? new GalleryImage() : new SingleImage(entity);
+  }
 
-module.exports = createImageUploadMiddleware;
+  getMiddleware() {
+    return {
+      single: [this.uploader.single('image'), this.validator],
+      array: [this.uploader.array('images', this.imageHandler.maxFiles), this.validator],
+    };
+  }
+}
+
+module.exports = (entity) => new ImageUploadHandler(entity).getMiddleware();
