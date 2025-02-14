@@ -2,19 +2,29 @@
 const Datastore = require('nedb');
 const path = require('path');
 
-const getDbConfig = (filename) => ({
-  filename:
-    process.env.NODE_ENV === 'test'
-      ? null // En mémoire pour les tests
-      : path.join(__dirname, '../data', filename),
-  autoload: true,
-});
+class Database {
+  constructor() {
+    this.entities = ['categories', 'products', 'brands', 'suppliers'];
+    this.stores = {};
+    this.initializeStores();
+  }
 
-const db = {
-  categories: new Datastore(getDbConfig('categories.db')),
-  products: new Datastore(getDbConfig('products.db')),
-  brands: new Datastore(getDbConfig('brands.db')),
-  suppliers: new Datastore(getDbConfig('suppliers.db')),
-};
+  getDbConfig(filename) {
+    return {
+      filename: process.env.NODE_ENV === 'test' ? null : path.join(__dirname, '../data', filename),
+      autoload: true,
+    };
+  }
 
-module.exports = db;
+  initializeStores() {
+    this.entities.forEach((entity) => {
+      this.stores[entity] = new Datastore(this.getDbConfig(`${entity}.db`));
+    });
+  }
+
+  getStore(entity) {
+    return this.stores[entity];
+  }
+}
+
+module.exports = new Database().stores;
