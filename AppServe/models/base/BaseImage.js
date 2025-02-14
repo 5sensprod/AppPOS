@@ -11,6 +11,11 @@ class BaseImage {
     this.maxSize = 5 * 1024 * 1024; // 5MB
   }
 
+  async ensureDirectoryExists(filePath) {
+    const dir = path.dirname(filePath);
+    await fs.mkdir(dir, { recursive: true });
+  }
+
   async uploadImage(file, entityId) {
     try {
       // Vérifie si le dossier existe, sinon le crée

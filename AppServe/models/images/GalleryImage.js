@@ -1,6 +1,5 @@
 // src/models/images/GalleryImage.js
 const BaseImage = require('../base/BaseImage');
-const path = require('path');
 const fs = require('fs').promises;
 
 class GalleryImage extends BaseImage {

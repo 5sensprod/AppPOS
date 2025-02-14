@@ -1,6 +1,5 @@
 // src/models/images/SingleImage.js
 const BaseImage = require('../base/BaseImage');
-const path = require('path');
 const fs = require('fs').promises;
 
 class SingleImage extends BaseImage {
@@ -11,39 +10,26 @@ class SingleImage extends BaseImage {
 
   async upload(file, entityId) {
     try {
-      // Valider le fichier
       this.validateFile(file);
-
-      // Obtenir les données de base de l'image via la classe parente
       const imageData = await this.uploadImage(file, entityId);
-
-      // Vérifier et supprimer l'ancienne image si elle existe
       const existingImage = await this.getExistingImage(entityId);
+
       if (existingImage) {
-        await this.deleteExistingImage(existingImage).catch((err) =>
-          console.warn('Avertissement: échec suppression ancienne image:', err.message)
-        );
+        await this.deleteExistingImage(existingImage);
       }
 
-      // Créer le dossier de destination s'il n'existe pas
-      const destDir = path.dirname(imageData.local_path);
-      await fs.mkdir(destDir, { recursive: true });
+      await this.ensureDirectoryExists(imageData.local_path);
 
-      // Déplacer physiquement le fichier
       try {
         await fs.rename(file.path, imageData.local_path);
       } catch (moveError) {
-        // Si le rename échoue, essayer de copier puis supprimer
         await fs.copyFile(file.path, imageData.local_path);
-        await fs.unlink(file.path).catch(() => {}); // Ignorer l'erreur si le fichier n'existe plus
+        await fs.unlink(file.path).catch(() => {});
       }
 
       return imageData;
     } catch (error) {
-      // Nettoyage en cas d'erreur, ignorer si le fichier n'existe pas
-      if (file.path) {
-        await fs.unlink(file.path).catch(() => {});
-      }
+      if (file.path) await fs.unlink(file.path).catch(() => {});
       throw error;
     }
   }
