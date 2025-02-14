@@ -223,30 +223,19 @@ async function syncCategoryToWC(category, results) {
     parent: category.parent_id ? (await Category.findById(category.parent_id))?.woo_id || 0 : 0,
   };
 
-  // Ne gérer l'image que si :
-  // 1. L'image existe ET
-  // 2. Soit elle n'a pas d'ID WordPress (nouvelle image)
-  // 3. Soit elle a été modifiée (à implémenter avec un flag ou timestamp)
-  if (category.image?.local_path && !category.image.wp_id) {
-    try {
-      const filename = path.basename(category.image.local_path);
-      const imageId = await uploadToWordPress(category._id, filename);
-      wcData.image = { id: imageId };
-
-      // Mettre à jour la catégorie locale avec l'ID de l'image WordPress
-      await Category.update(category._id, {
-        image: {
-          ...category.image,
-          wp_id: imageId,
-        },
-      });
-    } catch (error) {
-      console.error('Erreur upload image:', error);
-      throw error;
-    }
-  } else if (category.image?.wp_id) {
-    // Si l'image existe déjà sur WordPress, on conserve son ID
+  if (category.image?.wp_id) {
     wcData.image = { id: category.image.wp_id };
+  } else if (category.image?.local_path) {
+    const filename = path.basename(category.image.local_path);
+    const imageId = await uploadToWordPress(category._id, filename);
+    wcData.image = { id: imageId };
+
+    await Category.update(category._id, {
+      image: {
+        ...category.image,
+        wp_id: imageId,
+      },
+    });
   }
 
   if (category.woo_id) {
