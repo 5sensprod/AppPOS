@@ -2,7 +2,6 @@
 const path = require('path');
 const fs = require('fs').promises;
 const GalleryImage = require('../../models/images/GalleryImage');
-const BaseImageHandler = require('../../models/base/BaseImageHandler');
 const SingleImage = require('../../models/images/SingleImage');
 const WordPressImageSync = require('./WordPressImageSync');
 
