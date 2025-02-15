@@ -98,25 +98,47 @@ class CategoryWooCommerceService extends BaseWooCommerceService {
   }
 
   async _syncCategoryToWC(category, results) {
-    const wcData = this._mapLocalToWooCommerce(category);
+    try {
+      const wcData = {
+        name: category.name,
+        description: category.description || '',
+        parent: category.parent_id ? category.parent_id : 0,
+      };
 
-    if (category.image?.wp_id) {
-      wcData.image = { id: category.image.wp_id };
-    }
+      if (category.image?.wp_id) {
+        console.log('Syncing category with image:', {
+          categoryId: category._id,
+          wpImageId: category.image.wp_id,
+        });
+        wcData.image = {
+          id: parseInt(category.image.wp_id),
+          src: category.image.url,
+          alt: category.name,
+        };
+        console.log('WC Data being sent:', JSON.stringify(wcData, null, 2));
+      }
 
-    if (category.woo_id) {
-      await this.wcApi.put(`${this.endpoint}/${category.woo_id}`, wcData);
-      results.updated++;
-    } else {
-      const response = await this.wcApi.post(this.endpoint, wcData);
-      await Category.update(category._id, {
-        woo_id: response.data.id,
-        last_sync: new Date(),
+      if (category.woo_id) {
+        const response = await this.wcApi.put(`${this.endpoint}/${category.woo_id}`, wcData);
+        console.log('WC Response:', JSON.stringify(response.data, null, 2));
+        results.updated++;
+      } else {
+        const response = await this.wcApi.post(this.endpoint, wcData);
+        console.log('WC Response:', JSON.stringify(response.data, null, 2));
+        await Category.update(category._id, {
+          woo_id: response.data.id,
+          last_sync: new Date(),
+        });
+        results.created++;
+      }
+    } catch (error) {
+      console.error('WC Error:', error.response?.data || error.message);
+      results.errors.push({
+        category_id: category._id,
+        error: error.message,
       });
-      results.created++;
     }
   }
-
   async deleteCategory(categoryId) {
     const category = await Category.findById(categoryId);
     if (!category) throw new Error('Category not found');

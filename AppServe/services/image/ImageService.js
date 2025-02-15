@@ -14,10 +14,8 @@ class ImageService {
 
   async processUpload(file, entityId, options = {}) {
     try {
-      // 1. Upload local
       const imageData = await this.imageHandler.upload(file, entityId);
 
-      // 2. Synchronisation WordPress si applicable
       if (this.entity !== 'suppliers' && options.syncToWordPress) {
         try {
           const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
@@ -28,22 +26,27 @@ class ImageService {
             status: 'active',
           };
 
-          // Mettre à jour l'entité avec les données de l'image
-          const Model = require(
-            `../../models/${this.entity.charAt(0).toUpperCase() + this.entity.slice(1, -1)}`
-          );
+          const Model = require('../../models/Category');
           const item = await Model.findById(entityId);
 
           if (item) {
-            await Model.update(entityId, {
+            // Mise à jour avec la nouvelle image
+            const updatedItem = await Model.update(entityId, {
               ...item,
               image: updatedImageData,
             });
+
+            // Déclencher la synchronisation WooCommerce
+            if (process.env.SYNC_ON_CHANGE === 'true') {
+              const updatedDoc = await Model.findById(entityId);
+              const categoryWooCommerceService = require('../CategoryWooCommerceService');
+              await categoryWooCommerceService.syncToWooCommerce([updatedDoc]);
+            }
           }
 
           return updatedImageData;
         } catch (syncError) {
-          console.error('Erreur synchronisation WordPress:', syncError);
+          console.error('Erreur synchronisation:', syncError);
           return imageData;
         }
       }
@@ -54,7 +57,6 @@ class ImageService {
       throw error;
     }
   }
-
   async updateMetadata(entityId, metadata) {
     try {
       // 1. Mise à jour locale
