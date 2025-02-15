@@ -19,17 +19,24 @@ class BaseImageHandler extends BaseImage {
   }
 
   async updateEntity(entityId, imageData) {
-    const updateField = this.isGallery ? 'gallery_images' : 'image';
     return new Promise((resolve, reject) => {
-      this.collection.update(
-        { _id: entityId },
-        { $set: { [updateField]: imageData } },
-        {},
-        (err, numReplaced) => {
-          if (err) reject(err);
+      this.collection.findOne({ _id: entityId }, async (err, doc) => {
+        if (err) return reject(err);
+
+        const updateQuery = { _id: entityId };
+        const updateData = this.isGallery
+          ? {
+              $push: {
+                gallery_images: { $each: Array.isArray(imageData) ? imageData : [imageData] },
+              },
+            }
+          : { $set: { image: imageData } };
+
+        this.collection.update(updateQuery, updateData, { multi: false }, (err, numReplaced) => {
+          if (err) return reject(err);
           resolve(numReplaced);
-        }
-      );
+        });
+      });
     });
   }
 
