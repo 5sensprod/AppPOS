@@ -24,6 +24,7 @@ class UploadConfig {
     return multer.diskStorage({
       destination: (req, file, cb) => {
         const tempPath = path.join(this.basePath, 'public', this.imageHandler.entity, 'temp');
+        fs.mkdirSync(tempPath, { recursive: true });
         cb(null, tempPath);
       },
       filename: (req, file, cb) => {
