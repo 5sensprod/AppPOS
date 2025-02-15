@@ -42,6 +42,17 @@ class BaseImageHandler extends BaseImage {
 
   async upload(file, entityId) {
     try {
+      // Vérifier d'abord si l'entité existe
+      const entityExists = await new Promise((resolve, reject) => {
+        this.collection.findOne({ _id: entityId }, (err, doc) => {
+          if (err) reject(err);
+          resolve(doc);
+        });
+      });
+      if (!entityExists) {
+        throw new Error(`Entité avec l'ID ${entityId} non trouvée`);
+      }
+
       this.validateFile(file);
       const imageData = await this.uploadImage(file, entityId);
       const existingImage = await this.getImages(entityId);
