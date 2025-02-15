@@ -4,18 +4,19 @@ const createImageUploadMiddleware = require('../../../middleware/upload/handlers
 const BaseImageController = require('../../../controllers/image/BaseImageController');
 
 class BaseImageRoutes {
-  constructor(entity) {
+  constructor(entity, options = { type: 'single' }) {
     this.router = express.Router();
     this.entity = entity;
-    this.imageController = new BaseImageController(entity);
+    this.imageController = new BaseImageController(entity, options);
     this.uploadMiddleware = createImageUploadMiddleware(entity);
-    this.initializeRoutes();
+    this.initializeRoutes(options.type);
   }
 
-  initializeRoutes() {
+  initializeRoutes(type) {
+    const uploadMethod = type === 'gallery' ? 'array' : 'single';
     this.router.post(
       '/:id/image',
-      this.uploadMiddleware.single,
+      this.uploadMiddleware[uploadMethod],
       this.imageController.uploadImage.bind(this.imageController)
     );
 

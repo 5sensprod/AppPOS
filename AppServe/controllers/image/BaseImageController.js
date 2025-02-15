@@ -11,18 +11,23 @@ class BaseImageController {
 
   async uploadImage(req, res) {
     try {
-      if (!req.file) {
+      if ((!req.file && !req.files) || (req.files && req.files.length === 0)) {
         return res.status(400).json({ error: 'Aucune image fournie' });
       }
 
-      const imageData = await this.imageService.processUpload(req.file, req.params.id, {
-        syncToWordPress: process.env.SYNC_ON_CHANGE === 'true',
-      });
+      const files = req.files || [req.file];
+      const results = await Promise.all(
+        files.map((file) =>
+          this.imageService.processUpload(file, req.params.id, {
+            syncToWordPress: process.env.SYNC_ON_CHANGE === 'true',
+          })
+        )
+      );
 
       res.json({
         success: true,
-        message: 'Image téléversée avec succès',
-        data: imageData,
+        message: 'Images téléversées avec succès',
+        data: results,
       });
     } catch (error) {
       res.status(500).json({
