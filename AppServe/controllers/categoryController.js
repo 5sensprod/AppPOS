@@ -8,12 +8,13 @@ const BaseImageController = require('./image/BaseImageController');
 class CategoryController extends BaseController {
   constructor() {
     super(Category, categoryWooCommerceService);
-    this.imageController = new BaseImageController('categories');
+    this.imageController = new BaseImageController('entity_name', { type: 'single' });
     this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
     this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
     this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
   }
 
+  //spécifité entité categories
   async create(req, res) {
     try {
       const level = await calculateLevel(req.body.parent_id);

@@ -2,8 +2,11 @@
 const ImageService = require('../../services/image/ImageService');
 
 class BaseImageController {
-  constructor(entity) {
-    this.imageService = new ImageService(entity);
+  constructor(entity, options = { type: 'single' }) {
+    if (!['single', 'gallery'].includes(options.type)) {
+      throw new Error("Le type d'image doit être 'single' ou 'gallery'");
+    }
+    this.imageService = new ImageService(entity, options.type);
   }
 
   async uploadImage(req, res) {

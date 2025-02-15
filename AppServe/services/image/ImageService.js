@@ -1,13 +1,15 @@
 // src/services/image/ImageService.js
 const path = require('path');
 const fs = require('fs').promises;
+const GalleryImage = require('../../models/images/GalleryImage');
+const BaseImageHandler = require('../../models/base/BaseImageHandler');
 const SingleImage = require('../../models/images/SingleImage');
 const WordPressImageSync = require('./WordPressImageSync');
 
 class ImageService {
-  constructor(entity) {
+  constructor(entity, type = 'single') {
     this.entity = entity;
-    this.imageHandler = new SingleImage(entity);
+    this.imageHandler = type === 'gallery' ? new GalleryImage(entity) : new SingleImage(entity);
     this.wpSync = new WordPressImageSync();
   }
 

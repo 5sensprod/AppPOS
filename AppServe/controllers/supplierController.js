@@ -6,7 +6,7 @@ const BaseImageController = require('./image/BaseImageController');
 class SupplierController extends BaseController {
   constructor() {
     super(Supplier, null); // null car pas de WooCommerce
-    this.imageController = new BaseImageController('suppliers');
+    this.imageController = new BaseImageController('entity_name', { type: 'single' });
     this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
     this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
     this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
