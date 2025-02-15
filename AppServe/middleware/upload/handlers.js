@@ -15,7 +15,7 @@ class ImageUploadHandler {
   }
 
   createImageHandler(entity) {
-    return entity === 'products' ? new GalleryImage() : new SingleImage(entity);
+    return entity === 'products' ? new GalleryImage(entity) : new SingleImage(entity);
   }
 
   getMiddleware() {
