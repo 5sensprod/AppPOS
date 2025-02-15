@@ -79,23 +79,23 @@ class BaseController {
         return res.status(404).json({ message: 'Item not found' });
       }
 
-      // Suppression du répertoire d'images
-      const imageDir = path.join(process.cwd(), 'public', this.model.imageFolder, req.params.id);
-      try {
-        await fs.rm(imageDir, { recursive: true, force: true });
-      } catch (err) {
-        console.error('Erreur suppression répertoire:', err);
-      }
-
-      // Suppression de l'entité
-      await this.model.delete(req.params.id);
-
-      // Synchronisation WooCommerce si activée
+      // Suppression des images WordPress
       if (process.env.SYNC_ON_CHANGE === 'true' && this.wooCommerceService) {
         try {
           if (item.image?.wp_id) {
             await this.wooCommerceService.deleteMedia(item.image.wp_id);
           }
+
+          // Ajout: Suppression des images de galerie
+          if (item.gallery_images?.length > 0) {
+            for (const img of item.gallery_images) {
+              if (img.wp_id) {
+                await this.wooCommerceService.deleteMedia(img.wp_id);
+              }
+            }
+          }
+
+          // Suppression du produit WooCommerce
           if (item.woo_id) {
             await this.wooCommerceService.wcApi.delete(
               `${this.wooCommerceService.endpoint}/${item.woo_id}`,
@@ -108,6 +108,17 @@ class BaseController {
           }
         }
       }
+
+      // Suppression du répertoire d'images local
+      const imageDir = path.join(process.cwd(), 'public', this.model.imageFolder, req.params.id);
+      try {
+        await fs.rm(imageDir, { recursive: true, force: true });
+      } catch (err) {
+        console.error('Erreur suppression répertoire:', err);
+      }
+
+      // Suppression de l'entité
+      await this.model.delete(req.params.id);
 
       res.json({ message: 'Item deleted successfully' });
     } catch (error) {
