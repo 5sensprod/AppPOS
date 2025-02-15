@@ -73,12 +73,32 @@ class BaseController {
   async delete(req, res) {
     try {
       const item = await this.model.findById(req.params.id);
-      if (!item) return res.status(404).json({ message: 'Item not found' });
+      if (!item) {
+        return res.status(404).json({ message: 'Item not found' });
+      }
 
+      // 1. Toujours supprimer localement
+      await this.model.delete(req.params.id);
+
+      // 2. Si synchronisation WooCommerce activée et service disponible
       if (process.env.SYNC_ON_CHANGE === 'true' && this.wooCommerceService) {
-        await this.wooCommerceService.deleteCategory(req.params.id);
-      } else {
-        await this.model.delete(req.params.id);
+        try {
+          // Supprimer l'image sur WordPress si elle existe
+          if (item.image?.wp_id) {
+            await this.wooCommerceService.deleteMedia(item.image.wp_id);
+          }
+          // Supprimer l'entité sur WooCommerce si elle a un woo_id
+          if (item.woo_id) {
+            await this.wooCommerceService.wcApi.delete(
+              `${this.wooCommerceService.endpoint}/${item.woo_id}`,
+              { force: true }
+            );
+          }
+        } catch (error) {
+          if (error.response?.status !== 404) {
+            console.error('Erreur suppression WooCommerce:', error);
+          }
+        }
       }
 
       res.json({ message: 'Item deleted successfully' });

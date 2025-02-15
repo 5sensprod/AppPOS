@@ -3,47 +3,50 @@ const path = require('path');
 const fs = require('fs').promises;
 const SingleImage = require('../../models/images/SingleImage');
 const WordPressImageSync = require('./WordPressImageSync');
-const woocommerceService = require('../woocommerceService');
 
 class ImageService {
   constructor(entity) {
-    this.entity = entity; // Ajout pour identifier le type d'entité
+    this.entity = entity;
     this.imageHandler = new SingleImage(entity);
     this.wpSync = new WordPressImageSync();
   }
 
   async processUpload(file, entityId, options = {}) {
     try {
+      // 1. Upload local
       const imageData = await this.imageHandler.upload(file, entityId);
 
-      // Skip WordPress sync for suppliers
+      // 2. Synchronisation WordPress si applicable
       if (this.entity !== 'suppliers' && options.syncToWordPress) {
-        const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
-        const updatedImageData = {
-          ...imageData,
-          wp_id: wpData.id,
-          url: wpData.url,
-          status: 'active',
-        };
+        try {
+          const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
+          const updatedImageData = {
+            ...imageData,
+            wp_id: wpData.id,
+            url: wpData.url,
+            status: 'active',
+          };
 
-        if (this.entity === 'categories') {
-          const Category = require('../../models/Category');
-          const category = await Category.findById(entityId);
-          if (category) {
-            await Category.update(entityId, {
-              ...category,
+          // Mettre à jour l'entité avec les données de l'image
+          const Model = require(
+            `../../models/${this.entity.charAt(0).toUpperCase() + this.entity.slice(1, -1)}`
+          );
+          const item = await Model.findById(entityId);
+
+          if (item) {
+            await Model.update(entityId, {
+              ...item,
               image: updatedImageData,
             });
-            await woocommerceService.syncToWooCommerce([
-              {
-                ...category,
-                image: updatedImageData,
-              },
-            ]);
           }
+
+          return updatedImageData;
+        } catch (syncError) {
+          console.error('Erreur synchronisation WordPress:', syncError);
+          return imageData;
         }
-        return updatedImageData;
       }
+
       return imageData;
     } catch (error) {
       await this._cleanup(file.path).catch(() => {});
@@ -51,40 +54,53 @@ class ImageService {
     }
   }
 
-  async updateMetadata(entityId, imageData, metadata) {
-    const updatedImage = await this.imageHandler.update(entityId, metadata);
+  async updateMetadata(entityId, metadata) {
+    try {
+      // 1. Mise à jour locale
+      const updatedImage = await this.imageHandler.update(entityId, metadata);
 
-    if (updatedImage.wp_id && metadata.status) {
-      try {
-        await this.wpSync.updateMetadata(updatedImage.wp_id, metadata);
-      } catch (error) {
-        console.error('Erreur mise à jour WordPress:', error);
-        updatedImage.sync_error = error.message;
+      // 2. Synchronisation WordPress si applicable
+      if (updatedImage.wp_id && metadata.status && this.entity !== 'suppliers') {
+        try {
+          await this.wpSync.updateMetadata(updatedImage.wp_id, metadata);
+        } catch (error) {
+          console.error('Erreur mise à jour WordPress:', error);
+          updatedImage.sync_error = error.message;
+        }
       }
-    }
 
-    return updatedImage;
+      return updatedImage;
+    } catch (error) {
+      throw new Error(`Erreur mise à jour métadonnées: ${error.message}`);
+    }
   }
 
   async deleteImage(entityId, imageData) {
-    // Suppression WordPress si nécessaire
-    if (imageData.wp_id) {
-      try {
-        await this.wpSync.deleteFromWordPress(imageData.wp_id);
-      } catch (error) {
-        console.error('Erreur suppression WordPress:', error);
-        // On continue la suppression locale même si erreur WordPress
+    try {
+      // 1. Suppression WordPress si applicable
+      if (imageData?.wp_id && this.entity !== 'suppliers') {
+        try {
+          await this.wpSync.deleteFromWordPress(imageData.wp_id);
+        } catch (error) {
+          console.error('Erreur suppression WordPress:', error);
+        }
       }
-    }
 
-    // Suppression locale
-    await this.imageHandler.delete(entityId);
-    return true;
+      // 2. Suppression locale (toujours effectuée)
+      await this.imageHandler.delete(entityId);
+      return true;
+    } catch (error) {
+      throw new Error(`Erreur suppression image: ${error.message}`);
+    }
   }
 
   async resyncImage(imageData) {
     if (!imageData.local_path) {
       throw new Error('Chemin local requis pour la resynchronisation');
+    }
+
+    if (this.entity === 'suppliers') {
+      throw new Error('Resynchronisation non disponible pour les fournisseurs');
     }
 
     try {
@@ -100,10 +116,8 @@ class ImageService {
     }
   }
 
-  // Méthode "privée" par convention (préfixée par _)
   async _cleanup(filePath) {
     if (!filePath) return;
-
     try {
       const exists = await fs
         .access(filePath)
