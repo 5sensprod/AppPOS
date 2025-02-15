@@ -49,54 +49,20 @@ class BaseModel {
 
   async delete(id) {
     try {
-      // 1. Trouver l'entité
       const entity = await this.findById(id);
       if (!entity) return 0;
 
-      // 2. Supprimer le dossier d'images si existe
-      if (entity.image?.local_path) {
-        try {
-          // 2.1 Vérifier que le dossier existe
-          const projectRoot = path.resolve(__dirname, '../../');
-          const imageDir = path.join(projectRoot, 'public', this.imageFolder, id);
-
-          // 2.2 Vérifier si le dossier existe avant de tenter de le supprimer
-          const dirExists = await fs
-            .access(imageDir)
-            .then(() => true)
-            .catch(() => false);
-
-          if (dirExists) {
-            // 2.3 Supprimer d'abord le fichier image spécifique
-            if (entity.image.local_path) {
-              await fs
-                .unlink(entity.image.local_path)
-                .catch((err) => console.warn('Erreur suppression fichier:', err));
-            }
-
-            // 2.4 Puis supprimer le dossier complet
-            await fs
-              .rm(imageDir, { recursive: true, force: true })
-              .catch((err) => console.warn('Erreur suppression dossier:', err));
-          }
-        } catch (err) {
-          console.error('Erreur lors de la suppression des fichiers:', err);
-          // On continue la suppression de l'entité même si erreur fichiers
-        }
-      }
-
-      // 3. Supprimer l'entité de la base de données
+      // Plus besoin de la gestion d'image ici car déplacée dans BaseController
       return new Promise((resolve, reject) => {
         this.collection.remove({ _id: id }, {}, (err, numRemoved) => {
           if (err) {
-            console.error('Erreur suppression base de données:', err);
+            console.error('Erreur suppression:', err);
             reject(err);
           }
           resolve(numRemoved);
         });
       });
     } catch (error) {
-      console.error('Erreur générale lors de la suppression:', error);
       throw error;
     }
   }
