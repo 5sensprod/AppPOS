@@ -1,11 +1,12 @@
 const BaseController = require('./base/BaseController');
 const Product = require('../models/Product');
 const BaseImageController = require('./image/BaseImageController');
+const productWooCommerceService = require('../services/ProductWooCommerceService');
 
 class ProductController extends BaseController {
   constructor() {
-    super(Product, null); // Ajout de null comme second paramètre
-    this.imageController = new BaseImageController('entity_name', { type: 'single' });
+    super(Product, productWooCommerceService);
+    this.imageController = new BaseImageController('products', { type: 'single' });
     this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
     this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
     this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
