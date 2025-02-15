@@ -1,3 +1,4 @@
+//  middleware/upload/handlers.js
 const multer = require('multer');
 const createMulterConfig = require('./config');
 const createImageValidator = require('./validators');
