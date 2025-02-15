@@ -26,28 +26,39 @@ class ImageService {
             status: 'active',
           };
 
-          const Model = require('../../models/Category');
+          // Mise à jour du document avec la nouvelle image
+          const Model =
+            this.entity === 'products'
+              ? require('../../models/Product')
+              : require('../../models/Category');
+
           const item = await Model.findById(entityId);
+          if (!item) throw new Error('Entité non trouvée');
 
-          if (item) {
-            // Mise à jour avec la nouvelle image
-            const updatedItem = await Model.update(entityId, {
-              ...item,
-              image: updatedImageData,
-            });
+          // Mise à jour de l'entité avec la nouvelle image
+          const updateData = this.imageHandler.isGallery
+            ? {
+                gallery_images: [...(item.gallery_images || []), updatedImageData],
+              }
+            : { image: updatedImageData };
 
-            // Déclencher la synchronisation WooCommerce
-            if (process.env.SYNC_ON_CHANGE === 'true') {
-              const updatedDoc = await Model.findById(entityId);
-              const categoryWooCommerceService = require('../CategoryWooCommerceService');
-              await categoryWooCommerceService.syncToWooCommerce([updatedDoc]);
-            }
+          await Model.update(entityId, updateData);
+
+          // Synchronisation WooCommerce immédiate
+          if (process.env.SYNC_ON_CHANGE === 'true') {
+            const service =
+              this.entity === 'products'
+                ? require('../ProductWooCommerceService')
+                : require('../CategoryWooCommerceService');
+
+            const updatedDoc = await Model.findById(entityId);
+            await service.syncToWooCommerce(updatedDoc);
           }
 
           return updatedImageData;
         } catch (syncError) {
           console.error('Erreur synchronisation:', syncError);
-          return imageData;
+          throw syncError;
         }
       }
 

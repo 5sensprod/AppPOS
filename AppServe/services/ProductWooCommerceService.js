@@ -7,24 +7,18 @@ class ProductWooCommerceService extends BaseWooCommerceService {
   }
 
   async syncToWooCommerce(input) {
-    const results = { created: 0, updated: 0, errors: [], pending: [] };
-
+    const results = { created: 0, updated: 0, errors: [] };
     try {
       if (Array.isArray(input)) {
         for (const product of input) {
           await this._syncProductToWC(product, results);
         }
       } else {
-        const product = await Product.findById(input);
-        if (!product) throw new Error('Produit non trouvé');
-        await this._syncProductToWC(product, results);
+        await this._syncProductToWC(input, results);
       }
     } catch (error) {
-      results.errors.push({
-        error: error.message,
-      });
+      results.errors.push({ error: error.message });
     }
-
     return results;
   }
 
@@ -44,6 +38,7 @@ class ProductWooCommerceService extends BaseWooCommerceService {
         results.created++;
       }
     } catch (error) {
+      console.error('Erreur WC:', error.response?.data || error.message);
       results.errors.push({
         product_id: product._id,
         error: error.message,
@@ -65,32 +60,30 @@ class ProductWooCommerceService extends BaseWooCommerceService {
       meta_data: product.meta_data || [],
     };
 
+    let images = [];
     if (product.image?.wp_id) {
-      wcData.images = [
-        {
-          id: parseInt(product.image.wp_id),
-          src: product.image.url,
-        },
-      ];
+      images.push({
+        id: parseInt(product.image.wp_id),
+        src: product.image.url,
+        position: 0,
+        alt: product.name,
+      });
     }
 
-    return wcData;
-  }
+    if (product.gallery_images?.length > 0) {
+      const galleryImages = product.gallery_images
+        .filter((img) => img.wp_id)
+        .map((img, index) => ({
+          id: parseInt(img.wp_id),
+          src: img.url,
+          position: index + 1,
+          alt: `${product.name} - ${index + 1}`,
+        }));
+      images = [...images, ...galleryImages];
+    }
 
-  _mapWooCommerceToLocal(wcProduct) {
-    return {
-      name: wcProduct.name,
-      sku: wcProduct.sku,
-      description: wcProduct.description,
-      price: parseFloat(wcProduct.price),
-      regular_price: parseFloat(wcProduct.regular_price) || parseFloat(wcProduct.price),
-      sale_price: wcProduct.sale_price ? parseFloat(wcProduct.sale_price) : null,
-      status: wcProduct.status === 'publish' ? 'published' : 'draft',
-      stock: wcProduct.stock_quantity,
-      manage_stock: wcProduct.manage_stock,
-      woo_id: wcProduct.id,
-      meta_data: wcProduct.meta_data || [],
-    };
+    wcData.images = images;
+    return wcData;
   }
 }
 

@@ -6,7 +6,7 @@ const productWooCommerceService = require('../services/ProductWooCommerceService
 class ProductController extends BaseController {
   constructor() {
     super(Product, productWooCommerceService);
-    this.imageController = new BaseImageController('products', { type: 'single' });
+    this.imageController = new BaseImageController('products', { type: 'gallery' });
     this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
     this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
     this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
