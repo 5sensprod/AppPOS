@@ -9,7 +9,7 @@ require('dotenv').config();
 app.use(express.json());
 
 // Fichiers statiques (ex: images des catégories, produits, etc.)
-app.use('/public', express.static(path.resolve(__dirname, '../public')));
+app.use('/public', express.static(path.resolve(__dirname, 'public')));
 
 // Routes
 const categoryRoutes = require('./routes/categoryRoutes');

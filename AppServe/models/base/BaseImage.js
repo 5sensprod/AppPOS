@@ -4,7 +4,7 @@ const fs = require('fs').promises;
 
 class BaseImage {
   constructor(entity) {
-    this.entity = entity; // 'categories', 'products', etc.
+    this.entity = entity; // 'categories', 'products', brands, suppliers.
     this.uploadPath = path.join(process.cwd(), 'public', entity);
     this.maxFiles = 1;
     this.supportedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
