@@ -1,4 +1,6 @@
 // controllers\base\BaseController.js
+const fs = require('fs').promises;
+const path = require('path');
 
 class BaseController {
   constructor(model, wooCommerceService) {
@@ -77,17 +79,23 @@ class BaseController {
         return res.status(404).json({ message: 'Item not found' });
       }
 
-      // 1. Toujours supprimer localement
+      // Suppression du répertoire d'images
+      const imageDir = path.join(process.cwd(), 'public', this.model.imageFolder, req.params.id);
+      try {
+        await fs.rm(imageDir, { recursive: true, force: true });
+      } catch (err) {
+        console.error('Erreur suppression répertoire:', err);
+      }
+
+      // Suppression de l'entité
       await this.model.delete(req.params.id);
 
-      // 2. Si synchronisation WooCommerce activée et service disponible
+      // Synchronisation WooCommerce si activée
       if (process.env.SYNC_ON_CHANGE === 'true' && this.wooCommerceService) {
         try {
-          // Supprimer l'image sur WordPress si elle existe
           if (item.image?.wp_id) {
             await this.wooCommerceService.deleteMedia(item.image.wp_id);
           }
-          // Supprimer l'entité sur WooCommerce si elle a un woo_id
           if (item.woo_id) {
             await this.wooCommerceService.wcApi.delete(
               `${this.wooCommerceService.endpoint}/${item.woo_id}`,
