@@ -17,56 +17,36 @@ class ImageService {
       const imageData = await this.imageHandler.upload(file, entityId);
 
       if (this.entity !== 'suppliers' && options.syncToWordPress) {
-        try {
-          const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
-          const updatedImageData = {
-            ...imageData,
-            wp_id: wpData.id,
-            url: wpData.url,
-            status: 'active',
-          };
+        const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
+        const updatedImageData = {
+          ...imageData,
+          wp_id: wpData.id,
+          url: wpData.url,
+          status: 'active',
+        };
 
-          const Model =
-            this.entity === 'products'
-              ? require('../../models/Product')
-              : require('../../models/Category');
+        const Model = require('../../models/Brand');
+        const service = require('../BrandWooCommerceService');
 
-          console.log('Entity:', this.entity, 'EntityId:', entityId); // Debug
+        const item = await Model.findById(entityId);
+        if (!item) throw new Error(`${this.entity} non trouvé`);
 
-          const item = await Model.findById(entityId);
-          if (!item) {
-            console.error(
-              `${this.entity === 'products' ? 'Produit' : 'Catégorie'} ${entityId} non trouvé(e)`
-            );
-            throw new Error(
-              `${this.entity === 'products' ? 'Produit' : 'Catégorie'} non trouvé(e)`
-            );
-          }
+        // Recherche du tag_id du brand
+        const brandsResponse = await service.wcApi.get('products/brands');
+        const brandTag = brandsResponse.data.find((b) => b.name === item.name);
 
-          const updateData = this.imageHandler.isGallery
-            ? { gallery_images: [...(item.gallery_images || []), updatedImageData] }
-            : { image: updatedImageData };
-
-          await Model.update(entityId, {
-            ...item,
-            ...updateData,
+        if (brandTag) {
+          // Mise à jour de l'image avec le tag_id trouvé
+          await service.wcApi.put(`products/brands/${brandTag.id}`, {
+            name: item.name,
+            image: { id: wpData.id },
           });
 
-          const service =
-            this.entity === 'products'
-              ? require('../ProductWooCommerceService')
-              : require('../CategoryWooCommerceService');
-
-          if (process.env.SYNC_ON_CHANGE === 'true') {
-            const updatedDoc = await Model.findById(entityId);
-            await service.syncToWooCommerce(updatedDoc);
-          }
-
-          return updatedImageData;
-        } catch (syncError) {
-          console.error('Erreur synchronisation:', syncError);
-          throw syncError;
+          const updateData = { image: updatedImageData, woo_id: brandTag.id };
+          await Model.update(entityId, { ...item, ...updateData });
         }
+
+        return updatedImageData;
       }
 
       return imageData;

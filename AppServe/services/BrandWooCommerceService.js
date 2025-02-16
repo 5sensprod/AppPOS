@@ -4,9 +4,8 @@ const Brand = require('../models/Brand');
 
 class BrandWooCommerceService extends BaseWooCommerceService {
   constructor() {
-    super('products/attributes');
+    super('');
   }
-
   _mapWooCommerceToLocal(wcBrand) {
     return {
       name: wcBrand.name,
@@ -19,20 +18,43 @@ class BrandWooCommerceService extends BaseWooCommerceService {
   }
 
   _mapLocalToWooCommerce(brand) {
+    if (!brand || !brand.name) {
+      throw new Error('Invalid brand data');
+    }
+
     return {
       name: brand.name,
       description: brand.description || '',
-      slug: brand.slug,
-      type: 'select',
-      has_archives: true,
-      orderby: 'name',
+      slug: brand.slug || this._generateSlug(brand.name),
       meta_data: brand.meta_data || [],
     };
   }
 
-  async syncToWooCommerce(input = null) {
-    const results = { created: 0, updated: 0, deleted: 0, errors: [] };
-    return input ? this._handleSpecificSync(input, results) : this._handleFullSync(results);
+  _generateSlug(name) {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  }
+
+  async syncToWooCommerce(input) {
+    const results = { created: 0, updated: 0, errors: [] };
+    try {
+      const brandData = input[0];
+
+      const response = await this.wcApi.post('products/brands', {
+        name: brandData.name,
+        taxonomy: 'product_brand',
+      });
+
+      if (response.data) {
+        results.created++;
+      }
+    } catch (error) {
+      console.log(error.response?.data || error);
+      results.errors.push(error.message);
+    }
+    return results;
   }
 
   async _handleSpecificSync(input, results) {
@@ -81,22 +103,30 @@ class BrandWooCommerceService extends BaseWooCommerceService {
   }
 
   async _syncBrandToWC(brand, results) {
-    const wcData = this._mapLocalToWooCommerce(brand);
+    try {
+      // Attendre que les données de la marque soient chargées
+      const brandData = await this.model.findById(brand._id);
+      if (!brandData) {
+        throw new Error('Brand not found');
+      }
 
-    if (brand.image?.wp_id) {
-      wcData.image = { id: brand.image.wp_id };
-    }
+      const wcData = {
+        name: brandData.name,
+        description: brandData.description || '',
+        slug: brandData.slug || brandData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        meta_data: brandData.meta_data || [],
+      };
 
-    if (brand.woo_id) {
-      await this.wcApi.put(`${this.endpoint}/${brand.woo_id}`, wcData);
-      results.updated++;
-    } else {
-      const response = await this.wcApi.post(this.endpoint, wcData);
-      await Brand.update(brand._id, {
-        woo_id: response.data.id,
-        last_sync: new Date(),
-      });
-      results.created++;
+      if (brandData.woo_id) {
+        await this.wcApi.put(`${this.endpoint}/${brandData.woo_id}`, wcData);
+        results.updated++;
+      } else {
+        const response = await this.wcApi.post(this.endpoint, wcData);
+        await this.model.update(brandData._id, { woo_id: response.data.id, last_sync: new Date() });
+        results.created++;
+      }
+    } catch (error) {
+      results.errors.push({ brand_id: brand._id, error: error.message });
     }
   }
 
