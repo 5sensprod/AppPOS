@@ -115,32 +115,37 @@ class CategoryWooCommerceService extends BaseWooCommerceService {
 
   async _syncCategoryToWC(category, results) {
     try {
+      // Récupérer le woo_id du parent si parent_id existe
+      let parentWooId = 0;
+      if (category.parent_id) {
+        const parentCategory = await Category.findById(category.parent_id);
+        if (parentCategory?.woo_id) {
+          parentWooId = parentCategory.woo_id;
+        } else {
+          throw new Error(`Parent category ${category.parent_id} not synced with WooCommerce`);
+        }
+      }
+
       const wcData = {
         name: category.name,
         description: category.description || '',
-        parent: category.parent_id ? category.parent_id : 0,
+        parent: parentWooId,
       };
 
       if (category.image?.wp_id) {
-        console.log('Syncing category with image:', {
-          categoryId: category._id,
-          wpImageId: category.image.wp_id,
-        });
         wcData.image = {
           id: parseInt(category.image.wp_id),
           src: category.image.url,
           alt: category.name,
         };
-        console.log('WC Data being sent:', JSON.stringify(wcData, null, 2));
       }
 
       if (category.woo_id) {
         const response = await this.wcApi.put(`${this.endpoint}/${category.woo_id}`, wcData);
-        console.log('WC Response:', JSON.stringify(response.data, null, 2));
+        await Category.update(category._id, { last_sync: new Date() });
         results.updated++;
       } else {
         const response = await this.wcApi.post(this.endpoint, wcData);
-        console.log('WC Response:', JSON.stringify(response.data, null, 2));
         await Category.update(category._id, {
           woo_id: response.data.id,
           last_sync: new Date(),
@@ -155,6 +160,7 @@ class CategoryWooCommerceService extends BaseWooCommerceService {
       });
     }
   }
+
   async deleteCategory(categoryId) {
     const category = await Category.findById(categoryId);
     if (!category) throw new Error('Category not found');

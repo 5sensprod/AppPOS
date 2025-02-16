@@ -32,6 +32,33 @@ class CategoryController extends BaseController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  async delete(req, res) {
+    try {
+      const item = await this.model.findById(req.params.id);
+      if (!item) return ResponseHandler.notFound(res);
+
+      if (item.level === 0) {
+        const allCategories = await this.model.findAll();
+        const children = allCategories.filter((cat) => cat.parent_id === req.params.id);
+
+        if (children.length > 0) {
+          return ResponseHandler.error(res, {
+            status: 400,
+            message: `Impossible de supprimer la catégorie : ${children.length} sous-catégorie(s) existante(s)`,
+          });
+        }
+      }
+
+      await this.handleImageDeletion(item);
+      await this.handleWooCommerceDelete(item);
+      await this.model.delete(req.params.id);
+
+      return ResponseHandler.success(res, { message: 'Catégorie supprimée avec succès' });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
 }
 
 const categoryController = new CategoryController();
