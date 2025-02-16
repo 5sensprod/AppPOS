@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const categoryController = require('../controllers/categoryController');
-const validateSchema = require('../middleware/validation');
+const validateSchema = require('../validation/validation');
 const { createCategorySchema, updateCategorySchema } = require('../validation/schemas');
 const categoryImageRoutes = require('./image/categoryImageRoutes');
 

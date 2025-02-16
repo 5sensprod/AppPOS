@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const brandController = require('../controllers/BrandController');
-const validateSchema = require('../middleware/validation');
+const validateSchema = require('../validation/validation');
 const { createBrandSchema, updateBrandSchema } = require('../validation/schemas');
 const brandImageRoutes = require('./image/brandImageRoutes');
 

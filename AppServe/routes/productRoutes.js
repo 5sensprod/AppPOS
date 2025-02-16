@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
-const validateSchema = require('../middleware/validation');
+const validateSchema = require('../validation/validation');
 const { createProductSchema, updateProductSchema } = require('../validation/schemas');
 const productImageRoutes = require('./image/productImageRoutes');
 

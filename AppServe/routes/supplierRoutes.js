@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const supplierController = require('../controllers/supplierController');
-const validateSchema = require('../middleware/validation');
+const validateSchema = require('../validation/validation');
 const { createSupplierSchema, updateSupplierSchema } = require('../validation/schemas');
 const supplierImageRoutes = require('./image/supplierImageRoutes');
 
