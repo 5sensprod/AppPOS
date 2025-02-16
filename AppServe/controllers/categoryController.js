@@ -2,36 +2,34 @@
 const BaseController = require('./base/BaseController');
 const Category = require('../models/Category');
 const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
+const ResponseHandler = require('../handlers/ResponseHandler');
 const { calculateLevel } = require('../utils/categoryHelpers');
 
 class CategoryController extends BaseController {
   constructor() {
-    const imageOptions = {
+    super(Category, categoryWooCommerceService, {
       entity: 'categories',
       type: 'single',
-    };
-    super(Category, categoryWooCommerceService, imageOptions);
+    });
   }
 
   async create(req, res) {
     try {
-      const level = await calculateLevel(req.body.parent_id);
-      req.body.level = level;
-      await super.create(req, res);
+      req.body.level = await calculateLevel(req.body.parent_id);
+      return super.create(req, res);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      return ResponseHandler.error(res, error);
     }
   }
 
   async update(req, res) {
     try {
       if (req.body.parent_id) {
-        const level = await calculateLevel(req.body.parent_id);
-        req.body.level = level;
+        req.body.level = await calculateLevel(req.body.parent_id);
       }
-      await super.update(req, res);
+      return super.update(req, res);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      return ResponseHandler.error(res, error);
     }
   }
 }

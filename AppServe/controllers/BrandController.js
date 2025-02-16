@@ -2,27 +2,28 @@
 const BaseController = require('./base/BaseController');
 const Brand = require('../models/Brand');
 const brandWooCommerceService = require('../services/BrandWooCommerceService');
+const ResponseHandler = require('../handlers/ResponseHandler');
 
 class BrandController extends BaseController {
   constructor() {
-    const imageOptions = {
+    super(Brand, brandWooCommerceService, {
       entity: 'brands',
       type: 'single',
-    };
-    super(Brand, brandWooCommerceService, imageOptions);
+    });
   }
 
   async getBySupplier(req, res) {
     try {
       const brands = await this.model.findBySupplier(req.params.supplierId);
-      res.json(brands);
+      return ResponseHandler.success(res, brands);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      return ResponseHandler.error(res, error);
     }
   }
 }
 
 const brandController = new BrandController();
+
 module.exports = {
   getAll: brandController.getAll.bind(brandController),
   getById: brandController.getById.bind(brandController),

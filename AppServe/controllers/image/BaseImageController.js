@@ -1,5 +1,6 @@
 // controllers/image/BaseImageController.js
 const ImageService = require('../../services/image/ImageService');
+const ResponseHandler = require('../../handlers/ResponseHandler');
 
 class BaseImageController {
   constructor(entity, options = { type: 'single' }) {
@@ -36,53 +37,36 @@ class BaseImageController {
       const files = this.validateAndGetFiles(req);
       const results = await this.processFiles(files, req.params.id);
 
-      return res.json({
-        success: true,
+      return ResponseHandler.success(res, {
         message: 'Images téléversées avec succès',
         data: results,
       });
     } catch (error) {
-      return this.handleError(res, error);
+      return ResponseHandler.error(res, error);
     }
   }
+
   async updateImageMetadata(req, res) {
     try {
       const updateData = await this.imageService.updateMetadata(req.params.id, req.body);
-
-      res.json({
-        success: true,
+      return ResponseHandler.success(res, {
         message: 'Métadonnées mises à jour avec succès',
         data: updateData,
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
+      return ResponseHandler.error(res, error);
     }
   }
 
   async deleteImage(req, res) {
     try {
       await this.imageService.deleteImage(req.params.id);
-
-      res.json({
-        success: true,
+      return ResponseHandler.success(res, {
         message: 'Image supprimée avec succès',
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
+      return ResponseHandler.error(res, error);
     }
-  }
-
-  handleError(res, error) {
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-    });
   }
 }
 

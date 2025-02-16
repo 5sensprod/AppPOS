@@ -1,7 +1,8 @@
 // controllers/base/BaseController.js
+const ResponseHandler = require('../../handlers/ResponseHandler');
+const BaseImageController = require('../image/BaseImageController');
 const fs = require('fs').promises;
 const path = require('path');
-const BaseImageController = require('../image/BaseImageController');
 
 class BaseController {
   constructor(model, wooCommerceService, imageOptions = null) {
@@ -12,7 +13,7 @@ class BaseController {
     this.model = model;
     this.wooCommerceService = wooCommerceService;
 
-    if (imageOptions && imageOptions.entity) {
+    if (imageOptions?.entity) {
       this.imageController = new BaseImageController(imageOptions.entity, {
         type: imageOptions.type || 'single',
       });
@@ -29,19 +30,19 @@ class BaseController {
   async getAll(req, res) {
     try {
       const items = await this.model.findAll();
-      res.json(items);
+      return ResponseHandler.success(res, items);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      return ResponseHandler.error(res, error);
     }
   }
 
   async getById(req, res) {
     try {
       const item = await this.model.findById(req.params.id);
-      if (!item) return res.status(404).json({ message: 'Item not found' });
-      res.json(item);
+      if (!item) return ResponseHandler.notFound(res);
+      return ResponseHandler.success(res, item);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      return ResponseHandler.error(res, error);
     }
   }
 
@@ -49,99 +50,100 @@ class BaseController {
     try {
       const newItem = await this.model.create(req.body);
 
-      if (process.env.SYNC_ON_CHANGE === 'true' && this.wooCommerceService) {
+      if (this.shouldSync() && this.wooCommerceService) {
         try {
           const syncResult = await this.wooCommerceService.syncToWooCommerce([newItem]);
           if (syncResult.errors.length > 0) {
-            return res.status(207).json({
-              item: newItem,
-              sync_status: 'failed',
-              sync_errors: syncResult.errors,
+            return ResponseHandler.partialSuccess(res, newItem, {
+              message: syncResult.errors.join(', '),
             });
           }
         } catch (syncError) {
-          return res.status(207).json({
-            item: newItem,
-            sync_status: 'failed',
-            sync_error: syncError.message,
-          });
+          return ResponseHandler.partialSuccess(res, newItem, syncError);
         }
       }
 
-      res.status(201).json(newItem);
+      return ResponseHandler.created(res, newItem);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      return ResponseHandler.error(res, error);
     }
   }
 
   async update(req, res) {
     try {
       const updated = await this.model.update(req.params.id, req.body);
-      if (!updated) return res.status(404).json({ message: 'Item not found' });
+      if (!updated) return ResponseHandler.notFound(res);
 
-      if (process.env.SYNC_ON_CHANGE === 'true' && this.wooCommerceService) {
+      if (this.shouldSync() && this.wooCommerceService) {
         const updatedItem = await this.model.findById(req.params.id);
-        await this.wooCommerceService.syncToWooCommerce([updatedItem]);
+        try {
+          await this.wooCommerceService.syncToWooCommerce([updatedItem]);
+        } catch (syncError) {
+          return ResponseHandler.partialSuccess(res, updated, syncError);
+        }
       }
 
-      res.json({ message: 'Item updated successfully' });
+      return ResponseHandler.success(res, updated);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      return ResponseHandler.error(res, error);
     }
   }
 
   async delete(req, res) {
     try {
       const item = await this.model.findById(req.params.id);
-      if (!item) {
-        return res.status(404).json({ message: 'Item not found' });
+      if (!item) return ResponseHandler.notFound(res);
+
+      await this.handleImageDeletion(item);
+      await this.handleWooCommerceDelete(item);
+      await this.model.delete(req.params.id);
+
+      return ResponseHandler.success(res, { message: 'Item deleted successfully' });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  async handleImageDeletion(item) {
+    const imageDir = path.join(process.cwd(), 'public', this.model.imageFolder, item._id);
+    try {
+      await fs.rm(imageDir, { recursive: true, force: true });
+    } catch (error) {
+      console.error('Erreur suppression répertoire:', error);
+    }
+  }
+
+  async handleWooCommerceDelete(item) {
+    if (!this.shouldSync() || !this.wooCommerceService) return;
+
+    try {
+      if (item.image?.wp_id) {
+        await this.wooCommerceService.deleteMedia(item.image.wp_id);
       }
 
-      // Suppression des images WordPress
-      if (process.env.SYNC_ON_CHANGE === 'true' && this.wooCommerceService) {
-        try {
-          if (item.image?.wp_id) {
-            await this.wooCommerceService.deleteMedia(item.image.wp_id);
-          }
-
-          // Ajout: Suppression des images de galerie
-          if (item.gallery_images?.length > 0) {
-            for (const img of item.gallery_images) {
-              if (img.wp_id) {
-                await this.wooCommerceService.deleteMedia(img.wp_id);
-              }
-            }
-          }
-
-          // Suppression du produit WooCommerce
-          if (item.woo_id) {
-            await this.wooCommerceService.wcApi.delete(
-              `${this.wooCommerceService.endpoint}/${item.woo_id}`,
-              { force: true }
-            );
-          }
-        } catch (error) {
-          if (error.response?.status !== 404) {
-            console.error('Erreur suppression WooCommerce:', error);
+      if (item.gallery_images?.length > 0) {
+        for (const img of item.gallery_images) {
+          if (img.wp_id) {
+            await this.wooCommerceService.deleteMedia(img.wp_id);
           }
         }
       }
 
-      // Suppression du répertoire d'images local
-      const imageDir = path.join(process.cwd(), 'public', this.model.imageFolder, req.params.id);
-      try {
-        await fs.rm(imageDir, { recursive: true, force: true });
-      } catch (err) {
-        console.error('Erreur suppression répertoire:', err);
+      if (item.woo_id) {
+        await this.wooCommerceService.wcApi.delete(
+          `${this.wooCommerceService.endpoint}/${item.woo_id}`,
+          { force: true }
+        );
       }
-
-      // Suppression de l'entité
-      await this.model.delete(req.params.id);
-
-      res.json({ message: 'Item deleted successfully' });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      if (error.response?.status !== 404) {
+        console.error('Erreur suppression WooCommerce:', error);
+      }
     }
+  }
+
+  shouldSync() {
+    return process.env.SYNC_ON_CHANGE === 'true';
   }
 }
 
