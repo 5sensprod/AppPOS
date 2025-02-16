@@ -26,31 +26,38 @@ class ImageService {
             status: 'active',
           };
 
-          // Mise à jour du document avec la nouvelle image
           const Model =
             this.entity === 'products'
               ? require('../../models/Product')
               : require('../../models/Category');
 
-          const item = await Model.findById(entityId);
-          if (!item) throw new Error('Entité non trouvée');
+          console.log('Entity:', this.entity, 'EntityId:', entityId); // Debug
 
-          // Mise à jour de l'entité avec la nouvelle image
+          const item = await Model.findById(entityId);
+          if (!item) {
+            console.error(
+              `${this.entity === 'products' ? 'Produit' : 'Catégorie'} ${entityId} non trouvé(e)`
+            );
+            throw new Error(
+              `${this.entity === 'products' ? 'Produit' : 'Catégorie'} non trouvé(e)`
+            );
+          }
+
           const updateData = this.imageHandler.isGallery
-            ? {
-                gallery_images: [...(item.gallery_images || []), updatedImageData],
-              }
+            ? { gallery_images: [...(item.gallery_images || []), updatedImageData] }
             : { image: updatedImageData };
 
-          await Model.update(entityId, updateData);
+          await Model.update(entityId, {
+            ...item,
+            ...updateData,
+          });
 
-          // Synchronisation WooCommerce immédiate
+          const service =
+            this.entity === 'products'
+              ? require('../ProductWooCommerceService')
+              : require('../CategoryWooCommerceService');
+
           if (process.env.SYNC_ON_CHANGE === 'true') {
-            const service =
-              this.entity === 'products'
-                ? require('../ProductWooCommerceService')
-                : require('../CategoryWooCommerceService');
-
             const updatedDoc = await Model.findById(entityId);
             await service.syncToWooCommerce(updatedDoc);
           }

@@ -21,7 +21,12 @@ class CategoryWooCommerceService extends BaseWooCommerceService {
     return {
       name: category.name,
       description: category.description || '',
-      parent: category.parent_id ? category.parent_id : 0,
+      ...(category.image?.wp_id && {
+        image: {
+          id: parseInt(category.image.wp_id),
+          src: category.image.url,
+        },
+      }),
     };
   }
 
@@ -31,22 +36,33 @@ class CategoryWooCommerceService extends BaseWooCommerceService {
   }
 
   async _handleSpecificSync(input, results) {
-    if (Array.isArray(input)) {
-      for (const category of input) {
-        await this._syncCategoryToWC(category, results).catch((error) => {
-          results.errors.push({ category_id: category._id, error: error.message });
-        });
+    try {
+      if (Array.isArray(input)) {
+        for (const category of input) {
+          await this._syncCategoryToWC(category, results);
+        }
+        return results;
       }
+
+      // Si input est un objet catégorie complet
+      if (typeof input === 'object' && input._id) {
+        await this._syncCategoryToWC(input, results);
+        return results;
+      }
+
+      // Si input est un ID
+      const category = await Category.findById(input);
+      if (!category) throw new Error('Catégorie non trouvée');
+
+      await this._syncCategoryToWC(category, results);
+      return results;
+    } catch (error) {
+      results.errors.push({
+        category_id: typeof input === 'object' ? input._id : input,
+        error: error.message,
+      });
       return results;
     }
-
-    const category = await Category.findById(input);
-    if (!category) throw new Error('Catégorie non trouvée');
-
-    await this._syncCategoryToWC(category, results).catch((error) => {
-      results.errors.push({ category_id: input, error: error.message });
-    });
-    return results;
   }
 
   async _handleFullSync(results) {

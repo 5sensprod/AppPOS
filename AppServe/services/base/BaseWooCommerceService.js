@@ -41,16 +41,23 @@ class BaseWooCommerceService {
       const credentials = Buffer.from(
         `${process.env.WP_USER}:${process.env.WP_APP_PASSWORD}`
       ).toString('base64');
-      await axios.delete(`${process.env.WC_URL}/wp-json/wp/v2/media/${mediaId}?force=true`, {
-        headers: { Authorization: `Basic ${credentials}` },
+
+      await axios.delete(`${process.env.WC_URL}/wp-json/wp/v2/media/${mediaId}`, {
+        params: {
+          force: true,
+        },
+        headers: {
+          Authorization: `Basic ${credentials}`,
+          'Content-Type': 'application/json',
+        },
       });
     } catch (error) {
+      // Si l'erreur n'est pas une 404 (média déjà supprimé), on la propage
       if (error.response?.status !== 404) {
-        throw error;
+        throw new Error(`Erreur lors de la suppression du média ${mediaId}: ${error.message}`);
       }
     }
   }
-
   _mapWooCommerceToLocal(wcEntity) {
     throw new Error('_mapWooCommerceToLocal must be implemented');
   }
