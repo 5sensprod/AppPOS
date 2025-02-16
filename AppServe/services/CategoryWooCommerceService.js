@@ -169,12 +169,26 @@ class CategoryWooCommerceService extends BaseWooCommerceService {
     if (category.level === 0) {
       const allCategories = await Category.findAll();
       const children = allCategories.filter((cat) => cat.parent_id === categoryId);
-
       if (children.length > 0) {
         throw new Error(
           `Impossible de supprimer la catégorie dans WooCommerce : ${children.length} sous-catégorie(s) existante(s)`
         );
       }
+    }
+
+    // Vérifier les produits liés
+    const Product = require('../models/Product');
+    const allProducts = await Product.findAll();
+    const linkedProducts = allProducts.filter(
+      (product) =>
+        (product.categories?.length > 0 && product.categories.includes(categoryId)) ||
+        (product.category_id && product.category_id === categoryId)
+    );
+
+    if (linkedProducts.length > 0) {
+      throw new Error(
+        `Impossible de supprimer la catégorie dans WooCommerce : ${linkedProducts.length} produit(s) lié(s)`
+      );
     }
 
     if (category.woo_id) {

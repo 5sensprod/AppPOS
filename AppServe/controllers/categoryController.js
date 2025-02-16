@@ -38,16 +38,32 @@ class CategoryController extends BaseController {
       const item = await this.model.findById(req.params.id);
       if (!item) return ResponseHandler.notFound(res);
 
+      // Vérification des sous-catégories
       if (item.level === 0) {
         const allCategories = await this.model.findAll();
         const children = allCategories.filter((cat) => cat.parent_id === req.params.id);
-
         if (children.length > 0) {
           return ResponseHandler.error(res, {
             status: 400,
             message: `Impossible de supprimer la catégorie : ${children.length} sous-catégorie(s) existante(s)`,
           });
         }
+      }
+
+      // Vérification des produits liés
+      const Product = require('../models/Product');
+      const allProducts = await Product.findAll();
+      const linkedProducts = allProducts.filter(
+        (product) =>
+          (product.categories?.length > 0 && product.categories.includes(item._id)) ||
+          (product.category_id && product.category_id === item._id)
+      );
+
+      if (linkedProducts.length > 0) {
+        return ResponseHandler.error(res, {
+          status: 400,
+          message: `Impossible de supprimer la catégorie : ${linkedProducts.length} produit(s) lié(s)`,
+        });
       }
 
       await this.handleImageDeletion(item);

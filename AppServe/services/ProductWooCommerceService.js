@@ -1,5 +1,6 @@
 const BaseWooCommerceService = require('./base/BaseWooCommerceService');
 const Product = require('../models/Product');
+const Category = require('../models/Category');
 
 class ProductWooCommerceService extends BaseWooCommerceService {
   constructor() {
@@ -13,7 +14,7 @@ class ProductWooCommerceService extends BaseWooCommerceService {
         for (const product of input) {
           await this._syncProductToWC(product, results);
         }
-      } else {
+      } else if (input) {
         await this._syncProductToWC(input, results);
       }
     } catch (error) {
@@ -24,10 +25,11 @@ class ProductWooCommerceService extends BaseWooCommerceService {
 
   async _syncProductToWC(product, results) {
     try {
-      const wcData = this._mapLocalToWooCommerce(product);
+      const wcData = await this._prepareWooCommerceData(product);
 
       if (product.woo_id) {
         await this.wcApi.put(`${this.endpoint}/${product.woo_id}`, wcData);
+        await Product.update(product._id, { last_sync: new Date() });
         results.updated++;
       } else {
         const response = await this.wcApi.post(this.endpoint, wcData);
@@ -46,21 +48,33 @@ class ProductWooCommerceService extends BaseWooCommerceService {
     }
   }
 
-  _mapLocalToWooCommerce(product) {
+  async _prepareWooCommerceData(product) {
     const wcData = {
       name: product.name,
       sku: product.sku,
       description: product.description || '',
-      regular_price: product.regular_price?.toString() || product.price.toString(),
+      regular_price: (product.regular_price || product.price).toString(),
       price: product.price.toString(),
-      sale_price: product.sale_price?.toString() || '',
+      sale_price: (product.sale_price || '').toString(),
       status: product.status === 'published' ? 'publish' : 'draft',
-      manage_stock: product.manage_stock,
-      stock_quantity: product.stock,
+      manage_stock: product.manage_stock || false,
+      stock_quantity: product.stock || 0,
       meta_data: product.meta_data || [],
     };
 
-    let images = [];
+    // Gestion des catégories
+    if (product.categories?.length || product.category_id) {
+      const categoryIds = product.categories || [product.category_id];
+      const categories = await Category.findAll();
+
+      wcData.categories = categories
+        .filter((cat) => categoryIds.includes(cat._id) && cat.woo_id)
+        .map((cat) => ({ id: parseInt(cat.woo_id) }));
+    }
+
+    // Gestion des images
+    const images = [];
+
     if (product.image?.wp_id) {
       images.push({
         id: parseInt(product.image.wp_id),
@@ -70,7 +84,7 @@ class ProductWooCommerceService extends BaseWooCommerceService {
       });
     }
 
-    if (product.gallery_images?.length > 0) {
+    if (product.gallery_images?.length) {
       const galleryImages = product.gallery_images
         .filter((img) => img.wp_id)
         .map((img, index) => ({
@@ -79,11 +93,28 @@ class ProductWooCommerceService extends BaseWooCommerceService {
           position: index + 1,
           alt: `${product.name} - ${index + 1}`,
         }));
-      images = [...images, ...galleryImages];
+      images.push(...galleryImages);
     }
 
     wcData.images = images;
     return wcData;
+  }
+
+  async _mapWooCommerceToLocal(wcProduct) {
+    return {
+      name: wcProduct.name,
+      sku: wcProduct.sku,
+      description: wcProduct.description,
+      price: parseFloat(wcProduct.price),
+      regular_price: parseFloat(wcProduct.regular_price),
+      sale_price: wcProduct.sale_price ? parseFloat(wcProduct.sale_price) : null,
+      status: wcProduct.status === 'publish' ? 'published' : 'draft',
+      manage_stock: wcProduct.manage_stock,
+      stock: wcProduct.stock_quantity,
+      woo_id: wcProduct.id,
+      categories: wcProduct.categories?.map((cat) => cat.id) || [],
+      meta_data: wcProduct.meta_data || [],
+    };
   }
 }
 
