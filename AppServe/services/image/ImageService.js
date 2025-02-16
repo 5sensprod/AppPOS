@@ -25,25 +25,48 @@ class ImageService {
           status: 'active',
         };
 
-        const Model = require('../../models/Brand');
-        const service = require('../BrandWooCommerceService');
+        const Model =
+          this.entity === 'products'
+            ? require('../../models/Product')
+            : this.entity === 'categories'
+              ? require('../../models/Category')
+              : require('../../models/Brand');
 
         const item = await Model.findById(entityId);
         if (!item) throw new Error(`${this.entity} non trouvé`);
 
-        // Recherche du tag_id du brand
-        const brandsResponse = await service.wcApi.get('products/brands');
-        const brandTag = brandsResponse.data.find((b) => b.name === item.name);
+        const updateData = this.imageHandler.isGallery
+          ? { gallery_images: [...(item.gallery_images || []), updatedImageData] }
+          : { image: updatedImageData };
 
-        if (brandTag) {
-          // Mise à jour de l'image avec le tag_id trouvé
-          await service.wcApi.put(`products/brands/${brandTag.id}`, {
-            name: item.name,
-            image: { id: wpData.id },
-          });
+        if (this.entity === 'brands') {
+          const service = require('../BrandWooCommerceService');
+          const brandsResponse = await service.wcApi.get('products/brands');
+          const brandTag = brandsResponse.data.find((b) => b.name === item.name);
 
-          const updateData = { image: updatedImageData, woo_id: brandTag.id };
+          if (brandTag) {
+            await service.wcApi.put(`products/brands/${brandTag.id}`, {
+              name: item.name,
+              image: { id: wpData.id },
+            });
+            await Model.update(entityId, {
+              ...item,
+              ...updateData,
+              woo_id: brandTag.id,
+            });
+          }
+        } else {
           await Model.update(entityId, { ...item, ...updateData });
+
+          const service =
+            this.entity === 'products'
+              ? require('../ProductWooCommerceService')
+              : require('../CategoryWooCommerceService');
+
+          if (process.env.SYNC_ON_CHANGE === 'true') {
+            const updatedDoc = await Model.findById(entityId);
+            await service.syncToWooCommerce(updatedDoc);
+          }
         }
 
         return updatedImageData;
