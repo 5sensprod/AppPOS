@@ -3,18 +3,16 @@ const BaseController = require('./base/BaseController');
 const Category = require('../models/Category');
 const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
 const { calculateLevel } = require('../utils/categoryHelpers');
-const BaseImageController = require('./image/BaseImageController');
 
 class CategoryController extends BaseController {
   constructor() {
-    super(Category, categoryWooCommerceService);
-    this.imageController = new BaseImageController('entity_name', { type: 'single' });
-    this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
-    this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
-    this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
+    const imageOptions = {
+      entity: 'categories',
+      type: 'single',
+    };
+    super(Category, categoryWooCommerceService, imageOptions);
   }
 
-  //spécifité entité categories
   async create(req, res) {
     try {
       const level = await calculateLevel(req.body.parent_id);

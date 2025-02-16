@@ -1,42 +1,50 @@
-// src/controllers/image/BaseImageController.js
+// controllers/image/BaseImageController.js
 const ImageService = require('../../services/image/ImageService');
 
 class BaseImageController {
   constructor(entity, options = { type: 'single' }) {
-    if (!['single', 'gallery'].includes(options.type)) {
-      throw new Error("Le type d'image doit être 'single' ou 'gallery'");
-    }
+    this.validateOptions(options);
     this.imageService = new ImageService(entity, options.type);
+  }
+
+  validateOptions(options) {
+    const validTypes = ['single', 'gallery'];
+    if (!validTypes.includes(options.type)) {
+      throw new Error(`Type d'image invalide. Valeurs autorisées : ${validTypes.join(', ')}`);
+    }
+  }
+
+  validateAndGetFiles(req) {
+    if ((!req.file && !req.files) || req.files?.length === 0) {
+      throw new Error('Aucune image fournie');
+    }
+    return req.files || [req.file];
+  }
+
+  async processFiles(files, id) {
+    return Promise.all(
+      files.map((file) =>
+        this.imageService.processUpload(file, id, {
+          syncToWordPress: process.env.SYNC_ON_CHANGE === 'true',
+        })
+      )
+    );
   }
 
   async uploadImage(req, res) {
     try {
-      if ((!req.file && !req.files) || (req.files && req.files.length === 0)) {
-        return res.status(400).json({ error: 'Aucune image fournie' });
-      }
+      const files = this.validateAndGetFiles(req);
+      const results = await this.processFiles(files, req.params.id);
 
-      const files = req.files || [req.file];
-      const results = await Promise.all(
-        files.map((file) =>
-          this.imageService.processUpload(file, req.params.id, {
-            syncToWordPress: process.env.SYNC_ON_CHANGE === 'true',
-          })
-        )
-      );
-
-      res.json({
+      return res.json({
         success: true,
         message: 'Images téléversées avec succès',
         data: results,
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
+      return this.handleError(res, error);
     }
   }
-
   async updateImageMetadata(req, res) {
     try {
       const updateData = await this.imageService.updateMetadata(req.params.id, req.body);
@@ -68,6 +76,13 @@ class BaseImageController {
         error: error.message,
       });
     }
+  }
+
+  handleError(res, error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 }
 

@@ -2,15 +2,14 @@
 const BaseController = require('./base/BaseController');
 const Brand = require('../models/Brand');
 const brandWooCommerceService = require('../services/BrandWooCommerceService');
-const BaseImageController = require('./image/BaseImageController');
 
 class BrandController extends BaseController {
   constructor() {
-    super(Brand, brandWooCommerceService);
-    this.imageController = new BaseImageController('entity_name', { type: 'single' });
-    this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
-    this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
-    this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
+    const imageOptions = {
+      entity: 'brands',
+      type: 'single',
+    };
+    super(Brand, brandWooCommerceService, imageOptions);
   }
 
   async getBySupplier(req, res) {

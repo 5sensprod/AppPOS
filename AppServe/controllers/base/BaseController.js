@@ -1,11 +1,29 @@
-// controllers\base\BaseController.js
+// controllers/base/BaseController.js
 const fs = require('fs').promises;
 const path = require('path');
+const BaseImageController = require('../image/BaseImageController');
 
 class BaseController {
-  constructor(model, wooCommerceService) {
+  constructor(model, wooCommerceService, imageOptions = null) {
+    if (!model) {
+      throw new Error('Un modèle est requis pour le contrôleur de base');
+    }
+
     this.model = model;
     this.wooCommerceService = wooCommerceService;
+
+    if (imageOptions && imageOptions.entity) {
+      this.imageController = new BaseImageController(imageOptions.entity, {
+        type: imageOptions.type || 'single',
+      });
+      this.setupImageHandlers();
+    }
+  }
+
+  setupImageHandlers() {
+    this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
+    this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
+    this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
   }
 
   async getAll(req, res) {
