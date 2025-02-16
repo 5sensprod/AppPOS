@@ -165,9 +165,23 @@ class CategoryWooCommerceService extends BaseWooCommerceService {
     const category = await Category.findById(categoryId);
     if (!category) throw new Error('Category not found');
 
+    // Vérifier les enfants pour les catégories parentes
+    if (category.level === 0) {
+      const allCategories = await Category.findAll();
+      const children = allCategories.filter((cat) => cat.parent_id === categoryId);
+
+      if (children.length > 0) {
+        throw new Error(
+          `Impossible de supprimer la catégorie dans WooCommerce : ${children.length} sous-catégorie(s) existante(s)`
+        );
+      }
+    }
+
     if (category.woo_id) {
       try {
-        if (category.image?.wp_id) await this.deleteMedia(category.image.wp_id);
+        if (category.image?.wp_id) {
+          await this.deleteMedia(category.image.wp_id);
+        }
         await this.wcApi.delete(`${this.endpoint}/${category.woo_id}`, { force: true });
       } catch (error) {
         if (error.response?.status !== 404) throw error;
