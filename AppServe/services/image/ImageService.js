@@ -14,6 +14,19 @@ class ImageService {
 
   async processUpload(file, entityId, options = {}) {
     try {
+      // Charger l'entité pour vérifier l'image existante
+      const Model = this._getModelByEntity();
+      const item = await Model.findById(entityId);
+      if (!item) throw new Error(`${this.entity} non trouvé`);
+
+      // Si une image existe déjà, essayer de la supprimer
+      if (item.image) {
+        await this._handleExistingImage(item.image, entityId).catch((error) => {
+          console.warn("Avertissement lors de la suppression de l'ancienne image:", error.message);
+        });
+      }
+
+      // Procéder au nouvel upload
       const imageData = await this.imageHandler.upload(file, entityId);
 
       if (this.entity !== 'suppliers' && options.syncToWordPress) {
@@ -25,53 +38,8 @@ class ImageService {
           status: 'active',
         };
 
-        const Model =
-          this.entity === 'products'
-            ? require('../../models/Product')
-            : this.entity === 'categories'
-              ? require('../../models/Category')
-              : require('../../models/Brand');
-
-        const item = await Model.findById(entityId);
-        if (!item) throw new Error(`${this.entity} non trouvé`);
-
-        const updateData = this.imageHandler.isGallery
-          ? { gallery_images: [...(item.gallery_images || []), updatedImageData] }
-          : { image: updatedImageData };
-
-        if (this.entity === 'brands') {
-          const brandService = require('../BrandWooCommerceService');
-
-          // Utiliser le client du service pour la requête
-          const brand = await Model.findById(entityId);
-          if (brand) {
-            await brandService.syncToWooCommerce({
-              ...brand,
-              image: {
-                ...updatedImageData,
-                wp_id: wpData.id,
-              },
-            });
-
-            // Mise à jour locale
-            await Model.update(entityId, {
-              ...item,
-              ...updateData,
-            });
-          }
-        } else {
-          await Model.update(entityId, { ...item, ...updateData });
-
-          const service =
-            this.entity === 'products'
-              ? require('../ProductWooCommerceService')
-              : require('../CategoryWooCommerceService');
-
-          if (process.env.SYNC_ON_CHANGE === 'true') {
-            const updatedDoc = await Model.findById(entityId);
-            await service.syncToWooCommerce(updatedDoc);
-          }
-        }
+        // Mise à jour de l'entité avec la nouvelle image
+        await this._updateEntityWithNewImage(item, updatedImageData, Model);
 
         return updatedImageData;
       }
@@ -79,8 +47,104 @@ class ImageService {
       return imageData;
     } catch (error) {
       console.error('Upload error:', error);
-      await this._cleanup(file.path).catch(() => {});
+      // Nettoyer le fichier temporaire si nécessaire
+      if (file?.path) {
+        await this._cleanup(file.path).catch(console.error);
+      }
       throw error;
+    }
+  }
+
+  async _handleExistingImage(existingImage, entityId) {
+    // Supprimer l'image de WordPress si elle existe
+    if (existingImage.wp_id && this.entity !== 'suppliers') {
+      try {
+        await this.wpSync.deleteFromWordPress(existingImage.wp_id);
+      } catch (error) {
+        // Ignorer l'erreur 404, logger les autres
+        if (!error.message.includes('404')) {
+          console.error('Erreur suppression WordPress:', error);
+        }
+      }
+    }
+
+    // Supprimer le fichier local s'il existe
+    if (existingImage.local_path) {
+      try {
+        await fs.access(existingImage.local_path);
+        await fs.unlink(existingImage.local_path);
+      } catch (error) {
+        // Ignorer l'erreur si le fichier n'existe pas
+        if (error.code !== 'ENOENT') {
+          console.error('Erreur suppression fichier local:', error);
+        }
+      }
+    }
+
+    // Nettoyer le dossier si nécessaire
+    try {
+      const imageDir = path.join(process.cwd(), 'public', this.entity, entityId);
+      const exists = await fs
+        .access(imageDir)
+        .then(() => true)
+        .catch(() => false);
+
+      if (exists) {
+        const files = await fs.readdir(imageDir);
+        if (files.length === 0) {
+          await fs.rmdir(imageDir);
+        }
+      }
+    } catch (error) {
+      console.warn('Avertissement nettoyage dossier:', error.message);
+    }
+  }
+
+  async _updateEntityWithNewImage(item, updatedImageData, Model) {
+    const updateData = this.imageHandler.isGallery
+      ? { gallery_images: [...(item.gallery_images || []), updatedImageData] }
+      : { image: updatedImageData };
+
+    try {
+      // Mettre à jour l'entité locale
+      await Model.update(item._id, updateData);
+
+      // Synchroniser avec WooCommerce si nécessaire
+      if (this.entity !== 'suppliers' && process.env.SYNC_ON_CHANGE === 'true') {
+        const service = this._getWooCommerceService();
+        if (service) {
+          const updatedDoc = await Model.findById(item._id);
+          await service.syncToWooCommerce(updatedDoc);
+        }
+      }
+    } catch (error) {
+      console.error('Erreur mise à jour entité:', error);
+      throw error;
+    }
+  }
+
+  _getModelByEntity() {
+    return this.entity === 'products'
+      ? require('../../models/Product')
+      : this.entity === 'categories'
+        ? require('../../models/Category')
+        : this.entity === 'brands'
+          ? require('../../models/Brand')
+          : require('../../models/Supplier');
+  }
+
+  _getWooCommerceService() {
+    try {
+      return this.entity === 'products'
+        ? require('../ProductWooCommerceService')
+        : this.entity === 'categories'
+          ? require('../CategoryWooCommerceService')
+          : this.entity === 'brands'
+            ? require('../BrandWooCommerceService')
+            : null;
+    } catch (error) {
+      console.error('Service WooCommerce non trouvé:', error);
+      return null;
     }
   }
 
@@ -153,12 +217,11 @@ class ImageService {
         .access(filePath)
         .then(() => true)
         .catch(() => false);
-
       if (exists) {
         await fs.unlink(filePath);
       }
     } catch (error) {
-      console.error('Erreur nettoyage fichier:', error);
+      console.error('Erreur nettoyage fichier temporaire:', error);
     }
   }
 }
