@@ -1,120 +1,91 @@
-const BaseWooCommerceService = require('./base/BaseWooCommerceService');
+// services/ProductWooCommerceService.js
+const WooCommerceClient = require('./base/WooCommerceClient');
+const ProductSyncStrategy = require('./sync/ProductSync');
+const SyncErrorHandler = require('./base/SyncErrorHandler');
 const Product = require('../models/Product');
-const Category = require('../models/Category');
 
-class ProductWooCommerceService extends BaseWooCommerceService {
+class ProductWooCommerceService {
   constructor() {
-    super('products');
+    this.client = new WooCommerceClient();
+    this.strategy = new ProductSyncStrategy();
+    this.errorHandler = new SyncErrorHandler();
+    this.endpoint = 'products';
   }
 
-  async syncToWooCommerce(input) {
-    const results = { created: 0, updated: 0, errors: [] };
+  async syncToWooCommerce(input = null) {
+    const results = { created: 0, updated: 0, deleted: 0, errors: [] };
+
     try {
-      if (Array.isArray(input)) {
-        for (const product of input) {
-          await this._syncProductToWC(product, results);
-        }
-      } else if (input) {
-        await this._syncProductToWC(input, results);
+      if (!input) {
+        return await this.strategy.handleFullSync(this.client, results);
       }
+
+      const products = Array.isArray(input) ? input : [input];
+
+      for (const product of products) {
+        const result = await this.strategy.syncToWooCommerce(product, this.client, results);
+        if (!result.success) {
+          this.errorHandler.handleSyncError(result.error, results, product._id);
+        }
+      }
+
+      return {
+        success: true,
+        data: Array.isArray(input)
+          ? await Promise.all(products.map((p) => Product.findById(p._id)))
+          : [await Product.findById(input._id)],
+        ...results,
+      };
     } catch (error) {
-      results.errors.push({ error: error.message });
+      console.error('Sync error:', error);
+      return {
+        success: false,
+        error: error.message,
+        data: [],
+        ...results,
+      };
     }
-    return results;
   }
 
-  async _syncProductToWC(product, results) {
+  async deleteProduct(productId) {
     try {
-      const wcData = await this._prepareWooCommerceData(product);
+      const product = await Product.findById(productId);
+      if (!product) {
+        throw new Error('Product not found');
+      }
 
       if (product.woo_id) {
-        await this.wcApi.put(`${this.endpoint}/${product.woo_id}`, wcData);
-        await Product.update(product._id, { last_sync: new Date() });
-        results.updated++;
-      } else {
-        const response = await this.wcApi.post(this.endpoint, wcData);
-        await Product.update(product._id, {
-          woo_id: response.data.id,
-          last_sync: new Date(),
-        });
-        results.created++;
+        try {
+          // Suppression des images
+          if (product.image?.wp_id) {
+            await this.client.deleteMedia(product.image.wp_id);
+          }
+          if (product.gallery_images?.length) {
+            for (const image of product.gallery_images) {
+              if (image.wp_id) {
+                await this.client.deleteMedia(image.wp_id);
+              }
+            }
+          }
+          // Suppression du produit
+          await this.client.delete(`${this.endpoint}/${product.woo_id}`, { force: true });
+        } catch (error) {
+          if (error.response?.status !== 404) {
+            throw error;
+          }
+        }
       }
+
+      await Product.delete(productId);
+      return { success: true };
     } catch (error) {
-      console.error('Erreur WC:', error.response?.data || error.message);
-      results.errors.push({
-        product_id: product._id,
-        error: error.message,
-      });
+      this.errorHandler.handleError(error, 'product', productId);
+      throw error;
     }
   }
 
-  async _prepareWooCommerceData(product) {
-    const wcData = {
-      name: product.name,
-      sku: product.sku,
-      description: product.description || '',
-      regular_price: (product.regular_price || product.price).toString(),
-      price: product.price.toString(),
-      sale_price: (product.sale_price || '').toString(),
-      status: product.status === 'published' ? 'publish' : 'draft',
-      manage_stock: product.manage_stock || false,
-      stock_quantity: product.stock || 0,
-      meta_data: product.meta_data || [],
-    };
-
-    // Gestion des catégories
-    if (product.categories?.length || product.category_id) {
-      const categoryIds = product.categories || [product.category_id];
-      const categories = await Category.findAll();
-
-      wcData.categories = categories
-        .filter((cat) => categoryIds.includes(cat._id) && cat.woo_id)
-        .map((cat) => ({ id: parseInt(cat.woo_id) }));
-    }
-
-    // Gestion des images
-    const images = [];
-
-    if (product.image?.wp_id) {
-      images.push({
-        id: parseInt(product.image.wp_id),
-        src: product.image.url,
-        position: 0,
-        alt: product.name,
-      });
-    }
-
-    if (product.gallery_images?.length) {
-      const galleryImages = product.gallery_images
-        .filter((img) => img.wp_id)
-        .map((img, index) => ({
-          id: parseInt(img.wp_id),
-          src: img.url,
-          position: index + 1,
-          alt: `${product.name} - ${index + 1}`,
-        }));
-      images.push(...galleryImages);
-    }
-
-    wcData.images = images;
-    return wcData;
-  }
-
-  async _mapWooCommerceToLocal(wcProduct) {
-    return {
-      name: wcProduct.name,
-      sku: wcProduct.sku,
-      description: wcProduct.description,
-      price: parseFloat(wcProduct.price),
-      regular_price: parseFloat(wcProduct.regular_price),
-      sale_price: wcProduct.sale_price ? parseFloat(wcProduct.sale_price) : null,
-      status: wcProduct.status === 'publish' ? 'published' : 'draft',
-      manage_stock: wcProduct.manage_stock,
-      stock: wcProduct.stock_quantity,
-      woo_id: wcProduct.id,
-      categories: wcProduct.categories?.map((cat) => cat.id) || [],
-      meta_data: wcProduct.meta_data || [],
-    };
+  async testConnection() {
+    return this.client.testConnection(this.endpoint);
   }
 }
 

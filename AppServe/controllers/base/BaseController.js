@@ -117,28 +117,22 @@ class BaseController {
     if (!this.shouldSync() || !this.wooCommerceService) return;
 
     try {
-      if (item.image?.wp_id) {
-        await this.wooCommerceService.deleteMedia(item.image.wp_id);
-      }
+      // Détecter le type d'entité et appeler la bonne méthode de suppression
+      const entityType = this.model.constructor.name.toLowerCase();
+      const deleteMethod = {
+        brand: 'deleteBrand',
+        category: 'deleteCategory',
+        product: 'deleteProduct',
+      }[entityType];
 
-      if (item.gallery_images?.length > 0) {
-        for (const img of item.gallery_images) {
-          if (img.wp_id) {
-            await this.wooCommerceService.deleteMedia(img.wp_id);
-          }
-        }
-      }
-
-      if (item.woo_id) {
-        await this.wooCommerceService.wcApi.delete(
-          `${this.wooCommerceService.endpoint}/${item.woo_id}`,
-          { force: true }
-        );
+      if (deleteMethod && typeof this.wooCommerceService[deleteMethod] === 'function') {
+        await this.wooCommerceService[deleteMethod](item._id);
+      } else {
+        console.error(`Méthode de suppression non trouvée pour l'entité ${entityType}`);
       }
     } catch (error) {
-      if (error.response?.status !== 404) {
-        console.error('Erreur suppression WooCommerce:', error);
-      }
+      console.error('Erreur suppression WooCommerce:', error);
+      throw error;
     }
   }
 

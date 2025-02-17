@@ -40,19 +40,23 @@ class ImageService {
           : { image: updatedImageData };
 
         if (this.entity === 'brands') {
-          const service = require('../BrandWooCommerceService');
-          const brandsResponse = await service.wcApi.get('products/brands');
-          const brandTag = brandsResponse.data.find((b) => b.name === item.name);
+          const brandService = require('../BrandWooCommerceService');
 
-          if (brandTag) {
-            await service.wcApi.put(`products/brands/${brandTag.id}`, {
-              name: item.name,
-              image: { id: wpData.id },
+          // Utiliser le client du service pour la requête
+          const brand = await Model.findById(entityId);
+          if (brand) {
+            await brandService.syncToWooCommerce({
+              ...brand,
+              image: {
+                ...updatedImageData,
+                wp_id: wpData.id,
+              },
             });
+
+            // Mise à jour locale
             await Model.update(entityId, {
               ...item,
               ...updateData,
-              woo_id: brandTag.id,
             });
           }
         } else {
@@ -74,10 +78,12 @@ class ImageService {
 
       return imageData;
     } catch (error) {
+      console.error('Upload error:', error);
       await this._cleanup(file.path).catch(() => {});
       throw error;
     }
   }
+
   async updateMetadata(entityId, metadata) {
     try {
       // 1. Mise à jour locale
