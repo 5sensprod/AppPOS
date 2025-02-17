@@ -20,6 +20,44 @@ class BrandController extends BaseController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  async update(req, res) {
+    try {
+      const brand = await this.model.findById(req.params.id);
+      if (!brand) return ResponseHandler.notFound(res);
+
+      const updated = await this.model.update(req.params.id, req.body);
+
+      if (this.shouldSync() && this.wooCommerceService) {
+        const updatedBrand = await this.model.findById(req.params.id);
+        try {
+          await this.wooCommerceService.syncToWooCommerce(updatedBrand);
+        } catch (syncError) {
+          return ResponseHandler.partialSuccess(res, updated, syncError);
+        }
+      }
+
+      const finalBrand = await this.model.findById(req.params.id);
+      return ResponseHandler.success(res, finalBrand);
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  async delete(req, res) {
+    try {
+      const brand = await this.model.findById(req.params.id);
+      if (!brand) return ResponseHandler.notFound(res);
+
+      await this.handleImageDeletion(brand);
+      await this.handleWooCommerceDelete(brand);
+      await this.model.delete(req.params.id);
+
+      return ResponseHandler.success(res, { message: 'Marque supprimée avec succès' });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
 }
 
 const brandController = new BrandController();

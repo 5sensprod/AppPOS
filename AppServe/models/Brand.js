@@ -15,6 +15,22 @@ class Brand extends BaseModel {
       });
     });
   }
+
+  async create(data) {
+    return new Promise((resolve, reject) => {
+      this.collection.insert(
+        {
+          ...data,
+          woo_id: null,
+          last_sync: null,
+        },
+        (err, newDoc) => {
+          if (err) reject(err);
+          resolve(newDoc);
+        }
+      );
+    });
+  }
 }
 
 module.exports = new Brand();

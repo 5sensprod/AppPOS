@@ -45,6 +45,8 @@ const createBrandSchema = Joi.object({
       value: Joi.string(),
     })
   ),
+  woo_id: Joi.number(),
+  last_sync: Joi.date(),
 });
 
 const updateBrandSchema = Joi.object({
