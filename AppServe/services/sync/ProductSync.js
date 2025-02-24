@@ -19,50 +19,26 @@ class ProductSyncStrategy extends SyncStrategy {
       status: product.status === 'published' ? 'publish' : 'draft',
       manage_stock: product.manage_stock || false,
       stock_quantity: product.stock || 0,
-      meta_data: product.meta_data || [],
+      meta_data: [...(product.meta_data || []), { key: 'brand_id', value: product.brand_id }],
     };
 
     // Gestion des catégories
     wcData.categories = await this._prepareCategoryData(product);
 
-    // Gestion des images en incluant tous les IDs de la galerie
     // Gestion des images
-    const images = [];
-    const processedIds = new Set();
+    wcData.images = this._prepareImageData(product);
 
-    // Ajouter l'image principale
-    if (product.image?.wp_id) {
-      const mainImageId = parseInt(product.image.wp_id);
-      images.push({
-        id: mainImageId,
-        src: product.image.url,
-        alt: product.name,
-        position: 0,
-      });
-      processedIds.add(mainImageId);
+    // Ajouter la marque si elle existe
+    if (product.brand_id) {
+      const Brand = require('../../models/Brand');
+      const brand = await Brand.findById(product.brand_id);
+      if (brand?.woo_id) {
+        wcData.brands = [{ id: parseInt(brand.woo_id) }];
+      }
     }
 
-    // Ajouter toutes les images de la galerie
-    if (product.gallery_images?.length > 0) {
-      product.gallery_images.forEach((img, index) => {
-        if (img.wp_id && !processedIds.has(parseInt(img.wp_id))) {
-          images.push({
-            id: parseInt(img.wp_id),
-            src: img.url,
-            alt: `${product.name} - ${index + 1}`,
-            position: index + 1,
-          });
-          processedIds.add(parseInt(img.wp_id));
-        }
-      });
-    }
-
-    wcData.images = images;
-
-    console.log('WC Data for product:', wcData);
     return wcData;
   }
-
   async _prepareCategoryData(product) {
     // Si categories est vide ET category_id est null, utiliser "non classée"
     if (
