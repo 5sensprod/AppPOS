@@ -14,6 +14,8 @@ class BaseImageRoutes {
 
   initializeRoutes(type) {
     const uploadMethod = type === 'gallery' ? 'array' : 'single';
+
+    // Routes existantes
     this.router.post(
       '/:id/image',
       this.uploadMiddleware[uploadMethod],
@@ -26,6 +28,14 @@ class BaseImageRoutes {
     );
 
     this.router.delete('/:id/image', this.imageController.deleteImage.bind(this.imageController));
+
+    // Nouvelle route pour définir l'image principale
+    if (type === 'gallery') {
+      this.router.put(
+        '/:id/main-image',
+        this.imageController.setMainImage.bind(this.imageController)
+      );
+    }
   }
 
   getRouter() {

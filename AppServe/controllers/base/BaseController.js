@@ -25,6 +25,7 @@ class BaseController {
     this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
     this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
     this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
+    this.setMainImage = this.imageController.setMainImage.bind(this.imageController); // Ajout de cette ligne
   }
 
   async getAll(req, res) {

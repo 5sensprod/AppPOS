@@ -68,6 +68,51 @@ class BaseImageController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  async setMainImage(req, res) {
+    try {
+      const { id: entityId } = req.params;
+      const { imageId } = req.body; // wp_id de l'image à mettre en avant
+
+      const Model = this.imageService._getModelByEntity();
+      const item = await Model.findById(entityId);
+
+      if (!item) {
+        return ResponseHandler.error(res, new Error(`${this.imageService.entity} non trouvé`));
+      }
+
+      // Chercher l'image dans la galerie
+      const targetImage = item.gallery_images?.find((img) => img.wp_id === parseInt(imageId));
+
+      if (!targetImage) {
+        return ResponseHandler.error(res, new Error('Image non trouvée dans la galerie'));
+      }
+
+      // Mettre à jour l'image principale
+      const updateData = {
+        image: {
+          wp_id: targetImage.wp_id,
+          url: targetImage.url,
+        },
+      };
+
+      await Model.update(entityId, updateData);
+
+      // Synchroniser avec WooCommerce si nécessaire
+      if (this.imageService.entity === 'products' && process.env.SYNC_ON_CHANGE === 'true') {
+        const service = require('../../services/ProductWooCommerceService');
+        const updatedDoc = await Model.findById(entityId);
+        await service.syncToWooCommerce(updatedDoc);
+      }
+
+      return ResponseHandler.success(res, {
+        message: 'Image principale mise à jour avec succès',
+        data: updateData.image,
+      });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
 }
 
 module.exports = BaseImageController;

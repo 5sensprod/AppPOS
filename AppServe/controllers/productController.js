@@ -88,4 +88,5 @@ module.exports = {
   uploadImage: productController.uploadImage,
   updateImageMetadata: productController.updateImageMetadata,
   deleteImage: productController.deleteImage,
+  setMainImage: productController.setMainImage, // Ajout de cette ligne
 };
