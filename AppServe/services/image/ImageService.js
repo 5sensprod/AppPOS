@@ -12,44 +12,66 @@ class ImageService {
     this.wpSync = new WordPressImageSync();
   }
 
-  async processUpload(file, entityId, options = {}) {
+  async processUpload(files, entityId, options = {}) {
     try {
-      // Charger l'entité pour vérifier l'image existante
       const Model = this._getModelByEntity();
       const item = await Model.findById(entityId);
       if (!item) throw new Error(`${this.entity} non trouvé`);
 
-      // Si une image existe déjà, essayer de la supprimer
-      if (item.image) {
-        await this._handleExistingImage(item.image, entityId).catch((error) => {
-          console.warn("Avertissement lors de la suppression de l'ancienne image:", error.message);
-        });
+      const allUploadedImages = [];
+      const filesToProcess = Array.isArray(files) ? files : [files];
+
+      for (const file of filesToProcess) {
+        const imageData = await this.imageHandler.upload(file, entityId);
+
+        if (this.entity !== 'suppliers' && options.syncToWordPress) {
+          const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
+          const newImage = {
+            src: imageData.src,
+            local_path: imageData.local_path,
+            status: 'active',
+            type: imageData.type,
+            metadata: imageData.metadata,
+            wp_id: wpData.id,
+            url: wpData.url,
+          };
+          allUploadedImages.push(newImage);
+        }
       }
 
-      // Procéder au nouvel upload
-      const imageData = await this.imageHandler.upload(file, entityId);
+      if (allUploadedImages.length > 0) {
+        const updateData = {};
+        const currentGallery = item.gallery_images || [];
 
-      if (this.entity !== 'suppliers' && options.syncToWordPress) {
-        const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
-        const updatedImageData = {
-          ...imageData,
-          wp_id: wpData.id,
-          url: wpData.url,
-          status: 'active',
-        };
+        // Mettre à jour la galerie
+        updateData.gallery_images = [...currentGallery, ...allUploadedImages];
 
-        // Mise à jour de l'entité avec la nouvelle image
-        await this._updateEntityWithNewImage(item, updatedImageData, Model);
+        // Définir l'image principale si elle n'existe pas
+        if (!item.image) {
+          updateData.image = {
+            wp_id: allUploadedImages[0].wp_id,
+            url: allUploadedImages[0].url,
+          };
+        }
 
-        return updatedImageData;
+        await Model.update(entityId, updateData);
+
+        if (this.entity === 'products' && process.env.SYNC_ON_CHANGE === 'true') {
+          const service = require('../ProductWooCommerceService');
+          const updatedDoc = await Model.findById(entityId);
+          await service.syncToWooCommerce(updatedDoc);
+        }
+
+        return { message: 'Images téléversées avec succès', data: allUploadedImages };
       }
 
-      return imageData;
+      return { message: 'Aucune image téléversée', data: [] };
     } catch (error) {
-      console.error('Upload error:', error);
-      // Nettoyer le fichier temporaire si nécessaire
-      if (file?.path) {
-        await this._cleanup(file.path).catch(console.error);
+      if (files) {
+        const toClean = Array.isArray(files) ? files : [files];
+        for (const file of toClean) {
+          if (file.path) await this._cleanup(file.path).catch(console.error);
+        }
       }
       throw error;
     }

@@ -22,13 +22,44 @@ class ProductSyncStrategy extends SyncStrategy {
       meta_data: product.meta_data || [],
     };
 
-    // Gestion explicite des catégories
+    // Gestion des catégories
     wcData.categories = await this._prepareCategoryData(product);
 
+    // Gestion des images en incluant tous les IDs de la galerie
     // Gestion des images
-    wcData.images = this._prepareImageData(product);
+    const images = [];
+    const processedIds = new Set();
 
-    console.log('WC Data prepared:', wcData);
+    // Ajouter l'image principale
+    if (product.image?.wp_id) {
+      const mainImageId = parseInt(product.image.wp_id);
+      images.push({
+        id: mainImageId,
+        src: product.image.url,
+        alt: product.name,
+        position: 0,
+      });
+      processedIds.add(mainImageId);
+    }
+
+    // Ajouter toutes les images de la galerie
+    if (product.gallery_images?.length > 0) {
+      product.gallery_images.forEach((img, index) => {
+        if (img.wp_id && !processedIds.has(parseInt(img.wp_id))) {
+          images.push({
+            id: parseInt(img.wp_id),
+            src: img.url,
+            alt: `${product.name} - ${index + 1}`,
+            position: index + 1,
+          });
+          processedIds.add(parseInt(img.wp_id));
+        }
+      });
+    }
+
+    wcData.images = images;
+
+    console.log('WC Data for product:', wcData);
     return wcData;
   }
 
@@ -67,7 +98,7 @@ class ProductSyncStrategy extends SyncStrategy {
   _prepareImageData(product) {
     const images = [];
 
-    // Image principale
+    // Ajouter l'image principale si elle existe
     if (product.image?.wp_id) {
       images.push({
         id: parseInt(product.image.wp_id),
@@ -77,7 +108,7 @@ class ProductSyncStrategy extends SyncStrategy {
       });
     }
 
-    // Galerie d'images
+    // Ajouter toutes les images de la galerie
     if (product.gallery_images?.length) {
       const galleryImages = product.gallery_images
         .filter((img) => img.wp_id)
@@ -87,7 +118,14 @@ class ProductSyncStrategy extends SyncStrategy {
           position: index + 1,
           alt: `${product.name} - ${index + 1}`,
         }));
-      images.push(...galleryImages);
+
+      // Si l'image principale n'est pas définie, définir la première image de la galerie comme principale
+      if (!product.image?.wp_id && galleryImages.length > 0) {
+        images.push({ ...galleryImages[0], position: 0 });
+        images.push(...galleryImages.slice(1));
+      } else {
+        images.push(...galleryImages);
+      }
     }
 
     return images;
@@ -141,19 +179,23 @@ class ProductSyncStrategy extends SyncStrategy {
       last_sync: new Date(),
     };
 
-    // Met à jour les images si nécessaire
+    // Mettre à jour toutes les images
     if (wcData.images?.length > 0) {
-      const [mainImage, ...galleryImages] = wcData.images;
-      if (mainImage) {
-        updateData.image = {
-          wp_id: mainImage.id,
-          url: mainImage.src,
-        };
-      }
-      if (galleryImages.length > 0) {
-        updateData.gallery_images = galleryImages.map((img) => ({
+      // Première image comme image principale
+      updateData.image = {
+        wp_id: wcData.images[0].id,
+        url: wcData.images[0].src,
+      };
+
+      // Reste des images dans la galerie
+      if (wcData.images.length > 1) {
+        updateData.gallery_images = wcData.images.slice(1).map((img) => ({
           wp_id: img.id,
           url: img.src,
+          src: img.src, // Maintenir la cohérence des champs
+          local_path: img.local_path, // Conserver le chemin local s'il existe
+          status: 'active',
+          type: img.src.split('.').pop(),
         }));
       }
     }

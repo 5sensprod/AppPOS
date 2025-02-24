@@ -107,7 +107,7 @@ const updateSupplierSchema = Joi.object({
 
 const createProductSchema = Joi.object({
   name: Joi.string().required(),
-  sku: Joi.string().required(),
+  sku: Joi.string().optional(),
   description: Joi.string().allow('', null),
   purchase_price: Joi.number().min(0),
   regular_price: Joi.number().min(0),
