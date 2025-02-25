@@ -18,7 +18,7 @@ class ImageService {
       const item = await Model.findById(entityId);
       if (!item) throw new Error(`${this.entity} non trouvé`);
 
-      const allUploadedImages = [];
+      const uploadedImages = [];
       const filesToProcess = Array.isArray(files) ? files : [files];
 
       for (const file of filesToProcess) {
@@ -26,31 +26,32 @@ class ImageService {
 
         if (this.entity !== 'suppliers' && options.syncToWordPress) {
           const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
-          const newImage = {
-            src: imageData.src,
+          uploadedImages.push({
+            src: imageData.src, // Chemin local pour l'URL frontend
             local_path: imageData.local_path,
             status: 'active',
             type: imageData.type,
             metadata: imageData.metadata,
             wp_id: wpData.id,
-            url: wpData.url,
-          };
-          allUploadedImages.push(newImage);
+            url: wpData.url, // URL WordPress
+          });
+        } else {
+          // Sans synchronisation
+          uploadedImages.push(imageData);
         }
       }
 
-      if (allUploadedImages.length > 0) {
+      // Le reste du code reste identique
+      if (uploadedImages.length > 0) {
         const updateData = {};
         const currentGallery = item.gallery_images || [];
 
-        // Mettre à jour la galerie
-        updateData.gallery_images = [...currentGallery, ...allUploadedImages];
+        updateData.gallery_images = [...currentGallery, ...uploadedImages];
 
-        // Définir l'image principale si elle n'existe pas
         if (!item.image) {
           updateData.image = {
-            wp_id: allUploadedImages[0].wp_id,
-            url: allUploadedImages[0].url,
+            ...uploadedImages[0],
+            src: uploadedImages[0].src, // Conserver le chemin src local
           };
         }
 
@@ -62,7 +63,7 @@ class ImageService {
           await service.syncToWooCommerce(updatedDoc);
         }
 
-        return { message: 'Images téléversées avec succès', data: allUploadedImages };
+        return { message: 'Images téléversées avec succès', data: uploadedImages };
       }
 
       return { message: 'Aucune image téléversée', data: [] };

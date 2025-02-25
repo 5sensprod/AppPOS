@@ -155,24 +155,47 @@ class ProductSyncStrategy extends SyncStrategy {
       last_sync: new Date(),
     };
 
-    // Mettre à jour toutes les images
+    // Obtenir les données actuelles du produit
+    const currentProduct = await Product.findById(productId);
+
+    // Mettre à jour les images
     if (wcData.images?.length > 0) {
-      // Première image comme image principale
+      // Image principale
+      const mainWpId = wcData.images[0].id;
+
+      // Chercher si cette image existe déjà dans la galerie locale
+      let mainImageLocal = currentProduct.gallery_images?.find((img) => img.wp_id === mainWpId);
+
       updateData.image = {
-        wp_id: wcData.images[0].id,
+        wp_id: mainWpId,
         url: wcData.images[0].src,
+        // Conserver le chemin local s'il existe déjà
+        local_path: mainImageLocal?.local_path || null,
+        src: mainImageLocal?.src || wcData.images[0].src,
       };
 
-      // Reste des images dans la galerie
+      // Mettre à jour ou créer les images de galerie
       if (wcData.images.length > 1) {
-        updateData.gallery_images = wcData.images.slice(1).map((img) => ({
-          wp_id: img.id,
-          url: img.src,
-          src: img.src, // Maintenir la cohérence des champs
-          local_path: img.local_path, // Conserver le chemin local s'il existe
-          status: 'active',
-          type: img.src.split('.').pop(),
-        }));
+        const galleryImages = [];
+
+        for (const wcImage of wcData.images) {
+          // Chercher l'image correspondante dans la galerie actuelle
+          const existingImage = currentProduct.gallery_images?.find(
+            (img) => img.wp_id === wcImage.id
+          );
+
+          galleryImages.push({
+            wp_id: wcImage.id,
+            url: wcImage.src,
+            src: existingImage?.src || wcImage.src,
+            local_path: existingImage?.local_path || null,
+            status: 'active',
+            type: existingImage?.type || wcImage.src.split('.').pop(),
+            metadata: existingImage?.metadata || {},
+          });
+        }
+
+        updateData.gallery_images = galleryImages;
       }
     }
 
