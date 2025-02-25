@@ -126,6 +126,9 @@ class ProductSyncStrategy extends SyncStrategy {
 
   async syncToWooCommerce(product, client, results = { created: 0, updated: 0, errors: [] }) {
     try {
+      // Vérifier et téléverser les images en attente vers WordPress
+      await this._syncPendingImages(product);
+
       const wcData = await this._mapLocalToWooCommerce(product);
 
       let response;
@@ -147,6 +150,65 @@ class ProductSyncStrategy extends SyncStrategy {
       });
       return { success: false, error, results };
     }
+  }
+
+  async _syncPendingImages(product) {
+    // Si pas d'images ou pas d'images en attente, ne rien faire
+    if (!product.gallery_images?.length) return product;
+
+    const pendingImages = product.gallery_images.filter(
+      (img) => img.status === 'pending' || !img.wp_id || !img.url
+    );
+
+    if (!pendingImages.length) return product;
+
+    const wpSync = new (require('../../services/image/WordPressImageSync'))();
+    const Product = require('../../models/Product');
+    const updatedGallery = [...product.gallery_images];
+
+    // Uploader chaque image en attente
+    for (let i = 0; i < updatedGallery.length; i++) {
+      const img = updatedGallery[i];
+      if (img.status === 'pending' || !img.wp_id || !img.url) {
+        try {
+          if (!img.local_path) continue;
+
+          const wpData = await wpSync.uploadToWordPress(img.local_path);
+          updatedGallery[i] = {
+            ...img,
+            wp_id: wpData.id,
+            url: wpData.url,
+            status: 'active',
+          };
+        } catch (error) {
+          console.error(`Erreur upload WP pour image ${i}:`, error);
+        }
+      }
+    }
+
+    // Mettre à jour l'image principale si nécessaire
+    let mainImage = product.image;
+    if (mainImage && (mainImage.status === 'pending' || !mainImage.wp_id || !mainImage.url)) {
+      // Trouver cette image dans la galerie mise à jour
+      const matchingImg = updatedGallery.find(
+        (img) => img.local_path === mainImage.local_path || img.src === mainImage.src
+      );
+
+      if (matchingImg && matchingImg.wp_id) {
+        mainImage = {
+          ...matchingImg,
+        };
+      }
+    }
+
+    // Sauvegarder les modifications
+    await Product.update(product._id, {
+      gallery_images: updatedGallery,
+      image: mainImage,
+    });
+
+    // Recharger le produit avec les images mises à jour
+    return await Product.findById(product._id);
   }
 
   async _updateLocalProduct(productId, wcData) {

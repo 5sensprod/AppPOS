@@ -72,7 +72,7 @@ class BaseImageController {
   async setMainImage(req, res) {
     try {
       const { id: entityId } = req.params;
-      const { imageId } = req.body; // wp_id de l'image à mettre en avant
+      const { imageId, imageIndex } = req.body; // wp_id ou index en local
 
       const Model = this.imageService._getModelByEntity();
       const item = await Model.findById(entityId);
@@ -81,8 +81,15 @@ class BaseImageController {
         return ResponseHandler.error(res, new Error(`${this.imageService.entity} non trouvé`));
       }
 
-      // Chercher l'image dans la galerie
-      const targetImage = item.gallery_images?.find((img) => img.wp_id === parseInt(imageId));
+      let targetImage = null;
+
+      if (imageId) {
+        // Mode WooCommerce: recherche par wp_id
+        targetImage = item.gallery_images?.find((img) => img.wp_id === parseInt(imageId));
+      } else if (imageIndex !== undefined) {
+        // Mode local: recherche par index dans gallery_images
+        targetImage = item.gallery_images?.[imageIndex];
+      }
 
       if (!targetImage) {
         return ResponseHandler.error(res, new Error('Image non trouvée dans la galerie'));
@@ -90,10 +97,7 @@ class BaseImageController {
 
       // Mettre à jour l'image principale
       const updateData = {
-        image: {
-          wp_id: targetImage.wp_id,
-          url: targetImage.url,
-        },
+        image: targetImage,
       };
 
       await Model.update(entityId, updateData);
