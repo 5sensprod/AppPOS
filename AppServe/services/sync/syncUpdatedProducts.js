@@ -1,9 +1,7 @@
 // syncUpdatedProducts.js
-const Datastore = require('nedb');
 const path = require('path');
 const dotenv = require('dotenv');
-const fs = require('fs').promises; // Utiliser fs.promises explicitement
-const util = require('util');
+const fs = require('fs').promises;
 const WooCommerceClient = require('../base/WooCommerceClient');
 
 // Charger les variables d'environnement
@@ -13,14 +11,6 @@ dotenv.config();
 const PRODUCTS_DB = path.join(__dirname, 'data', 'products.db');
 const BRANDS_DB = path.join(__dirname, 'data', 'brands.db');
 const CATEGORIES_DB = path.join(__dirname, 'data', 'categories.db');
-
-// Promisify nedb functions
-function createDatastore(filePath) {
-  const db = new Datastore({ filename: filePath, autoload: true });
-  db.findAsync = util.promisify(db.find);
-  db.findOneAsync = util.promisify(db.findOne);
-  return db;
-}
 
 // Fonction pour mapper les catégories
 async function mapCategories(categoryIds) {
