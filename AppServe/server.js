@@ -1,14 +1,21 @@
 // server.js
 const express = require('express');
-const app = express();
-const port = 3000;
 const path = require('path');
+const cors = require('cors');
 require('dotenv').config();
 
+// Importer les utilitaires
+const { setupServer } = require('./utils/server-setup');
+
+// Créer l'application Express
+const app = express();
+const defaultPort = process.env.PORT || 3000;
+
 // Middleware
+app.use(cors());
 app.use(express.json());
 
-// Fichiers statiques (ex: images des catégories, produits, etc.)
+// Fichiers statiques
 app.use('/public', express.static(path.resolve(__dirname, 'public')));
 
 // Routes
@@ -18,6 +25,7 @@ const brandRoutes = require('./routes/brandRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const wooSyncRoutes = require('./routes/wooSyncRoutes');
 
+// Configurer les routes
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/brands', brandRoutes);
@@ -34,6 +42,8 @@ app.get('/', (req, res) => {
   res.json({ message: "Bienvenue sur l'API POS" });
 });
 
-app.listen(port, () => {
-  console.log(`Serveur démarré sur http://localhost:${port}`);
+// Démarrer le serveur
+setupServer(app, defaultPort).catch((error) => {
+  console.error('Impossible de démarrer le serveur:', error.message);
+  process.exit(1);
 });
