@@ -16,11 +16,13 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const productRoutes = require('./routes/productRoutes');
 const brandRoutes = require('./routes/brandRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
+const wooSyncRoutes = require('./routes/wooSyncRoutes');
 
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/sync', wooSyncRoutes);
 
 // Route de test
 app.get('/test', (req, res) => {

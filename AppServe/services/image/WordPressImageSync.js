@@ -54,6 +54,10 @@ class WordPressImageSync {
       });
       return true;
     } catch (error) {
+      // Si l'image n'existe pas (404), considérer comme un succès
+      if (error.response && error.response.status === 404) {
+        return true;
+      }
       throw new Error(`Erreur suppression WordPress: ${error.message}`);
     }
   }

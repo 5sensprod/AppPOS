@@ -1,9 +1,8 @@
 // createWooCommerceCategories.js
-const Datastore = require('nedb');
 const path = require('path');
 const dotenv = require('dotenv');
 const fs = require('fs');
-const WooCommerceClient = require('./services/base/WooCommerceClient');
+const WooCommerceClient = require('../services/base/WooCommerceClient');
 
 // Charger les variables d'environnement
 dotenv.config();
