@@ -1,13 +1,16 @@
 // main.js
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 // Gardez une référence globale de l'objet window
 let mainWindow;
 
+console.log("Démarrage d'Electron...");
+console.log('Répertoire actuel:', __dirname);
+
 function createWindow() {
   console.log('Création de la fenêtre principale...');
-
   // Créer la fenêtre du navigateur
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -21,9 +24,17 @@ function createWindow() {
 
   // Définir l'URL à charger en fonction de l'environnement
   const isDev = process.env.NODE_ENV === 'development';
-  const url = isDev
-    ? 'http://localhost:5173'
-    : `file://${path.join(__dirname, 'dist', 'index.html')}`;
+  let url;
+
+  if (isDev) {
+    url = 'http://localhost:5173';
+    console.log('Mode développement, chargement depuis:', url);
+  } else {
+    const distPath = path.join(__dirname, 'dist', 'index.html');
+    console.log('Mode production, vérification du chemin:', distPath);
+    console.log('Ce fichier existe-t-il?', fs.existsSync(distPath));
+    url = `file://${distPath}`;
+  }
 
   console.log(`Chargement de l'URL: ${url}`);
   mainWindow.loadURL(url);
@@ -45,7 +56,6 @@ function createWindow() {
 app.whenReady().then(() => {
   console.log('Electron est prêt!');
   createWindow();
-
   app.on('activate', function () {
     // Sur macOS, recréer la fenêtre quand l'icône du dock est cliquée
     if (mainWindow === null) createWindow();
