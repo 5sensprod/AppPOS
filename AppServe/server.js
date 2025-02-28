@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
+const { getLocalIpAddress } = require('./utils/network');
 
 // Importer les utilitaires
 const { setupServer } = require('./utils/server-setup');
@@ -36,6 +37,17 @@ app.use('/api/products', authMiddleware, productRoutes);
 app.use('/api/brands', authMiddleware, brandRoutes);
 app.use('/api/suppliers', authMiddleware, supplierRoutes);
 app.use('/api/sync', authMiddleware, wooSyncRoutes);
+
+// Ajouter cette route avant le démarrage du serveur
+app.get('/api/server-info', (req, res) => {
+  const ipAddress = getLocalIpAddress();
+  const port = req.socket.localPort; // Obtient le port sur lequel la requête est reçue
+  res.json({
+    ip: ipAddress,
+    port: port,
+    url: `http://${ipAddress}:${port}`,
+  });
+});
 
 // Route de test (non protégée)
 app.get('/test', (req, res) => {
