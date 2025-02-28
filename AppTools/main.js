@@ -1,41 +1,60 @@
-const { app, BrowserWindow, Tray, Menu } = require('electron');
-    const path = require('path');
+// main.js
+const { app, BrowserWindow } = require('electron');
+const path = require('path');
 
-    let mainWindow;
-    let tray;
+// Gardez une référence globale de l'objet window
+let mainWindow;
 
-    function createWindow () {
-      mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        webPreferences: {
-          preload: path.join(__dirname, 'preload.js')
-        }
-      });
+function createWindow() {
+  console.log('Création de la fenêtre principale...');
 
-      mainWindow.loadURL('http://localhost:3000');
+  // Créer la fenêtre du navigateur
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
 
-      mainWindow.on('closed', function () {
-        mainWindow = null;
-      });
-    }
+  // Définir l'URL à charger en fonction de l'environnement
+  const isDev = process.env.NODE_ENV === 'development';
+  const url = isDev
+    ? 'http://localhost:5173'
+    : `file://${path.join(__dirname, 'dist', 'index.html')}`;
 
-    app.on('ready', () => {
-      createWindow();
+  console.log(`Chargement de l'URL: ${url}`);
+  mainWindow.loadURL(url);
 
-      tray = new Tray(path.join(__dirname, 'icon.png'));
-      const contextMenu = Menu.buildFromTemplate([
-        { label: 'Open', click: () => { mainWindow.show(); } },
-        { label: 'Quit', click: () => { app.quit(); } }
-      ]);
-      tray.setContextMenu(contextMenu);
-      tray.setToolTip('AppPOS');
-    });
+  // Ouvrir les DevTools en développement
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
+  }
 
-    app.on('window-all-closed', function () {
-      if (process.platform !== 'darwin') app.quit();
-    });
+  // Événement de fermeture
+  mainWindow.on('closed', function () {
+    mainWindow = null;
+  });
 
-    app.on('activate', function () {
-      if (mainWindow === null) createWindow();
-    });
+  console.log('Fenêtre principale créée avec succès!');
+}
+
+// Créer la fenêtre quand l'app est prête
+app.whenReady().then(() => {
+  console.log('Electron est prêt!');
+  createWindow();
+
+  app.on('activate', function () {
+    // Sur macOS, recréer la fenêtre quand l'icône du dock est cliquée
+    if (mainWindow === null) createWindow();
+  });
+});
+
+// Quitter quand toutes les fenêtres sont fermées, sauf sur macOS
+app.on('window-all-closed', function () {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+console.log("Initialisation d'Electron terminée.");

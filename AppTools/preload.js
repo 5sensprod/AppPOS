@@ -1,10 +1,7 @@
+// preload.js
+// Toutes les APIs Node.js sont disponibles dans ce fichier.
+// Il est exécuté avant que votre page web ne soit chargée.
 window.addEventListener('DOMContentLoaded', () => {
-      const replaceText = (selector, text) => {
-        const element = document.getElementById(selector);
-        if (element) element.innerText = text;
-      };
-
-      for (const type of ['chrome', 'node', 'electron']) {
-        replaceText(`${type}-version`, process.versions[type]);
-      }
-    });
+  // Ici, vous pouvez injecter du JavaScript pour personnaliser la page web
+  console.log('DOMContentLoaded - Preload script executed');
+});
