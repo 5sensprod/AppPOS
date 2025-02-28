@@ -1,75 +1,83 @@
 // src/services/api.js
 import axios from 'axios';
+import apiConfigService from './apiConfig';
 
-// Création d'une instance axios avec une configuration par défaut
-const api = axios.create({
-  // En utilisant le proxy de Vite, nous pouvons utiliser des chemins relatifs
-  // au lieu de l'URL complète, ce qui évite les problèmes CORS
-  baseURL: '/',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  },
-});
-
-// Intercepteur pour les requêtes
-api.interceptors.request.use(
-  (config) => {
-    // Vous pouvez ajouter ici un token d'authentification si nécessaire
-    // const token = localStorage.getItem('token');
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
-    console.log('Requête API:', config.method.toUpperCase(), config.url);
-    return config;
-  },
-  (error) => {
-    console.error('Erreur de requête API:', error);
-    return Promise.reject(error);
+class ApiService {
+  constructor() {
+    this.api = axios.create();
+    this.isInitialized = false;
   }
-);
 
-// Intercepteur pour les réponses
-api.interceptors.response.use(
-  (response) => {
-    console.log('Réponse API reçue:', response.status, response.config.url);
-    return response;
-  },
-  (error) => {
-    // Gestion des erreurs de réponse
-    if (error.response) {
-      // Le serveur a répondu avec un code d'erreur
-      console.error('Erreur API:', error.response.status, error.response.data);
-    } else if (error.request) {
-      // La requête a été faite mais aucune réponse n'a été reçue
-      console.error('Pas de réponse du serveur:', error.request);
-    } else {
-      // Une erreur s'est produite lors de la configuration de la requête
-      console.error('Erreur de configuration de la requête:', error.message);
+  // Initialise le service API
+  async init() {
+    try {
+      // S'assure que la configuration API est initialisée
+      await apiConfigService.init();
+      this.isInitialized = true;
+      console.log('Service API initialisé avec succès');
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de l'initialisation du service API:", error);
+      throw error;
     }
-    return Promise.reject(error);
   }
-);
 
-// Méthodes d'API simplifiées
-const apiService = {
-  // Tester la connexion à l'API
-  testConnection: () => api.get('/test'),
+  // Vérifie si le service est initialisé
+  ensureInitialized() {
+    if (!this.isInitialized) {
+      throw new Error('Le service API doit être initialisé avant utilisation');
+    }
+  }
 
-  // Accéder à la page d'accueil de l'API
-  getHomePage: () => api.get('/'),
+  // Méthode GET
+  async get(url, config = {}) {
+    this.ensureInitialized();
+    const fullUrl = apiConfigService.createUrl(url);
+    return this.api.get(fullUrl, config);
+  }
 
-  // Méthodes génériques
-  get: (url, config = {}) => api.get(url, config),
-  post: (url, data, config = {}) => api.post(url, data, config),
-  put: (url, data, config = {}) => api.put(url, data, config),
-  delete: (url, config = {}) => api.delete(url, config),
+  // Méthode POST
+  async post(url, data, config = {}) {
+    this.ensureInitialized();
+    const fullUrl = apiConfigService.createUrl(url);
+    return this.api.post(fullUrl, data, config);
+  }
 
-  // Méthodes spécifiques pour les entités de votre API
-  // Exemple:
-  // getProducts: () => api.get('/api/products'),
-  // createProduct: (productData) => api.post('/api/products', productData),
-};
+  // Méthode PUT
+  async put(url, data, config = {}) {
+    this.ensureInitialized();
+    const fullUrl = apiConfigService.createUrl(url);
+    return this.api.put(fullUrl, data, config);
+  }
 
+  // Méthode DELETE
+  async delete(url, config = {}) {
+    this.ensureInitialized();
+    const fullUrl = apiConfigService.createUrl(url);
+    return this.api.delete(fullUrl, config);
+  }
+
+  // Définit le token d'authentification pour les requêtes futures
+  setAuthToken(token) {
+    if (token) {
+      this.api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      delete this.api.defaults.headers.common['Authorization'];
+    }
+  }
+
+  // Vérifie la connectivité API
+  async testConnection() {
+    try {
+      const response = await this.get('/test');
+      return response.data;
+    } catch (error) {
+      console.error('Test de connexion échoué:', error);
+      throw error;
+    }
+  }
+}
+
+// Exporte une instance unique du service
+const apiService = new ApiService();
 export default apiService;
