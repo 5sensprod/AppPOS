@@ -1,6 +1,6 @@
 {
   "name": "appstock",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "AppStock - Système de Point de Vente",
   "main": "main.js",
   "private": true,
@@ -12,11 +12,12 @@
     "dev:electron-only": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
     "build": "vite build",
     "prebuild:prod": "node ../scripts/prepare-production.js",
-    "build:prod": "vite build && electron-builder --publish always",
+    "build:prod": "vite build && electron-builder",
     "postbuild:prod": "node ../scripts/copy-node-modules.js",
     "dist": "npm run prebuild:prod && npm run build:prod",
     "preview": "vite preview",
-    "postbuild": "node ../scripts/copy-node-modules.js"
+    "postbuild": "node ../scripts/copy-node-modules.js",
+    "publish": "vite build && electron-builder --publish always"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
@@ -36,7 +37,7 @@
   },
   "build": {
     "appId": "com.cinqsensprod.apppos",
-    "productName": "AppPOS",
+    "productName": "AppStock",
     "files": [
       "dist/**/*",
       "main.js",
