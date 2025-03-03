@@ -65,3 +65,9 @@
     - `react`: Interface utilisateur.
     - `axios`: Appels API.
     - `vite`: Serveur de développement et build.
+
+## Configuration
+
+1. Copiez le fichier `.env.sample` vers `.env` dans le répertoire `AppServe`
+2. Modifiez les valeurs dans le fichier `.env` avec vos propres informations d'authentification
+3. Ne partagez jamais votre fichier `.env` contenant vos informations sensibles

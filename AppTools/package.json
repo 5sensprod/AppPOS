@@ -11,10 +11,15 @@
     "dev:electron": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
     "dev:electron-only": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
     "build": "vite build",
-    "dist": "vite build && electron-builder",
-    "preview": "vite preview"
+    "prebuild:prod": "node ../scripts/prepare-production.js",
+    "build:prod": "vite build && electron-builder",
+    "postbuild:prod": "node ../scripts/copy-node-modules.js",
+    "dist": "npm run prebuild:prod && npm run build:prod",
+    "preview": "vite preview",
+    "postbuild": "node ../scripts/copy-node-modules.js"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -35,8 +40,26 @@
       "main.js",
       "preload.js"
     ],
+    "extraResources": [
+      {
+        "from": "../AppServe",
+        "to": "AppServe",
+        "filter": [
+          "**/*",
+          "!node_modules/**",
+          "!.git/**"
+        ]
+      },
+      {
+        "from": "../AppServe/node_modules",
+        "to": "AppServe/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "directories": {
-      "output": "release"
+      "output": "../release"
     },
     "win": {
       "target": [
@@ -44,6 +67,10 @@
         "portable"
       ]
     },
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
     "publish": null
   }
 }

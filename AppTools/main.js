@@ -3,6 +3,34 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+
+// Charger les variables d'environnement en production
+if (process.env.NODE_ENV !== 'development') {
+  try {
+    const dotenv = require('dotenv');
+    let dotenvPath;
+
+    // Détermine le chemin en fonction de l'environnement (développement ou production)
+    if (app.isPackaged) {
+      // En production, dans un package Electron
+      dotenvPath = path.join(process.resourcesPath, 'AppServe', '.env');
+    } else {
+      // En développement
+      dotenvPath = path.join(__dirname, '..', 'AppServe', '.env');
+    }
+
+    console.log("Tentative de chargement des variables d'environnement depuis:", dotenvPath);
+    if (fs.existsSync(dotenvPath)) {
+      dotenv.config({ path: dotenvPath });
+      console.log("Variables d'environnement chargées avec succès");
+    } else {
+      console.error(`Fichier .env non trouvé à ${dotenvPath}`);
+    }
+  } catch (error) {
+    console.error("Erreur lors du chargement des variables d'environnement:", error);
+  }
+}
+
 // Gardez une référence globale de l'objet window
 let mainWindow;
 let apiProcess = null;
@@ -14,6 +42,17 @@ const isDev = process.env.NODE_ENV === 'development';
 const isDevMode = isDev || process.env.ELECTRON_IS_DEV === '1';
 const isApiExternallyManaged = process.env.API_EXTERNALLY_MANAGED === '1';
 
+// En production, définir le chemin de base pour AppServe selon la plateforme
+function getAppServePath() {
+  if (app.isPackaged) {
+    // En production, le chemin est relatif au dossier resources
+    return path.join(process.resourcesPath, 'AppServe');
+  } else {
+    // En développement
+    return path.join(__dirname, '..', 'AppServe');
+  }
+}
+
 // Fonction pour démarrer le serveur API
 function startAPIServer() {
   // Ne pas démarrer l'API si elle est gérée en externe
@@ -23,8 +62,10 @@ function startAPIServer() {
   }
 
   console.log('Démarrage du serveur API...');
-  // Chemin vers le fichier server.js d'AppServe
-  const serverPath = path.join(__dirname, '..', 'AppServe', 'server.js');
+  // Obtenir le chemin vers AppServe selon l'environnement
+  const appServePath = getAppServePath();
+  const serverPath = path.join(appServePath, 'server.js');
+
   console.log('Chemin du serveur API:', serverPath);
   // Vérifier si le fichier existe
   if (!fs.existsSync(serverPath)) {
@@ -32,18 +73,26 @@ function startAPIServer() {
     return null;
   }
 
-  // Définir les variables d'environnement spécifiques pour WooCommerce
+  // Définir les variables d'environnement pour le serveur
   const serverEnv = {
     ...process.env,
-    WC_URL: 'https://axemusique.shop', // Remplacez par l'URL réelle
-    WC_CONSUMER_KEY: 'ck_f0757e22e7bb7365f6ea3e1ef5108af1b2634b64', // Remplacez par la clé réelle
-    WC_CONSUMER_SECRET: 'cs_df7031b1d320ee93fd8677405bcd6190e8e06979', // Remplacez par le secret réel
+    NODE_ENV: isDevMode ? 'development' : 'production',
+    PORT: process.env.PORT || '3000',
+    WC_URL: process.env.WC_URL,
+    WC_CONSUMER_KEY: process.env.WC_CONSUMER_KEY,
+    WC_CONSUMER_SECRET: process.env.WC_CONSUMER_SECRET,
   };
+
+  console.log("Démarrage du serveur API avec les variables d'environnement:", {
+    NODE_ENV: serverEnv.NODE_ENV,
+    PORT: serverEnv.PORT,
+  });
 
   // Lancer le processus du serveur API
   const apiProc = spawn('node', [serverPath], {
     stdio: 'pipe',
     env: serverEnv,
+    cwd: appServePath, // Important: définir le répertoire de travail pour que les chemins relatifs fonctionnent
   });
 
   // Gérer les logs standard
@@ -75,6 +124,7 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       preload: path.join(__dirname, 'preload.js'),
+      devTools: true, // Toujours activer les devTools pour le débogage
     },
   });
 
@@ -93,10 +143,8 @@ function createWindow() {
   console.log(`Chargement de l'URL: ${url}`);
   mainWindow.loadURL(url);
 
-  // Ouvrir les DevTools en développement
-  if (isDevMode) {
-    mainWindow.webContents.openDevTools();
-  }
+  // Ouvrir les DevTools pour le débogage
+  mainWindow.webContents.openDevTools();
 
   // Événement de fermeture
   mainWindow.on('closed', function () {
@@ -118,9 +166,10 @@ app.whenReady().then(() => {
   if (!apiProcess) {
     createWindow();
   } else {
+    // Attendre plus longtemps pour que l'API démarre
     setTimeout(() => {
       createWindow();
-    }, 1000);
+    }, 5000); // 5 secondes pour être sûr
   }
 
   app.on('activate', function () {
