@@ -12,7 +12,7 @@
     "dev:electron-only": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
     "build": "vite build",
     "prebuild:prod": "node ../scripts/prepare-production.js",
-    "build:prod": "vite build && electron-builder",
+    "build:prod": "vite build && electron-builder --publish always",
     "postbuild:prod": "node ../scripts/copy-node-modules.js",
     "dist": "npm run prebuild:prod && npm run build:prod",
     "preview": "vite preview",

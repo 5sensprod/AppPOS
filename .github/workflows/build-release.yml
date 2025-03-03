@@ -7,11 +7,7 @@ on:
 
 jobs:
   release:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [windows-latest]
+    runs-on: windows-latest
 
     steps:
       - name: Check out Git repository
@@ -22,20 +18,11 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies
-        run: |
-          npm ci
-          cd AppServe && npm ci
-          cd ../AppTools && npm ci
+      - name: Install dependencies (monorepo)
+        run: npm ci --workspaces
 
-      - name: Build/release Electron app
-        uses: samuelmeuli/action-electron-builder@v1
-        with:
-          # GitHub token, automatically provided to the action
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Directory où se trouve package.json
-          package_root: ./AppTools
-          # Si la version est une pré-release
-          release: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          # Options de build spécifiques
-          build_script_name: build:prod
+      - name: Build and Publish Electron App
+        run: npm run dist
+        working-directory: AppTools
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
