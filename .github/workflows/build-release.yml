@@ -18,6 +18,12 @@ jobs:
         with:
           node-version: 18
 
+      - name: Fix electron version in package.json
+        run: |
+          $packageJson = Get-Content -Path "./AppTools/package.json" -Raw | ConvertFrom-Json
+          $packageJson.devDependencies.electron = "29.0.0"
+          $packageJson | ConvertTo-Json -Depth 10 | Set-Content -Path "./AppTools/package.json"
+
       - name: Install fs-extra in scripts folder
         run: npm install fs-extra --no-save
         working-directory: ./scripts
@@ -30,25 +36,21 @@ jobs:
         working-directory: ./AppServe
 
       - name: Install AppTools dependencies
-        run: npm install
-        working-directory: ./AppTools
-
-      - name: Verify script paths
         run: |
-          echo "Checking critical scripts..."
-          echo "prepare-production.js exists: $(Test-Path -Path ./scripts/prepare-production.js)"
-          echo "copy-node-modules.js exists: $(Test-Path -Path ./scripts/copy-node-modules.js)"
-          echo "afterPack.js exists: $(Test-Path -Path ./scripts/afterPack.js)"
+          npm install
+          npm install -D electron@29.0.0 electron-builder@latest
+        working-directory: ./AppTools
 
       - name: Run prepare-production script
         run: node ./scripts/prepare-production.js
 
-      - name: Build and publish Electron app
+      - name: Build Electron app with fixed version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd AppTools
-          npm run build:prod
+          npx vite build
+          npx electron-builder --publish always
 
       - name: List release files
         run: |
