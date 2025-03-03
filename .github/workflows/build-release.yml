@@ -18,11 +18,39 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies (monorepo)
-        run: npm ci --workspaces
+      - name: Install fs-extra in scripts folder
+        run: npm install fs-extra --no-save
+        working-directory: ./scripts
 
-      - name: Build and Publish Electron App
-        run: npm run dist
-        working-directory: AppTools
+      - name: Install root dependencies
+        run: npm install
+
+      - name: Install AppServe dependencies
+        run: npm install
+        working-directory: ./AppServe
+
+      - name: Install AppTools dependencies
+        run: npm install
+        working-directory: ./AppTools
+
+      - name: Verify script paths
+        run: |
+          echo "Checking critical scripts..."
+          echo "prepare-production.js exists: $(Test-Path -Path ./scripts/prepare-production.js)"
+          echo "copy-node-modules.js exists: $(Test-Path -Path ./scripts/copy-node-modules.js)"
+          echo "afterPack.js exists: $(Test-Path -Path ./scripts/afterPack.js)"
+
+      - name: Run prepare-production script
+        run: node ./scripts/prepare-production.js
+
+      - name: Build and publish Electron app
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd AppTools
+          npm run build:prod
+
+      - name: List release files
+        run: |
+          echo "Listing release directory content:"
+          Get-ChildItem -Path ./release -Recurse | Select-Object FullName
