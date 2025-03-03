@@ -1,7 +1,7 @@
 {
-  "name": "app-pos",
-  "version": "1.0.0",
-  "description": "AppPOS - Système de Point de Vente",
+  "name": "appstock",
+  "version": "2.0.0",
+  "description": "AppStock - Système de Point de Vente",
   "main": "main.js",
   "private": true,
   "author": "5sensprod",
@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "electron-log": "^5.3.1",
+    "electron-updater": "^6.3.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

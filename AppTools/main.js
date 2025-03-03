@@ -1,8 +1,14 @@
 // main.js
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const { autoUpdater } = require('electron-updater');
+
+// Configuration des logs pour autoUpdater
+autoUpdater.logger = require('electron-log');
+autoUpdater.logger.transports.file.level = 'info';
+console.log('Répertoire des logs autoUpdater:', autoUpdater.logger.transports.file.getFile().path);
 
 // Vérifier l'environnement au démarrage
 function checkEnvironment() {
@@ -215,7 +221,9 @@ function createWindow() {
   mainWindow.loadURL(url);
 
   // Ouvrir les DevTools pour le débogage
-  mainWindow.webContents.openDevTools();
+  if (isDevMode) {
+    mainWindow.webContents.openDevTools();
+  }
 
   // Événement de fermeture
   mainWindow.on('closed', function () {
@@ -223,7 +231,114 @@ function createWindow() {
   });
 
   console.log('Fenêtre principale créée avec succès!');
+
+  // Vérifier les mises à jour si en production
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
 }
+
+// Configuration des événements de mise à jour
+autoUpdater.on('checking-for-update', () => {
+  console.log('Vérification des mises à jour...');
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', { message: 'Vérification des mises à jour...' });
+  }
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Mise à jour disponible:', info);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', {
+      message: 'Mise à jour disponible',
+      info: info,
+    });
+
+    dialog
+      .showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Mise à jour disponible',
+        message: `Une nouvelle version (${info.version}) est disponible. Voulez-vous la télécharger maintenant ?`,
+        buttons: ['Oui', 'Non'],
+        defaultId: 0,
+      })
+      .then((result) => {
+        if (result.response === 0) {
+          autoUpdater.downloadUpdate();
+        }
+      });
+  }
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  console.log('Aucune mise à jour disponible:', info);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', {
+      message: 'Aucune mise à jour disponible',
+      info: info,
+    });
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Erreur lors de la mise à jour:', err);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', {
+      message: 'Erreur lors de la mise à jour',
+      error: err.toString(),
+    });
+  }
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  console.log(`Téléchargement: ${progressObj.percent}%`);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', {
+      message: 'Téléchargement en cours',
+      progress: progressObj,
+    });
+    mainWindow.setProgressBar(progressObj.percent / 100);
+  }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Mise à jour téléchargée:', info);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', {
+      message: 'Mise à jour téléchargée',
+      info: info,
+    });
+    mainWindow.setProgressBar(-1);
+
+    dialog
+      .showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Mise à jour prête',
+        message: "La mise à jour a été téléchargée. L'application redémarrera pour l'installer.",
+        buttons: ['Redémarrer maintenant', 'Plus tard'],
+        defaultId: 0,
+      })
+      .then((result) => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall(false, true);
+        }
+      });
+  }
+});
+
+// IPC pour les mises à jour manuelles
+ipcMain.on('check-for-updates', () => {
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdates();
+  } else {
+    console.log('Les mises à jour sont désactivées en mode développement');
+    if (mainWindow) {
+      mainWindow.webContents.send('update-message', {
+        message: 'Les mises à jour sont désactivées en mode développement',
+      });
+    }
+  }
+});
 
 // Créer la fenêtre quand l'app est prête
 app.whenReady().then(() => {
