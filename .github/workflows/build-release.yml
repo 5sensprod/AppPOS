@@ -23,6 +23,7 @@ jobs:
           $packageJson = Get-Content -Path "./AppTools/package.json" -Raw | ConvertFrom-Json
           $packageJson.devDependencies.electron = "29.0.0"
           $packageJson | ConvertTo-Json -Depth 10 | Set-Content -Path "./AppTools/package.json"
+          Get-Content -Path "./AppTools/package.json"
 
       - name: Install fs-extra in scripts folder
         run: npm install fs-extra --no-save
@@ -36,9 +37,15 @@ jobs:
         working-directory: ./AppServe
 
       - name: Install AppTools dependencies
+        run: npm install
+        working-directory: ./AppTools
+
+      - name: Force install specific electron version
         run: |
-          npm install
+          npm uninstall -D electron electron-builder
           npm install -D electron@29.0.0 electron-builder@latest
+          echo "Electron version:"
+          npx electron --version
         working-directory: ./AppTools
 
       - name: Run prepare-production script
@@ -47,10 +54,11 @@ jobs:
       - name: Build Electron app with fixed version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
         run: |
           cd AppTools
           npx vite build
-          npx electron-builder --publish always
+          npx electron-builder --publish always --x64 --dir
 
       - name: List release files
         run: |
