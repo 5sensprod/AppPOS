@@ -4,6 +4,40 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 
+// Vérifier l'environnement au démarrage
+function checkEnvironment() {
+  console.log("=== Informations de l'environnement ===");
+  console.log(`Electron version: ${process.versions.electron}`);
+  console.log(`Node.js version: ${process.versions.node}`);
+  console.log(`Architecture: ${process.arch}`);
+  console.log(`Plateforme: ${process.platform}`);
+  console.log(`Répertoire app: ${app.getAppPath()}`);
+  console.log(`Répertoire userData: ${app.getPath('userData')}`);
+  console.log(`Répertoire home: ${app.getPath('home')}`);
+  console.log(`Application packagée: ${app.isPackaged}`);
+  console.log(`Répertoire resources: ${process.resourcesPath}`);
+
+  // Vérifier les dossiers critiques
+  if (app.isPackaged) {
+    const appServePath = path.join(process.resourcesPath, 'AppServe');
+    console.log(`AppServe path existe: ${fs.existsSync(appServePath)}`);
+
+    const nodeModulesPath = path.join(appServePath, 'node_modules');
+    console.log(`node_modules path existe: ${fs.existsSync(nodeModulesPath)}`);
+
+    const serverJsPath = path.join(appServePath, 'server.js');
+    console.log(`server.js path existe: ${fs.existsSync(serverJsPath)}`);
+
+    const envPath = path.join(appServePath, '.env');
+    console.log(`Fichier .env existe: ${fs.existsSync(envPath)}`);
+  }
+
+  console.log('===============================');
+}
+
+// Appeler cette fonction au début
+checkEnvironment();
+
 // Charger les variables d'environnement en production
 if (process.env.NODE_ENV !== 'development') {
   try {
@@ -53,8 +87,36 @@ function getAppServePath() {
   }
 }
 
-// Fonction pour démarrer le serveur API
+// Créez un fichier de log pour capturer les erreurs
+const logPath = path.join(app.getPath('userData'), 'app.log');
+console.log(`Les logs seront écrits dans: ${logPath}`);
+
+// Rediriger la console vers un fichier
+const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+
+console.log = function (...args) {
+  const message = args
+    .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg) : arg))
+    .join(' ');
+  logStream.write(`[LOG ${new Date().toISOString()}] ${message}\n`);
+  originalConsoleLog.apply(console, args);
+};
+
+console.error = function (...args) {
+  const message = args
+    .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg) : arg))
+    .join(' ');
+  logStream.write(`[ERROR ${new Date().toISOString()}] ${message}\n`);
+  originalConsoleError.apply(console, args);
+};
+
+// Au début de la fonction startAPIServer
 function startAPIServer() {
+  console.log(`Chemin d'application: ${app.getAppPath()}`);
+  console.log(`Chemin des resources: ${process.resourcesPath}`);
+  console.log(`Environnement NODE_ENV: ${process.env.NODE_ENV}`);
   // Ne pas démarrer l'API si elle est gérée en externe
   if (isDevMode && isApiExternallyManaged) {
     console.log('Mode développement: le serveur API est géré en externe');
@@ -64,6 +126,15 @@ function startAPIServer() {
   console.log('Démarrage du serveur API...');
   // Obtenir le chemin vers AppServe selon l'environnement
   const appServePath = getAppServePath();
+  console.log('Vérification des modules dans:', appServePath);
+
+  // Vérifiez si les modules essentiels existent
+  const criticalModules = ['express', 'dotenv', 'cors']; // ajoutez vos modules critiques
+  for (const module of criticalModules) {
+    const modulePath = path.join(appServePath, 'node_modules', module);
+    console.log(`Module ${module} existe: ${fs.existsSync(modulePath)}`);
+  }
+
   const serverPath = path.join(appServePath, 'server.js');
 
   console.log('Chemin du serveur API:', serverPath);
