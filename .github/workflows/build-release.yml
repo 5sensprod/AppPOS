@@ -1,4 +1,4 @@
-name: Build Diagnosis
+name: Build and Release
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 
 jobs:
-  diagnose:
+  release:
     runs-on: windows-latest
 
     steps:
@@ -18,70 +18,76 @@ jobs:
         with:
           node-version: 18
 
-      - name: Examine package.json
-        run: |
-          echo "Current AppTools package.json:"
-          type ./AppTools/package.json
+      - name: Install root dependencies
+        run: npm install
 
-      - name: Clean install in AppTools
+      - name: Install AppServe dependencies
+        run: npm install
+        working-directory: ./AppServe
+
+      - name: Fix AppTools package.json
         run: |
           cd AppTools
-          npm ci || npm install
 
-      - name: Check installed Electron
-        run: |
-          cd AppTools
-          npm list electron
-          npm list electron-builder
-
-      - name: Install explicit Electron version
-        run: |
-          cd AppTools
-          npm uninstall electron electron-builder
-          npm install --save-exact electron@29.0.0 electron-builder@24.6.4
-          npm list electron
-          npm list electron-builder
-
-      - name: Create test electron-builder config
-        run: |
-          cd AppTools
-          $content = @"
-          {
-            "appId": "com.test.app",
-            "productName": "TestApp",
-            "directories": {
-              "output": "../test-output"
-            },
-            "win": {
-              "target": "dir"
-            }
-          }
-          "@
-          $content | Out-File -FilePath electron-builder-test.json -Encoding utf8
-
-      - name: Test electron-builder with explicit config
-        run: |
-          cd AppTools
-          npx vite build
-          npx electron-builder --config electron-builder-test.json
-        env:
-          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
-
-      - name: Build with edited package.json
-        run: |
-          cd AppTools
+          # Lire le package.json
           $packageJson = Get-Content -Path "package.json" -Raw | ConvertFrom-Json
-          # Simplify build config
-          $packageJson.build.directories.output = "../test-output-2"
-          $packageJson.build.publish = $null
-          $packageJson.build.win = @{ target = "dir" }
+
+          # S'assurer qu'electron et electron-builder sont dans devDependencies, pas dans dependencies
+          if ($packageJson.dependencies.electron) {
+            # Déplacer electron vers devDependencies
+            $electronVersion = $packageJson.dependencies.electron
+            $packageJson.dependencies.PSObject.Properties.Remove("electron")
+            $packageJson.devDependencies.electron = "29.0.0"
+          }
+
+          if ($packageJson.dependencies.'electron-builder') {
+            # Déplacer electron-builder vers devDependencies
+            $builderVersion = $packageJson.dependencies.'electron-builder'
+            $packageJson.dependencies.PSObject.Properties.Remove("electron-builder")
+            $packageJson.devDependencies.'electron-builder' = "24.6.4"
+          }
+
+          # Ajouter axios aux dependencies s'il n'existe pas
+          if (-not $packageJson.dependencies.axios) {
+            $packageJson.dependencies | Add-Member -Name "axios" -Value "^1.6.7" -MemberType NoteProperty
+          }
+
+          # Écrire le package.json mis à jour
           $packageJson | ConvertTo-Json -Depth 10 | Set-Content -Path "package.json"
 
-          # Show the modified package.json
-          type package.json
+          # Afficher le package.json modifié
+          Write-Host "Package.json modifié:"
+          Get-Content -Path "package.json"
 
-          # Try to build
+      - name: Install AppTools dependencies
+        run: |
+          cd AppTools
+          npm install
+          npm install --save axios
+          npm install --save-dev electron@29.0.0 electron-builder@24.6.4
+
+      - name: Run prepare-production script
+        run: node ./scripts/prepare-production.js
+
+      - name: Build frontend
+        run: |
+          cd AppTools
           npx vite build
-          npx electron-builder --dir
+
+      - name: Build and publish Electron app
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+        run: |
+          cd AppTools
+          npx electron-builder --win --x64 --publish always
+
+      - name: List release directory
+        if: always()
+        run: |
+          Write-Host "Contenu du répertoire release:"
+          if (Test-Path -Path "./release") {
+            Get-ChildItem -Path "./release" -Recurse
+          } else {
+            Write-Host "Le répertoire release n'existe pas"
+          }
