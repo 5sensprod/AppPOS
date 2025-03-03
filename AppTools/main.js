@@ -19,47 +19,10 @@ autoUpdater.setFeedURL({
   owner: '5sensprod',
   private: false,
 });
+
 // Options supplémentaires
 autoUpdater.allowPrerelease = false;
 autoUpdater.autoDownload = false;
-
-// Fonction pour tester l'accès à GitHub
-async function testGitHubAccess() {
-  console.log("Test d'accès à GitHub...");
-
-  const https = require('https');
-  // Testons simplement l'accès à github.com
-  const url = 'https://github.com';
-
-  return new Promise((resolve, reject) => {
-    const req = https.get(
-      url,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0',
-        },
-      },
-      (res) => {
-        console.log('Statut de la réponse GitHub:', res.statusCode);
-
-        if (res.statusCode === 200) {
-          console.log('GitHub accessible');
-          resolve({ tag_name: 'accessible' });
-        } else {
-          console.error("Erreur lors de l'accès à GitHub:", res.statusCode);
-          reject(new Error(`HTTP Status: ${res.statusCode}`));
-        }
-      }
-    );
-
-    req.on('error', (error) => {
-      console.error('Erreur de connexion:', error);
-      reject(error);
-    });
-
-    req.end();
-  });
-}
 
 // Vérifier l'environnement au démarrage
 function checkEnvironment() {
@@ -378,66 +341,14 @@ autoUpdater.on('update-downloaded', (info) => {
 });
 
 // IPC pour les mises à jour manuelles
-ipcMain.on('check-for-updates', async () => {
-  if (app.isPackaged) {
-    console.log('Vérification des mises à jour...');
-    autoUpdater.checkForUpdates();
-  } else {
-    console.log('Mode développement: simulation de mise à jour');
-
-    // Simuler une mise à jour en développement
-    mainWindow.webContents.send('update-message', {
-      message: 'Vérification des mises à jour...',
-    });
-
-    // Vérifier si l'accès à GitHub fonctionne
-    try {
-      const release = await testGitHubAccess();
-
-      setTimeout(() => {
-        mainWindow.webContents.send('update-message', {
-          message: 'Mise à jour disponible',
-          info: { version: release.tag_name },
-        });
-
-        // Simuler un téléchargement
-        let progress = 0;
-        const interval = setInterval(() => {
-          progress += 10;
-          mainWindow.webContents.send('update-message', {
-            message: 'Téléchargement en cours',
-            progress: { percent: progress },
-          });
-
-          if (progress >= 100) {
-            clearInterval(interval);
-            mainWindow.webContents.send('update-message', {
-              message: 'Mise à jour téléchargée',
-              info: { version: release.tag_name },
-            });
-          }
-        }, 500);
-      }, 2000);
-    } catch (error) {
-      mainWindow.webContents.send('update-message', {
-        message: 'Erreur lors de la mise à jour',
-        error: `Impossible d'accéder à GitHub: ${error.message}`,
-      });
-    }
-  }
+ipcMain.on('check-for-updates', () => {
+  console.log('Vérification des mises à jour...');
+  autoUpdater.checkForUpdates();
 });
 
 // Créer la fenêtre quand l'app est prête
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   console.log('Electron est prêt!');
-
-  // Tester l'accès à GitHub avant de démarrer
-  try {
-    const release = await testGitHubAccess();
-    console.log("Test d'accès à GitHub réussi:", release.tag_name);
-  } catch (error) {
-    console.error("Test d'accès à GitHub échoué:", error);
-  }
 
   // Démarrer le serveur API si nécessaire
   apiProcess = startAPIServer();
