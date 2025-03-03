@@ -12,14 +12,6 @@ autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'debug';
 console.log('Fichier de log autoUpdater:', log.transports.file.getFile().path);
 
-// Configuration de l'auto-updater
-autoUpdater.setFeedURL({
-  provider: 'github',
-  repo: 'AppPOS',
-  owner: '5sensprod',
-  private: false,
-});
-
 // Options supplémentaires
 autoUpdater.allowPrerelease = false;
 autoUpdater.autoDownload = false;
@@ -207,19 +199,29 @@ function startAPIServer() {
 
 function createWindow() {
   console.log('Création de la fenêtre principale...');
+  const appVersion = app.getVersion();
+
   // Créer la fenêtre du navigateur
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: false, // Changez à false pour la sécurité
-      contextIsolation: true, // Changez à true pour utiliser contextBridge
+      nodeIntegration: false,
+      contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
       devTools: true,
     },
   });
 
-  // Définir l'URL à charger en fonction de l'environnement
+  // Empêcher la page HTML de remplacer le titre
+  mainWindow.on('page-title-updated', (e) => {
+    e.preventDefault();
+  });
+
+  // Définir le titre avec la version
+  mainWindow.setTitle(`AppPOS - Système de Point de Vente - v${appVersion}`);
+
+  // Reste du code comme avant
   let url;
   if (isDevMode) {
     url = 'http://localhost:5173';
@@ -233,7 +235,6 @@ function createWindow() {
 
   console.log(`Chargement de l'URL: ${url}`);
   mainWindow.loadURL(url);
-
   // Ouvrir les DevTools pour le débogage
   if (isDevMode) {
     mainWindow.webContents.openDevTools();

@@ -1,8 +1,8 @@
 {
-  "name": "app-pos",
+  "name": "apppos-monorepo",
   "version": "1.0.0",
   "description": "Système de Point Vente",
-  "private": true,
+  "private": false,
   "workspaces": [
     "AppServe",
     "AppTools"

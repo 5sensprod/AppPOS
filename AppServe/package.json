@@ -1,5 +1,5 @@
 {
-  "name": "appserve",
+  "name": "apppos-server",
   "version": "1.0.0",
   "description": "Serveur POS",
   "main": "server.js",
