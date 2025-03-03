@@ -1,4 +1,4 @@
-name: Build and Release
+name: Build Diagnosis
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 
 jobs:
-  release:
+  diagnose:
     runs-on: windows-latest
 
     steps:
@@ -18,49 +18,70 @@ jobs:
         with:
           node-version: 18
 
-      - name: Fix electron version in package.json
+      - name: Examine package.json
         run: |
-          $packageJson = Get-Content -Path "./AppTools/package.json" -Raw | ConvertFrom-Json
-          $packageJson.devDependencies.electron = "29.0.0"
-          $packageJson | ConvertTo-Json -Depth 10 | Set-Content -Path "./AppTools/package.json"
-          Get-Content -Path "./AppTools/package.json"
+          echo "Current AppTools package.json:"
+          type ./AppTools/package.json
 
-      - name: Install fs-extra in scripts folder
-        run: npm install fs-extra --no-save
-        working-directory: ./scripts
-
-      - name: Install root dependencies
-        run: npm install
-
-      - name: Install AppServe dependencies
-        run: npm install
-        working-directory: ./AppServe
-
-      - name: Install AppTools dependencies
-        run: npm install
-        working-directory: ./AppTools
-
-      - name: Force install specific electron version
+      - name: Clean install in AppTools
         run: |
-          npm uninstall -D electron electron-builder
-          npm install -D electron@29.0.0 electron-builder@latest
-          echo "Electron version:"
-          npx electron --version
-        working-directory: ./AppTools
+          cd AppTools
+          npm ci || npm install
 
-      - name: Run prepare-production script
-        run: node ./scripts/prepare-production.js
+      - name: Check installed Electron
+        run: |
+          cd AppTools
+          npm list electron
+          npm list electron-builder
 
-      - name: Build Electron app with fixed version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+      - name: Install explicit Electron version
+        run: |
+          cd AppTools
+          npm uninstall electron electron-builder
+          npm install --save-exact electron@29.0.0 electron-builder@24.6.4
+          npm list electron
+          npm list electron-builder
+
+      - name: Create test electron-builder config
+        run: |
+          cd AppTools
+          $content = @"
+          {
+            "appId": "com.test.app",
+            "productName": "TestApp",
+            "directories": {
+              "output": "../test-output"
+            },
+            "win": {
+              "target": "dir"
+            }
+          }
+          "@
+          $content | Out-File -FilePath electron-builder-test.json -Encoding utf8
+
+      - name: Test electron-builder with explicit config
         run: |
           cd AppTools
           npx vite build
-          npx electron-builder --publish always --x64 --dir
+          npx electron-builder --config electron-builder-test.json
+        env:
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
 
-      - name: List release files
+      - name: Build with edited package.json
         run: |
-          echo "Listing release directory content:"
-          Get-ChildItem -Path ./release -Recurse | Select-Object FullName
+          cd AppTools
+          $packageJson = Get-Content -Path "package.json" -Raw | ConvertFrom-Json
+          # Simplify build config
+          $packageJson.build.directories.output = "../test-output-2"
+          $packageJson.build.publish = $null
+          $packageJson.build.win = @{ target = "dir" }
+          $packageJson | ConvertTo-Json -Depth 10 | Set-Content -Path "package.json"
+
+          # Show the modified package.json
+          type package.json
+
+          # Try to build
+          npx vite build
+          npx electron-builder --dir
+        env:
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
