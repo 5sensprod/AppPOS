@@ -9,6 +9,7 @@
     "dev": "vite",
     "start": "electron .",
     "dev:electron": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
+    "dev:electron-only": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
     "build": "vite build",
     "dist": "vite build && electron-builder",
     "preview": "vite preview"

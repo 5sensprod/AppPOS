@@ -9,7 +9,8 @@
   ],
   "scripts": {
     "start": "concurrently \"cd AppServe && npm start\" \"cd AppTools && npm start\"",
-    "dev": "concurrently \"cd AppServe && npm run dev\" \"cd AppTools && npm run dev\"",
+    "dev": "concurrently \"cd AppServe && npm run dev\" \"cd AppTools && npm run dev:electron-only\"",
+    "dev:separated": "concurrently \"cd AppServe && npm run dev\" \"cd AppTools && cross-env API_EXTERNALLY_MANAGED=1 npm run dev:electron-only\"",
     "install:all": "npm install && cd AppServe && npm install && cd ../AppTools && npm install",
     "build": "cd AppTools && npm run build",
     "test": "cd AppServe && npm test",
