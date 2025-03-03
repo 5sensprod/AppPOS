@@ -1,7 +1,18 @@
 // preload.js
-// Toutes les APIs Node.js sont disponibles dans ce fichier.
-// Il est exécuté avant que votre page web ne soit chargée.
+const { contextBridge, ipcRenderer } = require('electron');
+
+// Exposer des API sécurisées au processus de rendu
+contextBridge.exposeInMainWorld('electronAPI', {
+  // Fonction pour vérifier les mises à jour
+  checkForUpdates: () => ipcRenderer.send('check-for-updates'),
+
+  // Écouter les messages de mise à jour
+  onUpdateMessage: (callback) => {
+    ipcRenderer.on('update-message', (event, data) => callback(data));
+    return () => ipcRenderer.removeListener('update-message', callback);
+  },
+});
+
 window.addEventListener('DOMContentLoaded', () => {
-  // Ici, vous pouvez injecter du JavaScript pour personnaliser la page web
   console.log('DOMContentLoaded - Preload script executed');
 });

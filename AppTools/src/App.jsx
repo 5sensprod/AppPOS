@@ -7,7 +7,7 @@ function App() {
   return (
     <div className="App">
       <div className="p-4">
-        <h1 className="text-2xl font-bold mb-4">AppStock</h1>
+        <h1 className="text-2xl font-bold mb-4">AppStock POS v2.02</h1>
         <UpdateChecker />
         <div className="mt-6">
           <ApiTest />
