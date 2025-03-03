@@ -1,7 +1,7 @@
 {
-  "name": "appstock",
+  "name": "apppos",
   "version": "2.0.1",
-  "description": "AppStock - Système de Point de Vente",
+  "description": "AppPOS - Système de Point de Vente",
   "main": "main.js",
   "private": true,
   "author": "5sensprod",
@@ -37,7 +37,7 @@
   },
   "build": {
     "appId": "com.cinqsensprod.apppos",
-    "productName": "AppStock",
+    "productName": "AppPOS",
     "files": [
       "dist/**/*",
       "main.js",
