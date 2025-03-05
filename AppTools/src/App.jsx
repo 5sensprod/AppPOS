@@ -1,8 +1,10 @@
+// src/App.jsx
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ApiTest from './components/ApiTest';
 import UpdateChecker from './components/UpdateChecker';
 import Login from './components/Login';
+import Products from './components/Products';
 import { useAuth } from './contexts/AuthContext';
 import MainLayout from './components/layout/MainLayout';
 
@@ -49,17 +51,59 @@ function AppRoutes() {
         }
       />
 
-      {/* Autres routes protégées */}
+      {/* Route produits */}
       <Route
         path="/products"
         element={
           <ProtectedRoute>
             <MainLayout>
+              <Products />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Routes pour les autres sections */}
+      <Route
+        path="/sales"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
               <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
                 <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                  Gestion des produits
+                  Gestion des ventes
                 </h1>
-                {/* Contenu de la page produits */}
+                <p className="text-gray-600 dark:text-gray-300">Page en construction</p>
+              </div>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Rapports</h1>
+                <p className="text-gray-600 dark:text-gray-300">Page en construction</p>
+              </div>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                  Paramètres
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300">Page en construction</p>
               </div>
             </MainLayout>
           </ProtectedRoute>
