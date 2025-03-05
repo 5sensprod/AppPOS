@@ -41,3 +41,16 @@ export function initializeMenus() {
     path: '/settings',
   });
 }
+
+export function updateActiveMenuItem() {
+  const currentPath = window.location.pathname;
+
+  menuRegistry.getSidebarItems().forEach((item) => {
+    menuRegistry.updateSidebarItem(item.id, {
+      active: item.path === currentPath,
+    });
+  });
+}
+
+// Ajouter un écouteur pour mettre à jour lors des changements de route
+window.addEventListener('popstate', updateActiveMenuItem);
