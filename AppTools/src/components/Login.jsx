@@ -22,7 +22,7 @@ function Login() {
 
   return (
     <div className="mt-4 p-4 border rounded-lg">
-      <h2 className="text-xl font-semibold mb-3">Authentification</h2>
+      <h2 className="text-xl font-semibold mb-60">Authentification</h2>
 
       {isAuthenticated ? (
         <div>
