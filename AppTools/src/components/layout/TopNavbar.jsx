@@ -1,10 +1,21 @@
+// src/components/layout/TopNavbar.jsx - Intégration avec votre AuthContext
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { themeManager } from '../../utils/themeManager';
-import { Bell, MessageCircle, HelpCircle, Sun, Moon, User } from 'lucide-react';
+import { Bell, MessageCircle, Sun, Moon, User, LogOut } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const TopNavbar = () => {
+  const { user, logout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
   const handleToggleTheme = () => {
     themeManager.toggleTheme();
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -25,11 +36,6 @@ const TopNavbar = () => {
             <MessageCircle className="h-6 w-6" />
           </button>
 
-          {/* Aide */}
-          <button className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white">
-            <HelpCircle className="h-6 w-6" />
-          </button>
-
           {/* Bouton toggle dark/light */}
           <button
             onClick={handleToggleTheme}
@@ -39,18 +45,22 @@ const TopNavbar = () => {
             <Moon className="h-6 w-6 block dark:hidden" />
           </button>
 
-          {/* Profil utilisateur */}
-          <div className="relative">
-            <button className="flex items-center text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white">
-              <User className="h-6 w-6 md:hidden" />
-              <img
-                src="https://via.placeholder.com/32"
-                alt="User profile"
-                className="h-8 w-8 rounded-full hidden md:block"
-              />
-              <span className="ml-2 hidden md:block">Admin</span>
-            </button>
-          </div>
+          {/* Profil utilisateur et déconnexion */}
+          {isAuthenticated && (
+            <div className="relative flex items-center">
+              <div className="flex items-center text-gray-700 dark:text-gray-200 mr-3">
+                <User className="h-6 w-6 md:hidden" />
+                <span className="ml-2 hidden md:block">{user.username || 'Utilisateur'}</span>
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="text-gray-600 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400"
+              >
+                <LogOut className="h-6 w-6" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

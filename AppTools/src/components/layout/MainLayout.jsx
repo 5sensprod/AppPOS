@@ -1,21 +1,22 @@
-// src/components/layout/MainLayout.jsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import Sidebar from './Sidebar';
 import TopNavbar from './TopNavbar';
-import { themeManager } from '../../utils/themeManager';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MainLayout = ({ children }) => {
-  useEffect(() => {
-    themeManager.initTheme();
-  }, []);
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Chargement...</div>;
+  }
 
   return (
     <div className="flex h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
-      {/* Votre Sidebar existant */}
+      {/* Sidebar à gauche */}
       <Sidebar />
 
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Nouvelle TopNavbar */}
+        {/* Navbar en haut */}
         <TopNavbar />
 
         {/* Contenu principal */}

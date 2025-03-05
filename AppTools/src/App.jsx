@@ -1,26 +1,79 @@
-// Mise à jour de src/App.jsx
-import React, { useEffect } from 'react';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import ApiTest from './components/ApiTest';
 import UpdateChecker from './components/UpdateChecker';
 import Login from './components/Login';
-import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
 import MainLayout from './components/layout/MainLayout';
 
-function App() {
+// Route protégée qui vérifie l'authentification
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Chargement...</div>;
+  }
+
+  if (!isAuthenticated) {
+    // Rediriger vers la page de connexion si non authentifié
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+// Composant principal qui gère les routes
+function AppRoutes() {
   return (
-    <AuthProvider>
-      <MainLayout>
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">AppStock</h1>
-          <UpdateChecker />
-          <div className="mt-6">
-            <ApiTest />
-            <Login />
-          </div>
-        </div>
-      </MainLayout>
-    </AuthProvider>
+    <Routes>
+      {/* Page de connexion - accessible sans authentification */}
+      <Route path="/login" element={<Login />} />
+
+      {/* Routes protégées - nécessitent une authentification */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                  Tableau de bord
+                </h1>
+                <UpdateChecker />
+                <div className="mt-6">
+                  <ApiTest />
+                </div>
+              </div>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Autres routes protégées */}
+      <Route
+        path="/products"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                  Gestion des produits
+                </h1>
+                {/* Contenu de la page produits */}
+              </div>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Redirection des routes inconnues vers l'accueil */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
+}
+
+function App() {
+  return <AppRoutes />;
 }
 
 export default App;
