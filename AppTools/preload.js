@@ -11,6 +11,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update-message', (event, data) => callback(data));
     return () => ipcRenderer.removeListener('update-message', callback);
   },
+
+  // Ajout des fonctions pour le serveur web
+  webServer: {
+    onServerUrls: (callback) => {
+      console.log('Enregistrement du listener pour web-server-urls');
+      ipcRenderer.on('web-server-urls', (event, urls) => {
+        console.log('web-server-urls reçu:', urls);
+        callback(urls);
+      });
+      return () => ipcRenderer.removeListener('web-server-urls', callback);
+    },
+
+    // Nouvelle fonction pour demander les URLs
+    requestNetworkUrls: () => {
+      console.log('Demande des URLs réseau');
+      ipcRenderer.send('request-network-urls');
+    },
+  },
 });
 
 window.addEventListener('DOMContentLoaded', () => {

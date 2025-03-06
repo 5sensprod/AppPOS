@@ -1,15 +1,15 @@
 // main.js
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 
 // Importation des modules refactorisés
-const logger = require('./modules/logger');
-const environment = require('./modules/environment');
-const apiServer = require('./modules/apiServer');
-const updater = require('./modules/updater');
+const logger = require(path.join(__dirname, 'modules/logger'));
+const environment = require(path.join(__dirname, 'modules/environment'));
+const apiServer = require(path.join(__dirname, 'modules/apiServer'));
+const updater = require(path.join(__dirname, 'modules/updater'));
+const webServer = require(path.join(__dirname, 'modules/webServer'));
 
 // Configuration des logs
 logger.setupLogs(log, autoUpdater);
@@ -17,6 +17,7 @@ logger.setupLogs(log, autoUpdater);
 // Variables globales
 let mainWindow;
 let apiProcess = null;
+let webServerInstance = null;
 
 // Vérification de l'environnement au démarrage
 environment.checkEnvironment(app);
@@ -69,6 +70,16 @@ function createWindow() {
   if (app.isPackaged) {
     autoUpdater.checkForUpdatesAndNotify();
   }
+
+  // Démarrer le serveur web si mainWindow est prêt
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (!webServerInstance) {
+      webServerInstance = webServer.initWebServer(app, environment, mainWindow);
+    } else {
+      // La fenêtre est chargée, envoyer les URLs existantes
+      webServer.sendUrlsToWindow(mainWindow);
+    }
+  });
 }
 
 // Configurer les événements de mise à jour
@@ -78,6 +89,14 @@ updater.setupUpdateEvents(autoUpdater, mainWindow, dialog);
 ipcMain.on('check-for-updates', () => {
   console.log('Vérification des mises à jour...');
   autoUpdater.checkForUpdates();
+});
+
+// Ajouter un écouteur pour les demandes d'URLs
+ipcMain.on('request-network-urls', () => {
+  console.log('Demande des URLs réseau reçue');
+  if (mainWindow && webServerInstance) {
+    webServer.sendUrlsToWindow(mainWindow);
+  }
 });
 
 // Créer la fenêtre quand l'app est prête
@@ -106,11 +125,17 @@ app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Lors de la fermeture de l'application, terminer le processus API
+// Lors de la fermeture de l'application, terminer les processus
 app.on('before-quit', () => {
-  console.log('Arrêt du serveur API...');
+  console.log('Arrêt des serveurs...');
   if (apiProcess) {
+    console.log('Arrêt du serveur API...');
     apiProcess.kill();
+  }
+
+  if (webServerInstance && webServerInstance.close) {
+    console.log('Arrêt du serveur web...');
+    webServerInstance.close();
   }
 });
 

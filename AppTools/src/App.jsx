@@ -7,6 +7,7 @@ import Login from './components/Login';
 import Products from './components/Products';
 import { useAuth } from './contexts/AuthContext';
 import MainLayout from './components/layout/MainLayout';
+import NetworkAccess from './components/NetworkAccess';
 
 // Route protégée qui vérifie l'authentification
 function ProtectedRoute({ children }) {
@@ -26,136 +27,145 @@ function ProtectedRoute({ children }) {
 
 // Composant principal qui gère les routes
 function AppRoutes() {
+  const { isAuthenticated } = useAuth();
+
   return (
-    <Routes>
-      {/* Page de connexion - accessible sans authentification */}
-      <Route path="/login" element={<Login />} />
+    <>
+      {/* Afficher NetworkAccess uniquement si authentifié */}
+      {isAuthenticated && <NetworkAccess />}
 
-      {/* Routes protégées - nécessitent une authentification */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                  Tableau de bord
-                </h1>
-                <UpdateChecker />
-                <div className="mt-6">
-                  <ApiTest />
+      <Routes>
+        {/* Page de connexion - accessible sans authentification */}
+        <Route path="/login" element={<Login />} />
+
+        {/* Routes protégées - nécessitent une authentification */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                  <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                    Tableau de bord
+                  </h1>
+                  <UpdateChecker />
+                  <div className="mt-6">
+                    <ApiTest />
+                  </div>
                 </div>
-              </div>
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Route produits */}
-      <Route
-        path="/products"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <Products />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/products/categories"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                  Catégories de produits
-                </h1>
-                <p className="text-gray-600 dark:text-gray-300">Gestion des catégories</p>
-              </div>
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/products/suppliers"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                  Fournisseurs
-                </h1>
-                <p className="text-gray-600 dark:text-gray-300">Gestion des fournisseurs</p>
-              </div>
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/products/brands"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Marques</h1>
-                <p className="text-gray-600 dark:text-gray-300">Gestion des marques</p>
-              </div>
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+        {/* Route produits */}
+        <Route
+          path="/products"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Products />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/categories"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                  <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                    Catégories de produits
+                  </h1>
+                  <p className="text-gray-600 dark:text-gray-300">Gestion des catégories</p>
+                </div>
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/suppliers"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                  <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                    Fournisseurs
+                  </h1>
+                  <p className="text-gray-600 dark:text-gray-300">Gestion des fournisseurs</p>
+                </div>
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/brands"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                  <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Marques</h1>
+                  <p className="text-gray-600 dark:text-gray-300">Gestion des marques</p>
+                </div>
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Routes pour les autres sections */}
-      <Route
-        path="/sales"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                  Gestion des ventes
-                </h1>
-                <p className="text-gray-600 dark:text-gray-300">Page en construction</p>
-              </div>
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+        {/* Routes pour les autres sections */}
+        <Route
+          path="/sales"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                  <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                    Gestion des ventes
+                  </h1>
+                  <p className="text-gray-600 dark:text-gray-300">Page en construction</p>
+                </div>
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/reports"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Rapports</h1>
-                <p className="text-gray-600 dark:text-gray-300">Page en construction</p>
-              </div>
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                  <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                    Rapports
+                  </h1>
+                  <p className="text-gray-600 dark:text-gray-300">Page en construction</p>
+                </div>
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                  Paramètres
-                </h1>
-                <p className="text-gray-600 dark:text-gray-300">Page en construction</p>
-              </div>
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                  <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                    Paramètres
+                  </h1>
+                  <p className="text-gray-600 dark:text-gray-300">Page en construction</p>
+                </div>
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Redirection des routes inconnues vers l'accueil */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Redirection des routes inconnues vers l'accueil */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }
 
