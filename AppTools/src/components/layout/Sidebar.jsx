@@ -3,10 +3,15 @@
 import React, { useState } from 'react';
 import { useMenu } from '../menu/useMenu';
 import SidebarMenuItem from '../menu/SidebarMenuItem';
+import { useRouteSync } from '../menu/useRouteSync';
+import { KeyboardNavigation } from '../menu/KeyboardNavigation';
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { sidebarItems } = useMenu();
+
+  // Utiliser le hook de synchronisation
+  useRouteSync();
 
   const toggleCollapse = () => {
     setCollapsed(!collapsed);
@@ -38,12 +43,13 @@ const Sidebar = () => {
       </div>
 
       {/* Liste des éléments du menu */}
-      <nav className="flex-1 overflow-y-auto py-4">
-        <ul>
+      <nav className="flex-1 overflow-y-auto py-4" role="navigation" aria-label="Menu principal">
+        <ul role="menubar">
           {sidebarItems.map((item) => (
             <SidebarMenuItem key={item.id} item={item} collapsed={collapsed} />
           ))}
         </ul>
+        <KeyboardNavigation />
       </nav>
     </aside>
   );

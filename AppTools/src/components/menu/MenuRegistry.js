@@ -6,6 +6,72 @@ class MenuRegistry {
     this.topMenuItems = [];
     this.sidebarItems = [];
     this.listeners = [];
+
+    // Chargement de l'état des menus depuis localStorage
+    this.loadMenuState();
+  }
+  loadMenuState() {
+    try {
+      const savedState = localStorage.getItem('menuState');
+      if (savedState) {
+        const { expandedItems } = JSON.parse(savedState);
+        this.expandedItems = expandedItems || [];
+      } else {
+        this.expandedItems = [];
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement de l'état du menu:", error);
+      this.expandedItems = [];
+    }
+  }
+
+  saveMenuState() {
+    try {
+      const menuState = {
+        expandedItems: this.expandedItems,
+      };
+      localStorage.setItem('menuState', JSON.stringify(menuState));
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde de l'état du menu:", error);
+    }
+  }
+
+  isExpanded(itemId) {
+    return this.expandedItems.includes(itemId);
+  }
+
+  toggleExpanded(itemId) {
+    if (this.isExpanded(itemId)) {
+      this.expandedItems = this.expandedItems.filter((id) => id !== itemId);
+    } else {
+      this.expandedItems = [...this.expandedItems, itemId];
+    }
+    this.saveMenuState();
+    this.notifyListeners();
+  }
+
+  expandItemForPath(path) {
+    let found = false;
+
+    // Parcourir tous les éléments du menu pour trouver celui qui correspond au chemin
+    this.sidebarItems.forEach((item) => {
+      if (item.children) {
+        const matchingChild = item.children.find(
+          (child) => path === child.path || (path !== '/' && path.startsWith(child.path + '/'))
+        );
+
+        // Si un enfant correspond, développer le parent
+        if (matchingChild && !this.isExpanded(item.id)) {
+          this.expandedItems = [...this.expandedItems, item.id];
+          found = true;
+        }
+      }
+    });
+
+    if (found) {
+      this.saveMenuState();
+      this.notifyListeners();
+    }
   }
 
   // Ajouter un élément au menu supérieur

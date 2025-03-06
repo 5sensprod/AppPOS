@@ -1,10 +1,9 @@
 // src/components/menu/TopMenuItem.jsx
-// Composant pour les éléments du menu supérieur
-import React from 'react';
+import React, { memo } from 'react';
 import MenuButton from './MenuButton';
 
-const TopMenuItem = ({ item }) => {
-  const { icon, label, onClick, badge, active, disabled, component: CustomComponent } = item;
+const TopMenuItem = memo(({ item }) => {
+  const { icon, label, onClick, badge, active, disabled, component: CustomComponent, id } = item;
 
   // Si un composant personnalisé est fourni, l'utiliser
   if (CustomComponent) {
@@ -21,8 +20,12 @@ const TopMenuItem = ({ item }) => {
       active={active}
       disabled={disabled}
       className="mx-1"
+      data-menu-id={id}
+      aria-current={active ? 'page' : undefined}
+      aria-disabled={disabled}
+      role="menuitem"
     />
   );
-};
+});
 
 export default TopMenuItem;
