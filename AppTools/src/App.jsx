@@ -62,6 +62,49 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/products/categories"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                  Catégories de produits
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300">Gestion des catégories</p>
+              </div>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/products/suppliers"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                  Fournisseurs
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300">Gestion des fournisseurs</p>
+              </div>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/products/brands"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Marques</h1>
+                <p className="text-gray-600 dark:text-gray-300">Gestion des marques</p>
+              </div>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Routes pour les autres sections */}
       <Route

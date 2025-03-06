@@ -29,6 +29,21 @@ class MenuRegistry {
       return false;
     }
 
+    // Si l'élément a un parent, l'ajouter comme enfant
+    if (item.parentId) {
+      const parentIndex = this.sidebarItems.findIndex((i) => i.id === item.parentId);
+      if (parentIndex !== -1) {
+        if (!this.sidebarItems[parentIndex].children) {
+          this.sidebarItems[parentIndex].children = [];
+        }
+        this.sidebarItems[parentIndex].children.push(item);
+        this.notifyListeners();
+        return true;
+      }
+      console.warn(`Parent avec ID ${item.parentId} non trouvé`);
+      return false;
+    }
+
     this.sidebarItems.push(item);
     this.notifyListeners();
     return true;

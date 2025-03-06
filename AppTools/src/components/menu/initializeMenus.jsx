@@ -1,7 +1,16 @@
 // src/components/menu/initializeMenus.js
 import React from 'react';
 import { menuRegistry } from './MenuRegistry';
-import { Home, Package, ShoppingCart, BarChart2, Settings } from 'lucide-react';
+import {
+  Home,
+  Package,
+  ShoppingCart,
+  BarChart2,
+  Settings,
+  Folder, // Au lieu de Layers
+  Truck,
+  Tag,
+} from 'lucide-react';
 
 export function initializeMenus() {
   // Ajouter des éléments au menu latéral
@@ -18,6 +27,26 @@ export function initializeMenus() {
     icon: <Package className="h-6 w-6" />,
     label: 'Produits',
     path: '/products',
+    children: [
+      {
+        id: 'categories',
+        icon: <Folder className="h-5 w-5" />,
+        label: 'Catégories',
+        path: '/products/categories',
+      },
+      {
+        id: 'suppliers',
+        icon: <Truck className="h-5 w-5" />,
+        label: 'Fournisseurs',
+        path: '/products/suppliers',
+      },
+      {
+        id: 'brands',
+        icon: <Tag className="h-5 w-5" />,
+        label: 'Marques',
+        path: '/products/brands',
+      },
+    ],
   });
 
   menuRegistry.addSidebarItem({
