@@ -13,10 +13,14 @@ const defaultPort = process.env.PORT || 3000;
 
 // Configuration CORS améliorée
 const corsOptions = {
-  origin: true,
+  origin: function (origin, callback) {
+    // Permet les requêtes sans origine (ex: applications desktop)
+    // et toutes les origines du réseau local
+    callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true, // Important: permet l'envoi de cookies et headers d'authentification
+  credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };

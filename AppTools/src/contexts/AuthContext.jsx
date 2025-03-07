@@ -19,25 +19,23 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // Initialiser le service API
         await apiService.init();
 
-        // Vérifier si un token existe dans le localStorage
         const storedToken = localStorage.getItem('authToken');
         if (storedToken) {
-          // Définir le token dans le service API
           apiService.setAuthToken(storedToken);
           setToken(storedToken);
 
-          // Récupérer les informations de l'utilisateur
-          const userData = await fetchCurrentUser();
-          setUser(userData);
+          try {
+            const userData = await fetchCurrentUser();
+            setUser(userData);
+          } catch (userError) {
+            console.log('Session expirée ou invalide, déconnexion...');
+            logout(); // Déconnexion propre
+          }
         }
       } catch (err) {
-        console.error("Erreur lors de l'initialisation de l'authentification:", err);
-        setError("Échec de l'initialisation de l'authentification");
-        // En cas d'erreur, on nettoie les données d'authentification
-        logout();
+        console.error("Erreur d'initialisation:", err);
       } finally {
         setLoading(false);
       }
@@ -58,20 +56,26 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Fonction de connexion
+  // Dans le login
   const login = async (username, password) => {
     try {
       setError(null);
       setLoading(true);
 
+      // S'assurer que l'API est bien configurée
+      await apiService.init();
+
       const response = await apiService.post('/api/auth/login', { username, password });
 
       if (response.data.success) {
-        // Stocker le token
         const { token, user } = response.data;
+
+        // Stocker le token et l'URL API pour les reconnexions
         localStorage.setItem('authToken', token);
+        localStorage.setItem('apiBaseUrl', apiService.getBaseUrl());
+
         apiService.setAuthToken(token);
 
-        // Mettre à jour l'état
         setToken(token);
         setUser(user);
         return true;
@@ -80,6 +84,7 @@ export const AuthProvider = ({ children }) => {
         return false;
       }
     } catch (err) {
+      console.error('Erreur de connexion:', err);
       const errorMessage = err.response?.data?.message || 'Erreur lors de la connexion';
       setError(errorMessage);
       return false;

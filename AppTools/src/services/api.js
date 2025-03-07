@@ -10,15 +10,26 @@ class ApiService {
 
   // Initialise le service API
   async init() {
-    try {
-      // S'assure que la configuration API est initialisée
-      await apiConfigService.init();
-      this.isInitialized = true;
-      console.log('Service API initialisé avec succès');
-      return true;
-    } catch (error) {
-      console.error("Erreur lors de l'initialisation du service API:", error);
-      throw error;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        await apiConfigService.init();
+        this.isInitialized = true;
+        console.log('Service API initialisé avec succès');
+        return true;
+      } catch (error) {
+        attempts++;
+        console.warn(`Tentative ${attempts}/${maxAttempts} échouée`);
+
+        if (attempts >= maxAttempts) {
+          throw error;
+        }
+
+        // Attendre avant réessai
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
   }
 
@@ -32,7 +43,16 @@ class ApiService {
   // Méthode GET
   async get(url, config = {}) {
     this.ensureInitialized();
-    const fullUrl = apiConfigService.createUrl(url);
+
+    let fullUrl;
+    try {
+      fullUrl = apiConfigService.createUrl(url);
+    } catch (error) {
+      console.warn('Erreur avec createUrl:', error);
+      fullUrl = url;
+    }
+
+    console.log(`Requête GET vers: ${fullUrl}`);
     return this.api.get(fullUrl, config);
   }
 
@@ -75,6 +95,10 @@ class ApiService {
       console.error('Test de connexion échoué:', error);
       throw error;
     }
+  }
+
+  getBaseUrl() {
+    return apiConfigService.getBaseUrl();
   }
 }
 
