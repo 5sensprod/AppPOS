@@ -6,13 +6,13 @@ const path = require('path');
 function setupLogs(log, autoUpdater) {
   // Configuration des logs détaillés
   log.transports.file.level = 'debug';
-  autoUpdater.logger = log;
-  autoUpdater.logger.transports.file.level = 'debug';
-  console.log('Fichier de log autoUpdater:', log.transports.file.getFile().path);
 
-  // Options supplémentaires pour autoUpdater
-  autoUpdater.allowPrerelease = false;
-  autoUpdater.autoDownload = false;
+  // Configuration du logger pour autoUpdater
+  if (autoUpdater) {
+    autoUpdater.logger = log;
+    autoUpdater.logger.transports.file.level = 'debug';
+    console.log('Fichier de log autoUpdater:', log.transports.file.getFile().path);
+  }
 }
 
 // Configurer la redirection des logs vers un fichier

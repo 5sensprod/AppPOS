@@ -11,13 +11,17 @@ const apiServer = require(path.join(__dirname, 'modules/apiServer'));
 const updater = require(path.join(__dirname, 'modules/updater'));
 const webServer = require(path.join(__dirname, 'modules/webServer'));
 
-// Configuration des logs
-logger.setupLogs(log, autoUpdater);
-
 // Variables globales
 let mainWindow;
 let apiProcess = null;
 let webServerInstance = null;
+
+// Initialisation des logs
+logger.setupFileLogging(app);
+logger.setupLogs(log, autoUpdater);
+
+// Initialisation de l'autoUpdater
+updater.initUpdater(autoUpdater);
 
 // Vérification de l'environnement au démarrage
 environment.checkEnvironment(app);
@@ -66,9 +70,17 @@ function createWindow() {
 
   console.log('Fenêtre principale créée avec succès!');
 
+  // Une fois la fenêtre créée, configurer les événements de mise à jour
+  updater.setupUpdateEvents(autoUpdater, mainWindow, dialog);
+
   // Vérifier les mises à jour si en production
   if (app.isPackaged) {
-    autoUpdater.checkForUpdatesAndNotify();
+    console.log('Application packagée, vérification automatique des mises à jour...');
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+        console.error('Erreur lors de la vérification des mises à jour:', err);
+      });
+    }, 3000); // Petit délai pour s'assurer que tout est bien initialisé
   }
 
   // Démarrer le serveur web si mainWindow est prêt
@@ -82,13 +94,14 @@ function createWindow() {
   });
 }
 
-// Configurer les événements de mise à jour
-updater.setupUpdateEvents(autoUpdater, mainWindow, dialog);
-
 // Configurer les écouteurs IPC
 ipcMain.on('check-for-updates', () => {
-  console.log('Vérification des mises à jour...');
-  autoUpdater.checkForUpdates();
+  console.log('Demande de vérification manuelle des mises à jour');
+  if (mainWindow) {
+    updater.checkForUpdates(autoUpdater);
+  } else {
+    console.error('Impossible de vérifier les mises à jour: fenêtre principale non disponible');
+  }
 });
 
 // Ajouter un écouteur pour les demandes d'URLs

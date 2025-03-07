@@ -1,10 +1,34 @@
 // modules/updater.js
 
+// Initialiser l'autoUpdater
+function initUpdater(autoUpdater) {
+  // Options de configuration pour autoUpdater
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.autoDownload = false;
+
+  console.log('AutoUpdater initialisé avec les options de base');
+  return autoUpdater;
+}
+
 // Configuration des événements de mise à jour
 function setupUpdateEvents(autoUpdater, mainWindow, dialog) {
+  // Vérifier si mainWindow est défini
+  if (!mainWindow) {
+    console.error("setupUpdateEvents: mainWindow n'est pas défini!");
+    return;
+  }
+
+  // Suppression des anciens écouteurs pour éviter les doublons
+  autoUpdater.removeAllListeners('checking-for-update');
+  autoUpdater.removeAllListeners('update-available');
+  autoUpdater.removeAllListeners('update-not-available');
+  autoUpdater.removeAllListeners('error');
+  autoUpdater.removeAllListeners('download-progress');
+  autoUpdater.removeAllListeners('update-downloaded');
+
   autoUpdater.on('checking-for-update', () => {
     console.log('Vérification des mises à jour...');
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-message', {
         message: 'Vérification des mises à jour...',
       });
@@ -13,7 +37,7 @@ function setupUpdateEvents(autoUpdater, mainWindow, dialog) {
 
   autoUpdater.on('update-available', (info) => {
     console.log('Mise à jour disponible:', info);
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-message', {
         message: 'Mise à jour disponible',
         info: info,
@@ -31,13 +55,16 @@ function setupUpdateEvents(autoUpdater, mainWindow, dialog) {
           if (result.response === 0) {
             autoUpdater.downloadUpdate();
           }
+        })
+        .catch((err) => {
+          console.error("Erreur lors de l'affichage de la boîte de dialogue:", err);
         });
     }
   });
 
   autoUpdater.on('update-not-available', (info) => {
     console.log('Aucune mise à jour disponible:', info);
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-message', {
         message: 'Aucune mise à jour disponible',
         info: info,
@@ -47,7 +74,7 @@ function setupUpdateEvents(autoUpdater, mainWindow, dialog) {
 
   autoUpdater.on('error', (err) => {
     console.error('Erreur lors de la mise à jour:', err);
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-message', {
         message: 'Erreur lors de la mise à jour',
         error: err.toString(),
@@ -57,7 +84,7 @@ function setupUpdateEvents(autoUpdater, mainWindow, dialog) {
 
   autoUpdater.on('download-progress', (progressObj) => {
     console.log(`Téléchargement: ${progressObj.percent}%`);
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-message', {
         message: 'Téléchargement en cours',
         progress: progressObj,
@@ -68,7 +95,7 @@ function setupUpdateEvents(autoUpdater, mainWindow, dialog) {
 
   autoUpdater.on('update-downloaded', (info) => {
     console.log('Mise à jour téléchargée:', info);
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-message', {
         message: 'Mise à jour téléchargée',
         info: info,
@@ -87,11 +114,30 @@ function setupUpdateEvents(autoUpdater, mainWindow, dialog) {
           if (result.response === 0) {
             autoUpdater.quitAndInstall(false, true);
           }
+        })
+        .catch((err) => {
+          console.error("Erreur lors de l'affichage de la boîte de dialogue:", err);
         });
     }
   });
+
+  console.log('Événements de mise à jour configurés avec succès');
+}
+
+// Vérifier les mises à jour
+function checkForUpdates(autoUpdater) {
+  console.log('Vérification des mises à jour manuellement...');
+  try {
+    autoUpdater.checkForUpdates();
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la vérification des mises à jour:', error);
+    return false;
+  }
 }
 
 module.exports = {
+  initUpdater,
   setupUpdateEvents,
+  checkForUpdates,
 };
