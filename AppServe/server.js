@@ -4,17 +4,24 @@ const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
 const { getLocalIpAddress } = require('./utils/network');
-
 // Importer les utilitaires
 const { setupServer } = require('./utils/server-setup');
 const { authMiddleware } = require('./utils/auth');
-
 // Créer l'application Express
 const app = express();
 const defaultPort = process.env.PORT || 3000;
 
+// Configuration CORS améliorée
+const corsOptions = {
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true, // Important: permet l'envoi de cookies et headers d'authentification
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Fichiers statiques

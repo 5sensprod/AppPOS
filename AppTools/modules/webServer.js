@@ -13,7 +13,6 @@ let cachedAccessUrls = [];
 function getLocalIpAddresses() {
   const interfaces = os.networkInterfaces();
   const addresses = [];
-
   for (const ifaceName in interfaces) {
     for (const iface of interfaces[ifaceName]) {
       // Filtrer les adresses IPv4 internes
@@ -22,7 +21,6 @@ function getLocalIpAddresses() {
       }
     }
   }
-
   return addresses;
 }
 
@@ -44,27 +42,63 @@ function initWebServer(app, environment, mainWindow) {
   const apiPort = process.env.PORT || 3000;
   const expressApp = express();
 
-  // Middleware de base
-  expressApp.use(cors());
+  // Middleware de base avec configuration CORS permissive
+  expressApp.use(
+    cors({
+      origin: true,
+      credentials: true,
+    })
+  );
   expressApp.use(express.json());
   expressApp.use(express.urlencoded({ extended: false }));
 
-  // Configuration du proxy API
+  // Obtenir l'adresse IP locale à utiliser pour l'API
+  const localIps = getLocalIpAddresses();
+  const apiIp = localIps.length > 0 ? localIps[0] : 'localhost';
+  const apiUrl = `http://${apiIp}:${apiPort}`;
+
+  console.log(`Configurant le proxy API vers: ${apiUrl}`);
+
+  // Configuration du proxy API avec la vraie IP au lieu de localhost
   expressApp.use(
     '/api',
     createProxyMiddleware({
-      target: `http://localhost:${apiPort}`,
+      target: apiUrl,
       changeOrigin: true,
       pathRewrite: { '^/api': '/api' },
       logLevel: 'debug',
+      // Ces options sont importantes pour le CORS
+      onProxyRes: (proxyRes, req, res) => {
+        // Assurez-vous que les headers CORS sont correctement transmis
+        // En répondant à l'origine exacte qui a fait la requête
+        const origin = req.headers.origin || '*';
+        proxyRes.headers['Access-Control-Allow-Origin'] = origin;
+        proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+        proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+        proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
+
+        // Log pour debug
+        console.log(
+          `Proxy: ${req.method} ${req.url} -> ${apiUrl}${req.url.replace(/^\/api/, '/api')}`
+        );
+      },
     })
   );
+
+  // Ajouter un gestionnaire explicite pour les requêtes OPTIONS pre-flight
+  expressApp.options('/api/*', (req, res) => {
+    const origin = req.headers.origin || '*';
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.status(204).end();
+  });
 
   // Servir les fichiers statiques
   const distPath = app.isPackaged
     ? path.join(process.resourcesPath, 'app.asar', 'dist')
     : path.join(process.cwd(), 'dist');
-
   console.log(`Serving static files from: ${distPath}`);
   expressApp.use(express.static(distPath));
 
@@ -75,13 +109,11 @@ function initWebServer(app, environment, mainWindow) {
 
   // Démarrer le serveur
   const server = http.createServer(expressApp);
-
   server.listen(webPort, () => {
     const ipAddresses = getLocalIpAddresses();
     cachedAccessUrls = ipAddresses.map((ip) => `http://${ip}:${webPort}`);
-
     console.log(`Serveur web démarré sur le port ${webPort}`);
-    console.log(`Proxy API configuré vers http://localhost:${apiPort}`);
+    console.log(`Proxy API configuré vers ${apiUrl}`);
     console.log('Application accessible aux URLs:', cachedAccessUrls);
 
     // Envoyer les URLs tout de suite

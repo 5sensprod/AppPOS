@@ -19,33 +19,73 @@ class ApiConfigService {
     // Crée une nouvelle promesse d'initialisation
     this.initPromise = new Promise(async (resolve, reject) => {
       try {
-        // Essaie d'abord avec le proxy Vite (pour le développement)
-        await this._discoverApiThroughProxy()
-          .then(() => {
-            console.log('API découverte via proxy Vite');
+        // Récupérer l'URL actuelle
+        const currentUrl = window.location.origin;
+        console.log('URL actuelle:', currentUrl);
+
+        // Chemin d'accès aux informations du serveur
+        const serverInfoPath = '/api/server-info';
+
+        try {
+          // Essaie d'abord d'utiliser le proxy intégré (accès direct à /api)
+          // Important: cela fonctionnera pour les accès locaux ET distants car
+          // le serveur Express est configuré pour gérer le proxy /api sur les deux
+          console.log("Tentative de découverte d'API via chemin relatif:", serverInfoPath);
+          const response = await axios.get(serverInfoPath, { timeout: 3000 });
+
+          if (response.data && response.data.url) {
+            console.log('API découverte via proxy:', response.data);
+            this._setApiInfo(response.data);
+
+            // Pour les appels via proxy, on utilise des chemins relatifs
+            // ce qui fonctionne à la fois pour localhost et les accès réseau
+            this.apiBaseUrl = '';
             this.isInitialized = true;
             resolve(this.apiBaseUrl);
-          })
-          .catch(async (err) => {
-            console.warn('Échec de découverte via proxy, tentative directe...', err);
+            return;
+          }
+        } catch (proxyError) {
+          console.warn('Échec de découverte API via proxy:', proxyError.message);
+          // Continue avec les autres méthodes
+        }
 
-            // Si le proxy échoue, essaie une connexion directe
-            try {
-              await this._discoverApiDirect();
-              console.log('API découverte directement');
-              this.isInitialized = true;
-              resolve(this.apiBaseUrl);
-            } catch (directErr) {
-              // Si tout échoue, utilise une valeur par défaut
-              console.warn(
-                'Échec de découverte directe, utilisation de la valeur par défaut',
-                directErr
-              );
-              this.apiBaseUrl = 'http://localhost:3000';
-              this.isInitialized = true;
-              resolve(this.apiBaseUrl);
+        // Si le proxy échoue, essaie la découverte par les hôtes potentiels
+        // y compris l'hôte actuel (important pour les accès réseau)
+        const hosts = this._getPotentialHosts();
+        let discovered = false;
+
+        // Ajouter l'hôte actuel aux tentatives (avec port de l'API)
+        const currentHost = window.location.hostname;
+        const apiPort = 3000;
+        hosts.unshift(`http://${currentHost}:${apiPort}`);
+
+        console.log("Tentatives de découverte d'API sur hôtes:", hosts);
+
+        for (const host of hosts) {
+          try {
+            console.log(`Tentative de connexion à ${host}`);
+            const response = await axios.get(`${host}/api/server-info`, { timeout: 1500 });
+            if (response.data && response.data.url) {
+              console.log('API découverte à:', host, response.data);
+              this._setApiInfo(response.data);
+              discovered = true;
+              break;
             }
-          });
+          } catch (error) {
+            console.debug(`Échec pour ${host}:`, error.message);
+          }
+        }
+
+        if (discovered) {
+          this.isInitialized = true;
+          resolve(this.apiBaseUrl);
+        } else {
+          // En dernier recours, utiliser un chemin relatif (/api)
+          console.log('Utilisation du chemin relatif comme fallback');
+          this.apiBaseUrl = '';
+          this.isInitialized = true;
+          resolve(this.apiBaseUrl);
+        }
       } catch (error) {
         console.error("Erreur lors de l'initialisation de l'API:", error);
         reject(error);
@@ -55,57 +95,44 @@ class ApiConfigService {
     return this.initPromise;
   }
 
-  // Découvre l'API à travers le proxy Vite
-  async _discoverApiThroughProxy() {
-    try {
-      // Utilise le chemin relatif qui sera géré par le proxy Vite
-      const response = await axios.get('/api/server-info', { timeout: 3000 });
-      if (response.data && response.data.url) {
-        // Stocke l'URL complète pour les appels directs si nécessaire
-        this._setApiInfo(response.data);
-        // Mais pour les appels via proxy, on continue d'utiliser les chemins relatifs
-        this.apiBaseUrl = '';
-        return true;
-      }
-      throw new Error('Format de réponse invalide');
-    } catch (error) {
-      console.warn('Erreur lors de la découverte via proxy:', error.message);
-      throw error;
-    }
-  }
-
-  // Tente de découvrir l'API directement (sans proxy)
-  async _discoverApiDirect() {
-    // Liste des adresses IP potentielles à essayer
-    const potentialHosts = this._getPotentialHosts();
-
-    for (const host of potentialHosts) {
-      try {
-        console.log(`Tentative de connexion à ${host}`);
-        const response = await axios.get(`${host}/api/server-info`, { timeout: 1000 });
-        if (response.data && response.data.url) {
-          this._setApiInfo(response.data);
-          return true;
-        }
-      } catch (error) {
-        // Continue avec l'hôte suivant
-        console.debug(`Échec pour ${host}:`, error.message);
-      }
-    }
-
-    throw new Error("Impossible de découvrir l'API directement");
-  }
-
   // Génère une liste d'adresses IP potentielles à essayer
   _getPotentialHosts() {
     const hosts = ['http://localhost:3000'];
 
     // Ajoute d'autres ports potentiels
-    for (let port = 3001; port <= 3050; port++) {
+    for (let port = 3001; port <= 3010; port++) {
       hosts.push(`http://localhost:${port}`);
     }
 
+    // Tenter de détecter l'IP locale via le serveur Express
+    // qui gère également cette application web
+    const networkUrls = this._getNetworkUrlsFromElectron();
+    if (networkUrls && networkUrls.length > 0) {
+      for (const url of networkUrls) {
+        try {
+          // Extraire le hostname et reconstruire avec le port de l'API
+          const hostname = new URL(url).hostname;
+          hosts.push(`http://${hostname}:3000`);
+        } catch (e) {
+          console.warn('URL invalide:', url, e);
+        }
+      }
+    }
+
     return hosts;
+  }
+
+  // Récupère les URLs réseau depuis Electron si disponible
+  _getNetworkUrlsFromElectron() {
+    if (window.electronAPI && window.electronAPI.webServer) {
+      try {
+        // Tente de récupérer les URLs réseau depuis Electron
+        return window.electronAPI.webServer.getUrls && window.electronAPI.webServer.getUrls();
+      } catch (e) {
+        console.warn("Impossible d'obtenir les URLs réseau depuis Electron:", e);
+      }
+    }
+    return null;
   }
 
   // Définit les informations de l'API
