@@ -1,6 +1,6 @@
 {
   "name": "apppos-desktop",
-  "version": "2.0.14",
+  "version": "2.0.16",
   "description": "AppPOS - Système de Point de Vente",
   "main": "main.js",
   "private": false,
@@ -20,6 +20,7 @@
     "publish": "cross-env-shell \"GH_TOKEN=$GH_TOKEN\" vite build && electron-builder --publish always"
   },
   "dependencies": {
+    "bonjour": "^3.5.0",
     "cors": "^2.8.5",
     "electron-log": "^5.3.1",
     "electron-updater": "^6.3.9",

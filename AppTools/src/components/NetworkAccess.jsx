@@ -1,73 +1,80 @@
 import React, { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 
 const NetworkAccess = () => {
-  // Vérifier si exécuté dans Electron
-  const isElectron =
-    typeof window !== 'undefined' && !!window.electronAPI && !!window.electronAPI.webServer;
-  const [networkUrls, setNetworkUrls] = useState([]);
-  const [showUrls, setShowUrls] = useState(false);
-
-  // Si pas dans Electron, ne pas afficher le composant
-  if (!isElectron) {
-    console.log('Non-Electron environment detected, hiding NetworkAccess component');
-    return null;
-  }
+  const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.webServer;
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showUrls, setShowUrls] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = window.electronAPI.webServer.onServerUrls(setNetworkUrls);
-    window.electronAPI.webServer.requestNetworkUrls();
-    return unsubscribe;
-  }, []);
+    if (isElectron) {
+      setLoading(true);
+      window.electronAPI.webServer
+        .getMdnsServices()
+        .then((services) => setServices(services))
+        .catch((err) => {
+          console.error('Erreur découverte mDNS:', err);
+          setServices([]);
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [isElectron]);
+
+  if (!isElectron) return null;
 
   return (
-    <div className="p-4 bg-blue-50 rounded-lg shadow mb-4">
+    <div className="p-4 rounded-lg shadow mb-4 bg-blue-50 text-gray-800 dark:bg-gray-800 dark:text-white">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-blue-800">
-          Accès réseau {networkUrls.length ? 'disponible' : 'indisponible'}
+        <h3 className="font-semibold">
+          Accès réseau local {services.length ? 'disponible' : 'indisponible'}
         </h3>
         <button
-          onClick={() => {
-            if (!showUrls) window.electronAPI.webServer.requestNetworkUrls();
-            setShowUrls(!showUrls);
-          }}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
+          onClick={() => setShowUrls(!showUrls)}
+          className="px-3 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-700 dark:hover:bg-blue-600"
         >
-          {showUrls ? 'Masquer' : 'Afficher les URLs'}
+          {loading ? (
+            <Loader2 className="animate-spin inline-block" size={16} />
+          ) : showUrls ? (
+            'Masquer'
+          ) : (
+            'Découvrir via Bonjour'
+          )}
         </button>
       </div>
 
       {showUrls && (
         <div className="mt-3">
-          <p className="text-sm text-gray-600 mb-2">
-            L'application est accessible sur le réseau local aux adresses suivantes:
-          </p>
-          {networkUrls.length === 0 ? (
-            <p className="text-sm text-red-500">
-              Aucune URL disponible.
-              <button
-                onClick={() => window.electronAPI.webServer.requestNetworkUrls()}
-                className="ml-2 underline text-blue-500"
-              >
-                Actualiser
-              </button>
-            </p>
+          {loading ? (
+            <p className="text-sm">Recherche des services via Bonjour...</p>
+          ) : services.length === 0 ? (
+            <p className="text-sm text-red-500">Aucun service découvert sur le réseau local.</p>
           ) : (
-            <ul className="space-y-1">
-              {networkUrls.map((url, index) => (
-                <li key={index} className="flex items-center">
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    {url}
-                  </a>
+            <ul className="space-y-2">
+              {services.map((service, index) => (
+                <li key={index} className="border p-2 rounded shadow-sm bg-white dark:bg-gray-700">
+                  <p className="font-semibold">{service.name}</p>
+                  {service.addresses.map((addr, i) => (
+                    <div key={i}>
+                      <a
+                        href={`http://${addr}:${service.port}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 dark:text-blue-400 hover:underline"
+                      >
+                        {`http://${addr}:${service.port}`}
+                      </a>
+                    </div>
+                  ))}
                   <button
-                    onClick={() => navigator.clipboard.writeText(url)}
-                    className="ml-2 text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
+                    onClick={() =>
+                      navigator.clipboard.writeText(
+                        `http://${service.addresses[0]}:${service.port}`
+                      )
+                    }
+                    className="mt-1 text-xs text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
                   >
-                    Copier
+                    Copier URL
                   </button>
                 </li>
               ))}

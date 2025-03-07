@@ -71,3 +71,30 @@ setupServer(app, defaultPort).catch((error) => {
   console.error('Impossible de démarrer le serveur:', error.message);
   process.exit(1);
 });
+
+// Gestion de l'arrêt propre
+process.on('SIGINT', () => {
+  console.log("Signal d'interruption reçu. Arrêt propre du serveur...");
+  shutdownGracefully();
+});
+
+process.on('SIGTERM', () => {
+  console.log('Signal de terminaison reçu. Arrêt propre du serveur...');
+  shutdownGracefully();
+});
+
+process.on('exit', () => {
+  console.log('Processus en cours de sortie.');
+});
+
+function shutdownGracefully() {
+  const { shutdownServer } = require('./utils/server-setup');
+
+  // Nettoyer les services mDNS
+  shutdownServer();
+
+  // Fermer la connexion à la base de données ou autres ressources si nécessaire
+  // ...
+
+  process.exit(0);
+}

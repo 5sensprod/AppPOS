@@ -3,6 +3,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
+const bonjour = require('bonjour')(); // ✅ ajout nécessaire
 
 // Importation des modules refactorisés
 const logger = require(path.join(__dirname, 'modules/logger'));
@@ -28,6 +29,50 @@ environment.checkEnvironment(app);
 
 // Charger les variables d'environnement
 environment.loadEnvVariables(app);
+
+ipcMain.handle('discover-api-server', () => {
+  return new Promise((resolve, reject) => {
+    const browser = bonjour.find({ type: 'http' });
+
+    const timeout = setTimeout(() => {
+      browser.stop();
+      reject(new Error('Service AppPOS-API non trouvé via mDNS'));
+    }, 5000);
+
+    browser.on('up', (service) => {
+      if (service.name === 'AppPOS-API') {
+        const host = service.addresses.find((addr) => addr.includes('.')) || 'localhost';
+        const port = service.port;
+        clearTimeout(timeout);
+        browser.stop();
+        resolve({ ip: host, port, url: `http://${host}:${port}` });
+      }
+    });
+  });
+});
+
+// Découvrir tous les services HTTP publiés via Bonjour
+ipcMain.handle('get-mdns-services', () => {
+  return new Promise((resolve) => {
+    const browser = bonjour.find({ type: 'http' });
+    const servicesFound = [];
+
+    browser.on('up', (service) => {
+      servicesFound.push({
+        name: service.name,
+        host: service.host,
+        port: service.port,
+        addresses: service.addresses,
+        url: `http://${service.host}:${service.port}`,
+      });
+    });
+
+    setTimeout(() => {
+      browser.stop();
+      resolve(servicesFound);
+    }, 3000); // Attendre 3 sec. pour découvrir les services
+  });
+});
 
 // Fonction pour créer la fenêtre principale
 function createWindow() {
@@ -140,15 +185,12 @@ app.on('window-all-closed', function () {
 
 // Lors de la fermeture de l'application, terminer les processus
 app.on('before-quit', () => {
-  console.log('Arrêt des serveurs...');
-  if (apiProcess) {
-    console.log('Arrêt du serveur API...');
-    apiProcess.kill();
+  if (webServerInstance && webServer.stopWebServer) {
+    webServer.stopWebServer();
   }
 
-  if (webServerInstance && webServerInstance.close) {
-    console.log('Arrêt du serveur web...');
-    webServerInstance.close();
+  if (apiProcess) {
+    apiProcess.kill();
   }
 });
 

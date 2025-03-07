@@ -1,13 +1,22 @@
 // utils/server-setup.js
-const { getLocalIpAddress, findAvailablePort } = require('./network');
+const {
+  getLocalIpAddress,
+  findAvailablePort,
+  publishService,
+  cleanupMdnsServices,
+} = require('./network');
+
+// Service mDNS pour le serveur
+let serverService = null;
 
 /**
  * Configure et démarre le serveur Express sur un port disponible
  * @param {object} app L'application Express
  * @param {number} defaultPort Port par défaut
- * @returns {Promise<void>}
+ * @param {boolean} enableMdns Active ou désactive la publication mDNS (défaut: true)
+ * @returns {Promise<object>} L'instance du serveur
  */
-async function setupServer(app, defaultPort) {
+async function setupServer(app, defaultPort, enableMdns = true) {
   try {
     // Trouver un port disponible
     const port = await findAvailablePort(defaultPort);
@@ -18,6 +27,44 @@ async function setupServer(app, defaultPort) {
         const ipAddress = getLocalIpAddress();
         console.log(`Serveur démarré sur http://localhost:${port}`);
         console.log(`Serveur accessible sur le réseau à http://${ipAddress}:${port}`);
+
+        // Publication du service mDNS si activé
+        if (enableMdns) {
+          try {
+            const appVersion = process.env.npm_package_version || '1.0.0';
+
+            // Publier le service API avec des métadonnées utiles
+            serverService = publishService('AppPOS-API', 'http', port, {
+              version: appVersion,
+              path: '/api',
+              type: 'api',
+            });
+
+            console.log(`Service API accessible via mDNS: AppPOS-API.local`);
+          } catch (mdnsError) {
+            console.warn(
+              `Avertissement: Impossible de publier le service mDNS: ${mdnsError.message}`
+            );
+          }
+        }
+
+        // Ajouter une méthode pour arrêter proprement le serveur
+        const originalClose = server.close;
+        server.close = function (callback) {
+          // Arrêter le service mDNS si existant
+          try {
+            if (serverService) {
+              serverService.stop();
+              serverService = null;
+            }
+          } catch (err) {
+            console.warn(`Erreur lors de l'arrêt du service mDNS: ${err.message}`);
+          }
+
+          // Appeler la méthode close originale
+          return originalClose.call(this, callback);
+        };
+
         resolve(server);
       });
     });
@@ -27,6 +74,14 @@ async function setupServer(app, defaultPort) {
   }
 }
 
+/**
+ * Arrête proprement les services mDNS
+ */
+function shutdownServer() {
+  cleanupMdnsServices();
+}
+
 module.exports = {
   setupServer,
+  shutdownServer,
 };

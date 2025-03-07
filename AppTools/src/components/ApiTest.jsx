@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../services/api';
 import apiConfigService from '../services/apiConfig';
+import { themeManager } from '../utils/themeManager';
 
 const ApiTest = () => {
   const [status, setStatus] = useState('Initialisation...');
@@ -10,21 +11,20 @@ const ApiTest = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    themeManager.initTheme();
+
     const initApi = async () => {
       try {
         setStatus('Connexion au serveur API...');
 
-        // Initialiser le service API
         await apiService.init();
 
-        // Récupérer les infos de l'API
         const baseUrl = apiConfigService.getBaseUrl();
         setApiInfo({
           baseUrl,
           usingProxy: baseUrl === '',
         });
 
-        // Tester la connexion
         const result = await apiService.testConnection();
         setTestResult(result);
         setStatus('Connecté');
@@ -38,74 +38,50 @@ const ApiTest = () => {
     initApi();
   }, []);
 
-  return (
-    <div className="api-test">
-      <h2>Test de connexion API</h2>
+  const statusClass =
+    {
+      Connecté: 'text-green-600',
+      'Erreur de connexion': 'text-red-600',
+    }[status] || 'text-orange-600';
 
-      <div className="status">
-        <strong>Statut:</strong>
-        <span
-          className={
-            status === 'Connecté'
-              ? 'success'
-              : status === 'Erreur de connexion'
-                ? 'error'
-                : 'pending'
-          }
-        >
-          {status}
-        </span>
+  return (
+    <div className="p-5 border rounded-lg shadow-sm my-5 bg-white dark:bg-gray-800 dark:border-gray-700">
+      <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">
+        Test de connexion API
+      </h2>
+
+      <div className="mb-3 text-gray-800 dark:text-gray-200">
+        <strong>Statut : </strong>
+        <span className={`font-semibold ${statusClass}`}>{status}</span>
       </div>
 
       {apiInfo && (
-        <div className="api-info">
-          <h3>Information de connexion</h3>
+        <div className="mb-3 text-gray-800 dark:text-gray-200">
+          <h3 className="font-semibold">Information de connexion</h3>
           <p>
-            <strong>URL de base:</strong> {apiInfo.baseUrl || 'Utilisation du proxy Vite'}
+            <strong>URL de base :</strong> {apiInfo.baseUrl || 'Utilisation du proxy Vite'}
           </p>
           <p>
-            <strong>Mode:</strong> {apiInfo.usingProxy ? 'Via proxy' : 'Connexion directe'}
+            <strong>Mode :</strong> {apiInfo.usingProxy ? 'Via proxy' : 'Connexion directe'}
           </p>
         </div>
       )}
 
       {testResult && (
-        <div className="test-result">
-          <h3>Résultat du test</h3>
-          <pre>{JSON.stringify(testResult, null, 2)}</pre>
+        <div className="mb-3">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-200">Résultat du test</h3>
+          <pre className="bg-gray-100 dark:bg-gray-900 dark:text-gray-200 p-3 rounded overflow-auto text-sm">
+            {JSON.stringify(testResult, null, 2)}
+          </pre>
         </div>
       )}
 
       {error && (
-        <div className="error-message">
-          <h3>Erreur</h3>
+        <div className="mb-3 text-red-600">
+          <h3 className="font-semibold">Erreur</h3>
           <p>{error}</p>
         </div>
       )}
-
-      <style jsx>{`
-        .api-test {
-          padding: 20px;
-          border: 1px solid #ddd;
-          border-radius: 5px;
-          margin: 20px 0;
-        }
-        .success {
-          color: green;
-        }
-        .error {
-          color: red;
-        }
-        .pending {
-          color: orange;
-        }
-        .test-result pre {
-          background: #f5f5f5;
-          padding: 10px;
-          border-radius: 3px;
-          overflow: auto;
-        }
-      `}</style>
     </div>
   );
 };
