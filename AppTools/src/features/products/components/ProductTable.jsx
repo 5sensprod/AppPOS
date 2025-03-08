@@ -1,88 +1,139 @@
 // src/features/products/components/ProductTable.jsx
-import React, { useEffect, useState } from 'react';
-import { createEntityTable } from '../../../factories/createEntityTable';
-import { ENTITY_CONFIG } from '../constants';
+import React, { useEffect } from 'react';
 import { useProduct } from '../contexts/productContext';
+import { EntityTable } from '../../../components/common';
+import { ENTITY_CONFIG } from '../constants';
+import { Package } from 'lucide-react';
+import imageProxyService from '../../../services/imageProxyService';
 
-// Créer la table avec la factory
-const ProductTableBase = createEntityTable(ENTITY_CONFIG);
-
-// Composant qui connecte la table à son contexte
 function ProductTable(props) {
   const { products, loading, error, fetchProducts, deleteProduct, syncProduct } = useProduct();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Filtrage des produits par recherche et statut
-  const filteredProducts = products
-    ? products.filter((product) => {
-        // Filtrage par terme de recherche
-        const matchesSearch = searchTerm
-          ? product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-          : true;
+  // Configuration des colonnes
+  const columns = [
+    {
+      key: 'image',
+      label: 'Image',
+      render: (product) => (
+        <div className="h-12 w-12 flex-shrink-0">
+          {product.image && product.image.src ? (
+            <img
+              src={imageProxyService.getImageUrl(product.image.src)}
+              alt={product.name}
+              className="h-full w-full object-cover rounded-md"
+            />
+          ) : (
+            <div className="h-full w-full bg-gray-200 dark:bg-gray-700 rounded-md flex items-center justify-center">
+              <Package className="h-6 w-6 text-gray-400" />
+            </div>
+          )}
+        </div>
+      ),
+    },
+    { key: 'name', label: 'Nom', sortable: true },
+    { key: 'sku', label: 'SKU', sortable: true },
+    {
+      key: 'price',
+      label: 'Prix',
+      render: (product) => `${product.price ? product.price.toFixed(2) : '0.00'} €`,
+      sortable: true,
+    },
+    {
+      key: 'stock',
+      label: 'Stock',
+      render: (product) => (
+        <span
+          className={`${
+            product.stock <= product.min_stock ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'
+          }`}
+        >
+          {product.stock || 0}
+        </span>
+      ),
+      sortable: true,
+    },
+    {
+      key: 'status',
+      label: 'Statut',
+      render: (product) => {
+        const statusMap = {
+          published: {
+            label: 'Publié',
+            color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+          },
+          draft: {
+            label: 'Brouillon',
+            color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+          },
+          archived: {
+            label: 'Archivé',
+            color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+          },
+        };
 
-        // Filtrage par statut
-        const matchesStatus = statusFilter === 'all' ? true : product.status === statusFilter;
+        const status = statusMap[product.status] || statusMap.draft;
 
-        return matchesSearch && matchesStatus;
-      })
-    : [];
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
+            {status.label}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'sync',
+      label: 'Synchronisation',
+      render: (product) => (
+        <span className={product.woo_id ? 'text-green-500' : 'text-gray-400'}>
+          {product.woo_id ? 'Synchronisé' : 'Non synchronisé'}
+        </span>
+      ),
+    },
+  ];
+
+  // Configuration des filtres
+  const filters = [
+    {
+      id: 'status',
+      type: 'select',
+      allLabel: 'Tous les statuts',
+      options: [
+        { value: 'published', label: 'Publiés' },
+        { value: 'draft', label: 'Brouillons' },
+        { value: 'archived', label: 'Archivés' },
+      ],
+    },
+  ];
 
   return (
-    <div className="space-y-4">
-      {/* Filtres */}
-      <div className="flex flex-col sm:flex-row justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-4">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Rechercher par nom ou SKU..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-64 pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-          />
-          <svg
-            className="w-5 h-5 absolute left-3 top-2.5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-        </div>
-
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full sm:w-48 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-        >
-          <option value="all">Tous les statuts</option>
-          <option value="published">Publiés</option>
-          <option value="draft">Brouillons</option>
-          <option value="archived">Archivés</option>
-        </select>
-      </div>
-
-      {/* Table */}
-      <ProductTableBase
-        data={filteredProducts}
-        isLoading={loading}
-        error={error}
-        onDelete={deleteProduct}
-        onSync={syncProduct}
-        {...props}
-      />
-    </div>
+    <EntityTable
+      data={products || []}
+      isLoading={loading}
+      error={error}
+      columns={columns}
+      entityName="produit"
+      entityNamePlural="produits"
+      baseRoute="/products"
+      filters={filters}
+      searchFields={['name', 'sku']}
+      onDelete={deleteProduct}
+      onSync={syncProduct}
+      syncEnabled={true}
+      actions={['view', 'edit', 'delete', 'sync']}
+      batchActions={['delete', 'sync']}
+      pagination={{
+        enabled: true,
+        pageSize: 10,
+        showPageSizeOptions: true,
+        pageSizeOptions: [5, 10, 25, 50],
+      }}
+      defaultSort={{ field: 'name', direction: 'asc' }}
+      {...props}
+    />
   );
 }
 
