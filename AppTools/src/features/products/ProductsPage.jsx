@@ -3,7 +3,6 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProductProvider } from './contexts/productContext';
 import ProductTable from './components/ProductTable';
-import { ENTITY_CONFIG } from './constants';
 import { Package, Plus } from 'lucide-react';
 
 console.log('Importé ProductProvider:', ProductProvider);

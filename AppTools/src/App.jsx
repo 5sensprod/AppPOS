@@ -8,6 +8,7 @@ import { useAuth } from './contexts/AuthContext';
 import MainLayout from './components/layout/MainLayout';
 import NetworkAccess from './components/NetworkAccess';
 import { initializeServices } from './services/initServices';
+import { ProductProvider } from './features/products/contexts/productContext';
 
 // Importation des nouvelles pages de produits
 import ProductsPage from './features/products/ProductsPage';
@@ -115,7 +116,9 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <MainLayout>
-                <ProductForm />
+                <ProductProvider>
+                  <ProductForm />
+                </ProductProvider>
               </MainLayout>
             </ProtectedRoute>
           }
@@ -125,7 +128,9 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <MainLayout>
-                <ProductDetail />
+                <ProductProvider>
+                  <ProductDetail />
+                </ProductProvider>
               </MainLayout>
             </ProtectedRoute>
           }
@@ -135,7 +140,9 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <MainLayout>
-                <ProductForm />
+                <ProductProvider>
+                  <ProductForm />
+                </ProductProvider>
               </MainLayout>
             </ProtectedRoute>
           }
