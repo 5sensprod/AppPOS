@@ -4,7 +4,12 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      // Permet d'utiliser JSX dans des fichiers .js
+      include: '**/*.{jsx,js}',
+    }),
+  ],
   base: process.env.NODE_ENV === 'production' ? './' : '/',
   server: {
     // Exposer le serveur sur le réseau local

@@ -4,10 +4,14 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ApiTest from './components/ApiTest';
 import UpdateChecker from './components/UpdateChecker';
 import Login from './components/Login';
-import Products from './components/Products';
 import { useAuth } from './contexts/AuthContext';
 import MainLayout from './components/layout/MainLayout';
 import NetworkAccess from './components/NetworkAccess';
+
+// Importation des nouvelles pages de produits
+import ProductsPage from './features/products/ProductsPage';
+import ProductDetail from './features/products/components/ProductDetail';
+import ProductForm from './features/products/components/ProductForm';
 
 // Route protégée qui vérifie l'authentification
 function ProtectedRoute({ children }) {
@@ -58,17 +62,49 @@ function AppRoutes() {
           }
         />
 
-        {/* Route produits */}
+        {/* Nouvelles routes produits avec notre architecture basée sur les factories */}
         <Route
           path="/products"
           element={
             <ProtectedRoute>
               <MainLayout>
-                <Products />
+                <ProductsPage />
               </MainLayout>
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/products/new"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ProductForm />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/:id"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ProductDetail />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/:id/edit"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ProductForm />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Routes pour les autres entités (à convertir ultérieurement) */}
         <Route
           path="/products/categories"
           element={
