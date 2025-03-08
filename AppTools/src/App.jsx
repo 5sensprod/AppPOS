@@ -1,5 +1,5 @@
 // src/App.jsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ApiTest from './components/ApiTest';
 import UpdateChecker from './components/UpdateChecker';
@@ -7,6 +7,7 @@ import Login from './components/Login';
 import { useAuth } from './contexts/AuthContext';
 import MainLayout from './components/layout/MainLayout';
 import NetworkAccess from './components/NetworkAccess';
+import { initializeServices } from './services/initServices';
 
 // Importation des nouvelles pages de produits
 import ProductsPage from './features/products/ProductsPage';
@@ -32,6 +33,42 @@ function ProtectedRoute({ children }) {
 // Composant principal qui gère les routes
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
+  const [servicesInitialized, setServicesInitialized] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+
+  // Initialiser les services (imageProxyService) au démarrage
+  useEffect(() => {
+    async function initServices() {
+      try {
+        if (isAuthenticated) {
+          const success = await initializeServices();
+          setServicesInitialized(success);
+        }
+      } catch (error) {
+        console.error("Erreur lors de l'initialisation des services:", error);
+      } finally {
+        setInitializing(false);
+      }
+    }
+
+    if (isAuthenticated) {
+      initServices();
+    } else {
+      setInitializing(false);
+    }
+  }, [isAuthenticated]);
+
+  // Afficher un loader pendant l'initialisation des services
+  if (isAuthenticated && initializing) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Initialisation des services...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useProductExtras } from '../contexts/productContext';
 import { Upload, X, CheckCircle, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import imageProxyService from '../../../services/imageProxyService';
 
 function ProductImageManager({ product }) {
   const { uploadImage, uploadGalleryImage, deleteImage, deleteGalleryImage, setMainImage } =
@@ -123,6 +124,10 @@ function ProductImageManager({ product }) {
     }
   };
 
+  // Obtenir l'URL de l'image principale via le service proxy
+  const mainImageUrl =
+    product.image && product.image.src ? imageProxyService.getImageUrl(product.image.src) : null;
+
   return (
     <div className="space-y-6">
       {/* Image principale */}
@@ -133,13 +138,9 @@ function ProductImageManager({ product }) {
 
         <div className="flex items-start space-x-4">
           <div className="relative flex-shrink-0 w-48 h-48 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
-            {product.image && product.image.src ? (
+            {mainImageUrl ? (
               <>
-                <img
-                  src={product.image.src}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
+                <img src={mainImageUrl} alt={product.name} className="w-full h-full object-cover" />
                 <button
                   onClick={handleDeleteMainImage}
                   className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors duration-200"
@@ -210,7 +211,7 @@ function ProductImageManager({ product }) {
               <div key={index} className="relative group">
                 <div className="w-full h-32 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
                   <img
-                    src={image.src}
+                    src={imageProxyService.getImageUrl(image.src)}
                     alt={`Image ${index + 1}`}
                     className="w-full h-full object-cover"
                   />

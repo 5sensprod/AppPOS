@@ -1,6 +1,7 @@
 // src/features/products/constants.js
 import React from 'react';
 import { Package, ShoppingBag, Tag, BarChart2 } from 'lucide-react';
+import imageProxyService from '../../services/imageProxyService';
 
 export const ENTITY_CONFIG = {
   entityName: 'product',
@@ -14,7 +15,7 @@ export const ENTITY_CONFIG = {
         <div className="h-12 w-12 flex-shrink-0">
           {product.image && product.image.src ? (
             <img
-              src={product.image.src}
+              src={imageProxyService.getImageUrl(product.image.src)}
               alt={product.name}
               className="h-full w-full object-cover rounded-md"
             />
