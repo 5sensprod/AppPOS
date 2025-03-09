@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import apiService from '../services/api';
 import dataCache from '../utils/dataCache';
+import websocketService from '../services/websocketService';
 
 export function createEntityContext(options) {
   const {
@@ -194,6 +195,52 @@ export function createEntityContext(options) {
         }
       }
     }, []);
+
+    useEffect(() => {
+      // S'abonner aux mises à jour de cette entité
+      if (websocketService.isConnected) {
+        websocketService.subscribe(entityName);
+      }
+
+      // Gestionnaires d'événements pour les mises à jour en temps réel
+      const handleUpdate = ({ entityId, data }) => {
+        dispatch({
+          type: ACTIONS.UPDATE_SUCCESS,
+          payload: data,
+        });
+      };
+
+      const handleCreate = ({ data }) => {
+        dispatch({
+          type: ACTIONS.CREATE_SUCCESS,
+          payload: data,
+        });
+      };
+
+      const handleDelete = ({ entityId }) => {
+        dispatch({
+          type: ACTIONS.DELETE_SUCCESS,
+          payload: entityId,
+        });
+      };
+
+      // Enregistrement des gestionnaires d'événements
+      websocketService.on(`${entityName}_updated`, handleUpdate);
+      websocketService.on(`${entityName}_created`, handleCreate);
+      websocketService.on(`${entityName}_deleted`, handleDelete);
+
+      // Connexion et déconnexion lors du premier montage/démontage
+      websocketService.on('connect', () => {
+        websocketService.subscribe(entityName);
+      });
+
+      // Nettoyage à la destruction du composant
+      return () => {
+        websocketService.off(`${entityName}_updated`, handleUpdate);
+        websocketService.off(`${entityName}_created`, handleCreate);
+        websocketService.off(`${entityName}_deleted`, handleDelete);
+      };
+    }, [dispatch, entityName]);
 
     // Vérifier si les données sont périmées
     const isCacheStale = useCallback(() => {

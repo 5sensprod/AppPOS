@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update-message', (event, data) => callback(data));
     return () => ipcRenderer.removeListener('update-message', callback);
   },
+  getWebSocketSupport: () => ({ supported: true }),
 });
 
 window.addEventListener('DOMContentLoaded', () => {

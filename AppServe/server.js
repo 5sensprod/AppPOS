@@ -2,20 +2,25 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const http = require('http');
 require('dotenv').config();
 const { getLocalIpAddress } = require('./utils/network');
 // Importer les utilitaires
-const { setupServer } = require('./utils/server-setup');
+const { setupServerWithHttp } = require('./utils/server-setup');
 const { authMiddleware } = require('./utils/auth');
+// WebSocket Manager
+const websocketManager = require('./websocket/websocketManager');
+
 // Créer l'application Express
 const app = express();
 const defaultPort = process.env.PORT || 3000;
 
+// Créer un serveur HTTP pour à la fois Express et WebSocket
+const server = http.createServer(app);
+
 // Configuration CORS améliorée
 const corsOptions = {
   origin: function (origin, callback) {
-    // Permet les requêtes sans origine (ex: applications desktop)
-    // et toutes les origines du réseau local
     callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -24,6 +29,7 @@ const corsOptions = {
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
+
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -31,7 +37,7 @@ app.use(express.json());
 // Fichiers statiques
 app.use('/public', express.static(path.resolve(__dirname, 'public')));
 
-// Routes d'authentification (non protégées)
+// Routes...
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
@@ -49,29 +55,32 @@ app.use('/api/brands', authMiddleware, brandRoutes);
 app.use('/api/suppliers', authMiddleware, supplierRoutes);
 app.use('/api/sync', authMiddleware, wooSyncRoutes);
 
-// Ajouter cette route avant le démarrage du serveur
+// Route d'info serveur
 app.get('/api/server-info', (req, res) => {
   const ipAddress = getLocalIpAddress();
-  const port = req.socket.localPort; // Obtient le port sur lequel la requête est reçue
+  const port = req.socket.localPort;
   res.json({
     ip: ipAddress,
     port: port,
     url: `http://${ipAddress}:${port}`,
+    websocket: `ws://${ipAddress}:${port}/ws`,
   });
 });
 
-// Route de test (non protégée)
+// Routes de test et principale (non protégées)
 app.get('/test', (req, res) => {
   res.json({ message: 'Le serveur fonctionne correctement !' });
 });
 
-// Route principale (non protégée)
 app.get('/', (req, res) => {
   res.json({ message: "Bienvenue sur l'API POS" });
 });
 
-// Démarrer le serveur
-setupServer(app, defaultPort).catch((error) => {
+// Initialiser WebSocket avec le serveur HTTP
+websocketManager.initialize(server);
+
+// Démarrer le serveur avec notre setupServer modifié
+setupServerWithHttp(server, app, defaultPort).catch((error) => {
   console.error('Impossible de démarrer le serveur:', error.message);
   process.exit(1);
 });
@@ -93,12 +102,14 @@ process.on('exit', () => {
 
 function shutdownGracefully() {
   const { shutdownServer } = require('./utils/server-setup');
-
   // Nettoyer les services mDNS
   shutdownServer();
-
-  // Fermer la connexion à la base de données ou autres ressources si nécessaire
-  // ...
-
+  // Fermer la connexion WebSocket
+  websocketManager.close();
+  // Fermer le serveur HTTP
+  server.close(() => {
+    console.log('Serveur HTTP fermé.');
+  });
+  // Autres nettoyages...
   process.exit(0);
 }

@@ -3,6 +3,7 @@ const ResponseHandler = require('../../handlers/ResponseHandler');
 const BaseImageController = require('../image/BaseImageController');
 const fs = require('fs').promises;
 const path = require('path');
+const websocketManager = require('../../websocket/websocketManager');
 
 class BaseController {
   constructor(model, wooCommerceService, imageOptions = null) {
@@ -12,6 +13,7 @@ class BaseController {
 
     this.model = model;
     this.wooCommerceService = wooCommerceService;
+    this.entityName = model.constructor.name.toLowerCase().replace('model', '');
 
     if (imageOptions?.entity) {
       this.imageController = new BaseImageController(imageOptions.entity, {
@@ -25,7 +27,7 @@ class BaseController {
     this.uploadImage = this.imageController.uploadImage.bind(this.imageController);
     this.updateImageMetadata = this.imageController.updateImageMetadata.bind(this.imageController);
     this.deleteImage = this.imageController.deleteImage.bind(this.imageController);
-    this.setMainImage = this.imageController.setMainImage.bind(this.imageController); // Ajout de cette ligne
+    this.setMainImage = this.imageController.setMainImage.bind(this.imageController);
   }
 
   async getAll(req, res) {
@@ -51,6 +53,9 @@ class BaseController {
     try {
       const newItem = await this.model.create(req.body);
 
+      // Notifier via WebSocket de la création
+      websocketManager.notifyEntityCreated(this.entityName, newItem);
+
       if (this.shouldSync() && this.wooCommerceService) {
         try {
           const syncResult = await this.wooCommerceService.syncToWooCommerce([newItem]);
@@ -75,8 +80,13 @@ class BaseController {
       const updated = await this.model.update(req.params.id, req.body);
       if (!updated) return ResponseHandler.notFound(res);
 
+      // Récupérer l'entité mise à jour complète pour WebSocket
+      const updatedItem = await this.model.findById(req.params.id);
+
+      // Notifier via WebSocket de la mise à jour
+      websocketManager.notifyEntityUpdated(this.entityName, req.params.id, updatedItem);
+
       if (this.shouldSync() && this.wooCommerceService) {
-        const updatedItem = await this.model.findById(req.params.id);
         try {
           await this.wooCommerceService.syncToWooCommerce([updatedItem]);
         } catch (syncError) {
@@ -98,6 +108,9 @@ class BaseController {
       await this.handleImageDeletion(item);
       await this.handleWooCommerceDelete(item);
       await this.model.delete(req.params.id);
+
+      // Notifier via WebSocket de la suppression
+      websocketManager.notifyEntityDeleted(this.entityName, req.params.id);
 
       return ResponseHandler.success(res, { message: 'Item deleted successfully' });
     } catch (error) {
