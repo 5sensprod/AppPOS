@@ -1,7 +1,8 @@
 // src/components/common/EntityDetail.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Edit, ArrowLeft, Trash, RefreshCw, AlertCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle, Edit, Trash } from 'lucide-react';
+import { TabNavigation, ActionButton, InfoCard } from '../ui';
 
 /**
  * Composant générique pour afficher les détails d'une entité
@@ -79,30 +80,27 @@ const EntityDetail = ({
   // Affichage en cas d'erreur
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900 p-6 rounded-lg">
-        <h2 className="text-red-800 dark:text-red-200 text-lg font-medium mb-2">
-          Une erreur est survenue
-        </h2>
-        <p className="text-red-700 dark:text-red-300">{error}</p>
+      <InfoCard variant="danger" title="Une erreur est survenue" icon={AlertCircle}>
+        <p>{error}</p>
         <button
           onClick={() => navigate(baseRoute)}
           className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 rounded-md hover:bg-red-200 dark:hover:bg-red-700"
         >
           Retour à la liste {entityNamePlural ? `des ${entityNamePlural}` : ''}
         </button>
-      </div>
+      </InfoCard>
     );
   }
 
   // Si l'entité n'existe pas
   if (!entity) {
     return (
-      <div className="bg-yellow-50 dark:bg-yellow-900 p-6 rounded-lg">
-        <h2 className="text-yellow-800 dark:text-yellow-200 text-lg font-medium mb-2">
-          {entityName ? `${entityName.charAt(0).toUpperCase() + entityName.slice(1)}` : 'Élément'}{' '}
-          non trouvé
-        </h2>
-        <p className="text-yellow-700 dark:text-yellow-300">
+      <InfoCard
+        variant="warning"
+        title={`${entityName ? `${entityName.charAt(0).toUpperCase() + entityName.slice(1)}` : 'Élément'} non trouvé`}
+        icon={AlertCircle}
+      >
+        <p>
           {entityName
             ? `Le ${entityName} que vous recherchez n'existe pas ou a été supprimé.`
             : `L'élément que vous recherchez n'existe pas ou a été supprimé.`}
@@ -113,7 +111,7 @@ const EntityDetail = ({
         >
           Retour à la liste {entityNamePlural ? `des ${entityNamePlural}` : ''}
         </button>
-      </div>
+      </InfoCard>
     );
   }
 
@@ -136,38 +134,26 @@ const EntityDetail = ({
 
         <div className="flex space-x-3">
           {actions.includes('edit') && (
-            <button
+            <ActionButton
               onClick={() => navigate(`${baseRoute}/${entityId}/edit`)}
-              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Modifier
-            </button>
+              icon={Edit}
+              label="Modifier"
+              variant="primary"
+            />
           )}
 
           {syncEnabled && (
-            <button
+            <ActionButton
               onClick={handleSync}
-              className={`flex items-center px-4 py-2 rounded-lg transition-colors duration-200 ${
-                entity.woo_id
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-              disabled={isLoading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              {entity.woo_id ? 'Resynchroniser' : 'Synchroniser'}
-            </button>
+              icon={RefreshCw}
+              label={entity.woo_id ? 'Resynchroniser' : 'Synchroniser'}
+              variant={entity.woo_id ? 'success' : 'primary'}
+              isLoading={isLoading}
+            />
           )}
 
           {actions.includes('delete') && (
-            <button
-              onClick={handleDelete}
-              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
-            >
-              <Trash className="h-4 w-4 mr-2" />
-              Supprimer
-            </button>
+            <ActionButton onClick={handleDelete} icon={Trash} label="Supprimer" variant="danger" />
           )}
         </div>
       </div>
@@ -175,23 +161,7 @@ const EntityDetail = ({
       {/* Contenu avec onglets */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
         {tabs.length > 1 && (
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <nav className="flex -mb-px">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-4 px-6 text-sm font-medium ${
-                    activeTab === tab.id
-                      ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
+          <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
         )}
 
         {/* Contenu des onglets */}

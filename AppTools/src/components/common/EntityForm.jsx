@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { Save, ArrowLeft, Loader, AlertTriangle } from 'lucide-react';
+import { Save, ArrowLeft, Loader, AlertTriangle, Check } from 'lucide-react';
+import { TabNavigation, ActionButton, InfoCard } from '../ui';
 
 /**
  * Composant de formulaire générique pour créer et éditer des entités
@@ -358,40 +359,15 @@ const EntityForm = ({
 
       {/* Messages d'erreur/succès */}
       {serverError && (
-        <div className="bg-red-50 dark:bg-red-900 p-4 border-l-4 border-red-400 dark:border-red-600">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="h-5 w-5 text-red-400 dark:text-red-300" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700 dark:text-red-200">{serverError}</p>
-            </div>
-          </div>
-        </div>
+        <InfoCard variant="danger" icon={AlertTriangle}>
+          <p className="text-sm text-red-700 dark:text-red-200">{serverError}</p>
+        </InfoCard>
       )}
 
       {success && (
-        <div className="bg-green-50 dark:bg-green-900 p-4 border-l-4 border-green-400 dark:border-green-600">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-5 w-5 text-green-400 dark:text-green-300"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-green-700 dark:text-green-200">{success}</p>
-            </div>
-          </div>
-        </div>
+        <InfoCard variant="success" icon={Check}>
+          <p className="text-sm text-green-700 dark:text-green-200">{success}</p>
+        </InfoCard>
       )}
 
       {/* Formulaire */}
@@ -399,24 +375,12 @@ const EntityForm = ({
         <div className="px-4 py-5 sm:p-6">
           {/* Onglets */}
           {layout === 'tabs' && tabs.length > 0 && (
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-              <nav className="flex -mb-px">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`py-4 px-6 text-sm font-medium ${
-                      activeTab === tab.id
-                        ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                        : 'text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </nav>
-            </div>
+            <TabNavigation
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              className="mb-6"
+            />
           )}
 
           {/* Champs */}
@@ -457,26 +421,18 @@ const EntityForm = ({
               Annuler
             </button>
           )}
-          <button
+          <ActionButton
             type="submit"
+            icon={isLoading || isSubmitting ? Loader : Save}
+            label={isLoading || isSubmitting ? 'Chargement...' : buttonLabel}
+            variant="primary"
             disabled={isLoading || isSubmitting || (!isDirty && !isNew)}
-            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:bg-blue-400"
-          >
-            {isLoading || isSubmitting ? (
-              <>
-                <Loader className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
-                Chargement...
-              </>
-            ) : (
-              <>
-                <Save className="-ml-1 mr-2 h-4 w-4" />
-                {buttonLabel}
-              </>
-            )}
-          </button>
+            isLoading={isLoading || isSubmitting}
+          />
         </div>
       </form>
     </div>
   );
 };
+
 export default EntityForm;
