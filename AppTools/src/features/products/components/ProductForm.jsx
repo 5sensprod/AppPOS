@@ -57,7 +57,8 @@ function ProductForm() {
     brands: [],
     suppliers: [],
   });
-  const [activeTab, setActiveTab] = useState('general');
+  const hasTabs = ENTITY_CONFIG.tabs && ENTITY_CONFIG.tabs.length > 0;
+  const [activeTab, setActiveTab] = useState(hasTabs ? 'general' : null);
 
   // Récupérer les données du produit en mode édition
   useEffect(() => {
@@ -229,8 +230,10 @@ function ProductForm() {
           successMessage={success}
           buttonLabel={isNew ? 'Créer le produit' : 'Mettre à jour le produit'}
           formTitle={isNew ? 'Nouveau produit' : `Modifier ${product?.name || 'le produit'}`}
-          layout="tabs"
-          tabs={ENTITY_CONFIG.tabs}
+          layout={hasTabs ? 'tabs' : 'default'}
+          tabs={hasTabs ? ENTITY_CONFIG.tabs : []}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
         />
       )}
     </div>

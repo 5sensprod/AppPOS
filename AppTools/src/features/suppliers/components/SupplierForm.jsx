@@ -45,7 +45,8 @@ function SupplierForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [activeTab, setActiveTab] = useState('general');
+  const hasTabs = ENTITY_CONFIG.tabs && ENTITY_CONFIG.tabs.length > 0;
+  const [activeTab, setActiveTab] = useState(hasTabs ? 'general' : null);
 
   // Charger les données du fournisseur si on est en mode édition
   useEffect(() => {
@@ -218,8 +219,10 @@ function SupplierForm() {
           formTitle={
             isNew ? 'Nouveau fournisseur' : `Modifier ${supplier?.name || 'le fournisseur'}`
           }
-          layout="tabs"
-          tabs={ENTITY_CONFIG.tabs}
+          layout={hasTabs ? 'tabs' : 'default'}
+          tabs={hasTabs ? ENTITY_CONFIG.tabs : []}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
         />
       )}
 
