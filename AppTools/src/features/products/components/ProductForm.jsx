@@ -123,21 +123,53 @@ function ProductForm() {
     try {
       setLoading(true);
 
+      // Formater les données
+      const formattedData = { ...formData };
+
+      // Supprimer les champs vides
+      Object.keys(formattedData).forEach((key) => {
+        if (formattedData[key] === '') {
+          delete formattedData[key];
+        } else if (typeof formattedData[key] === 'object' && formattedData[key] !== null) {
+          Object.keys(formattedData[key]).forEach((subKey) => {
+            if (formattedData[key][subKey] === '') {
+              delete formattedData[key][subKey];
+            }
+          });
+        }
+      });
+
+      // Convertir les valeurs numériques
+      ['price', 'regular_price', 'sale_price', 'purchase_price', 'stock', 'min_stock'].forEach(
+        (field) => {
+          if (formattedData[field]) formattedData[field] = Number(formattedData[field]);
+        }
+      );
+
+      // S'assurer que categories est un tableau
+      if (formattedData.categories && !Array.isArray(formattedData.categories)) {
+        formattedData.categories = [formattedData.categories];
+      }
+
+      console.log('Données formatées:', formattedData);
+
       if (isEditing) {
-        await updateProduct(id, formData);
+        await updateProduct(id, formattedData);
       } else {
-        await createProduct(formData);
+        await createProduct(formattedData);
       }
 
       setLoading(false);
       navigate('/products');
     } catch (error) {
       console.error('Erreur lors de la soumission du formulaire:', error);
-      setError(
-        "Erreur lors de l'enregistrement du produit. Veuillez vérifier vos données et réessayer."
-      );
+      if (error.response?.data) {
+        console.error('Détails:', error.response.data);
+        setError(`Erreur: ${error.response.data.error || "Problème d'enregistrement"}`);
+      } else {
+        setError("Erreur lors de l'enregistrement du produit. Veuillez vérifier vos données.");
+      }
       setLoading(false);
-      throw error;
     }
   };
 

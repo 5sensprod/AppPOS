@@ -64,7 +64,7 @@ const updateBrandSchema = Joi.object({
 });
 
 const createSupplierSchema = Joi.object({
-  supplier_code: Joi.string().required(),
+  supplier_code: Joi.string(),
   customer_code: Joi.string(),
   name: Joi.string().required(),
   brands: Joi.array().items(Joi.string()).default([]), // IDs des marques
@@ -129,19 +129,25 @@ const createProductSchema = Joi.object({
   category_id: Joi.string().allow(null),
   categories: Joi.array().items(Joi.string()).default([]),
   category_path: Joi.array().items(Joi.string()),
-  supplier_id: Joi.string().required(),
-  brand_id: Joi.string().required(),
+  // supplier_id: Joi.string().required(),
+  supplier_id: Joi.string(),
+  brand_id: Joi.string(),
+  // brand_id: Joi.string().required(),
   status: Joi.string().valid('draft', 'published', 'archived').default('draft'),
   manage_stock: Joi.boolean().default(true),
   specifications: Joi.object().allow(null),
   meta_data: Joi.array().items(
     Joi.object({
-      key: Joi.string().required(),
-      value: Joi.string().required(),
+      key: Joi.string(),
+      value: Joi.string(),
+      // key: Joi.string().required(),
+      // value: Joi.string().required(),
     })
   ),
+  //   website_url: Joi.string().uri().allow('', null),
+  // }).required();
   website_url: Joi.string().uri().allow('', null),
-}).required();
+});
 
 const updateProductSchema = createProductSchema.keys({
   name: Joi.string(),

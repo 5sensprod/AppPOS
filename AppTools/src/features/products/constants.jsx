@@ -101,7 +101,7 @@ export const ENTITY_CONFIG = {
     { name: 'category_id', label: 'Catégorie principale', type: 'select', options: [] },
     { name: 'categories', label: 'Catégories', type: 'multiselect', options: [] },
     { name: 'brand_id', label: 'Marque', type: 'select', options: [] },
-    { name: 'supplier_id', label: 'Fournisseur', type: 'select', options: [], required: true },
+    { name: 'supplier_id', label: 'Fournisseur', type: 'select', options: [] },
     {
       name: 'status',
       label: 'Statut',

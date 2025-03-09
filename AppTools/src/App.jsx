@@ -9,11 +9,16 @@ import MainLayout from './components/layout/MainLayout';
 import NetworkAccess from './components/NetworkAccess';
 import { initializeServices } from './services/initServices';
 import { ProductProvider } from './features/products/contexts/productContext';
+import { SupplierProvider } from './features/suppliers/contexts/supplierContext';
 
 // Importation des nouvelles pages de produits
 import ProductsPage from './features/products/ProductsPage';
 import ProductDetail from './features/products/components/ProductDetail';
 import ProductForm from './features/products/components/ProductForm';
+
+import SuppliersPage from './features/suppliers/SuppliersPage';
+import SupplierDetail from './features/suppliers/components/SupplierDetail';
+import SupplierForm from './features/suppliers/components/SupplierForm';
 
 // Route protégée qui vérifie l'authentification
 function ProtectedRoute({ children }) {
@@ -169,12 +174,43 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <MainLayout>
-                <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                  <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-                    Fournisseurs
-                  </h1>
-                  <p className="text-gray-600 dark:text-gray-300">Gestion des fournisseurs</p>
-                </div>
+                <SuppliersPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/suppliers/new"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <SupplierProvider>
+                  <SupplierForm />
+                </SupplierProvider>
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/suppliers/:id"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <SupplierProvider>
+                  <SupplierDetail />
+                </SupplierProvider>
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/suppliers/:id/edit"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <SupplierProvider>
+                  <SupplierForm />
+                </SupplierProvider>
               </MainLayout>
             </ProtectedRoute>
           }
