@@ -5,7 +5,6 @@ import { useProduct } from '../contexts/productContext';
 import { EntityDetail, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { CheckCircle, AlertCircle } from 'lucide-react';
-import imageProxyService from '../../../services/imageProxyService';
 
 function ProductDetail() {
   const { id } = useParams();
@@ -17,21 +16,14 @@ function ProductDetail() {
 
   // Charger les données du produit
   useEffect(() => {
-    const fetchProduct = async () => {
-      try {
-        setLoading(true);
-        const productData = await getProductById(id);
-        setProduct(productData);
-        setLoading(false);
-      } catch (error) {
-        console.error('Erreur lors de la récupération du produit:', error);
-        setError('Erreur lors de la récupération du produit. Veuillez réessayer.');
-        setLoading(false);
-      }
-    };
+    if (!id) return;
 
-    fetchProduct();
-  }, [id, getProductById]);
+    setLoading(true);
+    getProductById(id)
+      .then(setProduct)
+      .catch(() => setError('Erreur lors de la récupération du produit.'))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   // Gérer la synchronisation du produit
   const handleSync = async (productId) => {

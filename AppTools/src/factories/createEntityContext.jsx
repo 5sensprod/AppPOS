@@ -1,14 +1,16 @@
 // src/factories/createEntityContext.js
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import apiService from '../services/api';
+import dataCache from '../utils/dataCache';
 
 export function createEntityContext(options) {
   const {
-    entityName, // Nom de l'entité (ex: 'product')
-    apiEndpoint, // Endpoint API (ex: '/api/products')
-    syncEnabled = true, // Si la synchronisation WooCommerce est disponible
-    customActions = {}, // Actions spécifiques à l'entité
-    customReducers = {}, // Reducers spécifiques à l'entité
+    entityName,
+    apiEndpoint,
+    syncEnabled = true,
+    customActions = {},
+    customReducers = {},
+    cacheDuration = 5 * 60 * 1000, // 5 minutes par défaut
   } = options;
 
   // Création du contexte
@@ -23,7 +25,19 @@ export function createEntityContext(options) {
     UPDATE_SUCCESS: 'UPDATE_SUCCESS',
     DELETE_SUCCESS: 'DELETE_SUCCESS',
     SYNC_SUCCESS: 'SYNC_SUCCESS',
+    INVALIDATE_CACHE: 'INVALIDATE_CACHE',
+    INIT_FROM_CACHE: 'INIT_FROM_CACHE',
     ...customActions,
+  };
+
+  // État initial enrichi
+  const initialState = {
+    items: [],
+    itemsById: {}, // Cache par ID
+    loading: false,
+    error: null,
+    lastFetched: null,
+    isDataStale: true,
   };
 
   // Reducer avec gestion des actions communes et personnalisées
@@ -37,38 +51,119 @@ export function createEntityContext(options) {
     switch (action.type) {
       case ACTIONS.FETCH_START:
         return { ...state, loading: true, error: null };
+
       case ACTIONS.FETCH_SUCCESS:
-        return { ...state, items: action.payload, loading: false };
+        // Construit un cache par ID pour un accès rapide
+        const itemsById = action.payload.reduce((acc, item) => {
+          acc[item._id] = item;
+          return acc;
+        }, {});
+
+        // Mettre à jour le cache global
+        dataCache.set(entityName, action.payload);
+
+        return {
+          ...state,
+          items: action.payload,
+          itemsById,
+          loading: false,
+          lastFetched: Date.now(),
+          isDataStale: false,
+        };
+
+      case ACTIONS.INIT_FROM_CACHE:
+        const cachedItems = action.payload;
+        const cachedItemsById = cachedItems.reduce((acc, item) => {
+          acc[item._id] = item;
+          return acc;
+        }, {});
+
+        return {
+          ...state,
+          items: cachedItems,
+          itemsById: cachedItemsById,
+          loading: false,
+          lastFetched: dataCache.timestamps[entityName] || Date.now(),
+          isDataStale: false,
+        };
+
       case ACTIONS.FETCH_ERROR:
         return { ...state, error: action.payload, loading: false };
-      case ACTIONS.CREATE_SUCCESS:
+
+      case ACTIONS.CREATE_SUCCESS: {
+        const newItem = action.payload;
+        const updatedItems = [...state.items, newItem];
+
+        // Mettre à jour le cache global
+        dataCache.set(entityName, updatedItems);
+
         return {
           ...state,
-          items: [...state.items, action.payload],
+          items: updatedItems,
+          itemsById: { ...state.itemsById, [newItem._id]: newItem },
           loading: false,
         };
-      case ACTIONS.UPDATE_SUCCESS:
+      }
+
+      case ACTIONS.UPDATE_SUCCESS: {
+        const updatedItem = action.payload;
+        const updatedItems = state.items.map((item) =>
+          item._id === updatedItem._id ? updatedItem : item
+        );
+
+        // Mettre à jour le cache global
+        dataCache.set(entityName, updatedItems);
+
         return {
           ...state,
-          items: state.items.map((item) =>
-            item._id === action.payload._id ? action.payload : item
-          ),
+          items: updatedItems,
+          itemsById: { ...state.itemsById, [updatedItem._id]: updatedItem },
           loading: false,
         };
-      case ACTIONS.DELETE_SUCCESS:
+      }
+
+      case ACTIONS.DELETE_SUCCESS: {
+        const newItemsById = { ...state.itemsById };
+        delete newItemsById[action.payload];
+        const filteredItems = state.items.filter((item) => item._id !== action.payload);
+
+        // Mettre à jour le cache global
+        dataCache.set(entityName, filteredItems);
+
         return {
           ...state,
-          items: state.items.filter((item) => item._id !== action.payload),
+          items: filteredItems,
+          itemsById: newItemsById,
           loading: false,
         };
-      case ACTIONS.SYNC_SUCCESS:
+      }
+
+      case ACTIONS.SYNC_SUCCESS: {
+        const syncedItem = action.payload;
+        const updatedItems = state.items.map((item) =>
+          item._id === syncedItem._id ? syncedItem : item
+        );
+
+        // Mettre à jour le cache global
+        dataCache.set(entityName, updatedItems);
+
         return {
           ...state,
-          items: state.items.map((item) =>
-            item._id === action.payload._id ? action.payload : item
-          ),
+          items: updatedItems,
+          itemsById: { ...state.itemsById, [syncedItem._id]: syncedItem },
           loading: false,
         };
+      }
+
+      case ACTIONS.INVALIDATE_CACHE:
+        // Invalider aussi le cache global
+        dataCache.invalidate(entityName);
+
+        return {
+          ...state,
+          isDataStale: true,
+        };
+
       default:
         return state;
     }
@@ -76,37 +171,86 @@ export function createEntityContext(options) {
 
   // Provider du contexte
   function EntityProvider({ children, initialItems = [] }) {
-    const initialState = {
+    const [state, dispatch] = useReducer(entityReducer, {
+      ...initialState,
       items: initialItems,
-      loading: false,
-      error: null,
-    };
+      itemsById: initialItems.reduce((acc, item) => {
+        acc[item._id] = item;
+        return acc;
+      }, {}),
+    });
 
-    const [state, dispatch] = useReducer(entityReducer, initialState);
+    // Vérifier au montage si des données existent dans le cache
+    useEffect(() => {
+      // Ne charger depuis le cache que si l'état est vide
+      if (state.items.length === 0) {
+        const cachedItems = dataCache.get(entityName);
+
+        if (cachedItems.length > 0 && !dataCache.isStale(entityName, cacheDuration)) {
+          console.log(
+            `Initialisation de ${entityName} depuis le cache global (${cachedItems.length} items)`
+          );
+          dispatch({ type: ACTIONS.INIT_FROM_CACHE, payload: cachedItems });
+        }
+      }
+    }, []);
+
+    // Vérifier si les données sont périmées
+    const isCacheStale = useCallback(() => {
+      if (state.isDataStale) return true;
+      if (!state.lastFetched) return true;
+      return Date.now() - state.lastFetched > cacheDuration;
+    }, [state.lastFetched, state.isDataStale]);
+
+    // Invalider le cache manuellement
+    const invalidateCache = useCallback(() => {
+      dispatch({ type: ACTIONS.INVALIDATE_CACHE });
+    }, []);
 
     // Actions CRUD standard
-    const fetchItems = useCallback(async (params = {}) => {
-      dispatch({ type: ACTIONS.FETCH_START });
-      try {
-        const response = await apiService.get(apiEndpoint, { params });
-        dispatch({ type: ACTIONS.FETCH_SUCCESS, payload: response.data.data });
-        return response.data;
-      } catch (error) {
-        dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
-        throw error;
-      }
-    }, []);
+    const fetchItems = useCallback(
+      async (params = {}, forceRefresh = false) => {
+        // Si les données sont déjà chargées et pas périmées, on évite l'appel API
+        if (!forceRefresh && state.items.length > 0 && !isCacheStale()) {
+          console.log(`Utilisation du cache pour ${entityName}`);
+          return { data: state.items };
+        }
 
-    const getItemById = useCallback(async (id) => {
-      dispatch({ type: ACTIONS.FETCH_START });
-      try {
-        const response = await apiService.get(`${apiEndpoint}/${id}`);
-        return response.data.data;
-      } catch (error) {
-        dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
-        throw error;
-      }
-    }, []);
+        dispatch({ type: ACTIONS.FETCH_START });
+        try {
+          console.log(`Appel API pour ${apiEndpoint}`);
+          const response = await apiService.get(apiEndpoint, { params });
+          dispatch({ type: ACTIONS.FETCH_SUCCESS, payload: response.data.data });
+          return response.data;
+        } catch (error) {
+          dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
+          throw error;
+        }
+      },
+      [state.items, isCacheStale]
+    );
+
+    const getItemById = useCallback(
+      async (id) => {
+        if (state.itemsById[id] && !isCacheStale()) {
+          return state.itemsById[id];
+        }
+
+        dispatch({ type: ACTIONS.FETCH_START });
+
+        try {
+          const response = await apiService.get(`${apiEndpoint}/${id}`);
+          const item = response.data.data;
+
+          dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: item });
+          return item;
+        } catch (error) {
+          dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
+          throw error;
+        }
+      },
+      [state.itemsById]
+    ); // ✅ Ne dépend que de `state.itemsById`
 
     const createItem = useCallback(async (itemData) => {
       dispatch({ type: ACTIONS.FETCH_START });
@@ -164,14 +308,20 @@ export function createEntityContext(options) {
     // Construction de la valeur du contexte avec noms adaptés à l'entité
     const value = {
       [`${entityName}s`]: state.items,
+      [`${entityName}sById`]: state.itemsById,
       loading: state.loading,
       error: state.error,
+      lastFetched: state.lastFetched,
+      isCacheStale: isCacheStale,
+      invalidateCache,
       [`fetch${capitalize(entityName)}s`]: fetchItems,
       [`get${capitalize(entityName)}ById`]: getItemById,
       [`create${capitalize(entityName)}`]: createItem,
       [`update${capitalize(entityName)}`]: updateItem,
       [`delete${capitalize(entityName)}`]: deleteItem,
       ...(syncEnabled && { [`sync${capitalize(entityName)}`]: syncItem }),
+      // Exposer dispatch pour permettre des actions personnalisées
+      dispatch,
     };
 
     return <EntityContext.Provider value={value}>{children}</EntityContext.Provider>;
@@ -190,7 +340,7 @@ export function createEntityContext(options) {
 
   // Helper pour capitaliser la première lettre
   function capitalize(string) {
-    if (!string) return ''; // Retourne une chaîne vide si string est undefined ou null
+    if (!string) return '';
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
 

@@ -16,21 +16,14 @@ function SupplierDetail() {
 
   // Charger les données du fournisseur
   useEffect(() => {
-    const fetchSupplier = async () => {
-      try {
-        setLoading(true);
-        const supplierData = await getSupplierById(id);
-        setSupplier(supplierData);
-        setLoading(false);
-      } catch (error) {
-        console.error('Erreur lors de la récupération du fournisseur:', error);
-        setError('Erreur lors de la récupération du fournisseur. Veuillez réessayer.');
-        setLoading(false);
-      }
-    };
+    if (!id) return;
 
-    fetchSupplier();
-  }, [id, getSupplierById]);
+    setLoading(true);
+    getSupplierById(id)
+      .then(setSupplier)
+      .catch(() => setError('Erreur lors de la récupération du fournisseur.'))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   // Rendu du contenu des onglets
   const renderTabContent = (supplier, activeTab) => {

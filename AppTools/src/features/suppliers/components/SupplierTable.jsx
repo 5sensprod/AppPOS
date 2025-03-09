@@ -1,15 +1,22 @@
 // src/features/suppliers/components/SupplierTable.jsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useSupplier } from '../contexts/supplierContext';
 import { EntityTable } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
+import { useFetchOnce } from '../../../hooks/useFetchOnce';
 
-function SupplierTable() {
-  const { suppliers, loading, error, fetchSuppliers, deleteSupplier } = useSupplier();
+function SupplierTable(props) {
+  const { suppliers, loading, error, fetchSuppliers, deleteSupplier, syncSupplier, isCacheStale } =
+    useSupplier();
 
-  useEffect(() => {
-    fetchSuppliers();
-  }, [fetchSuppliers]);
+  // Utilisation du hook personnalisé pour charger les données une seule fois
+  useFetchOnce(fetchSuppliers, suppliers, isCacheStale, {
+    debug: true,
+    name: 'fournisseurs',
+  });
+
+  // Configuration des filtres
+  const filters = [];
 
   return (
     <EntityTable
@@ -20,10 +27,13 @@ function SupplierTable() {
       entityName="fournisseur"
       entityNamePlural="fournisseurs"
       baseRoute="/products/suppliers"
-      searchFields={['name', 'supplier_code', 'customer_code', 'contact.name', 'contact.email']}
+      filters={filters}
+      searchFields={['name']}
       onDelete={deleteSupplier}
-      actions={['view', 'edit', 'delete']}
-      batchActions={['delete']}
+      onSync={syncSupplier}
+      syncEnabled={ENTITY_CONFIG.syncEnabled}
+      actions={['view', 'edit', 'delete', 'sync']}
+      batchActions={['delete', 'sync']}
       pagination={{
         enabled: true,
         pageSize: 10,
@@ -31,6 +41,7 @@ function SupplierTable() {
         pageSizeOptions: [5, 10, 25, 50],
       }}
       defaultSort={ENTITY_CONFIG.defaultSort}
+      {...props}
     />
   );
 }

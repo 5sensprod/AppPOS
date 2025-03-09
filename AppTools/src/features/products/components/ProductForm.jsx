@@ -61,23 +61,14 @@ function ProductForm() {
 
   // Récupérer les données du produit en mode édition
   useEffect(() => {
-    if (id) {
-      const fetchProduct = async () => {
-        try {
-          setLoading(true);
-          const productData = await getProductById(id);
-          setProduct(productData);
-          setLoading(false);
-        } catch (error) {
-          console.error('Erreur lors de la récupération du produit:', error);
-          setError('Erreur lors de la récupération du produit. Veuillez réessayer.');
-          setLoading(false);
-        }
-      };
+    if (!id) return;
 
-      fetchProduct();
-    }
-  }, [id, getProductById]);
+    setLoading(true);
+    getProductById(id)
+      .then(setProduct)
+      .catch(() => setError('Erreur lors de la récupération du produit.'))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   // Récupérer les listes déroulantes (catégories, marques, fournisseurs)
   useEffect(() => {

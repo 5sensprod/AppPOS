@@ -49,23 +49,14 @@ function SupplierForm() {
 
   // Charger les données du fournisseur si on est en mode édition
   useEffect(() => {
-    async function loadData() {
-      if (!isNew) {
-        setLoading(true);
-        try {
-          const supplierData = await getSupplierById(id);
-          setSupplier(supplierData);
-          setLoading(false);
-        } catch (error) {
-          console.error('Erreur lors du chargement du fournisseur:', error);
-          setError('Erreur lors du chargement du fournisseur. Veuillez réessayer.');
-          setLoading(false);
-        }
-      }
-    }
+    if (!id) return;
 
-    loadData();
-  }, [isNew, id, getSupplierById]);
+    setLoading(true);
+    getSupplierById(id)
+      .then(setSupplier)
+      .catch(() => setError('Erreur lors du chargement du fournisseur.'))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   // Valeurs initiales pour le formulaire
   const getInitialValues = () => {
