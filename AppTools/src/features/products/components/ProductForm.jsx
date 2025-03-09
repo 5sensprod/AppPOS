@@ -139,6 +139,11 @@ function ProductForm() {
     // Formatage des données
     const formattedData = { ...data };
 
+    // Convertir les chaînes vides en null
+    ['sku', 'category_id', 'brand_id', 'supplier_id'].forEach((field) => {
+      if (formattedData[field] === '') formattedData[field] = null;
+    });
+
     // Convertir les valeurs numériques
     ['price', 'regular_price', 'sale_price', 'purchase_price', 'stock', 'min_stock'].forEach(
       (field) => {

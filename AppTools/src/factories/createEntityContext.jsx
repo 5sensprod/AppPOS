@@ -267,10 +267,41 @@ export function createEntityContext(options) {
     const updateItem = useCallback(async (id, itemData) => {
       dispatch({ type: ACTIONS.FETCH_START });
       try {
-        const response = await apiService.put(`${apiEndpoint}/${id}`, itemData);
+        // Nettoyer les données avant envoi
+        const cleanedData = { ...itemData };
+
+        // Supprimer les champs non autorisés
+        delete cleanedData._id;
+        delete cleanedData.woo_id;
+        delete cleanedData.last_sync;
+        delete cleanedData.createdAt;
+        delete cleanedData.updatedAt;
+
+        // Convertir chaînes vides en null pour les champs de premier niveau
+        Object.keys(cleanedData).forEach((key) => {
+          if (cleanedData[key] === '') {
+            cleanedData[key] = null;
+          }
+          // Traiter les objets imbriqués
+          else if (typeof cleanedData[key] === 'object' && cleanedData[key] !== null) {
+            Object.keys(cleanedData[key]).forEach((subKey) => {
+              if (cleanedData[key][subKey] === '') {
+                cleanedData[key][subKey] = null;
+              }
+            });
+          }
+        });
+
+        console.log(`Données nettoyées pour mise à jour de ${entityName}:`, cleanedData);
+
+        const response = await apiService.put(`${apiEndpoint}/${id}`, cleanedData);
         dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: response.data.data });
         return response.data;
       } catch (error) {
+        console.error(`Erreur lors de la mise à jour de ${entityName}:`, error);
+        if (error.response && error.response.data) {
+          console.error("Détails de l'erreur:", error.response.data);
+        }
         dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
         throw error;
       }

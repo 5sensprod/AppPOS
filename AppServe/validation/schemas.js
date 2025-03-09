@@ -107,7 +107,7 @@ const updateSupplierSchema = Joi.object({
 
 const createProductSchema = Joi.object({
   name: Joi.string().required(),
-  sku: Joi.string().optional(),
+  sku: Joi.string().allow('', null).optional(),
   description: Joi.string().allow('', null),
   purchase_price: Joi.number().min(0),
   regular_price: Joi.number().min(0),
@@ -126,7 +126,7 @@ const createProductSchema = Joi.object({
   }),
   stock: Joi.number().min(0).required(),
   min_stock: Joi.number().min(0).default(0),
-  category_id: Joi.string().allow(null),
+  category_id: Joi.string().allow('', null),
   categories: Joi.array().items(Joi.string()).default([]),
   category_path: Joi.array().items(Joi.string()),
   // supplier_id: Joi.string().required(),
@@ -150,18 +150,17 @@ const createProductSchema = Joi.object({
 });
 
 const updateProductSchema = createProductSchema.keys({
-  name: Joi.string(),
-  sku: Joi.string(),
-  price: Joi.number().min(0),
-  stock: Joi.number().min(0),
-  category_id: Joi.string().allow(null),
+  name: Joi.string().allow('', null),
+  sku: Joi.string().allow('', null),
+  price: Joi.number().min(0).allow(null),
+  stock: Joi.number().min(0).allow(null),
+  category_id: Joi.string().allow('', null),
   categories: Joi.array().items(Joi.string()).default([]),
-  supplier_id: Joi.string(),
-  brand_id: Joi.string(),
+  supplier_id: Joi.string().allow('', null),
+  brand_id: Joi.string().allow('', null),
   woo_id: Joi.number(),
   images: Joi.array().items(imageSchema),
 });
-
 module.exports = {
   createCategorySchema,
   updateCategorySchema,
