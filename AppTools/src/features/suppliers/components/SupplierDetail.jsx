@@ -5,7 +5,6 @@ import { useSupplier } from '../contexts/supplierContext';
 import { EntityDetail, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { Mail, Phone, Building, MapPin, CreditCard, Calendar } from 'lucide-react';
-import imageProxyService from '../../../services/imageProxyService';
 
 function SupplierDetail() {
   const { id } = useParams();
@@ -76,10 +75,13 @@ function SupplierDetail() {
                   <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
                     Logo
                   </h3>
-                  <img
-                    src={imageProxyService.getImageUrl(supplier.image.src)}
-                    alt={supplier.name}
-                    className="h-32 w-32 object-contain mx-auto"
+                  <EntityImageManager
+                    entity={supplier}
+                    entityId={id}
+                    entityType="supplier"
+                    galleryMode={false}
+                    singleImageDisplay={supplier.image.src}
+                    isLoading={false}
                   />
                 </div>
               )}
@@ -261,7 +263,7 @@ function SupplierDetail() {
             entity={supplier}
             entityId={id}
             entityType="supplier"
-            galleryMode={false}
+            galleryMode={true}
             onUploadImage={() => {}}
             onDeleteImage={() => {}}
             isLoading={false}

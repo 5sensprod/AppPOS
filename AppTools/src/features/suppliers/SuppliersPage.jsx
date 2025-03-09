@@ -3,7 +3,6 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SupplierProvider } from './contexts/supplierContext';
 import SupplierTable from './components/SupplierTable';
-import { ENTITY_CONFIG } from './constants';
 import { Truck, Plus } from 'lucide-react';
 
 function SuppliersPage() {

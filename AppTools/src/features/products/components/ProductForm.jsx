@@ -1,34 +1,67 @@
 // src/features/products/components/ProductForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createEntityForm } from '../../../factories/createEntityForm';
+import { EntityForm } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { useProduct } from '../contexts/productContext';
 import apiService from '../../../services/api';
+import * as yup from 'yup';
 
-// Créer le formulaire de base avec la factory
-const ProductFormBase = createEntityForm({
-  entityName: ENTITY_CONFIG.name,
-  formFields: ENTITY_CONFIG.formFields,
-  cancelPath: '/products',
+// Schéma de validation pour les produits
+const productSchema = yup.object().shape({
+  name: yup.string().required('Le nom du produit est requis'),
+  sku: yup.string(),
+  description: yup.string(),
+  price: yup
+    .number()
+    .transform((value) => (isNaN(value) ? undefined : value))
+    .min(0, 'Le prix doit être positif')
+    .required('Le prix est requis'),
+  regular_price: yup
+    .number()
+    .transform((value) => (isNaN(value) ? undefined : value))
+    .min(0, 'Le prix régulier doit être positif'),
+  sale_price: yup
+    .number()
+    .transform((value) => (isNaN(value) ? undefined : value))
+    .min(0, 'Le prix promotionnel doit être positif'),
+  purchase_price: yup
+    .number()
+    .transform((value) => (isNaN(value) ? undefined : value))
+    .min(0, "Le prix d'achat doit être positif"),
+  stock: yup
+    .number()
+    .transform((value) => (isNaN(value) ? undefined : value))
+    .min(0, 'Le stock doit être positif')
+    .required('Le stock est requis'),
+  min_stock: yup
+    .number()
+    .transform((value) => (isNaN(value) ? undefined : value))
+    .min(0, 'Le stock minimum doit être positif'),
+  manage_stock: yup.boolean(),
+  status: yup.string().oneOf(['published', 'draft', 'archived']),
 });
 
 function ProductForm() {
   const { id } = useParams();
-  const isEditing = Boolean(id);
+  const isNew = !id;
   const navigate = useNavigate();
   const { createProduct, updateProduct, getProductById } = useProduct();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [categories, setCategories] = useState([]);
-  const [brands, setBrands] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
+  const [success, setSuccess] = useState(null);
+  const [relatedData, setRelatedData] = useState({
+    categories: [],
+    brands: [],
+    suppliers: [],
+  });
+  const [activeTab, setActiveTab] = useState('general');
 
   // Récupérer les données du produit en mode édition
   useEffect(() => {
-    if (isEditing) {
+    if (id) {
       const fetchProduct = async () => {
         try {
           setLoading(true);
@@ -44,7 +77,7 @@ function ProductForm() {
 
       fetchProduct();
     }
-  }, [isEditing, id, getProductById]);
+  }, [id, getProductById]);
 
   // Récupérer les listes déroulantes (catégories, marques, fournisseurs)
   useEffect(() => {
@@ -58,9 +91,11 @@ function ProductForm() {
           apiService.get('/api/suppliers'),
         ]);
 
-        setCategories(categoriesResponse.data.data || []);
-        setBrands(brandsResponse.data.data || []);
-        setSuppliers(suppliersResponse.data.data || []);
+        setRelatedData({
+          categories: categoriesResponse.data.data || [],
+          brands: brandsResponse.data.data || [],
+          suppliers: suppliersResponse.data.data || [],
+        });
 
         setLoading(false);
       } catch (error) {
@@ -73,124 +108,138 @@ function ProductForm() {
     fetchDropdownData();
   }, []);
 
-  // Préparer les options pour les listes déroulantes
-  const formFieldsWithOptions = ENTITY_CONFIG.formFields.map((field) => {
+  // Préparer les champs du formulaire avec les options
+  const formFields = ENTITY_CONFIG.formFields.map((field) => {
+    let updatedField = { ...field };
+
+    // Ajouter les onglets à chaque champ
+    if (['name', 'sku', 'description', 'status'].includes(field.name)) {
+      updatedField.tab = 'general';
+    } else if (['price', 'regular_price', 'sale_price', 'purchase_price'].includes(field.name)) {
+      updatedField.tab = 'general';
+    } else if (['stock', 'min_stock', 'manage_stock'].includes(field.name)) {
+      updatedField.tab = 'inventory';
+    } else if (['category_id', 'categories', 'brand_id', 'supplier_id'].includes(field.name)) {
+      updatedField.tab = 'inventory';
+    }
+
+    // Ajouter les options pour les listes déroulantes
     if (field.name === 'category_id') {
-      return {
-        ...field,
-        options: categories.map((category) => ({
-          value: category._id,
-          label: category.name,
-        })),
-      };
+      updatedField.options = relatedData.categories.map((cat) => ({
+        value: cat._id,
+        label: cat.name,
+      }));
+    } else if (field.name === 'categories') {
+      updatedField.options = relatedData.categories.map((cat) => ({
+        value: cat._id,
+        label: cat.name,
+      }));
+    } else if (field.name === 'brand_id') {
+      updatedField.options = relatedData.brands.map((brand) => ({
+        value: brand._id,
+        label: brand.name,
+      }));
+    } else if (field.name === 'supplier_id') {
+      updatedField.options = relatedData.suppliers.map((supplier) => ({
+        value: supplier._id,
+        label: supplier.name,
+      }));
     }
 
-    if (field.name === 'categories') {
-      return {
-        ...field,
-        options: categories.map((category) => ({
-          value: category._id,
-          label: category.name,
-        })),
-      };
-    }
-
-    if (field.name === 'brand_id') {
-      return {
-        ...field,
-        options: brands.map((brand) => ({
-          value: brand._id,
-          label: brand.name,
-        })),
-      };
-    }
-
-    if (field.name === 'supplier_id') {
-      return {
-        ...field,
-        options: suppliers.map((supplier) => ({
-          value: supplier._id,
-          label: supplier.name,
-        })),
-      };
-    }
-
-    return field;
+    return updatedField;
   });
 
-  // Soumission du formulaire
-  const handleSubmit = async (formData) => {
-    try {
-      setLoading(true);
+  // Valeurs initiales pour le formulaire
+  const getInitialValues = () => {
+    if (isNew) {
+      return {
+        name: '',
+        sku: '',
+        description: '',
+        price: '',
+        regular_price: '',
+        sale_price: '',
+        purchase_price: '',
+        stock: '',
+        min_stock: '',
+        manage_stock: false,
+        status: 'draft',
+        category_id: '',
+        categories: [],
+        brand_id: '',
+        supplier_id: '',
+      };
+    }
 
-      // Formater les données
-      const formattedData = { ...formData };
+    return product || {};
+  };
 
-      // Supprimer les champs vides
-      Object.keys(formattedData).forEach((key) => {
-        if (formattedData[key] === '') {
-          delete formattedData[key];
-        } else if (typeof formattedData[key] === 'object' && formattedData[key] !== null) {
-          Object.keys(formattedData[key]).forEach((subKey) => {
-            if (formattedData[key][subKey] === '') {
-              delete formattedData[key][subKey];
-            }
-          });
-        }
-      });
+  // Gestionnaire de soumission du formulaire
+  const handleSubmit = async (data) => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
 
-      // Convertir les valeurs numériques
-      ['price', 'regular_price', 'sale_price', 'purchase_price', 'stock', 'min_stock'].forEach(
-        (field) => {
-          if (formattedData[field]) formattedData[field] = Number(formattedData[field]);
-        }
-      );
+    // Formatage des données
+    const formattedData = { ...data };
 
-      // S'assurer que categories est un tableau
-      if (formattedData.categories && !Array.isArray(formattedData.categories)) {
-        formattedData.categories = [formattedData.categories];
+    // Convertir les valeurs numériques
+    ['price', 'regular_price', 'sale_price', 'purchase_price', 'stock', 'min_stock'].forEach(
+      (field) => {
+        if (formattedData[field]) formattedData[field] = Number(formattedData[field]);
       }
+    );
 
-      console.log('Données formatées:', formattedData);
-
-      if (isEditing) {
-        await updateProduct(id, formattedData);
-      } else {
+    try {
+      if (isNew) {
         await createProduct(formattedData);
+        setSuccess('Produit créé avec succès');
+        navigate('/products');
+      } else {
+        await updateProduct(id, formattedData);
+        setSuccess('Produit mis à jour avec succès');
+        // Recharger les données du produit
+        const updatedProduct = await getProductById(id);
+        setProduct(updatedProduct);
       }
 
       setLoading(false);
-      navigate('/products');
     } catch (error) {
-      console.error('Erreur lors de la soumission du formulaire:', error);
-      if (error.response?.data) {
-        console.error('Détails:', error.response.data);
-        setError(`Erreur: ${error.response.data.error || "Problème d'enregistrement"}`);
+      console.error('Erreur lors de la sauvegarde du produit:', error);
+      if (error.response) {
+        console.error("Détails de l'erreur:", error.response.data);
+        setError(`Erreur: ${error.response.data.error || 'Problème lors de la sauvegarde'}`);
       } else {
-        setError("Erreur lors de l'enregistrement du produit. Veuillez vérifier vos données.");
+        setError('Erreur lors de la sauvegarde du produit. Veuillez réessayer.');
       }
       setLoading(false);
     }
   };
 
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
-        {isEditing ? 'Modifier le produit' : 'Ajouter un produit'}
-      </h1>
+  // Gestionnaire d'annulation
+  const handleCancel = () => {
+    navigate(isNew ? '/products' : `/products/${id}`);
+  };
 
-      {loading && !product && isEditing ? (
-        <div className="py-10 text-center text-gray-500 dark:text-gray-400">
-          Chargement du produit...
-        </div>
-      ) : (
-        <ProductFormBase
-          initialData={product || {}}
-          isEditing={isEditing}
+  return (
+    <div className="container mx-auto px-4 py-6">
+      {/* Formulaire principal */}
+      {(!id || (id && product)) && (
+        <EntityForm
+          fields={formFields}
+          entityName="produit"
+          schema={productSchema}
+          isNew={isNew}
+          initialValues={getInitialValues()}
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
           isLoading={loading}
           error={error}
-          onSubmit={handleSubmit}
-          formFields={formFieldsWithOptions}
+          successMessage={success}
+          buttonLabel={isNew ? 'Créer le produit' : 'Mettre à jour le produit'}
+          formTitle={isNew ? 'Nouveau produit' : `Modifier ${product?.name || 'le produit'}`}
+          layout="tabs"
+          tabs={ENTITY_CONFIG.tabs}
         />
       )}
     </div>
