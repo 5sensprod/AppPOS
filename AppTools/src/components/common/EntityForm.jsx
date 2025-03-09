@@ -89,63 +89,60 @@ const EntityForm = ({
     fields.forEach((field) => {
       let fieldSchema;
 
-      // Déterminer le type de champ Yup en fonction du type de champ
-      switch (field.type) {
-        case 'text':
-        case 'textarea':
-        case 'select':
-        case 'email':
-          fieldSchema = yup.string();
-          if (field.type === 'email') fieldSchema = fieldSchema.email('Email invalide');
-          break;
-        case 'number':
-          fieldSchema = yup.number().transform((value) => (isNaN(value) ? undefined : value));
-          if (field.min !== undefined)
-            fieldSchema = fieldSchema.min(field.min, `Doit être supérieur ou égal à ${field.min}`);
-          if (field.max !== undefined)
-            fieldSchema = fieldSchema.max(field.max, `Doit être inférieur ou égal à ${field.max}`);
-          break;
-        case 'checkbox':
-          fieldSchema = yup.boolean();
-          break;
-        case 'date':
-          fieldSchema = yup.date();
-          break;
-        case 'multiselect':
-          fieldSchema = yup.array().of(yup.string());
-          break;
-        default:
-          fieldSchema = yup.string();
+      // Gérer les champs imbriqués
+      const fieldNameParts = field.name.split('.');
+      if (fieldNameParts.length > 1) {
+        const [parent, child] = fieldNameParts;
+        if (!schemaShape[parent]) {
+          schemaShape[parent] = yup.object().shape({});
+        }
+        schemaShape[parent] = schemaShape[parent].shape({
+          [child]: getYupSchemaForField(field),
+        });
+      } else {
+        schemaShape[field.name] = getYupSchemaForField(field);
       }
-
-      // Ajouter les validations supplémentaires
-      if (field.required) {
-        fieldSchema = fieldSchema.required('Ce champ est requis');
-      }
-
-      if (field.validation) {
-        // Appliquer des validations personnalisées si elles sont fournies
-        if (field.validation.min)
-          fieldSchema = fieldSchema.min(
-            field.validation.min,
-            `Minimum ${field.validation.min} caractères`
-          );
-        if (field.validation.max)
-          fieldSchema = fieldSchema.max(
-            field.validation.max,
-            `Maximum ${field.validation.max} caractères`
-          );
-        if (field.validation.pattern)
-          fieldSchema = fieldSchema.matches(
-            field.validation.pattern,
-            field.validation.message || 'Format invalide'
-          );
-      }
-
-      schemaShape[field.name] = fieldSchema;
     });
 
     return yup.object().shape(schemaShape);
+  }
+
+  function getYupSchemaForField(field) {
+    let schema;
+
+    switch (field.type) {
+      case 'text':
+      case 'textarea':
+      case 'select':
+      case 'email':
+        schema = yup.string();
+        if (field.type === 'email') schema = schema.email('Email invalide');
+        break;
+      case 'number':
+        schema = yup.number().transform((value) => (isNaN(value) ? undefined : value));
+        if (field.min !== undefined)
+          schema = schema.min(field.min, `Doit être supérieur ou égal à ${field.min}`);
+        if (field.max !== undefined)
+          schema = schema.max(field.max, `Doit être inférieur ou égal à ${field.max}`);
+        break;
+      case 'checkbox':
+        schema = yup.boolean();
+        break;
+      case 'date':
+        schema = yup.date();
+        break;
+      case 'multiselect':
+        schema = yup.array().of(yup.string());
+        break;
+      default:
+        schema = yup.string();
+    }
+
+    if (field.required) {
+      schema = schema.required('Ce champ est requis');
+    }
+
+    return schema;
   }
 
   // Organiser les champs par onglet si nécessaire

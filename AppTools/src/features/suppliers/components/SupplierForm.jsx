@@ -4,32 +4,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSupplier } from '../contexts/supplierContext';
 import { EntityForm, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
-import * as yup from 'yup';
-
-// Schéma de validation pour les fournisseurs
-const supplierSchema = yup.object().shape({
-  name: yup.string(),
-  supplier_code: yup.string(),
-  customer_code: yup.string(),
-  contact: yup.object().shape({
-    name: yup.string(),
-    email: yup.string().email('Adresse email invalide'),
-    phone: yup.string(),
-    address: yup.string(),
-  }),
-  banking: yup.object().shape({
-    iban: yup.string(),
-    bic: yup.string(),
-  }),
-  payment_terms: yup.object().shape({
-    type: yup.string(),
-    discount: yup
-      .number()
-      .transform((value) => (isNaN(value) ? undefined : value))
-      .min(0, 'La remise doit être positive')
-      .max(100, 'La remise ne peut pas dépasser 100%'),
-  }),
-});
 
 function SupplierForm() {
   const { id } = useParams();
@@ -207,7 +181,6 @@ function SupplierForm() {
         <EntityForm
           fields={ENTITY_CONFIG.formFields}
           entityName="fournisseur"
-          schema={supplierSchema}
           isNew={isNew}
           initialValues={getInitialValues()}
           onSubmit={handleSubmit}

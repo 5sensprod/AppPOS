@@ -5,42 +5,6 @@ import { EntityForm } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { useProduct } from '../contexts/productContext';
 import apiService from '../../../services/api';
-import * as yup from 'yup';
-
-// Schéma de validation pour les produits
-const productSchema = yup.object().shape({
-  name: yup.string().required('Le nom du produit est requis'),
-  sku: yup.string(),
-  description: yup.string(),
-  price: yup
-    .number()
-    .transform((value) => (isNaN(value) ? undefined : value))
-    .min(0, 'Le prix doit être positif')
-    .required('Le prix est requis'),
-  regular_price: yup
-    .number()
-    .transform((value) => (isNaN(value) ? undefined : value))
-    .min(0, 'Le prix régulier doit être positif'),
-  sale_price: yup
-    .number()
-    .transform((value) => (isNaN(value) ? undefined : value))
-    .min(0, 'Le prix promotionnel doit être positif'),
-  purchase_price: yup
-    .number()
-    .transform((value) => (isNaN(value) ? undefined : value))
-    .min(0, "Le prix d'achat doit être positif"),
-  stock: yup
-    .number()
-    .transform((value) => (isNaN(value) ? undefined : value))
-    .min(0, 'Le stock doit être positif')
-    .required('Le stock est requis'),
-  min_stock: yup
-    .number()
-    .transform((value) => (isNaN(value) ? undefined : value))
-    .min(0, 'Le stock minimum doit être positif'),
-  manage_stock: yup.boolean(),
-  status: yup.string().oneOf(['published', 'draft', 'archived']),
-});
 
 function ProductForm() {
   const { id } = useParams();
@@ -220,7 +184,6 @@ function ProductForm() {
         <EntityForm
           fields={formFields}
           entityName="produit"
-          schema={productSchema}
           isNew={isNew}
           initialValues={getInitialValues()}
           onSubmit={handleSubmit}

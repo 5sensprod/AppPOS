@@ -10,6 +10,7 @@ const TabNavigation = ({ tabs = [], activeTab, onTabChange, className = '' }) =>
       <nav className="flex -mb-px">
         {tabs.map((tab) => (
           <button
+            type="button"
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={`py-4 px-6 text-sm font-medium ${
