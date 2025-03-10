@@ -3,7 +3,8 @@ const express = require('express');
 const router = express.Router();
 const wooSyncController = require('../controllers/wooSyncController');
 
-// Route pour synchroniser un produit spécifique
+router.get('/products/pending', wooSyncController.getPendingSync);
+// Route pour synchroniser un produit spécifique l image nest pas prise en compte ! utilser plutot {{base_url}}/api/products/:id/sync
 router.post('/products/:id/sync', wooSyncController.syncProduct);
 
 // Route pour synchroniser tous les produits modifiés

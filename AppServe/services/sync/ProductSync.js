@@ -85,10 +85,10 @@ class ProductSyncStrategy extends SyncStrategy {
       });
     }
 
-    // Ajouter toutes les images de la galerie
+    // Ajouter toutes les images de la galerie (sauf l'image principale pour éviter les doublons)
     if (product.gallery_images?.length) {
       const galleryImages = product.gallery_images
-        .filter((img) => img.wp_id)
+        .filter((img) => img.wp_id && (!product.image || img.wp_id !== product.image.wp_id))
         .map((img, index) => ({
           id: parseInt(img.wp_id),
           src: img.url,
@@ -96,12 +96,19 @@ class ProductSyncStrategy extends SyncStrategy {
           alt: `${product.name} - ${index + 1}`,
         }));
 
-      // Si l'image principale n'est pas définie, définir la première image de la galerie comme principale
-      if (!product.image?.wp_id && galleryImages.length > 0) {
-        images.push({ ...galleryImages[0], position: 0 });
-        images.push(...galleryImages.slice(1));
-      } else {
-        images.push(...galleryImages);
+      images.push(...galleryImages);
+    }
+
+    // Si aucune image n'a été ajoutée mais qu'il y a des images avec wp_id dans la galerie
+    if (images.length === 0 && product.gallery_images?.some((img) => img.wp_id)) {
+      const firstImage = product.gallery_images.find((img) => img.wp_id);
+      if (firstImage) {
+        images.push({
+          id: parseInt(firstImage.wp_id),
+          src: firstImage.url,
+          position: 0,
+          alt: product.name,
+        });
       }
     }
 
@@ -130,20 +137,44 @@ class ProductSyncStrategy extends SyncStrategy {
       // Vérifier et téléverser les images en attente vers WordPress
       await this._syncPendingImages(product);
 
-      const wcData = await this._mapLocalToWooCommerce(product);
+      // Recharger le produit avec les images mises à jour
+      const Product = require('../../models/Product');
+      const updatedProduct = await Product.findById(product._id);
+
+      const wcData = await this._mapLocalToWooCommerce(updatedProduct);
 
       let response;
-      if (product.woo_id) {
-        response = await client.put(`${this.endpoint}/${product.woo_id}`, wcData);
-        await this._updateLocalProduct(product._id, response.data);
+      if (updatedProduct.woo_id) {
+        // Produit existant
+        response = await client.put(`${this.endpoint}/${updatedProduct.woo_id}`, wcData);
+        await this._updateLocalProduct(updatedProduct._id, response.data);
         results.updated++;
       } else {
+        // Nouveau produit
         response = await client.post(this.endpoint, wcData);
-        await this._updateLocalProduct(product._id, response.data);
+        // Immédiatement après création, mettre à jour avec les images
+        if (response.data.id && wcData.images && wcData.images.length > 0) {
+          // Mettre à jour le produit local avec le woo_id
+          await Product.update(updatedProduct._id, { woo_id: response.data.id });
+
+          // Réessayer avec PUT pour s'assurer que les images sont bien associées
+          const imageUpdateData = {
+            id: response.data.id,
+            images: wcData.images,
+          };
+
+          await client.put(`${this.endpoint}/${response.data.id}`, imageUpdateData);
+        }
+
+        await this._updateLocalProduct(updatedProduct._id, response.data);
         results.created++;
       }
 
-      return { success: true, product: await Product.findById(product._id), results };
+      return {
+        success: true,
+        product: await Product.findById(updatedProduct._id),
+        results,
+      };
     } catch (error) {
       results.errors.push({
         product_id: product._id,

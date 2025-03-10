@@ -37,6 +37,14 @@ class BaseImageController {
       const files = this.validateAndGetFiles(req);
       const results = await this.processFiles(files, req.params.id);
 
+      // Marquer le produit comme pending_sync s'il a un woo_id
+      const Model = this.imageService._getModelByEntity();
+      const item = await Model.findById(req.params.id);
+
+      if (item && item.woo_id) {
+        await Model.update(req.params.id, { pending_sync: true });
+      }
+
       return ResponseHandler.success(res, {
         message: 'Images téléversées avec succès',
         data: results,
@@ -61,6 +69,15 @@ class BaseImageController {
   async deleteImage(req, res) {
     try {
       await this.imageService.deleteImage(req.params.id);
+
+      // Marquer le produit comme pending_sync s'il a un woo_id
+      const Model = this.imageService._getModelByEntity();
+      const item = await Model.findById(req.params.id);
+
+      if (item && item.woo_id) {
+        await Model.update(req.params.id, { pending_sync: true });
+      }
+
       return ResponseHandler.success(res, {
         message: 'Image supprimée avec succès',
       });
@@ -73,6 +90,15 @@ class BaseImageController {
     try {
       const { id, imageId } = req.params;
       await this.imageService.deleteGalleryImage(id, imageId);
+
+      // Marquer le produit comme pending_sync s'il a un woo_id
+      const Model = this.imageService._getModelByEntity();
+      const item = await Model.findById(id);
+
+      if (item && item.woo_id) {
+        await Model.update(id, { pending_sync: true });
+      }
+
       return ResponseHandler.success(res, { message: 'Image supprimée de la galerie avec succès' });
     } catch (error) {
       return ResponseHandler.error(res, error);
@@ -93,12 +119,10 @@ class BaseImageController {
 
       let targetImage = null;
 
-      // Recherche uniquement par _id local ou index
+      // Recherche par _id local uniquement
       if (imageId) {
-        // Recherche par _id (UUID) uniquement
         targetImage = item.gallery_images?.find((img) => img._id === imageId);
       } else if (imageIndex !== undefined) {
-        // Mode local: recherche par index dans gallery_images
         targetImage = item.gallery_images?.[imageIndex];
       }
 
@@ -110,6 +134,11 @@ class BaseImageController {
       const updateData = {
         image: targetImage,
       };
+
+      // Ajouter pending_sync si le produit a déjà un woo_id
+      if (item.woo_id) {
+        updateData.pending_sync = true;
+      }
 
       await Model.update(entityId, updateData);
 

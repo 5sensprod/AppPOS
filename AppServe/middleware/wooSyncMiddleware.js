@@ -3,85 +3,143 @@ const ProductWooCommerceService = require('../services/ProductWooCommerceService
 
 /**
  * Middleware pour synchroniser automatiquement les modifications avec WooCommerce
- * À ajouter aux routes de mise à jour des produits
+ * @param {Object} options - Options de configuration
+ * @param {boolean} options.forceSync - Force la synchronisation même si SYNC_ON_CHANGE est désactivé
+ * @param {boolean} options.manualSync - Indique si c'est une synchronisation manuelle (via API)
  */
-async function wooSyncMiddleware(req, res, next) {
-  // Sauvegarder la réponse originale
-  const originalSend = res.send;
+function wooSyncMiddleware(options = { forceSync: false, manualSync: false }) {
+  return async function (req, res, next) {
+    // Pour synchronisation manuelle via API
+    if (options.manualSync) {
+      try {
+        const productId = req.params.id;
+        const Product = require('../models/Product');
+        const product = await Product.findById(productId);
 
-  // Intercepter la réponse
-  res.send = function (body) {
-    try {
-      // Récupérer les données de la réponse
-      const data = typeof body === 'string' ? JSON.parse(body) : body;
-
-      // Vérifier si c'est une réponse de succès avec des données de produit
-      if (data && data.success && data.data) {
-        // Si c'est un tableau, prendre le premier élément, sinon utiliser directement
-        const product = Array.isArray(data.data) ? data.data[0] : data.data;
-
-        // Vérifier si le produit a un woo_id (déjà synchronisé avec WooCommerce)
-        if (product.woo_id) {
-          // Lancer la synchronisation en arrière-plan
-          syncWithWooCommerce(product)
-            .then((result) => {
-              if (result.success) {
-                console.log(`Produit ${product._id} synchronisé avec WooCommerce`);
-              } else {
-                console.error(
-                  `Erreur lors de la synchronisation du produit ${product._id}:`,
-                  result.error
-                );
-              }
-            })
-            .catch((error) => {
-              console.error(
-                `Erreur non gérée lors de la synchronisation du produit ${product._id}:`,
-                error
-              );
-            });
+        if (!product) {
+          return res.status(404).json({
+            success: false,
+            message: 'Produit non trouvé',
+          });
         }
+
+        const result = await ProductWooCommerceService.syncToWooCommerce(product);
+
+        // Réinitialiser pending_sync après synchronisation réussie
+        if (result.success) {
+          await Product.update(productId, {
+            pending_sync: false,
+            last_sync: new Date(),
+          });
+        }
+
+        return res.json({
+          success: result.success,
+          message: result.success
+            ? `Produit synchronisé avec succès ${result.data[0].woo_id ? '(mis à jour)' : '(créé)'}`
+            : 'Échec de la synchronisation',
+          data: result,
+        });
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          message: error.message,
+        });
       }
-    } catch (error) {
-      console.error('Erreur dans le middleware de synchronisation WooCommerce:', error);
     }
 
-    // Appeler la fonction send originale
-    return originalSend.call(this, body);
-  };
+    // Pour synchronisation automatique (comportement existant)
+    const originalSend = res.send;
 
-  // Continuer le traitement de la requête
-  next();
+    res.send = function (body) {
+      try {
+        const data = typeof body === 'string' ? JSON.parse(body) : body;
+
+        if (data && data.success && data.data) {
+          const product = Array.isArray(data.data) ? data.data[0] : data.data;
+
+          // Synchroniser si forceSync est true OU si le produit a déjà un woo_id
+          const shouldSync =
+            options.forceSync ||
+            (product.woo_id && process.env.SYNC_ON_CHANGE === 'true') ||
+            req.query.sync === 'true';
+
+          if (shouldSync) {
+            syncWithWooCommerce(product)
+              .then((result) => {
+                if (result.success) {
+                  console.log(`Produit ${product._id} synchronisé avec WooCommerce`);
+                  // Réinitialiser pending_sync
+                  const Product = require('../models/Product');
+                  Product.update(product._id, { pending_sync: false }).catch((err) =>
+                    console.error('Erreur réinitialisation pending_sync:', err)
+                  );
+                } else {
+                  console.error(
+                    `Erreur lors de la synchronisation du produit ${product._id}:`,
+                    result.error
+                  );
+                }
+              })
+              .catch((error) => {
+                console.error(
+                  `Erreur non gérée lors de la synchronisation du produit ${product._id}:`,
+                  error
+                );
+              });
+          }
+        }
+      } catch (error) {
+        console.error('Erreur dans le middleware de synchronisation WooCommerce:', error);
+      }
+
+      return originalSend.call(this, body);
+    };
+
+    next();
+  };
 }
 
-// Fonction pour synchroniser avec WooCommerce
+// Fonction pour synchroniser avec WooCommerce reste inchangée
 async function syncWithWooCommerce(product) {
   try {
+    // S'assurer que le produit est complet (avec toutes les données d'image)
+    const productWithImages = product;
+
+    // Si les images ne sont pas complètes dans l'objet product,
+    // on récupère le produit complet depuis la base de données
+    if ((!product.image || !product.gallery_images) && product._id) {
+      const Product = require('../models/Product');
+      productWithImages = await Product.findById(product._id);
+    }
+
     // Créer un objet de données filtré avec seulement les champs nécessaires pour WooCommerce
     const wcProduct = {
-      _id: product._id,
-      name: product.name,
-      sku: product.sku,
-      description: product.description || '',
-      description_short: product.description_short || '',
-      price: product.price,
-      regular_price: product.regular_price || product.price,
-      sale_price: product.sale_price,
-      status: product.status,
-      manage_stock: product.manage_stock,
-      stock: product.stock,
-      brand_id: product.brand_id,
-      category_id: product.category_id,
-      categories: product.categories,
-      meta_data: product.meta_data,
+      _id: productWithImages._id,
+      name: productWithImages.name,
+      sku: productWithImages.sku,
+      description: productWithImages.description || '',
+      description_short: productWithImages.description_short || '',
+      price: productWithImages.price,
+      regular_price: productWithImages.regular_price || productWithImages.price,
+      sale_price: productWithImages.sale_price,
+      status: productWithImages.status,
+      manage_stock: productWithImages.manage_stock,
+      stock: productWithImages.stock,
+      brand_id: productWithImages.brand_id,
+      category_id: productWithImages.category_id,
+      categories: productWithImages.categories,
+      meta_data: productWithImages.meta_data,
+      image: productWithImages.image,
+      gallery_images: productWithImages.gallery_images,
     };
 
     // Si le produit a un woo_id, l'inclure pour permettre les mises à jour
-    if (product.woo_id) {
-      wcProduct.woo_id = product.woo_id;
+    if (productWithImages.woo_id) {
+      wcProduct.woo_id = productWithImages.woo_id;
     }
 
-    console.log('Synchronisation du produit avec WooCommerce (champs filtrés):', wcProduct._id);
+    console.log('Synchronisation du produit avec WooCommerce:', wcProduct._id);
 
     // Utiliser le service de synchronisation WooCommerce
     return await ProductWooCommerceService.syncToWooCommerce(wcProduct);

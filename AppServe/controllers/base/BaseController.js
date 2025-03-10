@@ -77,18 +77,32 @@ class BaseController {
 
   async update(req, res) {
     try {
-      const updated = await this.model.update(req.params.id, req.body);
-      if (!updated) return ResponseHandler.notFound(res);
+      const id = req.params.id;
+      const updateData = req.body;
+
+      // Vérifier si le produit existe
+      const existing = await this.model.findById(id);
+      if (!existing) return ResponseHandler.notFound(res);
+
+      // Marquer comme pending_sync si le produit a déjà un woo_id
+      if (existing.woo_id) {
+        updateData.pending_sync = true;
+      }
+
+      const updated = await this.model.update(id, updateData);
 
       // Récupérer l'entité mise à jour complète pour WebSocket
-      const updatedItem = await this.model.findById(req.params.id);
+      const updatedItem = await this.model.findById(id);
 
       // Notifier via WebSocket de la mise à jour
-      websocketManager.notifyEntityUpdated(this.entityName, req.params.id, updatedItem);
+      websocketManager.notifyEntityUpdated(this.entityName, id, updatedItem);
 
+      // Synchroniser immédiatement si SYNC_ON_CHANGE est true
       if (this.shouldSync() && this.wooCommerceService) {
         try {
           await this.wooCommerceService.syncToWooCommerce([updatedItem]);
+          // Réinitialiser pending_sync après synchronisation réussie
+          await this.model.update(id, { pending_sync: false });
         } catch (syncError) {
           return ResponseHandler.partialSuccess(res, updated, syncError);
         }
