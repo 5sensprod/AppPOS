@@ -36,6 +36,12 @@ class BaseImageRoutes {
         this.imageController.setMainImage.bind(this.imageController)
       );
     }
+
+    // Pour supprimer une image spécifique de la galerie
+    this.router.delete(
+      '/:id/gallery/:imageId',
+      this.imageController.deleteGalleryImage.bind(this.imageController)
+    );
   }
 
   getRouter() {

@@ -69,6 +69,16 @@ class BaseImageController {
     }
   }
 
+  async deleteGalleryImage(req, res) {
+    try {
+      const { id, imageId } = req.params;
+      await this.imageService.deleteGalleryImage(id, imageId);
+      return ResponseHandler.success(res, { message: 'Image supprimée de la galerie avec succès' });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   async setMainImage(req, res) {
     try {
       const { id: entityId } = req.params;

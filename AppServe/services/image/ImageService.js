@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const GalleryImage = require('../../models/images/GalleryImage');
 const SingleImage = require('../../models/images/SingleImage');
 const WordPressImageSync = require('./WordPressImageSync');
+const { v4: uuidv4 } = require('uuid');
 
 class ImageService {
   constructor(entity, type = 'single') {
@@ -23,6 +24,8 @@ class ImageService {
 
       for (const file of filesToProcess) {
         const imageData = await this.imageHandler.upload(file, entityId);
+        // Ajouter _id unique
+        imageData._id = uuidv4();
 
         if (this.entity !== 'suppliers' && options.syncToWordPress) {
           const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
@@ -215,6 +218,53 @@ class ImageService {
       return true;
     } catch (error) {
       throw new Error(`Erreur suppression image: ${error.message}`);
+    }
+  }
+
+  async deleteGalleryImage(entityId, imageId) {
+    try {
+      const Model = this._getModelByEntity();
+      const item = await Model.findById(entityId);
+
+      if (!item) throw new Error(`Entité non trouvée`);
+
+      const imageToDelete = item.gallery_images?.find((img) => img._id === imageId);
+
+      if (!imageToDelete) throw new Error(`Image non trouvée`);
+
+      // Suppression WordPress et fichier local
+      if (imageToDelete.wp_id) await this.wpSync.deleteFromWordPress(imageToDelete.wp_id);
+      if (imageToDelete.local_path) await this._handleExistingImage(imageToDelete, entityId);
+
+      // Mise à jour données
+      const updateData = {
+        gallery_images: item.gallery_images.filter((img) => img._id !== imageId),
+      };
+
+      // Si c'est aussi l'image principale, la supprimer
+      if (
+        item.image &&
+        (item.image._id === imageId || item.image.local_path === imageToDelete.local_path)
+      ) {
+        // Si d'autres images existent dans la galerie, utiliser la première comme principale
+        if (updateData.gallery_images.length > 0) {
+          updateData.image = { ...updateData.gallery_images[0] };
+        } else {
+          updateData.image = null;
+        }
+      }
+
+      await Model.update(entityId, updateData);
+
+      // Synchronisation WooCommerce
+      if (this.entity === 'products' && process.env.SYNC_ON_CHANGE === 'true') {
+        const service = this._getWooCommerceService();
+        await service.syncToWooCommerce(await Model.findById(entityId));
+      }
+
+      return true;
+    } catch (error) {
+      throw new Error(`Erreur suppression: ${error.message}`);
     }
   }
 
