@@ -24,19 +24,20 @@ class ImageService {
 
       for (const file of filesToProcess) {
         const imageData = await this.imageHandler.upload(file, entityId);
-        // Ajouter _id unique
+        // Ajouter _id unique systématiquement
         imageData._id = uuidv4();
 
         if (this.entity !== 'suppliers' && options.syncToWordPress) {
           const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
           uploadedImages.push({
-            src: imageData.src, // Chemin local pour l'URL frontend
+            _id: imageData._id, // Conserver l'ID local
+            src: imageData.src,
             local_path: imageData.local_path,
             status: 'active',
             type: imageData.type,
             metadata: imageData.metadata,
             wp_id: wpData.id,
-            url: wpData.url, // URL WordPress
+            url: wpData.url,
           });
         } else {
           // Sans synchronisation
@@ -59,6 +60,10 @@ class ImageService {
 
         for (const img of allImages) {
           if (!pathsAdded.has(img.local_path)) {
+            // S'assurer que chaque image a un _id
+            if (!img._id) {
+              img._id = uuidv4();
+            }
             uniqueImages.push({ ...img, status: 'active' });
             pathsAdded.add(img.local_path);
           }
@@ -76,7 +81,7 @@ class ImageService {
         }
       }
 
-      return { message: 'Aucune image téléversée', data: [] };
+      return { message: 'Images téléversées avec succès', data: uploadedImages };
     } catch (error) {
       if (files) {
         const toClean = Array.isArray(files) ? files : [files];
@@ -134,6 +139,11 @@ class ImageService {
   }
 
   async _updateEntityWithNewImage(item, updatedImageData, Model) {
+    // S'assurer que l'image a un _id
+    if (!updatedImageData._id) {
+      updatedImageData._id = uuidv4();
+    }
+
     const updateData = this.imageHandler.isGallery
       ? { gallery_images: [...(item.gallery_images || []), updatedImageData] }
       : { image: updatedImageData };
@@ -228,23 +238,36 @@ class ImageService {
 
       if (!item) throw new Error(`Entité non trouvée`);
 
+      // Rechercher l'image par _id uniquement
       const imageToDelete = item.gallery_images?.find((img) => img._id === imageId);
 
       if (!imageToDelete) throw new Error(`Image non trouvée`);
 
-      // Suppression WordPress et fichier local
-      if (imageToDelete.wp_id) await this.wpSync.deleteFromWordPress(imageToDelete.wp_id);
-      if (imageToDelete.local_path) await this._handleExistingImage(imageToDelete, entityId);
+      // Suppression WordPress si wp_id existe
+      if (imageToDelete.wp_id) {
+        try {
+          await this.wpSync.deleteFromWordPress(imageToDelete.wp_id);
+        } catch (error) {
+          console.error(`Erreur lors de la suppression WordPress:`, error.message);
+          // Continuer même en cas d'erreur WordPress
+        }
+      }
 
-      // Mise à jour données
+      // Suppression du fichier local
+      if (imageToDelete.local_path) {
+        await this._handleExistingImage(imageToDelete, entityId);
+      }
+
+      // Mise à jour des données locales
       const updateData = {
-        gallery_images: item.gallery_images.filter((img) => img._id !== imageId),
+        gallery_images: item.gallery_images.filter((img) => (img._id === imageId ? false : true)),
       };
 
-      // Si c'est aussi l'image principale, la supprimer
+      // Si c'est aussi l'image principale, la supprimer ou la remplacer
       if (
         item.image &&
-        (item.image._id === imageId || item.image.local_path === imageToDelete.local_path)
+        (item.image._id === imageId ||
+          (item.image.local_path && item.image.local_path === imageToDelete.local_path))
       ) {
         // Si d'autres images existent dans la galerie, utiliser la première comme principale
         if (updateData.gallery_images.length > 0) {
@@ -256,10 +279,13 @@ class ImageService {
 
       await Model.update(entityId, updateData);
 
-      // Synchronisation WooCommerce
+      // Synchronisation WooCommerce après la mise à jour locale
       if (this.entity === 'products' && process.env.SYNC_ON_CHANGE === 'true') {
         const service = this._getWooCommerceService();
-        await service.syncToWooCommerce(await Model.findById(entityId));
+        if (service) {
+          const updatedDoc = await Model.findById(entityId);
+          await service.syncToWooCommerce(updatedDoc);
+        }
       }
 
       return true;

@@ -82,7 +82,7 @@ class BaseImageController {
   async setMainImage(req, res) {
     try {
       const { id: entityId } = req.params;
-      const { imageId, imageIndex } = req.body; // wp_id ou index en local
+      const { imageId, imageIndex } = req.body;
 
       const Model = this.imageService._getModelByEntity();
       const item = await Model.findById(entityId);
@@ -93,9 +93,10 @@ class BaseImageController {
 
       let targetImage = null;
 
+      // Recherche uniquement par _id local ou index
       if (imageId) {
-        // Mode WooCommerce: recherche par wp_id
-        targetImage = item.gallery_images?.find((img) => img.wp_id === parseInt(imageId));
+        // Recherche par _id (UUID) uniquement
+        targetImage = item.gallery_images?.find((img) => img._id === imageId);
       } else if (imageIndex !== undefined) {
         // Mode local: recherche par index dans gallery_images
         targetImage = item.gallery_images?.[imageIndex];

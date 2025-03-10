@@ -2,6 +2,7 @@
 const SyncStrategy = require('../base/SyncStrategy');
 const Product = require('../../models/Product');
 const Category = require('../../models/Category');
+const { v4: uuidv4 } = require('uuid');
 
 class ProductSyncStrategy extends SyncStrategy {
   constructor() {
@@ -153,7 +154,6 @@ class ProductSyncStrategy extends SyncStrategy {
   }
 
   async _syncPendingImages(product) {
-    // Si pas d'images ou pas d'images en attente, ne rien faire
     if (!product.gallery_images?.length) return product;
 
     const pendingImages = product.gallery_images.filter(
@@ -175,7 +175,7 @@ class ProductSyncStrategy extends SyncStrategy {
 
           const wpData = await wpSync.uploadToWordPress(img.local_path);
           updatedGallery[i] = {
-            ...img,
+            ...img, // Préserver toutes les propriétés incluant _id
             wp_id: wpData.id,
             url: wpData.url,
             status: 'active',
@@ -196,6 +196,7 @@ class ProductSyncStrategy extends SyncStrategy {
 
       if (matchingImg && matchingImg.wp_id) {
         mainImage = {
+          ...mainImage, // Préserver _id et autres propriétés
           ...matchingImg,
         };
       }
@@ -229,11 +230,13 @@ class ProductSyncStrategy extends SyncStrategy {
       let mainImageLocal = currentProduct.gallery_images?.find((img) => img.wp_id === mainWpId);
 
       updateData.image = {
+        _id: mainImageLocal?._id || uuidv4(), // Préserver _id ou en créer un nouveau
         wp_id: mainWpId,
         url: wcData.images[0].src,
         // Conserver le chemin local s'il existe déjà
         local_path: mainImageLocal?.local_path || null,
         src: mainImageLocal?.src || wcData.images[0].src,
+        status: 'active',
       };
 
       // Mettre à jour ou créer les images de galerie sans duplication
@@ -254,6 +257,7 @@ class ProductSyncStrategy extends SyncStrategy {
           );
 
           galleryImages.push({
+            _id: existingImage?._id || uuidv4(), // Préserver _id ou en créer un nouveau
             wp_id: wcImage.id,
             url: wcImage.src,
             src: existingImage?.src || wcImage.src,
