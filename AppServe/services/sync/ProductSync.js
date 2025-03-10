@@ -236,11 +236,18 @@ class ProductSyncStrategy extends SyncStrategy {
         src: mainImageLocal?.src || wcData.images[0].src,
       };
 
-      // Mettre à jour ou créer les images de galerie
-      if (wcData.images.length > 1) {
+      // Mettre à jour ou créer les images de galerie sans duplication
+      if (wcData.images.length > 0) {
         const galleryImages = [];
+        const addedWpIds = new Set();
 
         for (const wcImage of wcData.images) {
+          // Si cette image a déjà été ajoutée, la sauter
+          if (addedWpIds.has(wcImage.id)) continue;
+
+          // Ajouter l'ID à l'ensemble des IDs déjà traités
+          addedWpIds.add(wcImage.id);
+
           // Chercher l'image correspondante dans la galerie actuelle
           const existingImage = currentProduct.gallery_images?.find(
             (img) => img.wp_id === wcImage.id

@@ -41,29 +41,36 @@ class ImageService {
         }
       }
 
-      // Le reste du code reste identique
       if (uploadedImages.length > 0) {
         const updateData = {};
-        const currentGallery = item.gallery_images || [];
 
-        updateData.gallery_images = [...currentGallery, ...uploadedImages];
-
-        if (!item.image) {
-          updateData.image = {
-            ...uploadedImages[0],
-            src: uploadedImages[0].src, // Conserver le chemin src local
-          };
+        // Définir l'image principale si nécessaire
+        if (!item.image && uploadedImages.length > 0) {
+          updateData.image = { ...uploadedImages[0], status: 'active' };
         }
+
+        // Construire une nouvelle gallery sans duplication
+        const allImages = [...(item.gallery_images || []), ...uploadedImages];
+        const uniqueImages = [];
+        const pathsAdded = new Set();
+
+        for (const img of allImages) {
+          if (!pathsAdded.has(img.local_path)) {
+            uniqueImages.push({ ...img, status: 'active' });
+            pathsAdded.add(img.local_path);
+          }
+        }
+
+        updateData.gallery_images = uniqueImages;
 
         await Model.update(entityId, updateData);
 
+        // Synchronisation avec WooCommerce
         if (this.entity === 'products' && process.env.SYNC_ON_CHANGE === 'true') {
           const service = require('../ProductWooCommerceService');
           const updatedDoc = await Model.findById(entityId);
           await service.syncToWooCommerce(updatedDoc);
         }
-
-        return { message: 'Images téléversées avec succès', data: uploadedImages };
       }
 
       return { message: 'Aucune image téléversée', data: [] };
