@@ -1,6 +1,5 @@
 // server/websocket/websocketManager.js
 const WebSocket = require('ws');
-const http = require('http');
 const logger = require('../utils/logger');
 
 class WebSocketManager {
@@ -46,7 +45,11 @@ class WebSocketManager {
       const { type, payload } = parsedMessage;
 
       if (type === 'subscribe') {
-        const { entityType } = payload;
+        let { entityType } = payload;
+
+        // Assurer que l'entité est toujours en pluriel
+        entityType = entityType.endsWith('s') ? entityType : `${entityType}s`;
+
         if (entityType) {
           const clientData = this.clients.get(client);
           clientData.subscriptions.add(entityType);
@@ -63,15 +66,22 @@ class WebSocketManager {
 
   // Notifier les clients après des opérations CRUD
   notifyEntityCreated(entityType, entityData) {
-    this.broadcast('entity_created', { entityType, data: entityData }, [entityType]);
+    const entityPlural = entityType.endsWith('s') ? entityType : `${entityType}s`;
+    this.broadcast('entity_created', { entityType: entityPlural, data: entityData }, [
+      entityPlural,
+    ]);
   }
 
   notifyEntityUpdated(entityType, entityId, entityData) {
-    this.broadcast('entity_updated', { entityType, entityId, data: entityData }, [entityType]);
+    const entityPlural = entityType.endsWith('s') ? entityType : `${entityType}s`;
+    this.broadcast('entity_updated', { entityType: entityPlural, entityId, data: entityData }, [
+      entityPlural,
+    ]);
   }
 
   notifyEntityDeleted(entityType, entityId) {
-    this.broadcast('entity_deleted', { entityType, entityId }, [entityType]);
+    const entityPlural = entityType.endsWith('s') ? entityType : `${entityType}s`;
+    this.broadcast('entity_deleted', { entityType: entityPlural, entityId }, [entityPlural]);
   }
 
   // Envoyer à un client spécifique

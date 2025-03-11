@@ -6,7 +6,9 @@ const websocketManager = require('../../websocket/websocketManager');
 class BaseImageController {
   constructor(entity, options = { type: 'single' }) {
     this.validateOptions(options);
-    this.imageService = new ImageService(entity, options.type);
+    this.entityName = entity.endsWith('s') ? entity : `${entity}s`;
+
+    this.imageService = new ImageService(this.entityName, options.type);
     console.log(
       `[WS-DEBUG] BaseImageController initialisé pour l'entité: ${this.imageService.entity}`
     );
@@ -38,9 +40,7 @@ class BaseImageController {
 
   async uploadImage(req, res) {
     try {
-      console.log(
-        `[WS-DEBUG] Début uploadImage pour ${this.imageService.entity} id:${req.params.id}`
-      );
+      console.log(`[WS-DEBUG] Début uploadImage pour ${this.entityName} id:${req.params.id}`);
 
       const files = this.validateAndGetFiles(req);
       console.log(`[WS-DEBUG] Fichiers validés: ${files.length} fichier(s)`);
@@ -48,31 +48,20 @@ class BaseImageController {
       const results = await this.processFiles(files, req.params.id);
       console.log(`[WS-DEBUG] Fichiers traités avec succès`);
 
-      // Marquer le produit comme pending_sync s'il a un woo_id
       const Model = this.imageService._getModelByEntity();
-      console.log(`[WS-DEBUG] Modèle récupéré: ${Model ? 'OK' : 'NULL'}`);
-
       const item = await Model.findById(req.params.id);
-      console.log(`[WS-DEBUG] Item trouvé: ${item ? 'OK' : 'NULL'}`);
 
       if (item && item.woo_id) {
         await Model.update(req.params.id, { pending_sync: true });
         console.log(`[WS-DEBUG] Item marqué comme pending_sync`);
       }
 
-      // Récupérer l'entité COMPLÈTE mise à jour pour WebSocket
       const updatedItem = await Model.findById(req.params.id);
       console.log(`[WS-DEBUG] Item mis à jour récupéré: ${updatedItem ? 'OK' : 'NULL'}`);
 
-      // Avant notification
-      console.log(`[WS-DEBUG] Prêt à envoyer notification:
-        - entité: ${this.imageService.entity}
-        - id: ${req.params.id}
-        - a image?: ${updatedItem && updatedItem.image ? 'OUI' : 'NON'}`);
-
       try {
-        // Notifier via WebSocket - utiliser le nom d'entité exact
-        websocketManager.notifyEntityUpdated(this.imageService.entity, req.params.id, updatedItem);
+        // Notifier via WebSocket - utiliser le nom d'entité en pluriel
+        websocketManager.notifyEntityUpdated(this.entityName, req.params.id, updatedItem);
         console.log(`[WS-DEBUG] Notification WebSocket envoyée avec succès`);
       } catch (wsError) {
         console.error(`[WS-DEBUG] ERREUR lors de la notification WebSocket:`, wsError);
@@ -109,32 +98,24 @@ class BaseImageController {
 
   async deleteImage(req, res) {
     try {
-      console.log(
-        `[WS-DEBUG] Début deleteImage pour ${this.imageService.entity} id:${req.params.id}`
-      );
+      console.log(`[WS-DEBUG] Début deleteImage pour ${this.entityName} id:${req.params.id}`);
 
       await this.imageService.deleteImage(req.params.id);
       console.log(`[WS-DEBUG] Image supprimée au niveau du service`);
 
-      // Marquer le produit comme pending_sync s'il a un woo_id
       const Model = this.imageService._getModelByEntity();
-      console.log(`[WS-DEBUG] Modèle récupéré: ${Model ? 'OK' : 'NULL'}`);
-
       const item = await Model.findById(req.params.id);
-      console.log(`[WS-DEBUG] Item trouvé: ${item ? 'OK' : 'NULL'}`);
 
       if (item && item.woo_id) {
         await Model.update(req.params.id, { pending_sync: true });
         console.log(`[WS-DEBUG] Item marqué comme pending_sync`);
       }
 
-      // Récupérer l'entité mise à jour pour WebSocket
       const updatedItem = await Model.findById(req.params.id);
-      console.log(`[WS-DEBUG] Item mis à jour récupéré: ${updatedItem ? 'OK' : 'NULL'}`);
 
       try {
-        // Notifier via WebSocket de la mise à jour
-        websocketManager.notifyEntityUpdated(this.imageService.entity, req.params.id, updatedItem);
+        // Notifier via WebSocket en utilisant le nom d'entité en pluriel
+        websocketManager.notifyEntityUpdated(this.entityName, req.params.id, updatedItem);
         console.log(`[WS-DEBUG] Notification WebSocket envoyée avec succès`);
       } catch (wsError) {
         console.error(`[WS-DEBUG] ERREUR lors de la notification WebSocket:`, wsError);
@@ -148,36 +129,28 @@ class BaseImageController {
       return ResponseHandler.error(res, error);
     }
   }
-
   async deleteGalleryImage(req, res) {
     try {
       const { id, imageId } = req.params;
       console.log(
-        `[WS-DEBUG] Début deleteGalleryImage pour ${this.imageService.entity} id:${id}, imageId:${imageId}`
+        `[WS-DEBUG] Début deleteGalleryImage pour ${this.entityName} id:${id}, imageId:${imageId}`
       );
 
       await this.imageService.deleteGalleryImage(id, imageId);
       console.log(`[WS-DEBUG] Image de galerie supprimée au niveau du service`);
 
-      // Marquer le produit comme pending_sync s'il a un woo_id
       const Model = this.imageService._getModelByEntity();
-      console.log(`[WS-DEBUG] Modèle récupéré: ${Model ? 'OK' : 'NULL'}`);
-
       const item = await Model.findById(id);
-      console.log(`[WS-DEBUG] Item trouvé: ${item ? 'OK' : 'NULL'}`);
 
       if (item && item.woo_id) {
         await Model.update(id, { pending_sync: true });
         console.log(`[WS-DEBUG] Item marqué comme pending_sync`);
       }
 
-      // Récupérer l'entité mise à jour pour WebSocket
       const updatedItem = await Model.findById(id);
-      console.log(`[WS-DEBUG] Item mis à jour récupéré: ${updatedItem ? 'OK' : 'NULL'}`);
 
       try {
-        // Notifier via WebSocket de la mise à jour
-        websocketManager.notifyEntityUpdated(this.imageService.entity, id, updatedItem);
+        websocketManager.notifyEntityUpdated(this.entityName, id, updatedItem);
         console.log(`[WS-DEBUG] Notification WebSocket envoyée avec succès`);
       } catch (wsError) {
         console.error(`[WS-DEBUG] ERREUR lors de la notification WebSocket:`, wsError);
@@ -195,71 +168,48 @@ class BaseImageController {
       const { id: entityId } = req.params;
       const { imageId, imageIndex } = req.body;
 
-      console.log(`[WS-DEBUG] Début setMainImage pour ${this.imageService.entity} id:${entityId}
-        - imageId: ${imageId}
-        - imageIndex: ${imageIndex}`);
+      console.log(`[WS-DEBUG] Début setMainImage pour ${this.entityName} id:${entityId}`);
 
       const Model = this.imageService._getModelByEntity();
-      console.log(`[WS-DEBUG] Modèle récupéré: ${Model ? 'OK' : 'NULL'}`);
-
       const item = await Model.findById(entityId);
-      console.log(`[WS-DEBUG] Item trouvé: ${item ? 'OK' : 'NULL'}`);
 
       if (!item) {
         console.log(`[WS-DEBUG] Item non trouvé, sortie anticipée`);
-        return ResponseHandler.error(res, new Error(`${this.imageService.entity} non trouvé`));
+        return ResponseHandler.error(res, new Error(`${this.entityName} non trouvé`));
       }
 
       let targetImage = null;
 
-      // Recherche par _id local uniquement
       if (imageId) {
         targetImage = item.gallery_images?.find((img) => img._id === imageId);
-        console.log(`[WS-DEBUG] Image trouvée par ID: ${targetImage ? 'OK' : 'NULL'}`);
       } else if (imageIndex !== undefined) {
         targetImage = item.gallery_images?.[imageIndex];
-        console.log(`[WS-DEBUG] Image trouvée par Index: ${targetImage ? 'OK' : 'NULL'}`);
       }
 
       if (!targetImage) {
-        console.log(`[WS-DEBUG] Image cible non trouvée, sortie anticipée`);
         return ResponseHandler.error(res, new Error('Image non trouvée dans la galerie'));
       }
 
-      // Mettre à jour l'image principale
-      const updateData = {
-        image: targetImage,
-      };
+      const updateData = { image: targetImage };
 
-      // Ajouter pending_sync si le produit a déjà un woo_id
       if (item.woo_id) {
         updateData.pending_sync = true;
       }
 
-      console.log(`[WS-DEBUG] Mise à jour avec données:`, JSON.stringify(updateData));
       await Model.update(entityId, updateData);
       console.log(`[WS-DEBUG] Mise à jour réussie`);
 
-      // Récupérer l'entité COMPLÈTE mise à jour pour WebSocket
       const updatedItem = await Model.findById(entityId);
-      console.log(`[WS-DEBUG] Item mis à jour récupéré: ${updatedItem ? 'OK' : 'NULL'}`);
-
-      // Avant notification
-      console.log(`[WS-DEBUG] Prêt à envoyer notification:
-        - entité: ${this.imageService.entity}
-        - id: ${entityId}
-        - a image?: ${updatedItem && updatedItem.image ? 'OUI' : 'NON'}`);
 
       try {
-        // Notifier via WebSocket avec l'entité complète
-        websocketManager.notifyEntityUpdated(this.imageService.entity, entityId, updatedItem);
+        // Notifier via WebSocket
+        websocketManager.notifyEntityUpdated(this.entityName, entityId, updatedItem);
         console.log(`[WS-DEBUG] Notification WebSocket envoyée avec succès`);
       } catch (wsError) {
         console.error(`[WS-DEBUG] ERREUR lors de la notification WebSocket:`, wsError);
       }
 
-      // Synchroniser avec WooCommerce si nécessaire
-      if (this.imageService.entity === 'product' && process.env.SYNC_ON_CHANGE === 'true') {
+      if (this.entityName === 'products' && process.env.SYNC_ON_CHANGE === 'true') {
         try {
           console.log(`[WS-DEBUG] Tentative de synchronisation WooCommerce`);
           const service = require('../../services/ProductWooCommerceService');

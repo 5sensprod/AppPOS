@@ -197,66 +197,46 @@ export function createEntityContext(options) {
     }, []);
 
     useEffect(() => {
-      // S'abonner aux mises à jour de cette entité
-      if (websocketService.isConnected) {
-        websocketService.subscribe(entityName === 'product' ? 'products' : entityName);
-      }
+      const entityPlural = entityName.endsWith('s') ? entityName : `${entityName}s`;
 
-      // Gestionnaires d'événements pour les mises à jour en temps réel
       const handleUpdate = ({ entityId, data }) => {
-        dispatch({
-          type: ACTIONS.UPDATE_SUCCESS,
-          payload: data,
-        });
+        dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: data });
       };
 
       const handleCreate = ({ data }) => {
-        dispatch({
-          type: ACTIONS.CREATE_SUCCESS,
-          payload: data,
-        });
+        dispatch({ type: ACTIONS.CREATE_SUCCESS, payload: data });
       };
 
       const handleDelete = ({ entityId }) => {
-        dispatch({
-          type: ACTIONS.DELETE_SUCCESS,
-          payload: entityId,
-        });
+        dispatch({ type: ACTIONS.DELETE_SUCCESS, payload: entityId });
       };
 
-      // Enregistrement des gestionnaires d'événements
-      websocketService.on(
-        `${entityName === 'product' ? 'products' : entityName}_updated`,
-        handleUpdate
-      );
-      websocketService.on(
-        `${entityName === 'product' ? 'products' : entityName}_created`,
-        handleCreate
-      );
-      websocketService.on(
-        `${entityName === 'product' ? 'products' : entityName}_deleted`,
-        handleDelete
-      );
+      // Vérifier la connexion et s'abonner aux mises à jour
+      const subscribeToWebSocket = () => {
+        if (websocketService.isConnected) {
+          websocketService.subscribe(entityPlural);
+          websocketService.on(`${entityPlural}_updated`, handleUpdate);
+          websocketService.on(`${entityPlural}_created`, handleCreate);
+          websocketService.on(`${entityPlural}_deleted`, handleDelete);
+        }
+      };
 
-      // Connexion et déconnexion lors du premier montage/démontage
-      websocketService.on('connect', () => {
-        websocketService.subscribe(entityName === 'product' ? 'products' : entityName);
-      });
+      subscribeToWebSocket();
 
-      // Nettoyage à la destruction du composant
+      // Écouter les reconnexions WebSocket et réabonner si nécessaire
+      const handleReconnect = () => {
+        console.log(`[WS-DEBUG] Reconnexion WebSocket détectée, réabonnement à ${entityPlural}`);
+        subscribeToWebSocket();
+      };
+
+      websocketService.on('connect', handleReconnect);
+
       return () => {
-        websocketService.off(
-          `${entityName === 'product' ? 'products' : entityName}_updated`,
-          handleUpdate
-        );
-        websocketService.off(
-          `${entityName === 'product' ? 'products' : entityName}_created`,
-          handleCreate
-        );
-        websocketService.off(
-          `${entityName === 'product' ? 'products' : entityName}_deleted`,
-          handleDelete
-        );
+        // Nettoyage des abonnements pour éviter les doublons
+        websocketService.off(`${entityPlural}_updated`, handleUpdate);
+        websocketService.off(`${entityPlural}_created`, handleCreate);
+        websocketService.off(`${entityPlural}_deleted`, handleDelete);
+        websocketService.off('connect', handleReconnect);
       };
     }, [dispatch, entityName]);
 
