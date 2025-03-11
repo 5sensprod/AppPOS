@@ -199,7 +199,7 @@ export function createEntityContext(options) {
     useEffect(() => {
       // S'abonner aux mises à jour de cette entité
       if (websocketService.isConnected) {
-        websocketService.subscribe(entityName);
+        websocketService.subscribe(entityName === 'product' ? 'products' : entityName);
       }
 
       // Gestionnaires d'événements pour les mises à jour en temps réel
@@ -225,20 +225,38 @@ export function createEntityContext(options) {
       };
 
       // Enregistrement des gestionnaires d'événements
-      websocketService.on(`${entityName}_updated`, handleUpdate);
-      websocketService.on(`${entityName}_created`, handleCreate);
-      websocketService.on(`${entityName}_deleted`, handleDelete);
+      websocketService.on(
+        `${entityName === 'product' ? 'products' : entityName}_updated`,
+        handleUpdate
+      );
+      websocketService.on(
+        `${entityName === 'product' ? 'products' : entityName}_created`,
+        handleCreate
+      );
+      websocketService.on(
+        `${entityName === 'product' ? 'products' : entityName}_deleted`,
+        handleDelete
+      );
 
       // Connexion et déconnexion lors du premier montage/démontage
       websocketService.on('connect', () => {
-        websocketService.subscribe(entityName);
+        websocketService.subscribe(entityName === 'product' ? 'products' : entityName);
       });
 
       // Nettoyage à la destruction du composant
       return () => {
-        websocketService.off(`${entityName}_updated`, handleUpdate);
-        websocketService.off(`${entityName}_created`, handleCreate);
-        websocketService.off(`${entityName}_deleted`, handleDelete);
+        websocketService.off(
+          `${entityName === 'product' ? 'products' : entityName}_updated`,
+          handleUpdate
+        );
+        websocketService.off(
+          `${entityName === 'product' ? 'products' : entityName}_created`,
+          handleCreate
+        );
+        websocketService.off(
+          `${entityName === 'product' ? 'products' : entityName}_deleted`,
+          handleDelete
+        );
       };
     }, [dispatch, entityName]);
 

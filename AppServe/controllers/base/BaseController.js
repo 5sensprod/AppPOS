@@ -13,7 +13,7 @@ class BaseController {
 
     this.model = model;
     this.wooCommerceService = wooCommerceService;
-    this.entityName = model.constructor.name.toLowerCase().replace('model', '');
+    this.entityName = `${model.constructor.name.toLowerCase().replace('model', '')}s`;
 
     if (imageOptions?.entity) {
       this.imageController = new BaseImageController(imageOptions.entity, {
