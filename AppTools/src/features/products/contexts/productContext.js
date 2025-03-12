@@ -173,13 +173,16 @@ export function useProductExtras() {
     if (dispatch) {
       try {
         const formData = new FormData();
-        formData.append('image', imageFile);
+        // Utilisez le même nom de champ que Postman
+        formData.append('images', imageFile);
 
-        const response = await apiService.post(`/api/products/${productId}/gallery`, formData, {
+        const response = await apiService.post(`/api/products/${productId}/image`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
+
+        console.log('Réponse upload:', response.data);
 
         dispatch({
           type: customActions.UPLOAD_GALLERY_IMAGE,
@@ -217,7 +220,20 @@ export function useProductExtras() {
   const deleteGalleryImage = async (productId, imageIndex) => {
     if (dispatch) {
       try {
-        await apiService.delete(`/api/products/${productId}/gallery/${imageIndex}`);
+        // Obtenir le produit actuel
+        const response = await apiService.get(`/api/products/${productId}`);
+        const product = response.data.data;
+
+        // Vérifier que l'image existe
+        if (!product.gallery_images || !product.gallery_images[imageIndex]) {
+          throw new Error('Image non trouvée');
+        }
+
+        // Extraire l'ID de l'image
+        const imageId = product.gallery_images[imageIndex]._id;
+
+        // Supprimer l'image avec son ID réel
+        await apiService.delete(`/api/products/${productId}/gallery/${imageId}`);
 
         dispatch({
           type: customActions.DELETE_GALLERY_IMAGE,
