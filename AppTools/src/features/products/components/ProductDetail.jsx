@@ -5,6 +5,7 @@ import { useProduct } from '../contexts/productContext';
 import { EntityDetail, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { CheckCircle, AlertCircle } from 'lucide-react';
+import websocketService from '../../../services/websocketService';
 
 function ProductDetail() {
   const { id } = useParams();
@@ -23,6 +24,50 @@ function ProductDetail() {
       .then(setProduct)
       .catch(() => setError('Erreur lors de la récupération du produit.'))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    // S'abonner aux mises à jour WebSocket des produits
+    if (websocketService.isConnected) {
+      console.log('[WS-DEBUG] Abonnement aux mises à jour de produits');
+      websocketService.subscribe('products');
+    }
+
+    // Gestionnaire pour les mises à jour de produits
+    const handleProductUpdate = ({ entityId, data }) => {
+      console.log('[WS-DEBUG] Mise à jour de produit reçue:', entityId);
+      if (entityId === id && data) {
+        console.log('[WS-DEBUG] Mise à jour du produit actuel avec:', data);
+        setProduct(data);
+      }
+    };
+
+    // Gestionnaire pour les événements entity_updated
+    const handleEntityUpdate = (payload) => {
+      console.log('[WS-DEBUG] Événement entity_updated reçu:', payload);
+      if (payload.entityType === 'products' && payload.entityId === id) {
+        console.log('[WS-DEBUG] Mise à jour du produit actuel depuis entity_updated');
+        setProduct(payload.data);
+      }
+    };
+
+    // Gestionnaire pour la connexion WebSocket
+    const handleConnect = () => {
+      console.log('[WS-DEBUG] WebSocket connecté, abonnement aux produits');
+      websocketService.subscribe('products');
+    };
+
+    // S'abonner aux événements
+    websocketService.on('products_updated', handleProductUpdate);
+    websocketService.on('entity_updated', handleEntityUpdate);
+    websocketService.on('connect', handleConnect);
+
+    return () => {
+      // Nettoyer les abonnements
+      websocketService.off('products_updated', handleProductUpdate);
+      websocketService.off('entity_updated', handleEntityUpdate);
+      websocketService.off('connect', handleConnect);
+    };
   }, [id]);
 
   // Gérer la synchronisation du produit
