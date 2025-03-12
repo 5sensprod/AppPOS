@@ -321,6 +321,10 @@ export function createEntityContext(options) {
         delete cleanedData.last_sync;
         delete cleanedData.createdAt;
         delete cleanedData.updatedAt;
+        delete cleanedData.gallery_images;
+        delete cleanedData.image;
+        delete cleanedData.pending_sync;
+        delete cleanedData.SKU;
 
         // Convertir chaînes vides en null pour les champs de premier niveau
         Object.keys(cleanedData).forEach((key) => {

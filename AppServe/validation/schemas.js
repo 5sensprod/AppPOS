@@ -151,7 +151,7 @@ const createProductSchema = Joi.object({
 
 const updateProductSchema = createProductSchema.keys({
   name: Joi.string().allow('', null),
-  sku: Joi.string().allow('', null),
+  sku: Joi.string().allow('', null).optional(),
   price: Joi.number().min(0).allow(null),
   stock: Joi.number().min(0).allow(null),
   category_id: Joi.string().allow('', null),
