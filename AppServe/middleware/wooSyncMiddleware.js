@@ -1,6 +1,6 @@
 // middleware/wooSyncMiddleware.js
 const ProductWooCommerceService = require('../services/ProductWooCommerceService');
-
+const websocketManager = require('../websocket/websocketManager');
 /**
  * Middleware pour synchroniser automatiquement les modifications avec WooCommerce
  * @param {Object} options - Options de configuration
@@ -31,6 +31,12 @@ function wooSyncMiddleware(options = { forceSync: false, manualSync: false }) {
             pending_sync: false,
             last_sync: new Date(),
           });
+
+          // Récupérer le produit mis à jour avec son woo_id
+          const updatedProduct = await Product.findById(productId);
+
+          // Envoyer une notification WebSocket
+          websocketManager.notifyEntityUpdated('products', productId, updatedProduct);
         }
 
         return res.json({
