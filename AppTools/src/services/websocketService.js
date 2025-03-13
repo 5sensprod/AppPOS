@@ -5,98 +5,111 @@ class WebSocketService {
   constructor() {
     this.socket = null;
     this.isConnected = false;
+    this.isReconnecting = false; // 🔹 Empêche les boucles infinies
     this.eventHandlers = {};
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000;
-    this.baseUrl = null;
   }
 
   init(baseUrl) {
     if (this.socket) this.disconnect();
-    this.baseUrl = baseUrl || this.baseUrl;
 
-    if (!this.baseUrl) {
-      console.error('Aucune URL de WebSocket fournie');
-      return;
-    }
-
+    this.isReconnecting = false; // 🔹 Réinitialisation après une tentative de connexion réussie
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = this.baseUrl.replace(/^http(s)?:/, wsProtocol);
-    const endpoint = `${wsUrl}/ws`;
+    const wsUrl = baseUrl
+      ? baseUrl.replace(/^http(s)?:/, wsProtocol)
+      : `${wsProtocol}//${window.location.host}`;
 
-    console.log(`Connexion WebSocket: ${endpoint}`);
-    this.socket = new WebSocket(endpoint);
+    console.log(`Nouvelle connexion WebSocket à ${wsUrl}/ws`);
+
+    this.socket = new WebSocket(`${wsUrl}/ws`);
     this.setupEventListeners();
   }
 
   setupEventListeners() {
     this.socket.addEventListener('open', () => {
-      console.log('✅ WebSocket connecté');
+      console.log('WebSocket connecté');
       this.isConnected = true;
       this.reconnectAttempts = 0;
+      this.isReconnecting = false; // 🔹 Connexion réussie, stoppe la reconnexion
       this.triggerEvent('connect');
     });
 
-    this.socket.addEventListener('message', (event) => this.handleMessage(event));
-    this.socket.addEventListener('close', (event) => this.handleClose(event));
-    this.socket.addEventListener('error', (error) => this.triggerEvent('error', error));
-  }
+    this.socket.addEventListener('message', ({ data }) => {
+      try {
+        const { type, payload } = JSON.parse(data);
+        console.log('Message reçu:', { type, payload });
 
-  handleMessage(event) {
-    try {
-      const data = JSON.parse(event.data);
-      console.log('📩 Message WebSocket reçu:', data);
+        const actions = {
+          entity_updated: () => this.handleEntityUpdate(payload),
+          entity_created: () => this.handleEntityCreate(payload),
+          entity_deleted: () => this.handleEntityDelete(payload),
+        };
 
-      if (data.type && data.payload) {
-        this.updateCache(data.type, data.payload);
-        this.triggerEvent(data.type, data.payload);
+        actions[type]?.();
+        this.triggerEvent(type, payload);
+      } catch (error) {
+        console.error('Erreur de traitement WebSocket:', error);
       }
-    } catch (error) {
-      console.error('❌ Erreur de parsing WebSocket:', error);
-    }
+    });
+
+    this.socket.addEventListener('close', ({ code, reason }) => {
+      console.log(`WebSocket fermé: ${code} ${reason}`);
+      this.isConnected = false;
+      this.attemptReconnect();
+      this.triggerEvent('disconnect');
+    });
+
+    this.socket.addEventListener('error', (error) => {
+      console.error('Erreur WebSocket:', error);
+      this.triggerEvent('error', error);
+    });
   }
 
-  handleClose(event) {
-    console.warn(`🚫 WebSocket fermé: ${event.code} ${event.reason}`);
-    this.isConnected = false;
-    this.triggerEvent('disconnect');
-    this.attemptReconnect();
-  }
-
-  updateCache(type, payload) {
-    const { entityType, entityId, data: entityData } = payload;
-
-    if (!entityType) return;
-    const entities = dataCache.get(entityType) || [];
-
-    switch (type) {
-      case 'entity_updated':
-        dataCache.set(
-          entityType,
-          entities.map((item) => (item._id === entityId ? { ...item, ...entityData } : item))
-        );
-        break;
-      case 'entity_created':
-        dataCache.set(entityType, [...entities, entityData]);
-        break;
-      case 'entity_deleted':
-        dataCache.set(
-          entityType,
-          entities.filter((item) => item._id !== entityId)
-        );
-        break;
+  attemptReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts || this.isReconnecting) {
+      console.error(`Reconnexion annulée après ${this.maxReconnectAttempts} tentatives`);
+      return;
     }
 
-    this.triggerEvent(`${entityType}_${type.split('_')[1]}`, payload);
+    this.reconnectAttempts++;
+    this.isReconnecting = true; // 🔹 Empêche plusieurs reconnexions en parallèle
+    console.log(`Reconnexion dans ${this.reconnectDelay}ms (Tentative ${this.reconnectAttempts})`);
+
+    setTimeout(() => {
+      if (!this.isConnected) {
+        this.init(); // 🔹 Vérification avant d’initier une nouvelle connexion
+      }
+    }, this.reconnectDelay);
+  }
+
+  handleEntityUpdate({ entityType, entityId, data }) {
+    dataCache.set(
+      entityType,
+      dataCache.get(entityType).map((item) => (item._id === entityId ? { ...item, ...data } : item))
+    );
+    this.triggerEvent(`${entityType}_updated`, { entityId, data });
+  }
+
+  handleEntityCreate({ entityType, data }) {
+    dataCache.set(entityType, [...dataCache.get(entityType), data]);
+    this.triggerEvent(`${entityType}_created`, { data });
+  }
+
+  handleEntityDelete({ entityType, entityId }) {
+    dataCache.set(
+      entityType,
+      dataCache.get(entityType).filter((item) => item._id !== entityId)
+    );
+    this.triggerEvent(`${entityType}_deleted`, { entityId });
   }
 
   send(type, payload) {
     if (!this.isConnected) {
-      console.warn('⚠️ WebSocket non connecté');
+      console.warn('Envoi WebSocket impossible: connexion fermée');
       return false;
     }
-
     this.socket.send(JSON.stringify({ type, payload }));
     return true;
   }
@@ -105,22 +118,8 @@ class WebSocketService {
     return this.send('subscribe', { entityType });
   }
 
-  attemptReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('❌ Reconnexion échouée après plusieurs tentatives');
-      return;
-    }
-
-    this.reconnectAttempts++;
-    console.log(
-      `🔄 Reconnexion dans ${this.reconnectDelay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
-    );
-
-    setTimeout(() => this.init(), this.reconnectDelay);
-  }
-
   on(eventName, callback) {
-    if (!this.eventHandlers[eventName]) this.eventHandlers[eventName] = [];
+    this.eventHandlers[eventName] = this.eventHandlers[eventName] || [];
     this.eventHandlers[eventName].push(callback);
   }
 
@@ -136,7 +135,7 @@ class WebSocketService {
       try {
         callback(data);
       } catch (error) {
-        console.error(`⚠️ Erreur dans le gestionnaire ${eventName}:`, error);
+        console.error(`Erreur dans le gestionnaire d'événement ${eventName}:`, error);
       }
     });
   }
@@ -146,8 +145,10 @@ class WebSocketService {
       this.socket.close();
       this.socket = null;
       this.isConnected = false;
+      this.isReconnecting = false; // 🔹 Stoppe la reconnexion en cas de fermeture manuelle
     }
   }
 }
 
-export default new WebSocketService();
+const websocketService = new WebSocketService();
+export default websocketService;

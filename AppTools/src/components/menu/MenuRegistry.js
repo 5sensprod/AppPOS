@@ -5,198 +5,154 @@ class MenuRegistry {
   constructor() {
     this.topMenuItems = [];
     this.sidebarItems = [];
-    this.listeners = [];
+    this.listeners = new Set();
 
     // Chargement de l'état des menus depuis localStorage
+    this.expandedItems = new Set();
     this.loadMenuState();
   }
+
   loadMenuState() {
     try {
-      const savedState = localStorage.getItem('menuState');
-      if (savedState) {
-        const { expandedItems } = JSON.parse(savedState);
-        this.expandedItems = expandedItems || [];
-      } else {
-        this.expandedItems = [];
-      }
+      const savedState = JSON.parse(localStorage.getItem('menuState'));
+      this.expandedItems = new Set(savedState?.expandedItems || []);
     } catch (error) {
       console.error("Erreur lors du chargement de l'état du menu:", error);
-      this.expandedItems = [];
     }
   }
 
   saveMenuState() {
     try {
-      const menuState = {
-        expandedItems: this.expandedItems,
-      };
-      localStorage.setItem('menuState', JSON.stringify(menuState));
+      localStorage.setItem(
+        'menuState',
+        JSON.stringify({ expandedItems: Array.from(this.expandedItems) })
+      );
     } catch (error) {
       console.error("Erreur lors de la sauvegarde de l'état du menu:", error);
     }
   }
 
   isExpanded(itemId) {
-    return this.expandedItems.includes(itemId);
+    return this.expandedItems.has(itemId);
   }
 
   toggleExpanded(itemId) {
-    if (this.isExpanded(itemId)) {
-      this.expandedItems = this.expandedItems.filter((id) => id !== itemId);
-    } else {
-      this.expandedItems = [...this.expandedItems, itemId];
-    }
+    this.isExpanded(itemId) ? this.expandedItems.delete(itemId) : this.expandedItems.add(itemId);
     this.saveMenuState();
     this.notifyListeners();
   }
 
   expandItemForPath(path) {
-    let found = false;
+    let shouldNotify = false;
 
-    // Parcourir tous les éléments du menu pour trouver celui qui correspond au chemin
     this.sidebarItems.forEach((item) => {
-      if (item.children) {
-        const matchingChild = item.children.find(
-          (child) => path === child.path || (path !== '/' && path.startsWith(child.path + '/'))
-        );
-
-        // Si un enfant correspond, développer le parent
-        if (matchingChild && !this.isExpanded(item.id)) {
-          this.expandedItems = [...this.expandedItems, item.id];
-          found = true;
+      if (item.children?.some((child) => path.startsWith(child.path + '/'))) {
+        if (!this.isExpanded(item.id)) {
+          this.expandedItems.add(item.id);
+          shouldNotify = true;
         }
       }
     });
 
-    if (found) {
+    if (shouldNotify) {
       this.saveMenuState();
       this.notifyListeners();
     }
   }
 
-  // Ajouter un élément au menu supérieur
-  addTopMenuItem(item) {
-    // Vérifier que l'élément a un ID unique
-    if (this.topMenuItems.some((i) => i.id === item.id)) {
-      console.warn(`Un élément de menu avec l'ID ${item.id} existe déjà dans le menu supérieur`);
+  addMenuItem(collection, item) {
+    if (collection.some((i) => i.id === item.id)) {
+      console.warn(`Un élément de menu avec l'ID ${item.id} existe déjà`);
       return false;
     }
 
-    this.topMenuItems.push(item);
-    this.notifyListeners();
-    return true;
-  }
-
-  // Ajouter un élément au menu latéral
-  addSidebarItem(item) {
-    // Vérifier que l'élément a un ID unique
-    if (this.sidebarItems.some((i) => i.id === item.id)) {
-      console.warn(`Un élément de menu avec l'ID ${item.id} existe déjà dans le menu latéral`);
-      return false;
-    }
-
-    // Si l'élément a un parent, l'ajouter comme enfant
     if (item.parentId) {
-      const parentIndex = this.sidebarItems.findIndex((i) => i.id === item.parentId);
-      if (parentIndex !== -1) {
-        if (!this.sidebarItems[parentIndex].children) {
-          this.sidebarItems[parentIndex].children = [];
-        }
-        this.sidebarItems[parentIndex].children.push(item);
-        this.notifyListeners();
-        return true;
+      const parent = collection.find((i) => i.id === item.parentId);
+      if (!parent) {
+        console.warn(`Parent avec ID ${item.parentId} non trouvé`);
+        return false;
       }
-      console.warn(`Parent avec ID ${item.parentId} non trouvé`);
-      return false;
+      parent.children = parent.children || [];
+      parent.children.push(item);
+    } else {
+      collection.push(item);
     }
 
-    this.sidebarItems.push(item);
     this.notifyListeners();
     return true;
   }
 
-  // Supprimer un élément du menu supérieur
+  addTopMenuItem(item) {
+    return this.addMenuItem(this.topMenuItems, item);
+  }
+
+  addSidebarItem(item) {
+    return this.addMenuItem(this.sidebarItems, item);
+  }
+
+  removeMenuItem(collection, id) {
+    const initialLength = collection.length;
+    const filtered = collection.filter((item) => item.id !== id);
+
+    if (filtered.length !== initialLength) {
+      this.notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
   removeTopMenuItem(id) {
-    const initialLength = this.topMenuItems.length;
-    this.topMenuItems = this.topMenuItems.filter((item) => item.id !== id);
-
-    if (this.topMenuItems.length !== initialLength) {
-      this.notifyListeners();
-      return true;
-    }
-
-    return false;
+    return this.removeMenuItem(this.topMenuItems, id);
   }
 
-  // Supprimer un élément du menu latéral
   removeSidebarItem(id) {
-    const initialLength = this.sidebarItems.length;
-    this.sidebarItems = this.sidebarItems.filter((item) => item.id !== id);
-
-    if (this.sidebarItems.length !== initialLength) {
-      this.notifyListeners();
-      return true;
-    }
-
-    return false;
+    return this.removeMenuItem(this.sidebarItems, id);
   }
 
-  // Mettre à jour un élément existant dans le menu supérieur
-  updateTopMenuItem(id, updates) {
-    const itemIndex = this.topMenuItems.findIndex((item) => item.id === id);
+  updateMenuItem(collection, id, updates) {
+    const item = collection.find((item) => item.id === id);
+    if (!item) return false;
 
-    if (itemIndex !== -1) {
-      this.topMenuItems[itemIndex] = { ...this.topMenuItems[itemIndex], ...updates };
-      this.notifyListeners();
-      return true;
-    }
-
-    return false;
-  }
-
-  // Mettre à jour un élément existant dans le menu latéral
-  updateSidebarItem(id, updates) {
-    const itemIndex = this.sidebarItems.findIndex((item) => item.id === id);
-
-    if (itemIndex !== -1) {
-      this.sidebarItems[itemIndex] = { ...this.sidebarItems[itemIndex], ...updates };
-      this.notifyListeners();
-      return true;
-    }
-
-    return false;
-  }
-
-  // Trier les éléments de menu selon l'ordre spécifié
-  sortTopMenuItems(sortFn) {
-    this.topMenuItems.sort(sortFn);
+    Object.assign(item, updates);
     this.notifyListeners();
+    return true;
+  }
+
+  updateTopMenuItem(id, updates) {
+    return this.updateMenuItem(this.topMenuItems, id, updates);
+  }
+
+  updateSidebarItem(id, updates) {
+    return this.updateMenuItem(this.sidebarItems, id, updates);
+  }
+
+  sortMenuItems(collection, sortFn) {
+    collection.sort(sortFn);
+    this.notifyListeners();
+  }
+
+  sortTopMenuItems(sortFn) {
+    this.sortMenuItems(this.topMenuItems, sortFn);
   }
 
   sortSidebarItems(sortFn) {
-    this.sidebarItems.sort(sortFn);
-    this.notifyListeners();
+    this.sortMenuItems(this.sidebarItems, sortFn);
   }
 
-  // S'abonner aux changements
   subscribe(listener) {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
-    };
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
-  // Notifier les abonnés des changements
   notifyListeners() {
     this.listeners.forEach((listener) =>
       listener({
-        topMenuItems: this.topMenuItems,
-        sidebarItems: this.sidebarItems,
+        topMenuItems: [...this.topMenuItems],
+        sidebarItems: [...this.sidebarItems],
       })
     );
   }
 
-  // Obtenir les éléments actuels
   getTopMenuItems() {
     return [...this.topMenuItems];
   }
