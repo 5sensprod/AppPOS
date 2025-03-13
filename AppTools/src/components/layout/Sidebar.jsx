@@ -1,5 +1,5 @@
-// src/components/layout/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react'; // Import des icônes Lucide
 import { useMenu } from '../menu/useMenu';
 import SidebarMenuItem from '../menu/SidebarMenuItem';
 import { useAccessibility } from '../../contexts/AccessibilityProvider';
@@ -11,7 +11,6 @@ const Sidebar = () => {
   const { handleExpandMenu, handleCollapseMenu, handleActivateMenu, setActiveZone } =
     useAccessibility();
 
-  // Configuration de la navigation clavier
   useKeyboardNavigation({
     direction: 'vertical',
     onExpand: handleExpandMenu,
@@ -21,29 +20,23 @@ const Sidebar = () => {
     selector: 'a[href], button[role="menuitem"], [tabindex]:not([tabindex="-1"])',
   });
 
-  // Définir la zone active au focus
   useEffect(() => {
     const sidebar = document.getElementById('sidebar-menu');
-
-    const handleFocus = () => {
-      setActiveZone('sidebar');
-    };
+    const handleFocus = () => setActiveZone('sidebar');
 
     if (sidebar) {
       sidebar.addEventListener('focusin', handleFocus);
-      return () => {
-        sidebar.removeEventListener('focusin', handleFocus);
-      };
+      return () => sidebar.removeEventListener('focusin', handleFocus);
     }
   }, [setActiveZone]);
 
-  const toggleCollapse = () => {
-    setCollapsed(!collapsed);
-  };
+  const toggleCollapse = () => setCollapsed(!collapsed);
 
   return (
     <aside
-      className={`${collapsed ? 'w-16' : 'w-64'} bg-gray-800 dark:bg-gray-900 text-white transition-all duration-300 ease-in-out flex flex-col`}
+      className={`${
+        collapsed ? 'w-16' : 'w-64'
+      } bg-gray-800 dark:bg-gray-900 text-white transition-all duration-300 ease-in-out flex flex-col`}
       role="navigation"
       aria-label="Menu principal"
     >
@@ -56,20 +49,7 @@ const Sidebar = () => {
           aria-label={collapsed ? 'Développer le menu' : 'Réduire le menu'}
           tabIndex={0}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d={collapsed ? 'M13 5l7 7-7 7M5 5l7 7-7 7' : 'M11 19l-7-7 7-7m8 14l-7-7 7-7'}
-            />
-          </svg>
+          {collapsed ? <ChevronRight size={24} /> : <ChevronLeft size={24} />}
         </button>
       </div>
 
