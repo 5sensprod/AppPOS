@@ -198,7 +198,7 @@ class BaseController {
   }
 
   shouldSync() {
-    return process.env.SYNC_ON_CHANGE === 'true';
+    return false;
   }
 }
 

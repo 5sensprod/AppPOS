@@ -4,7 +4,7 @@ const ProductWooCommerceService = require('../services/ProductWooCommerceService
 /**
  * Middleware pour synchroniser automatiquement les modifications avec WooCommerce
  * @param {Object} options - Options de configuration
- * @param {boolean} options.forceSync - Force la synchronisation même si SYNC_ON_CHANGE est désactivé
+ *@param {boolean} options.forceSync - Force la synchronisation automatique
  * @param {boolean} options.manualSync - Indique si c'est une synchronisation manuelle (via API)
  */
 function wooSyncMiddleware(options = { forceSync: false, manualSync: false }) {
@@ -59,10 +59,7 @@ function wooSyncMiddleware(options = { forceSync: false, manualSync: false }) {
           const product = Array.isArray(data.data) ? data.data[0] : data.data;
 
           // Synchroniser si forceSync est true OU si le produit a déjà un woo_id
-          const shouldSync =
-            options.forceSync ||
-            (product.woo_id && process.env.SYNC_ON_CHANGE === 'true') ||
-            req.query.sync === 'true';
+          const shouldSync = options.forceSync || req.query.sync === 'true';
 
           if (shouldSync) {
             syncWithWooCommerce(product)

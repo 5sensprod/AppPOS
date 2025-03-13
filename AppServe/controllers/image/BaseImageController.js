@@ -32,7 +32,7 @@ class BaseImageController {
     return Promise.all(
       files.map((file) =>
         this.imageService.processUpload(file, id, {
-          syncToWordPress: process.env.SYNC_ON_CHANGE === 'true',
+          syncToWordPress: false,
         })
       )
     );
@@ -211,7 +211,7 @@ class BaseImageController {
         console.error(`[WS-DEBUG] ERREUR lors de la notification WebSocket:`, wsError);
       }
 
-      if (this.entityName === 'products' && process.env.SYNC_ON_CHANGE === 'true') {
+      if (false) {
         try {
           console.log(`[WS-DEBUG] Tentative de synchronisation WooCommerce`);
           const service = require('../../services/ProductWooCommerceService');

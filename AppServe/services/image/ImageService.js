@@ -74,7 +74,7 @@ class ImageService {
         await Model.update(entityId, updateData);
 
         // Synchronisation avec WooCommerce
-        if (this.entity === 'products' && process.env.SYNC_ON_CHANGE === 'true') {
+        if (false) {
           const service = require('../ProductWooCommerceService');
           const updatedDoc = await Model.findById(entityId);
           await service.syncToWooCommerce(updatedDoc);
@@ -153,7 +153,7 @@ class ImageService {
       await Model.update(item._id, updateData);
 
       // Synchroniser avec WooCommerce si nécessaire
-      if (this.entity !== 'suppliers' && process.env.SYNC_ON_CHANGE === 'true') {
+      if (false) {
         const service = this._getWooCommerceService();
         if (service) {
           const updatedDoc = await Model.findById(item._id);
@@ -298,11 +298,7 @@ class ImageService {
       await Model.update(entityId, updateData);
 
       // Synchronisation WooCommerce après la mise à jour locale SEULEMENT si localOnly n'est pas actif
-      if (
-        this.entity === 'products' &&
-        process.env.SYNC_ON_CHANGE === 'true' &&
-        !options.localOnly
-      ) {
+      if (false) {
         const service = this._getWooCommerceService();
         if (service) {
           const updatedDoc = await Model.findById(entityId);
