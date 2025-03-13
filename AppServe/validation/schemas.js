@@ -149,18 +149,11 @@ const createProductSchema = Joi.object({
   website_url: Joi.string().uri().allow('', null),
 });
 
-const updateProductSchema = createProductSchema.keys({
-  name: Joi.string().allow('', null),
-  sku: Joi.string().allow('', null).optional(),
-  price: Joi.number().min(0).allow(null),
-  stock: Joi.number().min(0).allow(null),
-  category_id: Joi.string().allow('', null),
-  categories: Joi.array().items(Joi.string()).default([]),
-  supplier_id: Joi.string().allow('', null),
-  brand_id: Joi.string().allow('', null),
-  woo_id: Joi.number(),
-  images: Joi.array().items(imageSchema),
-});
+const updateProductSchema = createProductSchema.fork(
+  Object.keys(createProductSchema.describe().keys),
+  (schema) => schema.optional()
+);
+
 module.exports = {
   createCategorySchema,
   updateCategorySchema,
