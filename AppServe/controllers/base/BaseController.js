@@ -115,14 +115,35 @@ class BaseController {
       const item = await this.model.findById(req.params.id);
       if (!item) return ResponseHandler.notFound(res);
 
+      // Sauvegarder l'ID WooCommerce avant suppression
+      const wooId = item.woo_id;
+
+      // Supprimer les images associées
       await this.handleImageDeletion(item);
-      await this.handleWooCommerceDelete(item);
+
+      // Supprimer l'entité sur WooCommerce si elle y existe
+      if (wooId) {
+        try {
+          await this.handleWooCommerceDelete(item);
+          console.log(
+            `Entité ${this.entityName} (ID: ${req.params.id}) supprimée sur WooCommerce (woo_id: ${wooId})`
+          );
+        } catch (wcError) {
+          console.error(`Erreur lors de la suppression sur WooCommerce:`, wcError);
+          // On continue malgré l'erreur pour supprimer en local
+        }
+      }
+
+      // Supprimer l'entité en local
       await this.model.delete(req.params.id);
 
-      // Standardisation des notifications WebSocket
+      // Notifier via WebSocket
       websocketManager.notifyEntityDeleted(this.entityName, req.params.id);
 
-      return ResponseHandler.success(res, { message: 'Item deleted successfully' });
+      return ResponseHandler.success(res, {
+        message: 'Item deleted successfully',
+        wooDeleteStatus: wooId ? 'completed' : 'not_applicable',
+      });
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
@@ -138,23 +159,40 @@ class BaseController {
   }
 
   async handleWooCommerceDelete(item) {
-    if (!this.shouldSync() || !this.wooCommerceService) return;
+    if (!item.woo_id) return;
 
     try {
-      const entityType = this.model.constructor.name.toLowerCase();
-      const deleteMethod = {
-        brands: 'deleteBrand',
-        categories: 'deleteCategory',
-        products: 'deleteProduct',
-      }[this.entityName];
+      const entityType = this.entityName;
 
-      if (deleteMethod && typeof this.wooCommerceService[deleteMethod] === 'function') {
-        await this.wooCommerceService[deleteMethod](item._id);
-      } else {
-        console.error(`Méthode de suppression non trouvée pour l'entité ${this.entityName}`);
+      // Service WooCommerce approprié selon le type d'entité
+      let wooService;
+      let deleteMethod;
+
+      switch (entityType) {
+        case 'products':
+          wooService = require('../../services/ProductWooCommerceService');
+          deleteMethod = 'deleteProduct';
+          break;
+        case 'categories':
+          wooService = require('../../services/CategoryWooCommerceService');
+          deleteMethod = 'deleteCategory';
+          break;
+        case 'brands':
+          wooService = require('../../services/BrandWooCommerceService');
+          deleteMethod = 'deleteBrand';
+          break;
+        default:
+          console.error(`Type d'entité non géré pour la suppression: ${entityType}`);
+          return;
+      }
+
+      // Appel de la méthode de suppression
+      if (wooService && typeof wooService[deleteMethod] === 'function') {
+        await wooService[deleteMethod](item._id);
+        console.log(`${entityType} ${item._id} supprimé de WooCommerce`);
       }
     } catch (error) {
-      console.error('Erreur suppression WooCommerce:', error);
+      console.error(`Erreur lors de la suppression WooCommerce (${this.entityName}):`, error);
       throw error;
     }
   }
