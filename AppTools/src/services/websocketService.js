@@ -9,108 +9,91 @@ class WebSocketService {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000;
+    this.baseUrl = null;
   }
 
   init(baseUrl) {
-    if (this.socket) {
-      this.disconnect();
+    if (this.socket) this.disconnect();
+    this.baseUrl = baseUrl || this.baseUrl;
+
+    if (!this.baseUrl) {
+      console.error('Aucune URL de WebSocket fournie');
+      return;
     }
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = baseUrl
-      ? `${baseUrl.replace(/^http(s)?:/, wsProtocol)}`
-      : `${wsProtocol}//${window.location.host}`;
-
+    const wsUrl = this.baseUrl.replace(/^http(s)?:/, wsProtocol);
     const endpoint = `${wsUrl}/ws`;
-    console.log(`Initialisation de la connexion WebSocket sur ${endpoint}`);
 
+    console.log(`Connexion WebSocket: ${endpoint}`);
     this.socket = new WebSocket(endpoint);
     this.setupEventListeners();
   }
 
   setupEventListeners() {
     this.socket.addEventListener('open', () => {
-      console.log('Connexion WebSocket établie');
+      console.log('✅ WebSocket connecté');
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.triggerEvent('connect');
     });
 
-    this.socket.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('Message WebSocket reçu:', data);
+    this.socket.addEventListener('message', (event) => this.handleMessage(event));
+    this.socket.addEventListener('close', (event) => this.handleClose(event));
+    this.socket.addEventListener('error', (error) => this.triggerEvent('error', error));
+  }
 
-        if (data.type && data.payload) {
-          // Évènements de notification de changement de données
-          if (data.type === 'entity_updated') {
-            const { entityType, entityId, data: entityData } = data.payload;
-            this.handleEntityUpdate(entityType, entityId, entityData);
-          } else if (data.type === 'entity_created') {
-            const { entityType, data: entityData } = data.payload;
-            this.handleEntityCreate(entityType, entityData);
-          } else if (data.type === 'entity_deleted') {
-            const { entityType, entityId } = data.payload;
-            this.handleEntityDelete(entityType, entityId);
-          }
+  handleMessage(event) {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('📩 Message WebSocket reçu:', data);
 
-          // Déclencher l'événement pour les gestionnaires personnalisés
-          this.triggerEvent(data.type, data.payload);
-        }
-      } catch (error) {
-        console.error('Erreur de traitement du message WebSocket:', error);
+      if (data.type && data.payload) {
+        this.updateCache(data.type, data.payload);
+        this.triggerEvent(data.type, data.payload);
       }
-    });
-
-    this.socket.addEventListener('close', (event) => {
-      console.log(`Connexion WebSocket fermée: ${event.code} ${event.reason}`);
-      this.isConnected = false;
-      this.attemptReconnect();
-      this.triggerEvent('disconnect');
-    });
-
-    this.socket.addEventListener('error', (error) => {
-      console.error('Erreur WebSocket:', error);
-      this.triggerEvent('error', error);
-    });
+    } catch (error) {
+      console.error('❌ Erreur de parsing WebSocket:', error);
+    }
   }
 
-  // Gestion des mises à jour d'entités
-  handleEntityUpdate(entityType, entityId, entityData) {
-    // Mettre à jour le cache
-    const entities = dataCache.get(entityType);
-    const updatedEntities = entities.map((item) =>
-      item._id === entityId ? { ...item, ...entityData } : item
-    );
-
-    dataCache.set(entityType, updatedEntities);
-
-    // Déclencher un événement spécifique à l'entité
-    this.triggerEvent(`${entityType}_updated`, { entityId, data: entityData });
+  handleClose(event) {
+    console.warn(`🚫 WebSocket fermé: ${event.code} ${event.reason}`);
+    this.isConnected = false;
+    this.triggerEvent('disconnect');
+    this.attemptReconnect();
   }
 
-  handleEntityCreate(entityType, entityData) {
-    const entities = dataCache.get(entityType);
-    const updatedEntities = [...entities, entityData];
+  updateCache(type, payload) {
+    const { entityType, entityId, data: entityData } = payload;
 
-    dataCache.set(entityType, updatedEntities);
+    if (!entityType) return;
+    const entities = dataCache.get(entityType) || [];
 
-    this.triggerEvent(`${entityType}_created`, { data: entityData });
+    switch (type) {
+      case 'entity_updated':
+        dataCache.set(
+          entityType,
+          entities.map((item) => (item._id === entityId ? { ...item, ...entityData } : item))
+        );
+        break;
+      case 'entity_created':
+        dataCache.set(entityType, [...entities, entityData]);
+        break;
+      case 'entity_deleted':
+        dataCache.set(
+          entityType,
+          entities.filter((item) => item._id !== entityId)
+        );
+        break;
+    }
+
+    this.triggerEvent(`${entityType}_${type.split('_')[1]}`, payload);
   }
 
-  handleEntityDelete(entityType, entityId) {
-    const entities = dataCache.get(entityType);
-    const updatedEntities = entities.filter((item) => item._id !== entityId);
-
-    dataCache.set(entityType, updatedEntities);
-
-    this.triggerEvent(`${entityType}_deleted`, { entityId });
-  }
-
-  // Envoyer un message au serveur
   send(type, payload) {
     if (!this.isConnected) {
-      console.warn("Tentative d'envoi de message WebSocket sans connexion établie");
+      console.warn('⚠️ WebSocket non connecté');
       return false;
     }
 
@@ -118,65 +101,46 @@ class WebSocketService {
     return true;
   }
 
-  // Abonnement à un type d'entité
   subscribe(entityType) {
     return this.send('subscribe', { entityType });
   }
 
-  // Tenter de se reconnecter en cas de déconnexion
   attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error(
-        `Nombre maximum de tentatives de reconnexion atteint (${this.maxReconnectAttempts})`
-      );
+      console.error('❌ Reconnexion échouée après plusieurs tentatives');
       return;
     }
 
     this.reconnectAttempts++;
     console.log(
-      `Tentative de reconnexion WebSocket ${this.reconnectAttempts}/${this.maxReconnectAttempts} dans ${this.reconnectDelay}ms`
+      `🔄 Reconnexion dans ${this.reconnectDelay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
     );
 
-    setTimeout(() => {
-      if (!this.isConnected) {
-        this.init();
-      }
-    }, this.reconnectDelay);
+    setTimeout(() => this.init(), this.reconnectDelay);
   }
 
-  // Gérer les événements personnalisés
   on(eventName, callback) {
-    if (!this.eventHandlers[eventName]) {
-      this.eventHandlers[eventName] = [];
-    }
+    if (!this.eventHandlers[eventName]) this.eventHandlers[eventName] = [];
     this.eventHandlers[eventName].push(callback);
   }
 
   off(eventName, callback) {
     if (!this.eventHandlers[eventName]) return;
-
-    if (callback) {
-      this.eventHandlers[eventName] = this.eventHandlers[eventName].filter(
-        (handler) => handler !== callback
-      );
-    } else {
-      delete this.eventHandlers[eventName];
-    }
+    this.eventHandlers[eventName] = callback
+      ? this.eventHandlers[eventName].filter((handler) => handler !== callback)
+      : [];
   }
 
   triggerEvent(eventName, data) {
-    if (!this.eventHandlers[eventName]) return;
-
-    this.eventHandlers[eventName].forEach((callback) => {
+    this.eventHandlers[eventName]?.forEach((callback) => {
       try {
         callback(data);
       } catch (error) {
-        console.error(`Erreur dans le gestionnaire d'événement ${eventName}:`, error);
+        console.error(`⚠️ Erreur dans le gestionnaire ${eventName}:`, error);
       }
     });
   }
 
-  // Fermer la connexion WebSocket
   disconnect() {
     if (this.socket) {
       this.socket.close();
@@ -186,5 +150,4 @@ class WebSocketService {
   }
 }
 
-const websocketService = new WebSocketService();
-export default websocketService;
+export default new WebSocketService();

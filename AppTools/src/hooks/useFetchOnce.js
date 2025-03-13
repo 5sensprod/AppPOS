@@ -1,17 +1,8 @@
 // src/hooks/useFetchOnce.js
 import { useEffect } from 'react';
 
-// Stockage partagé entre toutes les instances du hook pour maintenir l'état
-// même après un remontage du composant (important pour StrictMode)
 const fetchCache = new Map();
 
-/**
- * Hook pour effectuer un appel fetch une seule fois, même en StrictMode
- * @param {Function} fetchFn - Fonction de fetch à appeler
- * @param {Array} items - Tableau d'items déjà en cache
- * @param {Function} isCacheStale - Fonction pour vérifier si le cache est périmé
- * @param {Object} options - Options supplémentaires
- */
 export function useFetchOnce(fetchFn, items = [], isCacheStale = () => true, options = {}) {
   const { forceRefresh = false, debug = false, name = 'items' } = options;
 

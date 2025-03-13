@@ -1,8 +1,8 @@
 // src/contexts/AuthContext.js
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import apiService from '../services/api';
 
-// Créer le contexte
+// Création du contexte
 const AuthContext = createContext();
 
 // Hook personnalisé pour utiliser le contexte
@@ -11,31 +11,23 @@ export const useAuth = () => useContext(AuthContext);
 // Provider du contexte d'authentification
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Initialisation du contexte d'auth
+  // Initialisation de l'authentification
   useEffect(() => {
     const initAuth = async () => {
       try {
         await apiService.init();
-
         const storedToken = localStorage.getItem('authToken');
+
         if (storedToken) {
           apiService.setAuthToken(storedToken);
-          setToken(storedToken);
-
-          try {
-            const userData = await fetchCurrentUser();
-            setUser(userData);
-          } catch (userError) {
-            console.log('Session expirée ou invalide, déconnexion...');
-            logout(); // Déconnexion propre
-          }
+          const { data } = await apiService.get('/api/auth/me');
+          setUser(data?.user || null);
         }
-      } catch (err) {
-        console.error("Erreur d'initialisation:", err);
+      } catch {
+        logout();
       } finally {
         setLoading(false);
       }
@@ -44,101 +36,54 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  // Récupérer l'utilisateur actuel depuis l'API
-  const fetchCurrentUser = async () => {
-    try {
-      const response = await apiService.get('/api/auth/me');
-      return response.data.user;
-    } catch (err) {
-      console.error("Erreur lors de la récupération de l'utilisateur:", err);
-      throw err;
-    }
-  };
-
   // Fonction de connexion
-  // Dans le login
-  const login = async (username, password) => {
+  const login = useCallback(async (username, password) => {
+    setError(null);
     try {
-      setError(null);
-      setLoading(true);
-
-      // S'assurer que l'API est bien configurée
       await apiService.init();
+      const { data } = await apiService.post('/api/auth/login', { username, password });
 
-      const response = await apiService.post('/api/auth/login', { username, password });
-
-      if (response.data.success) {
-        const { token, user } = response.data;
-
-        // Stocker le token et l'URL API pour les reconnexions
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('apiBaseUrl', apiService.getBaseUrl());
-
-        apiService.setAuthToken(token);
-
-        setToken(token);
-        setUser(user);
+      if (data.success) {
+        localStorage.setItem('authToken', data.token);
+        apiService.setAuthToken(data.token);
+        setUser(data.user);
         return true;
       } else {
-        setError(response.data.message || 'Échec de la connexion');
+        setError(data.message || 'Échec de la connexion');
         return false;
       }
     } catch (err) {
-      console.error('Erreur de connexion:', err);
-      const errorMessage = err.response?.data?.message || 'Erreur lors de la connexion';
-      setError(errorMessage);
+      setError(err.response?.data?.message || 'Erreur de connexion');
       return false;
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
 
   // Fonction d'inscription
-  const register = async (userData) => {
+  const register = useCallback(async (userData) => {
+    setError(null);
     try {
-      setError(null);
-      setLoading(true);
-
-      const response = await apiService.post('/api/auth/register', userData);
-
-      if (response.data.success) {
-        return true;
-      } else {
-        setError(response.data.message || "Échec de l'inscription");
-        return false;
-      }
+      const { data } = await apiService.post('/api/auth/register', userData);
+      return data.success;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || "Erreur lors de l'inscription";
-      setError(errorMessage);
+      setError(err.response?.data?.message || "Erreur lors de l'inscription");
       return false;
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
 
   // Fonction de déconnexion
-  const logout = () => {
-    // Supprimer le token du localStorage
+  const logout = useCallback(() => {
     localStorage.removeItem('authToken');
-
-    // Supprimer le token des en-têtes API
     apiService.setAuthToken(null);
-
-    // Réinitialiser l'état
-    setToken(null);
     setUser(null);
     setError(null);
-  };
+  }, []);
 
   // Vérifier si l'utilisateur a un rôle spécifique
-  const hasRole = (role) => {
-    return user && user.role === role;
-  };
+  const hasRole = useCallback((role) => user?.role === role, [user]);
 
   // Valeur du contexte
   const value = {
     user,
-    token,
     loading,
     error,
     isAuthenticated: !!user,

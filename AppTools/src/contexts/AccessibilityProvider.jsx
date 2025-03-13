@@ -12,102 +12,67 @@ export const AccessibilityProvider = ({ children }) => {
   const { isExpanded, toggleExpanded, sidebarItems } = useMenu();
   const [activeZone, setActiveZone] = useState(null);
 
-  // Méthode pour trouver un élément de menu par ID
-  const findMenuItemById = useCallback((items, id) => {
+  // Trouver un item de menu ou son parent par ID
+  const findMenuItem = useCallback((items, id, findParent = false) => {
     for (const item of items) {
-      if (item.id === id) {
-        return item;
-      }
-
+      if (!findParent && item.id === id) return item;
       if (item.children) {
-        const found = findMenuItemById(item.children, id);
+        if (findParent && item.children.some((child) => child.id === id)) return item;
+        const found = findMenuItem(item.children, id, findParent);
         if (found) return found;
       }
     }
     return null;
   }, []);
 
-  // Méthode pour trouver le parent d'un élément de menu
-  const findParentMenuItem = useCallback((items, childId) => {
-    for (const item of items) {
-      if (item.children && item.children.some((child) => child.id === childId)) {
-        return item;
-      }
-
-      if (item.children) {
-        const found = findParentMenuItem(item.children, childId);
-        if (found) return found;
-      }
-    }
-    return null;
-  }, []);
-
-  // Méthode pour développer un menu
+  // Développer un menu
   const handleExpandMenu = useCallback(
     (menuId) => {
-      const menuItem = findMenuItemById(sidebarItems, menuId);
-      if (menuItem && menuItem.children && menuItem.children.length > 0) {
-        if (!isExpanded(menuId)) {
-          toggleExpanded(menuId);
-        }
+      const menuItem = findMenuItem(sidebarItems, menuId);
+      if (menuItem?.children?.length && !isExpanded(menuId)) {
+        toggleExpanded(menuId);
       }
     },
-    [sidebarItems, isExpanded, toggleExpanded, findMenuItemById]
+    [sidebarItems, isExpanded, toggleExpanded]
   );
 
-  // Méthode pour réduire un menu
+  // Réduire un menu
   const handleCollapseMenu = useCallback(
     (menuId) => {
-      const parentItem = findParentMenuItem(sidebarItems, menuId);
-      if (parentItem) {
-        if (isExpanded(parentItem.id)) {
-          toggleExpanded(parentItem.id);
-
-          // Focus sur le parent
-          setTimeout(() => {
-            const parentElement = document.querySelector(`[data-menu-id="${parentItem.id}"]`);
-            if (parentElement) {
-              parentElement.focus();
-            }
-          }, 0);
-        }
+      const parentItem = findMenuItem(sidebarItems, menuId, true);
+      if (parentItem && isExpanded(parentItem.id)) {
+        toggleExpanded(parentItem.id);
+        requestAnimationFrame(() => {
+          document.querySelector(`[data-menu-id="${parentItem.id}"]`)?.focus();
+        });
       }
     },
-    [sidebarItems, isExpanded, toggleExpanded, findParentMenuItem]
+    [sidebarItems, isExpanded, toggleExpanded]
   );
 
-  // Méthode pour activer un item de menu
+  // Activer un menu
   const handleActivateMenu = useCallback(
     (menuId) => {
-      const menuItem = findMenuItemById(sidebarItems, menuId);
-      if (menuItem) {
-        // Si l'élément a un onClick, l'appeler
-        if (menuItem.onClick) {
-          menuItem.onClick();
-        }
-        // Sinon, si c'est un lien, simuler un clic
-        else if (menuItem.path) {
-          const element = document.querySelector(`[data-menu-id="${menuId}"]`);
-          if (element) {
-            element.click();
-          }
-        }
-      }
+      const menuItem = findMenuItem(sidebarItems, menuId);
+      if (menuItem?.onClick) menuItem.onClick();
+      else if (menuItem?.path) document.querySelector(`[data-menu-id="${menuId}"]`)?.click();
     },
-    [sidebarItems, findMenuItemById]
+    [sidebarItems]
   );
 
-  const value = {
-    activeZone,
-    setActiveZone,
-    handleExpandMenu,
-    handleCollapseMenu,
-    handleActivateMenu,
-    findMenuItemById,
-    findParentMenuItem,
-  };
-
-  return <AccessibilityContext.Provider value={value}>{children}</AccessibilityContext.Provider>;
+  return (
+    <AccessibilityContext.Provider
+      value={{
+        activeZone,
+        setActiveZone,
+        handleExpandMenu,
+        handleCollapseMenu,
+        handleActivateMenu,
+      }}
+    >
+      {children}
+    </AccessibilityContext.Provider>
+  );
 };
 
 // Hook pour utiliser le contexte d'accessibilité

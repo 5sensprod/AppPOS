@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react'; // Import des icônes Lucide
+//src\components\layout\Sidebar.jsx
+import React, { useState, useCallback } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMenu } from '../menu/useMenu';
 import SidebarMenuItem from '../menu/SidebarMenuItem';
 import { useAccessibility } from '../../contexts/AccessibilityProvider';
@@ -20,23 +21,13 @@ const Sidebar = () => {
     selector: 'a[href], button[role="menuitem"], [tabindex]:not([tabindex="-1"])',
   });
 
-  useEffect(() => {
-    const sidebar = document.getElementById('sidebar-menu');
-    const handleFocus = () => setActiveZone('sidebar');
-
-    if (sidebar) {
-      sidebar.addEventListener('focusin', handleFocus);
-      return () => sidebar.removeEventListener('focusin', handleFocus);
-    }
-  }, [setActiveZone]);
-
-  const toggleCollapse = () => setCollapsed(!collapsed);
+  const toggleCollapse = useCallback(() => setCollapsed((prev) => !prev), []);
 
   return (
     <aside
-      className={`${
+      className={`flex flex-col transition-all duration-300 ease-in-out ${
         collapsed ? 'w-16' : 'w-64'
-      } bg-gray-800 dark:bg-gray-900 text-white transition-all duration-300 ease-in-out flex flex-col`}
+      } bg-gray-800 dark:bg-gray-900 text-white`}
       role="navigation"
       aria-label="Menu principal"
     >
@@ -47,7 +38,6 @@ const Sidebar = () => {
           onClick={toggleCollapse}
           className="text-gray-300 hover:text-white"
           aria-label={collapsed ? 'Développer le menu' : 'Réduire le menu'}
-          tabIndex={0}
         >
           {collapsed ? <ChevronRight size={24} /> : <ChevronLeft size={24} />}
         </button>

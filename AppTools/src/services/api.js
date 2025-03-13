@@ -5,79 +5,52 @@ import apiConfigService from './apiConfig';
 class ApiService {
   constructor() {
     this.api = axios.create();
-    this.isInitialized = false;
   }
 
-  // Initialise le service API
-  async init() {
-    let attempts = 0;
-    const maxAttempts = 3;
-
-    while (attempts < maxAttempts) {
+  // Initialise le service API avec 3 tentatives max
+  async init(retries = 3) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         await apiConfigService.init();
-        this.isInitialized = true;
-        console.log('Service API initialisé avec succès');
+        console.log('✅ Service API initialisé');
         return true;
       } catch (error) {
-        attempts++;
-        console.warn(`Tentative ${attempts}/${maxAttempts} échouée`);
-
-        if (attempts >= maxAttempts) {
-          throw error;
-        }
-
-        // Attendre avant réessai
+        console.warn(`⚠️ Tentative ${attempt}/${retries} échouée`);
+        if (attempt === retries) throw error;
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
   }
 
-  // Vérifie si le service est initialisé
-  ensureInitialized() {
-    if (!this.isInitialized) {
-      throw new Error('Le service API doit être initialisé avant utilisation');
-    }
-  }
-
-  // Méthode GET
-  async get(url, config = {}) {
-    this.ensureInitialized();
-
-    let fullUrl;
+  // Génère l'URL complète et exécute la requête HTTP
+  async request(method, url, data = null, config = {}) {
     try {
-      fullUrl = apiConfigService.createUrl(url);
+      const fullUrl = apiConfigService.createUrl(url);
+      console.log(`🔄 Requête ${method.toUpperCase()} vers: ${fullUrl}`);
+      return this.api[method](fullUrl, data, config);
     } catch (error) {
-      console.warn('Erreur avec createUrl:', error);
-      fullUrl = url;
+      console.error(`❌ Erreur sur la requête ${method.toUpperCase()} ${url}:`, error);
+      throw error;
     }
-
-    console.log(`Requête GET vers: ${fullUrl}`);
-    return this.api.get(fullUrl, config);
   }
 
-  // Méthode POST
-  async post(url, data, config = {}) {
-    this.ensureInitialized();
-    const fullUrl = apiConfigService.createUrl(url);
-    return this.api.post(fullUrl, data, config);
+  get(url, config = {}) {
+    return this.request('get', url, null, config);
   }
 
-  // Méthode PUT
-  async put(url, data, config = {}) {
-    this.ensureInitialized();
-    const fullUrl = apiConfigService.createUrl(url);
-    return this.api.put(fullUrl, data, config);
+  post(url, data, config = {}) {
+    return this.request('post', url, data, config);
   }
 
-  // Méthode DELETE
-  async delete(url, config = {}) {
-    this.ensureInitialized();
-    const fullUrl = apiConfigService.createUrl(url);
-    return this.api.delete(fullUrl, config);
+  put(url, data, config = {}) {
+    return this.request('put', url, data, config);
   }
 
-  // Définit le token d'authentification pour les requêtes futures
+  delete(url, config = {}) {
+    return this.request('delete', url, null, config);
+  }
+
+  // Définit le token d'authentification pour toutes les requêtes
   setAuthToken(token) {
     if (token) {
       this.api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -86,13 +59,11 @@ class ApiService {
     }
   }
 
-  // Vérifie la connectivité API
   async testConnection() {
     try {
-      const response = await this.get('/test');
-      return response.data;
+      return (await this.get('/test')).data;
     } catch (error) {
-      console.error('Test de connexion échoué:', error);
+      console.error('🚫 Test de connexion échoué:', error);
       throw error;
     }
   }
@@ -102,6 +73,5 @@ class ApiService {
   }
 }
 
-// Exporte une instance unique du service
-const apiService = new ApiService();
-export default apiService;
+// Exporter une instance unique
+export default new ApiService();

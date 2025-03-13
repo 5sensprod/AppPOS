@@ -10,88 +10,53 @@ export const useKeyboardNavigation = ({
   containerId = null,
 }) => {
   useEffect(() => {
-    const getContainer = () => {
-      if (!containerId) return document;
-      const container = document.getElementById(containerId);
-      return container || document;
-    };
+    const container = containerId ? document.getElementById(containerId) || document : document;
+    const focusables = () => Array.from(container.querySelectorAll(selector));
 
-    const getFocusableElements = () => {
-      const container = getContainer();
-      return Array.from(container.querySelectorAll(selector));
-    };
+    const navigationKeys = new Map([
+      ['ArrowDown', { move: 1, condition: direction === 'vertical' }],
+      ['ArrowUp', { move: -1, condition: direction === 'vertical' }],
+      ['ArrowRight', { action: onExpand, condition: direction === 'vertical' }],
+      ['ArrowLeft', { action: onCollapse, condition: direction === 'vertical' }],
+      ['Enter', { action: true }],
+      [' ', { action: true }],
+      ['Home', { move: 'start' }],
+      ['End', { move: 'end' }],
+    ]);
 
     const handleKeyDown = (e) => {
-      const focusables = getFocusableElements();
-
-      if (!focusables.includes(document.activeElement)) return;
-
-      const currentIndex = focusables.indexOf(document.activeElement);
+      const elements = focusables();
       const activeElement = document.activeElement;
+      if (!elements.includes(activeElement)) return;
+
+      const { key } = e;
+      const action = navigationKeys.get(key);
+      if (!action) return;
+
+      e.preventDefault();
+      const currentIndex = elements.indexOf(activeElement);
       const menuId = activeElement.getAttribute('data-menu-id');
 
-      const navigationKeys =
-        direction === 'horizontal'
-          ? { next: 'ArrowRight', prev: 'ArrowLeft' }
-          : { next: 'ArrowDown', prev: 'ArrowUp' };
-
-      // Navigation selon la direction
-      if (e.key === navigationKeys.next) {
-        e.preventDefault();
-        if (currentIndex < focusables.length - 1) {
-          focusables[currentIndex + 1].focus();
-        }
-      } else if (e.key === navigationKeys.prev) {
-        e.preventDefault();
-        if (currentIndex > 0) {
-          focusables[currentIndex - 1].focus();
+      if (action.move !== undefined) {
+        if (action.move === 'start') elements[0]?.focus();
+        else if (action.move === 'end') elements[elements.length - 1]?.focus();
+        else {
+          const nextIndex = currentIndex + action.move;
+          if (elements[nextIndex]) elements[nextIndex].focus();
         }
       }
 
-      // Expansion/réduction (seulement pour les menus verticaux)
-      else if (e.key === 'ArrowRight' && direction === 'vertical' && onExpand && menuId) {
-        e.preventDefault();
-        onExpand(menuId);
-      } else if (e.key === 'ArrowLeft' && direction === 'vertical' && onCollapse && menuId) {
-        e.preventDefault();
-        onCollapse(menuId);
-      }
-
-      // Activation avec Entrée ou Espace - CORRECTION ICI
-      else if ((e.key === 'Enter' || e.key === ' ') && menuId) {
-        e.preventDefault();
-
-        // Si c'est un bouton ou un lien, simuler un clic plutôt que d'appeler onActivate
+      if (action.action && menuId) {
         if (activeElement.tagName === 'BUTTON' || activeElement.tagName === 'A') {
           activeElement.click();
-        }
-        // Sinon, utiliser la fonction d'activation si disponible
-        else if (onActivate) {
-          onActivate(menuId);
-        }
-      }
-
-      // Navigation rapide
-      else if (e.key === 'Home') {
-        e.preventDefault();
-        if (focusables.length > 0) {
-          focusables[0].focus();
-        }
-      } else if (e.key === 'End') {
-        e.preventDefault();
-        if (focusables.length > 0) {
-          focusables[focusables.length - 1].focus();
+        } else {
+          action.action(menuId);
         }
       }
     };
 
-    // Ajouter l'écouteur au conteneur
-    const container = getContainer();
     container.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      container.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => container.removeEventListener('keydown', handleKeyDown);
   }, [selector, direction, onActivate, onExpand, onCollapse, containerId]);
 };
 
