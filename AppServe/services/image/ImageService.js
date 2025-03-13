@@ -231,7 +231,7 @@ class ImageService {
     }
   }
 
-  async deleteGalleryImage(entityId, imageId) {
+  async deleteGalleryImage(entityId, imageId, options = { localOnly: false }) {
     try {
       const Model = this._getModelByEntity();
       const item = await Model.findById(entityId);
@@ -243,24 +243,37 @@ class ImageService {
 
       if (!imageToDelete) throw new Error(`Image non trouvée`);
 
-      // Suppression WordPress si wp_id existe
-      if (imageToDelete.wp_id) {
+      // En mode localOnly, on ne supprime PAS l'image sur WordPress
+      // Mais on conserve l'information de cette image dans un champ temporaire
+      if (options.localOnly) {
+        console.log(`[WS-DEBUG] Mode localOnly activé - Suppression WordPress ignorée`);
+      }
+      // Uniquement si NOT localOnly, on supprime sur WordPress
+      else if (imageToDelete.wp_id && this.entity !== 'suppliers') {
         try {
           await this.wpSync.deleteFromWordPress(imageToDelete.wp_id);
+          console.log(`[WS-DEBUG] Image supprimée sur WordPress (wp_id: ${imageToDelete.wp_id})`);
         } catch (error) {
-          console.error(`Erreur lors de la suppression WordPress:`, error.message);
-          // Continuer même en cas d'erreur WordPress
+          console.error(`[WS-DEBUG] ERREUR lors de la suppression WordPress:`, error.message);
         }
       }
 
-      // Suppression du fichier local
+      // Suppression du fichier local uniquement (pas WordPress)
       if (imageToDelete.local_path) {
-        await this._handleExistingImage(imageToDelete, entityId);
+        try {
+          await fs.access(imageToDelete.local_path);
+          await fs.unlink(imageToDelete.local_path);
+          console.log(`[WS-DEBUG] Fichier local supprimé: ${imageToDelete.local_path}`);
+        } catch (error) {
+          if (error.code !== 'ENOENT') {
+            console.error('Erreur suppression fichier local:', error);
+          }
+        }
       }
 
       // Mise à jour des données locales
       const updateData = {
-        gallery_images: item.gallery_images.filter((img) => (img._id === imageId ? false : true)),
+        gallery_images: item.gallery_images.filter((img) => img._id !== imageId),
       };
 
       // Si c'est aussi l'image principale, la supprimer ou la remplacer
@@ -277,14 +290,24 @@ class ImageService {
         }
       }
 
+      // Marquer comme nécessitant une synchronisation si localOnly est activé
+      if (options.localOnly && item.woo_id) {
+        updateData.pending_sync = true;
+      }
+
       await Model.update(entityId, updateData);
 
-      // Synchronisation WooCommerce après la mise à jour locale
-      if (this.entity === 'products' && process.env.SYNC_ON_CHANGE === 'true') {
+      // Synchronisation WooCommerce après la mise à jour locale SEULEMENT si localOnly n'est pas actif
+      if (
+        this.entity === 'products' &&
+        process.env.SYNC_ON_CHANGE === 'true' &&
+        !options.localOnly
+      ) {
         const service = this._getWooCommerceService();
         if (service) {
           const updatedDoc = await Model.findById(entityId);
           await service.syncToWooCommerce(updatedDoc);
+          console.log(`[WS-DEBUG] Synchronisation WooCommerce effectuée automatiquement`);
         }
       }
 

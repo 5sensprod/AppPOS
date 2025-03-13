@@ -136,27 +136,29 @@ class BaseImageController {
         `[WS-DEBUG] Début deleteGalleryImage pour ${this.entityName} id:${id}, imageId:${imageId}`
       );
 
-      await this.imageService.deleteGalleryImage(id, imageId);
-      console.log(`[WS-DEBUG] Image de galerie supprimée au niveau du service`);
+      // Utiliser localOnly=true pour n'effectuer que des suppressions locales
+      const options = { localOnly: true };
+
+      await this.imageService.deleteGalleryImage(id, imageId, options);
+      console.log(`[WS-DEBUG] Image de galerie supprimée au niveau local uniquement`);
 
       const Model = this.imageService._getModelByEntity();
-      const item = await Model.findById(id);
-
-      if (item && item.woo_id) {
-        await Model.update(id, { pending_sync: true });
-        console.log(`[WS-DEBUG] Item marqué comme pending_sync`);
-      }
-
       const updatedItem = await Model.findById(id);
 
       try {
+        // S'assurer que la notification WebSocket est envoyée avec l'item mis à jour
         websocketManager.notifyEntityUpdated(this.entityName, id, updatedItem);
         console.log(`[WS-DEBUG] Notification WebSocket envoyée avec succès`);
       } catch (wsError) {
         console.error(`[WS-DEBUG] ERREUR lors de la notification WebSocket:`, wsError);
       }
 
-      return ResponseHandler.success(res, { message: 'Image supprimée de la galerie avec succès' });
+      return ResponseHandler.success(res, {
+        message: 'Image supprimée de la galerie localement avec succès',
+        pendingSync: true,
+        note: 'Pour mettre à jour WooCommerce, veuillez effectuer une synchronisation manuelle',
+        data: updatedItem, // Ajouter l'item mis à jour dans la réponse
+      });
     } catch (error) {
       console.error(`[WS-DEBUG] ERREUR GÉNÉRALE dans deleteGalleryImage:`, error);
       return ResponseHandler.error(res, error);
