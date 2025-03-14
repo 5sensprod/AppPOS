@@ -27,6 +27,30 @@ class CategorySyncStrategy extends SyncStrategy {
       parent: parentWooId,
     };
 
+    // Sauvegarde de l'ancien ID d'image WordPress pour suppression si nécessaire
+    let oldImageWpId = null;
+
+    // Vérifier si la catégorie a déjà une image dans WooCommerce
+    if (category.woo_id) {
+      try {
+        // Tentative de récupération des données actuelles de la catégorie sur WooCommerce
+        const client = new WooCommerceClient();
+        const response = await client.get(`products/categories/${category.woo_id}`);
+        if (response.data && response.data.image && response.data.image.id) {
+          oldImageWpId = response.data.image.id;
+          console.log(
+            `[WS-DEBUG] Image WooCommerce existante trouvée pour catégorie ${category._id}: wp_id=${oldImageWpId}`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[WS-DEBUG] Erreur récupération données WooCommerce pour catégorie ${category._id}:`,
+          error.message
+        );
+        // Continuer malgré l'erreur
+      }
+    }
+
     // Ajout de l'image si présente
     if (category.image?.wp_id) {
       wcData.image = {
@@ -34,6 +58,14 @@ class CategorySyncStrategy extends SyncStrategy {
         src: category.image.url,
         alt: category.name,
       };
+
+      // Si l'ID de l'image a changé, marquer l'ancienne pour suppression
+      if (oldImageWpId && parseInt(category.image.wp_id) !== oldImageWpId) {
+        console.log(
+          `[WS-DEBUG] Changement d'image détecté: ancien=${oldImageWpId}, nouveau=${category.image.wp_id}`
+        );
+        // L'image sera automatiquement remplacée dans WooCommerce
+      }
     } else if (category.image && !category.image.wp_id && category.image.local_path) {
       // Si l'image existe localement mais n'a pas d'ID WordPress, on tente de la téléverser
       try {
@@ -62,12 +94,25 @@ class CategorySyncStrategy extends SyncStrategy {
         console.log(
           `[WS-DEBUG] Image téléversée avec succès pour catégorie ${category._id}, wp_id: ${wpData.id}`
         );
+
+        // Si une ancienne image existe, on la supprimera après le succès de la mise à jour
+        if (oldImageWpId && parseInt(wpData.id) !== oldImageWpId) {
+          console.log(
+            `[WS-DEBUG] Ancienne image à supprimer après mise à jour: wp_id=${oldImageWpId}`
+          );
+        }
       } catch (error) {
         console.error(
           `[WS-DEBUG] Erreur lors du téléversement de l'image pour catégorie ${category._id}:`,
           error.message
         );
       }
+    } else if (oldImageWpId && !category.image) {
+      // Si la catégorie n'a plus d'image mais en avait une avant, on la supprime
+      console.log(
+        `[WS-DEBUG] Suppression de l'image pour catégorie ${category._id} car plus d'image associée`
+      );
+      wcData.image = null;
     }
 
     return wcData;
