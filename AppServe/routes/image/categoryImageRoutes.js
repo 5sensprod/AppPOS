@@ -3,7 +3,7 @@ const BaseImageRoutes = require('./base/BaseImageRoutes');
 
 class CategoryImageRoutes extends BaseImageRoutes {
   constructor() {
-    super('categories');
+    super('categories', { type: 'single' });
   }
 }
 

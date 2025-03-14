@@ -34,6 +34,40 @@ class CategorySyncStrategy extends SyncStrategy {
         src: category.image.url,
         alt: category.name,
       };
+    } else if (category.image && !category.image.wp_id && category.image.local_path) {
+      // Si l'image existe localement mais n'a pas d'ID WordPress, on tente de la téléverser
+      try {
+        console.log(
+          `[WS-DEBUG] Image existante sans wp_id, tentative de téléversement pour catégorie ${category._id}`
+        );
+        const WordPressImageSync = require('../../services/image/WordPressImageSync');
+        const wpSync = new WordPressImageSync();
+        const wpData = await wpSync.uploadToWordPress(category.image.local_path);
+
+        // Mise à jour de l'image avec les données WordPress
+        await Category.update(category._id, {
+          image: {
+            ...category.image,
+            wp_id: wpData.id,
+            url: wpData.url,
+          },
+        });
+
+        wcData.image = {
+          id: parseInt(wpData.id),
+          src: wpData.url,
+          alt: category.name,
+        };
+
+        console.log(
+          `[WS-DEBUG] Image téléversée avec succès pour catégorie ${category._id}, wp_id: ${wpData.id}`
+        );
+      } catch (error) {
+        console.error(
+          `[WS-DEBUG] Erreur lors du téléversement de l'image pour catégorie ${category._id}:`,
+          error.message
+        );
+      }
     }
 
     return wcData;
@@ -55,7 +89,25 @@ class CategorySyncStrategy extends SyncStrategy {
 
       let response;
       if (category.woo_id) {
-        response = await client.put(`${this.endpoint}/${category.woo_id}`, wcData);
+        try {
+          // Tentative standard de mise à jour
+          response = await client.put(`${this.endpoint}/${category.woo_id}`, wcData);
+        } catch (error) {
+          // Si l'erreur est term_exists et qu'on a une image
+          if (error.response?.data?.code === 'term_exists' && wcData.image) {
+            console.log(
+              `Erreur term_exists - Mise à jour de l'image uniquement pour la catégorie ${category._id}`
+            );
+
+            // Ne mettre à jour que l'image
+            response = await client.put(`${this.endpoint}/${category.woo_id}`, {
+              image: wcData.image,
+            });
+          } else {
+            throw error;
+          }
+        }
+
         await this._updateLocalCategory(category._id, response.data);
         results.updated++;
       } else {
@@ -66,6 +118,7 @@ class CategorySyncStrategy extends SyncStrategy {
 
       return { success: true, category: await Category.findById(category._id), results };
     } catch (error) {
+      console.error(`Erreur synchronisation catégorie ${category._id}:`, error.message);
       results.errors.push({
         category_id: category._id,
         error: error.message,

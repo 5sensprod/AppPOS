@@ -22,6 +22,15 @@ class ImageService {
       const uploadedImages = [];
       const filesToProcess = Array.isArray(files) ? files : [files];
 
+      // Limiter le nombre de fichiers selon le type (single ou gallery)
+      if (this.imageHandler.isGallery === false && filesToProcess.length > 1) {
+        // Pour type 'single', ne prendre que le premier fichier
+        console.log(
+          `[WS-DEBUG] Type 'single' - Limitation à un seul fichier (${filesToProcess.length} fournis)`
+        );
+        filesToProcess.length = 1;
+      }
+
       for (const file of filesToProcess) {
         const imageData = await this.imageHandler.upload(file, entityId);
         // Ajouter _id unique systématiquement
@@ -48,28 +57,36 @@ class ImageService {
       if (uploadedImages.length > 0) {
         const updateData = {};
 
-        // Définir l'image principale si nécessaire
-        if (!item.image && uploadedImages.length > 0) {
+        // Pour le type 'single', remplacer l'image existante
+        if (!this.imageHandler.isGallery) {
           updateData.image = { ...uploadedImages[0], status: 'active' };
-        }
-
-        // Construire une nouvelle gallery sans duplication
-        const allImages = [...(item.gallery_images || []), ...uploadedImages];
-        const uniqueImages = [];
-        const pathsAdded = new Set();
-
-        for (const img of allImages) {
-          if (!pathsAdded.has(img.local_path)) {
-            // S'assurer que chaque image a un _id
-            if (!img._id) {
-              img._id = uuidv4();
-            }
-            uniqueImages.push({ ...img, status: 'active' });
-            pathsAdded.add(img.local_path);
+          // Pour le type 'single', ne pas utiliser gallery_images
+          updateData.gallery_images = [];
+        } else {
+          // Pour 'gallery', comportement original
+          // Définir l'image principale si nécessaire
+          if (!item.image && uploadedImages.length > 0) {
+            updateData.image = { ...uploadedImages[0], status: 'active' };
           }
-        }
 
-        updateData.gallery_images = uniqueImages;
+          // Construire une nouvelle gallery sans duplication
+          const allImages = [...(item.gallery_images || []), ...uploadedImages];
+          const uniqueImages = [];
+          const pathsAdded = new Set();
+
+          for (const img of allImages) {
+            if (!pathsAdded.has(img.local_path)) {
+              // S'assurer que chaque image a un _id
+              if (!img._id) {
+                img._id = uuidv4();
+              }
+              uniqueImages.push({ ...img, status: 'active' });
+              pathsAdded.add(img.local_path);
+            }
+          }
+
+          updateData.gallery_images = uniqueImages;
+        }
 
         await Model.update(entityId, updateData);
 

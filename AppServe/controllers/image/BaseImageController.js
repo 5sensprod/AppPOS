@@ -22,9 +22,28 @@ class BaseImageController {
   }
 
   validateAndGetFiles(req) {
-    if ((!req.file && !req.files) || req.files?.length === 0) {
+    // Pour les entités de type 'single', on devrait avoir req.file (pas req.files)
+    // Mais en cas d'erreur dans le middleware, on pourrait avoir req.files
+    if (this.imageService.imageHandler.isGallery === false) {
+      // Si on a req.file, c'est le comportement normal pour 'single'
+      if (req.file) {
+        console.log(`[WS-DEBUG] Type 'single' - Utilisation de req.file`);
+        return [req.file];
+      }
+      // Si on a req.files malgré le type 'single', on prend seulement le premier
+      else if (req.files && req.files.length > 0) {
+        console.log(`[WS-DEBUG] Type 'single' mais req.files détecté - Limitation à 1 fichier`);
+        return [req.files[0]];
+      }
+      // Sinon, aucun fichier n'a été fourni
       throw new Error('Aucune image fournie');
     }
+
+    // Pour les entités de type 'gallery'
+    if ((!req.file && !req.files) || (req.files && req.files.length === 0)) {
+      throw new Error('Aucune image fournie');
+    }
+
     return req.files || [req.file];
   }
 
