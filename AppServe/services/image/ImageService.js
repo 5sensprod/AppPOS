@@ -423,18 +423,98 @@ class ImageService {
     }
   }
 
-  async deleteImage(entityId, imageData) {
+  async deleteImage(entityId) {
     try {
+      const Model = this._getModelByEntity();
+      const item = await Model.findById(entityId);
+
+      if (!item) throw new Error(`Entité non trouvée`);
+
+      const imageData = item.image;
+
       // 1. Suppression WordPress si applicable
       if (imageData?.wp_id && this.entity !== 'suppliers') {
         try {
+          console.log(`[WS-DEBUG] Suppression de l'image WordPress wp_id: ${imageData.wp_id}`);
           await this.wpSync.deleteFromWordPress(imageData.wp_id);
+          console.log(`[WS-DEBUG] Image WordPress supprimée avec succès`);
         } catch (error) {
-          console.error('Erreur suppression WordPress:', error);
+          console.error('[WS-DEBUG] Erreur suppression WordPress:', error);
         }
       }
 
-      // 2. Suppression locale (toujours effectuée)
+      // 2. Suppression du fichier local
+      if (imageData?.local_path) {
+        try {
+          console.log(`[WS-DEBUG] Suppression du fichier local: ${imageData.local_path}`);
+          await fs.access(imageData.local_path);
+          await fs.unlink(imageData.local_path);
+          console.log(`[WS-DEBUG] Fichier local supprimé avec succès`);
+        } catch (fsError) {
+          // Si le chemin direct ne fonctionne pas, essayer avec un chemin reconstruit
+          if (imageData.src) {
+            try {
+              const fileName = imageData.src.split('/').pop();
+              const alternativePath = path.join(
+                process.cwd(),
+                'public',
+                this.entity,
+                entityId,
+                fileName
+              );
+              console.log(`[WS-DEBUG] Tentative avec chemin alternatif: ${alternativePath}`);
+
+              await fs.access(alternativePath);
+              await fs.unlink(alternativePath);
+              console.log(`[WS-DEBUG] Fichier supprimé avec chemin alternatif`);
+            } catch (altError) {
+              console.error(`[WS-DEBUG] Échec suppression fichier:`, altError.message);
+            }
+          }
+        }
+      }
+
+      // 3. Nettoyer le répertoire d'images de l'entité
+      try {
+        const entityDir = path.join(process.cwd(), 'public', this.entity, entityId);
+        console.log(`[WS-DEBUG] Nettoyage du répertoire: ${entityDir}`);
+
+        // Vérifier si le répertoire existe
+        try {
+          await fs.access(entityDir);
+
+          // Lister tous les fichiers et les supprimer
+          const files = await fs.readdir(entityDir);
+          console.log(`[WS-DEBUG] ${files.length} fichiers trouvés dans le répertoire`);
+
+          for (const file of files) {
+            const filePath = path.join(entityDir, file);
+            try {
+              await fs.unlink(filePath);
+              console.log(`[WS-DEBUG] Fichier supprimé: ${filePath}`);
+            } catch (unlinkError) {
+              console.error(
+                `[WS-DEBUG] Erreur suppression fichier: ${filePath}`,
+                unlinkError.message
+              );
+            }
+          }
+
+          // Supprimer le répertoire vide
+          await fs.rmdir(entityDir);
+          console.log(`[WS-DEBUG] Répertoire supprimé: ${entityDir}`);
+        } catch (accessError) {
+          if (accessError.code === 'ENOENT') {
+            console.log(`[WS-DEBUG] Le répertoire n'existe pas: ${entityDir}`);
+          } else {
+            console.error(`[WS-DEBUG] Erreur accès répertoire:`, accessError.message);
+          }
+        }
+      } catch (dirError) {
+        console.error(`[WS-DEBUG] Erreur nettoyage répertoire:`, dirError);
+      }
+
+      // 4. Mettre à jour l'entité en base de données
       await this.imageHandler.delete(entityId);
       return true;
     } catch (error) {
