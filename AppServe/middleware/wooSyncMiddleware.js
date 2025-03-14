@@ -12,38 +12,73 @@ function wooSyncMiddleware(options = { forceSync: false, manualSync: false }) {
     // Pour synchronisation manuelle via API
     if (options.manualSync) {
       try {
-        const productId = req.params.id;
-        const Product = require('../models/Product');
-        const product = await Product.findById(productId);
+        const entityId = req.params.id;
+        const Model = req.model;
 
-        if (!product) {
-          return res.status(404).json({
+        if (!Model) {
+          return res.status(400).json({
             success: false,
-            message: 'Produit non trouvé',
+            message: 'Modèle non spécifié pour la synchronisation',
           });
         }
 
-        const result = await ProductWooCommerceService.syncToWooCommerce(product);
+        const entity = await Model.findById(entityId);
+        if (!entity) {
+          return res.status(404).json({
+            success: false,
+            message: 'Entité non trouvée',
+          });
+        }
+
+        // Déterminer quel service utiliser selon le modèle
+        let syncService;
+        let entityType;
+
+        if (Model.name === 'Product' || Model.constructor.name === 'Product') {
+          syncService = require('../services/ProductWooCommerceService');
+          entityType = 'produit';
+        } else if (Model.name === 'Category' || Model.constructor.name === 'Category') {
+          syncService = require('../services/CategoryWooCommerceService');
+          entityType = 'catégorie';
+        } else if (Model.name === 'Brand' || Model.constructor.name === 'Brand') {
+          syncService = require('../services/BrandWooCommerceService');
+          entityType = 'marque';
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "Type d'entité non pris en charge pour la synchronisation",
+          });
+        }
+
+        const result = await syncService.syncToWooCommerce(entity);
 
         // Réinitialiser pending_sync après synchronisation réussie
         if (result.success) {
-          await Product.update(productId, {
+          await Model.update(entityId, {
             pending_sync: false,
             last_sync: new Date(),
           });
 
-          // Récupérer le produit mis à jour avec son woo_id
-          const updatedProduct = await Product.findById(productId);
+          // Récupérer l'entité mise à jour avec son woo_id
+          const updatedEntity = await Model.findById(entityId);
+
+          // Déterminer le nom de l'entité pour la notification WebSocket
+          const websocketEntityName =
+            entityType === 'produit'
+              ? 'products'
+              : entityType === 'catégorie'
+                ? 'categories'
+                : 'brands';
 
           // Envoyer une notification WebSocket
-          websocketManager.notifyEntityUpdated('products', productId, updatedProduct);
+          websocketManager.notifyEntityUpdated(websocketEntityName, entityId, updatedEntity);
         }
 
         return res.json({
           success: result.success,
           message: result.success
-            ? `Produit synchronisé avec succès ${result.data[0].woo_id ? '(mis à jour)' : '(créé)'}`
-            : 'Échec de la synchronisation',
+            ? `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} synchronisé avec succès ${result.data[0].woo_id ? '(mis à jour)' : '(créé)'}`
+            : `Échec de la synchronisation de ${entityType}`,
           data: result,
         });
       } catch (error) {
@@ -53,7 +88,6 @@ function wooSyncMiddleware(options = { forceSync: false, manualSync: false }) {
         });
       }
     }
-
     // Pour synchronisation automatique (comportement existant)
     const originalSend = res.send;
 
