@@ -58,6 +58,36 @@ class WooSyncController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  async getPendingCategories(req, res) {
+    try {
+      const Category = require('../models/Category');
+      const allCategories = await Category.findAll();
+      const pendingCategories = allCategories.filter((category) => category.pending_sync === true);
+
+      return ResponseHandler.success(res, {
+        count: pendingCategories.length,
+        data: pendingCategories,
+      });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  async getPendingBrands(req, res) {
+    try {
+      const Brand = require('../models/Brand');
+      const allBrands = await Brand.findAll();
+      const pendingBrands = allBrands.filter((brand) => brand.pending_sync === true);
+
+      return ResponseHandler.success(res, {
+        count: pendingBrands.length,
+        data: pendingBrands,
+      });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
   /**
    * Synchronise tous les produits modifiés avec WooCommerce
    */
@@ -145,4 +175,6 @@ module.exports = {
   syncAllUpdatedProducts: wooSyncController.syncAllUpdatedProducts.bind(wooSyncController),
   forceSync: wooSyncController.forceSync.bind(wooSyncController),
   getPendingSync: wooSyncController.getPendingSync.bind(wooSyncController),
+  getPendingCategories: wooSyncController.getPendingCategories.bind(wooSyncController),
+  getPendingBrands: wooSyncController.getPendingBrands.bind(wooSyncController),
 };
