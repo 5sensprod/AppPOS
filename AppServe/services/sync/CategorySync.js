@@ -29,6 +29,7 @@ class CategorySyncStrategy extends SyncStrategy {
 
     // Sauvegarde de l'ancien ID d'image WordPress pour suppression si nécessaire
     let oldImageWpId = null;
+    const WooCommerceClient = require('../base/WooCommerceClient');
 
     // Vérifier si la catégorie a déjà une image dans WooCommerce
     if (category.woo_id) {
@@ -59,12 +60,22 @@ class CategorySyncStrategy extends SyncStrategy {
         alt: category.name,
       };
 
-      // Si l'ID de l'image a changé, marquer l'ancienne pour suppression
+      // Si l'ID de l'image a changé, supprimer l'ancienne image
       if (oldImageWpId && parseInt(category.image.wp_id) !== oldImageWpId) {
         console.log(
           `[WS-DEBUG] Changement d'image détecté: ancien=${oldImageWpId}, nouveau=${category.image.wp_id}`
         );
-        // L'image sera automatiquement remplacée dans WooCommerce
+
+        try {
+          const client = new WooCommerceClient();
+          await client.deleteMedia(oldImageWpId);
+          console.log(`[WS-DEBUG] Ancienne image WP media supprimée: ${oldImageWpId}`);
+        } catch (delError) {
+          console.error(
+            `[WS-DEBUG] Erreur lors de la suppression de l'ancienne image:`,
+            delError.message
+          );
+        }
       }
     } else if (category.image && !category.image.wp_id && category.image.local_path) {
       // Si l'image existe localement mais n'a pas d'ID WordPress, on tente de la téléverser
@@ -97,9 +108,16 @@ class CategorySyncStrategy extends SyncStrategy {
 
         // Si une ancienne image existe, on la supprimera après le succès de la mise à jour
         if (oldImageWpId && parseInt(wpData.id) !== oldImageWpId) {
-          console.log(
-            `[WS-DEBUG] Ancienne image à supprimer après mise à jour: wp_id=${oldImageWpId}`
-          );
+          try {
+            const client = new WooCommerceClient();
+            await client.deleteMedia(oldImageWpId);
+            console.log(`[WS-DEBUG] Ancienne image WP media supprimée: ${oldImageWpId}`);
+          } catch (delError) {
+            console.error(
+              `[WS-DEBUG] Erreur lors de la suppression de l'ancienne image:`,
+              delError.message
+            );
+          }
         }
       } catch (error) {
         console.error(
@@ -113,6 +131,17 @@ class CategorySyncStrategy extends SyncStrategy {
         `[WS-DEBUG] Suppression de l'image pour catégorie ${category._id} car plus d'image associée`
       );
       wcData.image = null;
+
+      try {
+        const client = new WooCommerceClient();
+        await client.deleteMedia(oldImageWpId);
+        console.log(`[WS-DEBUG] Ancienne image WP media supprimée: ${oldImageWpId}`);
+      } catch (delError) {
+        console.error(
+          `[WS-DEBUG] Erreur lors de la suppression de l'ancienne image:`,
+          delError.message
+        );
+      }
     }
 
     return wcData;

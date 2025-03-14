@@ -64,7 +64,13 @@ class BaseImageController {
       const files = this.validateAndGetFiles(req);
       console.log(`[WS-DEBUG] Fichiers validés: ${files.length} fichier(s)`);
 
-      const results = await this.processFiles(files, req.params.id);
+      // Option pour forcer la synchronisation WordPress si nécessaire
+      const syncOptions = {
+        syncToWordPress: req.query.sync_wp === 'true',
+      };
+      console.log(`[WS-DEBUG] Options de synchronisation:`, syncOptions);
+
+      const results = await this.processFiles(files, req.params.id, syncOptions);
       console.log(`[WS-DEBUG] Fichiers traités avec succès`);
 
       const Model = this.imageService._getModelByEntity();
@@ -84,6 +90,41 @@ class BaseImageController {
         console.log(`[WS-DEBUG] Notification WebSocket envoyée avec succès`);
       } catch (wsError) {
         console.error(`[WS-DEBUG] ERREUR lors de la notification WebSocket:`, wsError);
+      }
+
+      // Synchronisation immédiate avec WooCommerce si demandé via query parameter
+      if (req.query.sync_woo === 'true' && item && item.woo_id) {
+        console.log(
+          `[WS-DEBUG] Synchronisation WooCommerce demandée pour ${this.entityName} id:${req.params.id}`
+        );
+
+        try {
+          // Déterminer le service WooCommerce approprié
+          let syncService;
+          if (this.entityName === 'products') {
+            syncService = require('../../services/ProductWooCommerceService');
+          } else if (this.entityName === 'categories') {
+            syncService = require('../../services/CategoryWooCommerceService');
+          } else if (this.entityName === 'brands') {
+            syncService = require('../../services/BrandWooCommerceService');
+          }
+
+          if (syncService) {
+            const syncResult = await syncService.syncToWooCommerce(updatedItem);
+            console.log(
+              `[WS-DEBUG] Résultat synchronisation WooCommerce:`,
+              syncResult.success ? 'Succès' : 'Échec',
+              syncResult.errors && syncResult.errors.length ? syncResult.errors : ''
+            );
+
+            // Mettre à jour pending_sync après synchronisation réussie
+            if (syncResult.success) {
+              await Model.update(req.params.id, { pending_sync: false });
+            }
+          }
+        } catch (syncError) {
+          console.error(`[WS-DEBUG] ERREUR lors de la synchronisation WooCommerce:`, syncError);
+        }
       }
 
       return ResponseHandler.success(res, {

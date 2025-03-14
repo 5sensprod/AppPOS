@@ -32,27 +32,13 @@ class ImageService {
 
       // Pour le type 'single', sauvegarder l'ancienne image pour suppression ultérieure
       let oldImage = null;
-      let oldImagePath = null;
 
       if (!this.imageHandler.isGallery && item.image) {
         oldImage = { ...item.image };
-
-        // Si le chemin local est manquant, essayer de le reconstruire à partir du src
-        if (!oldImage.local_path && oldImage.src) {
-          // Typiquement, src est au format: /public/categories/ID/filename.jpg
-          const srcParts = oldImage.src.split('/');
-          if (srcParts.length >= 4) {
-            const filename = srcParts[srcParts.length - 1];
-            oldImagePath = path.join(process.cwd(), 'public', this.entity, entityId, filename);
-            console.log(`[WS-DEBUG] Chemin local reconstruit à partir du src: ${oldImagePath}`);
-          }
-        } else if (oldImage.local_path) {
-          oldImagePath = oldImage.local_path;
-          console.log(`[WS-DEBUG] Chemin local existant trouvé: ${oldImagePath}`);
-        }
+        console.log(`[WS-DEBUG] Ancienne image trouvée pour ${entityId}:`, oldImage);
       }
 
-      // Traitement des nouvelles images (partie inchangée)
+      // Traitement des nouvelles images
       for (const file of filesToProcess) {
         const imageData = await this.imageHandler.upload(file, entityId);
         imageData._id = uuidv4();
@@ -74,7 +60,7 @@ class ImageService {
         }
       }
 
-      // Mise à jour de l'entité (partie inchangée)
+      // Mise à jour de l'entité
       if (uploadedImages.length > 0) {
         const updateData = {};
 
@@ -109,13 +95,14 @@ class ImageService {
         // SECTION CORRIGÉE: Suppression de l'ancienne image
         if (!this.imageHandler.isGallery && oldImage) {
           try {
+            console.log(`[WS-DEBUG] Début suppression de l'ancienne image:`, oldImage);
+
             // Supprimer l'ancienne image de WordPress si elle existe
             if (oldImage.wp_id && this.entity !== 'suppliers') {
               try {
-                console.log(
-                  `[WS-DEBUG] Suppression de l'ancienne image WordPress wp_id: ${oldImage.wp_id}`
-                );
+                console.log(`[WS-DEBUG] Suppression de l'image WordPress wp_id: ${oldImage.wp_id}`);
                 await this.wpSync.deleteFromWordPress(oldImage.wp_id);
+                console.log(`[WS-DEBUG] Image WordPress supprimée avec succès`);
               } catch (wpError) {
                 console.error(
                   `[WS-DEBUG] Erreur lors de la suppression WordPress:`,
@@ -124,79 +111,69 @@ class ImageService {
               }
             }
 
-            // Supprimer le fichier local si nous avons un chemin
-            if (oldImagePath) {
+            // Supprimer le fichier local
+            if (oldImage.local_path) {
               try {
-                console.log(
-                  `[WS-DEBUG] Tentative de suppression du fichier local: ${oldImagePath}`
-                );
-
-                // Vérifier si le fichier existe
-                try {
-                  await fs.access(oldImagePath);
-                  console.log(`[WS-DEBUG] Le fichier existe, suppression...`);
-                  await fs.unlink(oldImagePath);
-                  console.log(`[WS-DEBUG] Fichier supprimé avec succès!`);
-                } catch (accessError) {
-                  if (accessError.code === 'ENOENT') {
-                    console.log(`[WS-DEBUG] Le fichier n'existe pas: ${oldImagePath}`);
-
-                    // Essayer avec un chemin alternatif
-                    let alternativePath = null;
-
-                    // Alternative 1: Utiliser juste le nom de fichier
-                    if (path.isAbsolute(oldImagePath)) {
-                      const filename = path.basename(oldImagePath);
-                      alternativePath = path.join(
-                        process.cwd(),
-                        'public',
-                        this.entity,
-                        entityId,
-                        filename
-                      );
-
-                      console.log(
-                        `[WS-DEBUG] Tentative avec chemin alternatif: ${alternativePath}`
-                      );
-
-                      try {
-                        await fs.access(alternativePath);
-                        await fs.unlink(alternativePath);
-                        console.log(`[WS-DEBUG] Fichier supprimé avec chemin alternatif!`);
-                      } catch (altError) {
-                        console.log(`[WS-DEBUG] Échec avec chemin alternatif: ${altError.message}`);
-                      }
-                    }
-                  } else {
-                    console.error(`[WS-DEBUG] Erreur d'accès au fichier:`, accessError.message);
-                  }
-                }
+                console.log(`[WS-DEBUG] Suppression du fichier local: ${oldImage.local_path}`);
+                await fs.access(oldImage.local_path); // Vérifier si le fichier existe
+                await fs.unlink(oldImage.local_path);
+                console.log(`[WS-DEBUG] Fichier local supprimé avec succès`);
               } catch (fsError) {
                 console.error(
                   `[WS-DEBUG] Erreur lors de la suppression du fichier local:`,
-                  fsError
+                  fsError.message
                 );
+
+                // Si le chemin direct ne fonctionne pas, essayer de reconstruire le chemin
+                if (oldImage.src) {
+                  try {
+                    const fileName = oldImage.src.split('/').pop();
+                    const alternativePath = path.join(
+                      process.cwd(),
+                      'public',
+                      this.entity,
+                      entityId,
+                      fileName
+                    );
+                    console.log(`[WS-DEBUG] Tentative avec chemin alternatif: ${alternativePath}`);
+
+                    await fs.access(alternativePath);
+                    await fs.unlink(alternativePath);
+                    console.log(`[WS-DEBUG] Fichier supprimé avec chemin alternatif`);
+                  } catch (altError) {
+                    console.error(`[WS-DEBUG] Échec avec chemin alternatif:`, altError.message);
+                  }
+                }
               }
-            } else {
-              // Si nous n'avons pas de chemin spécifique, essayons de nettoyer le répertoire
-              console.log(
-                `[WS-DEBUG] Pas de chemin précis pour l'ancienne image, nettoyage du répertoire`
-              );
-              await this.cleanupDirectoryForEntity(entityId);
+            } else if (oldImage.src) {
+              // Si nous n'avons pas local_path mais avons src, essayer de reconstruire le chemin
+              try {
+                const fileName = oldImage.src.split('/').pop();
+                const reconstructedPath = path.join(
+                  process.cwd(),
+                  'public',
+                  this.entity,
+                  entityId,
+                  fileName
+                );
+                console.log(`[WS-DEBUG] Tentative avec chemin reconstruit: ${reconstructedPath}`);
+
+                await fs.access(reconstructedPath);
+                await fs.unlink(reconstructedPath);
+                console.log(`[WS-DEBUG] Fichier supprimé avec chemin reconstruit`);
+              } catch (reconError) {
+                console.error(`[WS-DEBUG] Échec avec chemin reconstruit:`, reconError.message);
+              }
             }
+
+            // Nettoyer les fichiers orphelins
+            await this.cleanupDirectoryForEntity(entityId);
           } catch (error) {
             console.error(
               `[WS-DEBUG] Erreur générale lors de la suppression de l'ancienne image:`,
               error
             );
           }
-        }
-
-        // Synchronisation avec WooCommerce (partie inchangée)
-        if (false) {
-          const service = require('../ProductWooCommerceService');
-          const updatedDoc = await Model.findById(entityId);
-          await service.syncToWooCommerce(updatedDoc);
         }
       }
 
