@@ -1,7 +1,7 @@
 // src/features/products/components/ProductTable.jsx
 import React, { useEffect } from 'react';
 import { useProduct } from '../contexts/productContext';
-import EntityTable from '@/components/common/EntityTable/index';
+import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 
 function ProductTable(props) {

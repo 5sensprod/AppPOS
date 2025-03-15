@@ -1,7 +1,7 @@
 // src/features/suppliers/components/SupplierTable.jsx
 import React, { useEffect } from 'react';
 import { useSupplier } from '../contexts/supplierContext';
-import EntityTable from '@/components/common/EntityTable/index';
+import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 
 function SupplierTable(props) {
