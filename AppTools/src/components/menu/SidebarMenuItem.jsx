@@ -1,5 +1,5 @@
 // src/components/menu/SidebarMenuItem.jsx
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useMemo, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { useMenu } from './useMenu';
@@ -12,10 +12,10 @@ const isActive = (menuPath, currentPath) =>
 const hasActiveChild = (children, currentPath) =>
   children?.some((child) => isActive(child.path, currentPath));
 
-const SubMenu = memo(({ children, expanded }) => (
+const SubMenu = memo(({ children, expanded, currentPath }) => (
   <div
     className={`overflow-hidden transition-all duration-300 ease-in-out ${
-      expanded ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
+      expanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
     }`}
     aria-expanded={expanded}
   >
@@ -25,11 +25,11 @@ const SubMenu = memo(({ children, expanded }) => (
           <Link
             to={child.path}
             className={`flex items-center px-4 py-2 rounded-lg transition-colors duration-200 w-full ${
-              isActive(child.path, window.location.pathname)
+              isActive(child.path, currentPath)
                 ? 'bg-blue-500 text-white'
                 : 'text-gray-300 hover:bg-gray-700 hover:text-white'
             }`}
-            aria-current={isActive(child.path, window.location.pathname) ? 'page' : undefined}
+            aria-current={isActive(child.path, currentPath) ? 'page' : undefined}
             data-menu-id={child.id}
           >
             {child.icon}
@@ -63,18 +63,38 @@ const SidebarMenuItem = ({ item, collapsed = false }) => {
   const { icon, label, path, badge, disabled, component: CustomComponent, children } = item;
   const location = useLocation();
   const { isExpanded, toggleExpanded } = useMenu();
+  const currentPath = location.pathname;
 
   const expanded = isExpanded(item.id);
-  const handleToggle = useCallback(() => toggleExpanded(item.id), [toggleExpanded, item.id]);
-
-  const active = useMemo(() => isActive(path, location.pathname), [path, location.pathname]);
-  const hasActiveChildItem = useMemo(
-    () => hasActiveChild(children, location.pathname),
-    [children, location.pathname]
+  const handleToggle = useCallback(
+    (e) => {
+      e.stopPropagation(); // Éviter la propagation de l'événement
+      toggleExpanded(item.id);
+    },
+    [toggleExpanded, item.id]
   );
 
+  // Vérifier si l'élément actuel est actif ou si l'un de ses enfants est actif
+  const active = useMemo(() => isActive(path, currentPath), [path, currentPath]);
+  const hasActiveChildItem = useMemo(
+    () => hasActiveChild(children, currentPath),
+    [children, currentPath]
+  );
+
+  // Si un enfant est actif, développer automatiquement le parent
+  useEffect(() => {
+    if (hasActiveChildItem && !expanded) {
+      toggleExpanded(item.id);
+    }
+  }, [hasActiveChildItem, expanded, toggleExpanded, item.id]);
+
   if (CustomComponent) {
-    return <CustomComponent item={{ ...item, active }} collapsed={collapsed} />;
+    return (
+      <CustomComponent
+        item={{ ...item, active: active || hasActiveChildItem }}
+        collapsed={collapsed}
+      />
+    );
   }
 
   return (
@@ -88,7 +108,7 @@ const SidebarMenuItem = ({ item, collapsed = false }) => {
                 ? 'bg-blue-600 text-white'
                 : 'text-gray-300 hover:bg-gray-700 hover:text-white'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            aria-current={active ? 'page' : undefined}
+            aria-current={active || hasActiveChildItem ? 'page' : undefined}
             aria-disabled={disabled}
             role="menuitem"
             tabIndex={disabled ? -1 : 0}
@@ -115,7 +135,9 @@ const SidebarMenuItem = ({ item, collapsed = false }) => {
           )}
         </div>
 
-        {!collapsed && children?.length > 0 && <SubMenu children={children} expanded={expanded} />}
+        {!collapsed && children?.length > 0 && (
+          <SubMenu children={children} expanded={expanded} currentPath={currentPath} />
+        )}
       </div>
     </li>
   );

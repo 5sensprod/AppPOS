@@ -21,6 +21,8 @@ import ProductForm from './features/products/components/ProductForm';
 import SuppliersPage from './features/suppliers/SuppliersPage';
 import SupplierDetail from './features/suppliers/components/SupplierDetail';
 import SupplierForm from './features/suppliers/components/SupplierForm';
+import CategoriesPage from './pages/CategoriesPage';
+import BrandsPage from './pages/BrandsPage';
 
 // **Loader pour l'initialisation des services**
 const Loader = ({ message }) => (
@@ -49,11 +51,26 @@ const entityRoutes = [
     form: ProductForm,
   },
   {
+    path: 'products/categories', // Corriger le chemin
+    component: CategoriesPage,
+    // Utiliser des composants temporaires pour éviter les erreurs
+    provider: ({ children }) => <>{children}</>,
+    details: () => <div>Détails de la catégorie</div>,
+    form: () => <div>Formulaire de catégorie</div>,
+  },
+  {
     path: 'products/suppliers',
     component: SuppliersPage,
     provider: SupplierProvider,
     details: SupplierDetail,
     form: SupplierForm,
+  },
+  {
+    path: 'products/brands',
+    component: BrandsPage,
+    provider: ({ children }) => <>{children}</>,
+    details: () => <div>Détails de la marque</div>,
+    form: () => <div>Formulaire de marque</div>,
   },
 ];
 
