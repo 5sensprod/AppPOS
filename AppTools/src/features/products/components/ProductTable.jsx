@@ -1,19 +1,16 @@
 // src/features/products/components/ProductTable.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useProduct } from '../contexts/productContext';
 import { EntityTable } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
-import { useFetchOnce } from '../../../hooks/useFetchOnce';
 
 function ProductTable(props) {
-  const { products, loading, error, fetchProducts, deleteProduct, syncProduct, isCacheStale } =
-    useProduct();
+  const { products, loading, error, fetchProducts, deleteProduct, syncProduct } = useProduct();
 
-  // Utilisation du hook personnalisé pour charger les données une seule fois
-  useFetchOnce(fetchProducts, products, isCacheStale, {
-    debug: true,
-    name: 'produits',
-  });
+  // Chargement direct des données au montage du composant
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   // Configuration des filtres
   const filters = [

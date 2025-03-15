@@ -1,19 +1,16 @@
 // src/features/suppliers/components/SupplierTable.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSupplier } from '../contexts/supplierContext';
 import { EntityTable } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
-import { useFetchOnce } from '../../../hooks/useFetchOnce';
 
 function SupplierTable(props) {
-  const { suppliers, loading, error, fetchSuppliers, deleteSupplier, syncSupplier, isCacheStale } =
-    useSupplier();
+  const { suppliers, loading, error, fetchSuppliers, deleteSupplier, syncSupplier } = useSupplier();
 
-  // Utilisation du hook personnalisé pour charger les données une seule fois
-  useFetchOnce(fetchSuppliers, suppliers, isCacheStale, {
-    debug: true,
-    name: 'fournisseurs',
-  });
+  // Chargement direct des données au montage du composant
+  useEffect(() => {
+    fetchSuppliers();
+  }, [fetchSuppliers]);
 
   // Configuration des filtres
   const filters = [];

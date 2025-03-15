@@ -1,7 +1,6 @@
 // src/factories/createEntityContext.js
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import apiService from '../services/api';
-import dataCache from '../utils/dataCache';
 import websocketService from '../services/websocketService';
 
 export function createEntityContext(options) {
@@ -11,7 +10,6 @@ export function createEntityContext(options) {
     syncEnabled = true,
     customActions = {},
     customReducers = {},
-    cacheDuration = 5 * 60 * 1000, // 5 minutes par défaut
   } = options;
 
   // Création du contexte
@@ -26,19 +24,15 @@ export function createEntityContext(options) {
     UPDATE_SUCCESS: 'UPDATE_SUCCESS',
     DELETE_SUCCESS: 'DELETE_SUCCESS',
     SYNC_SUCCESS: 'SYNC_SUCCESS',
-    INVALIDATE_CACHE: 'INVALIDATE_CACHE',
-    INIT_FROM_CACHE: 'INIT_FROM_CACHE',
     ...customActions,
   };
 
-  // État initial enrichi
+  // État initial simplifié
   const initialState = {
     items: [],
     itemsById: {}, // Cache par ID
     loading: false,
     error: null,
-    lastFetched: null,
-    isDataStale: true,
   };
 
   // Reducer avec gestion des actions communes et personnalisées
@@ -60,32 +54,11 @@ export function createEntityContext(options) {
           return acc;
         }, {});
 
-        // Mettre à jour le cache global
-        dataCache.set(entityName, action.payload);
-
         return {
           ...state,
           items: action.payload,
           itemsById,
           loading: false,
-          lastFetched: Date.now(),
-          isDataStale: false,
-        };
-
-      case ACTIONS.INIT_FROM_CACHE:
-        const cachedItems = action.payload;
-        const cachedItemsById = cachedItems.reduce((acc, item) => {
-          acc[item._id] = item;
-          return acc;
-        }, {});
-
-        return {
-          ...state,
-          items: cachedItems,
-          itemsById: cachedItemsById,
-          loading: false,
-          lastFetched: dataCache.timestamps[entityName] || Date.now(),
-          isDataStale: false,
         };
 
       case ACTIONS.FETCH_ERROR:
@@ -99,13 +72,9 @@ export function createEntityContext(options) {
 
         if (itemExists) {
           console.log(`[REDUCER] Élément ${newItem._id} déjà présent, mise à jour au lieu d'ajout`);
-          // Mise à jour au lieu d'ajout si l'élément existe déjà
           const updatedItems = state.items.map((item) =>
             item._id === newItem._id ? newItem : item
           );
-
-          // Mettre à jour le cache global
-          dataCache.set(entityName, updatedItems);
 
           return {
             ...state,
@@ -117,9 +86,6 @@ export function createEntityContext(options) {
 
         // Si l'élément n'existe pas, l'ajouter normalement
         const updatedItems = [...state.items, newItem];
-
-        // Mettre à jour le cache global
-        dataCache.set(entityName, updatedItems);
 
         return {
           ...state,
@@ -135,9 +101,6 @@ export function createEntityContext(options) {
           item._id === updatedItem._id ? updatedItem : item
         );
 
-        // Mettre à jour le cache global
-        dataCache.set(entityName, updatedItems);
-
         return {
           ...state,
           items: updatedItems,
@@ -150,9 +113,6 @@ export function createEntityContext(options) {
         const newItemsById = { ...state.itemsById };
         delete newItemsById[action.payload];
         const filteredItems = state.items.filter((item) => item._id !== action.payload);
-
-        // Mettre à jour le cache global
-        dataCache.set(entityName, filteredItems);
 
         return {
           ...state,
@@ -168,9 +128,6 @@ export function createEntityContext(options) {
           item._id === syncedItem._id ? syncedItem : item
         );
 
-        // Mettre à jour le cache global
-        dataCache.set(entityName, updatedItems);
-
         return {
           ...state,
           items: updatedItems,
@@ -178,15 +135,6 @@ export function createEntityContext(options) {
           loading: false,
         };
       }
-
-      case ACTIONS.INVALIDATE_CACHE:
-        // Invalider aussi le cache global
-        dataCache.invalidate(entityName);
-
-        return {
-          ...state,
-          isDataStale: true,
-        };
 
       default:
         return state;
@@ -203,21 +151,6 @@ export function createEntityContext(options) {
         return acc;
       }, {}),
     });
-
-    // Vérifier au montage si des données existent dans le cache
-    useEffect(() => {
-      // Ne charger depuis le cache que si l'état est vide
-      if (state.items.length === 0) {
-        const cachedItems = dataCache.get(entityName);
-
-        if (cachedItems.length > 0 && !dataCache.isStale(entityName, cacheDuration)) {
-          console.log(
-            `Initialisation de ${entityName} depuis le cache global (${cachedItems.length} items)`
-          );
-          dispatch({ type: ACTIONS.INIT_FROM_CACHE, payload: cachedItems });
-        }
-      }
-    }, []);
 
     useEffect(() => {
       // S'assurer que le nom utilisé pour les abonnements est correct
@@ -325,62 +258,35 @@ export function createEntityContext(options) {
       };
     }, [dispatch, entityName]);
 
-    // Vérifier si les données sont périmées
-    const isCacheStale = useCallback(() => {
-      if (state.isDataStale) return true;
-      if (!state.lastFetched) return true;
-      return Date.now() - state.lastFetched > cacheDuration;
-    }, [state.lastFetched, state.isDataStale]);
-
-    // Invalider le cache manuellement
-    const invalidateCache = useCallback(() => {
-      dispatch({ type: ACTIONS.INVALIDATE_CACHE });
+    // Actions CRUD standard
+    const fetchItems = useCallback(async (params = {}) => {
+      dispatch({ type: ACTIONS.FETCH_START });
+      try {
+        console.log(`Appel API pour ${apiEndpoint}`);
+        const response = await apiService.get(apiEndpoint, { params });
+        dispatch({ type: ACTIONS.FETCH_SUCCESS, payload: response.data.data });
+        return response.data;
+      } catch (error) {
+        dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
+        throw error;
+      }
     }, []);
 
-    // Actions CRUD standard
-    const fetchItems = useCallback(
-      async (params = {}, forceRefresh = false) => {
-        // Si les données sont déjà chargées et pas périmées, on évite l'appel API
-        if (!forceRefresh && state.items.length > 0 && !isCacheStale()) {
-          console.log(`Utilisation du cache pour ${entityName}`);
-          return { data: state.items };
-        }
+    const getItemById = useCallback(async (id) => {
+      // Toujours récupérer les données fraîches
+      dispatch({ type: ACTIONS.FETCH_START });
 
-        dispatch({ type: ACTIONS.FETCH_START });
-        try {
-          console.log(`Appel API pour ${apiEndpoint}`);
-          const response = await apiService.get(apiEndpoint, { params });
-          dispatch({ type: ACTIONS.FETCH_SUCCESS, payload: response.data.data });
-          return response.data;
-        } catch (error) {
-          dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
-          throw error;
-        }
-      },
-      [state.items, isCacheStale]
-    );
+      try {
+        const response = await apiService.get(`${apiEndpoint}/${id}`);
+        const item = response.data.data;
 
-    const getItemById = useCallback(
-      async (id) => {
-        if (state.itemsById[id] && !isCacheStale()) {
-          return state.itemsById[id];
-        }
-
-        dispatch({ type: ACTIONS.FETCH_START });
-
-        try {
-          const response = await apiService.get(`${apiEndpoint}/${id}`);
-          const item = response.data.data;
-
-          dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: item });
-          return item;
-        } catch (error) {
-          dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
-          throw error;
-        }
-      },
-      [state.itemsById]
-    ); // ✅ Ne dépend que de `state.itemsById`
+        dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: item });
+        return item;
+      } catch (error) {
+        dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
+        throw error;
+      }
+    }, []);
 
     const createItem = useCallback(async (itemData) => {
       dispatch({ type: ACTIONS.FETCH_START });
@@ -476,9 +382,6 @@ export function createEntityContext(options) {
       [`${entityName}sById`]: state.itemsById,
       loading: state.loading,
       error: state.error,
-      lastFetched: state.lastFetched,
-      isCacheStale: isCacheStale,
-      invalidateCache,
       [`fetch${capitalize(entityName)}s`]: fetchItems,
       [`get${capitalize(entityName)}ById`]: getItemById,
       [`create${capitalize(entityName)}`]: createItem,

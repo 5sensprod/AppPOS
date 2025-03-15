@@ -1,5 +1,4 @@
 // src/services/websocketService.js
-import dataCache from '../utils/dataCache';
 
 class WebSocketService {
   constructor() {
@@ -79,29 +78,20 @@ class WebSocketService {
 
     setTimeout(() => {
       if (!this.isConnected) {
-        this.init(); // 🔹 Vérification avant d’initier une nouvelle connexion
+        this.init(); // 🔹 Vérification avant d'initier une nouvelle connexion
       }
     }, this.reconnectDelay);
   }
 
   handleEntityUpdate({ entityType, entityId, data }) {
-    dataCache.set(
-      entityType,
-      dataCache.get(entityType).map((item) => (item._id === entityId ? { ...item, ...data } : item))
-    );
     this.triggerEvent(`${entityType}_updated`, { entityId, data });
   }
 
   handleEntityCreate({ entityType, data }) {
-    dataCache.set(entityType, [...dataCache.get(entityType), data]);
     this.triggerEvent(`${entityType}_created`, { data });
   }
 
   handleEntityDelete({ entityType, entityId }) {
-    dataCache.set(
-      entityType,
-      dataCache.get(entityType).filter((item) => item._id !== entityId)
-    );
     this.triggerEvent(`${entityType}_deleted`, { entityId });
   }
 
