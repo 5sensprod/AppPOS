@@ -13,6 +13,8 @@ import Login from './components/Login';
 // Providers
 import { ProductProvider } from './features/products/contexts/productContext';
 import { SupplierProvider } from './features/suppliers/contexts/supplierContext';
+import { CategoryProvider } from './features/categories/contexts/categoryContext';
+import { BrandProvider } from './features/brands/contexts/brandContext';
 
 // Pages
 import ProductsPage from './features/products/ProductsPage';
@@ -54,7 +56,7 @@ const entityRoutes = [
     path: 'products/categories', // Corriger le chemin
     component: CategoriesPage,
     // Utiliser des composants temporaires pour éviter les erreurs
-    provider: ({ children }) => <>{children}</>,
+    provider: CategoryProvider,
     details: () => <div>Détails de la catégorie</div>,
     form: () => <div>Formulaire de catégorie</div>,
   },
@@ -68,9 +70,9 @@ const entityRoutes = [
   {
     path: 'products/brands',
     component: BrandsPage,
-    provider: ({ children }) => <>{children}</>,
-    details: () => <div>Détails de la marque</div>,
-    form: () => <div>Formulaire de marque</div>,
+    provider: BrandProvider, // Utilise maintenant le BrandProvider
+    details: () => <div>Détails de la marque</div>, // À remplacer par vos composants réels
+    form: () => <div>Formulaire de marque</div>, // À remplacer par vos composants réels
   },
 ];
 

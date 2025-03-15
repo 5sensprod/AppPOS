@@ -202,14 +202,20 @@ class CategorySyncStrategy extends SyncStrategy {
   }
 
   async _updateLocalCategory(categoryId, wcData) {
+    // D'abord, récupérer l'objet catégorie actuel pour préserver ses propriétés
+    const currentCategory = await Category.findById(categoryId);
+
     const updateData = {
       woo_id: wcData.id,
       last_sync: new Date(),
+      pending_sync: false,
     };
 
-    // Mise à jour de l'image si présente
+    // Mise à jour de l'image si présente dans la réponse WooCommerce
     if (wcData.image) {
+      // Conserver les propriétés locales et ajouter les infos WordPress
       updateData.image = {
+        ...currentCategory.image, // Garde toutes les propriétés locales (src, local_path, etc.)
         wp_id: wcData.image.id,
         url: wcData.image.src,
       };

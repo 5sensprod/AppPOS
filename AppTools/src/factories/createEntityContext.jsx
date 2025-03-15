@@ -93,6 +93,29 @@ export function createEntityContext(options) {
 
       case ACTIONS.CREATE_SUCCESS: {
         const newItem = action.payload;
+
+        // Vérifier si l'élément existe déjà pour éviter les doublons
+        const itemExists = state.items.some((item) => item._id === newItem._id);
+
+        if (itemExists) {
+          console.log(`[REDUCER] Élément ${newItem._id} déjà présent, mise à jour au lieu d'ajout`);
+          // Mise à jour au lieu d'ajout si l'élément existe déjà
+          const updatedItems = state.items.map((item) =>
+            item._id === newItem._id ? newItem : item
+          );
+
+          // Mettre à jour le cache global
+          dataCache.set(entityName, updatedItems);
+
+          return {
+            ...state,
+            items: updatedItems,
+            itemsById: { ...state.itemsById, [newItem._id]: newItem },
+            loading: false,
+          };
+        }
+
+        // Si l'élément n'existe pas, l'ajouter normalement
         const updatedItems = [...state.items, newItem];
 
         // Mettre à jour le cache global
@@ -197,27 +220,79 @@ export function createEntityContext(options) {
     }, []);
 
     useEffect(() => {
+      // S'assurer que le nom utilisé pour les abonnements est correct
+      // Note: entityPlural normalise le nom pour l'API WebSocket
       const entityPlural = entityName.endsWith('s') ? entityName : `${entityName}s`;
+      const entityType = entityName.endsWith('y')
+        ? `${entityName.slice(0, -1)}ies` // category -> categories
+        : entityName.endsWith('s')
+          ? entityName
+          : `${entityName}s`; // product -> products
+
+      console.log(
+        `[WS-DEBUG] Configuration WebSocket pour ${entityName} (type: ${entityType}, plural: ${entityPlural})`
+      );
 
       const handleUpdate = ({ entityId, data }) => {
+        console.log(`[WS-DEBUG] Mise à jour ${entityType} reçue:`, { entityId, data });
         dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: data });
       };
 
       const handleCreate = ({ data }) => {
+        console.log(`[WS-DEBUG] Création ${entityType} reçue:`, data);
         dispatch({ type: ACTIONS.CREATE_SUCCESS, payload: data });
       };
 
       const handleDelete = ({ entityId }) => {
+        console.log(`[WS-DEBUG] Suppression ${entityType} reçue:`, entityId);
         dispatch({ type: ACTIONS.DELETE_SUCCESS, payload: entityId });
+      };
+
+      // IMPORTANT: S'abonner aussi aux événements génériques
+      const handleGenericEvent = (payload) => {
+        if (payload?.entityType === entityType || payload?.entityType === entityPlural) {
+          console.log(`[WS-DEBUG] Événement générique pour ${entityType}:`, payload);
+          if (payload.entityId && payload.data) {
+            dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: payload.data });
+          } else if (payload.data && !payload.entityId) {
+            dispatch({ type: ACTIONS.CREATE_SUCCESS, payload: payload.data });
+          } else if (payload.entityId && !payload.data) {
+            dispatch({ type: ACTIONS.DELETE_SUCCESS, payload: payload.entityId });
+          }
+        }
       };
 
       // Vérifier la connexion et s'abonner aux mises à jour
       const subscribeToWebSocket = () => {
         if (websocketService.isConnected) {
+          // S'abonner avec les deux formats possibles pour plus de sûreté
           websocketService.subscribe(entityPlural);
+          if (entityType !== entityPlural) {
+            websocketService.subscribe(entityType);
+          }
+
+          // Écouter les événements spécifiques (pluriel standard)
           websocketService.on(`${entityPlural}_updated`, handleUpdate);
           websocketService.on(`${entityPlural}_created`, handleCreate);
           websocketService.on(`${entityPlural}_deleted`, handleDelete);
+
+          // Si le pluriel est spécial, écouter aussi ces formats
+          if (entityType !== entityPlural) {
+            websocketService.on(`${entityType}_updated`, handleUpdate);
+            websocketService.on(`${entityType}_created`, handleCreate);
+            websocketService.on(`${entityType}_deleted`, handleDelete);
+          }
+
+          // Écouter les événements génériques
+          websocketService.on('entity_updated', handleGenericEvent);
+          websocketService.on('entity_created', handleGenericEvent);
+          websocketService.on('entity_deleted', handleGenericEvent);
+
+          console.log(`[WS-DEBUG] Abonnement établi pour ${entityName} (${entityType})`);
+        } else {
+          console.warn(
+            `[WS-DEBUG] WebSocket non connecté, impossible de s'abonner pour ${entityName}`
+          );
         }
       };
 
@@ -225,7 +300,7 @@ export function createEntityContext(options) {
 
       // Écouter les reconnexions WebSocket et réabonner si nécessaire
       const handleReconnect = () => {
-        console.log(`[WS-DEBUG] Reconnexion WebSocket détectée, réabonnement à ${entityPlural}`);
+        console.log(`[WS-DEBUG] Reconnexion WebSocket détectée, réabonnement à ${entityType}`);
         subscribeToWebSocket();
       };
 
@@ -236,6 +311,16 @@ export function createEntityContext(options) {
         websocketService.off(`${entityPlural}_updated`, handleUpdate);
         websocketService.off(`${entityPlural}_created`, handleCreate);
         websocketService.off(`${entityPlural}_deleted`, handleDelete);
+
+        if (entityType !== entityPlural) {
+          websocketService.off(`${entityType}_updated`, handleUpdate);
+          websocketService.off(`${entityType}_created`, handleCreate);
+          websocketService.off(`${entityType}_deleted`, handleDelete);
+        }
+
+        websocketService.off('entity_updated', handleGenericEvent);
+        websocketService.off('entity_created', handleGenericEvent);
+        websocketService.off('entity_deleted', handleGenericEvent);
         websocketService.off('connect', handleReconnect);
       };
     }, [dispatch, entityName]);

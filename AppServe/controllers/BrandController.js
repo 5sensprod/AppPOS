@@ -49,11 +49,24 @@ class BrandController extends BaseController {
       const brand = await this.model.findById(req.params.id);
       if (!brand) return ResponseHandler.notFound(res);
 
+      // Vérification des produits liés (si nécessaire)
+      // ...
+
+      // Supprimer l'image et l'entité de WooCommerce (si synchronisée)
       await this.handleImageDeletion(brand);
       await this.handleWooCommerceDelete(brand);
+
+      // Supprimer l'entité localement
       await this.model.delete(req.params.id);
 
-      return ResponseHandler.success(res, { message: 'Marque supprimée avec succès' });
+      // Notification WebSocket
+      const websocketManager = require('../websocket/websocketManager');
+      websocketManager.notifyEntityDeleted('brands', req.params.id);
+
+      return ResponseHandler.success(res, {
+        message: 'Marque supprimée avec succès',
+        woo_status: brand.woo_id ? 'synchronized' : 'not_applicable',
+      });
     } catch (error) {
       return ResponseHandler.error(res, error);
     }

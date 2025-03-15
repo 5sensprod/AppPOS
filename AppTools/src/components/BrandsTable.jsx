@@ -1,39 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { Pencil, Trash2, RotateCw, CheckCircle, XCircle } from 'lucide-react';
-import apiService from '../services/api';
+// src/components/BrandsTable.jsx
+import React, { useState } from 'react';
+import { Pencil, Trash2, RotateCw, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { useBrand, useBrandExtras } from '../features/brands/contexts/brandContext';
 import imageProxyService from '../services/imageProxyService';
 
 function BrandsTable() {
-  const [brands, setBrands] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { brands, loading, fetchBrands, deleteBrand, invalidateCache } = useBrand();
+
+  const { syncBrand } = useBrandExtras();
   const [syncStatus, setSyncStatus] = useState({});
 
-  const fetchBrands = async () => {
-    setLoading(true);
-    try {
-      const response = await apiService.get('/api/brands');
-      console.log('Réponse API:', response);
-
-      // Extraire le tableau de marques de la structure imbriquée
-      const brandsData =
-        response.data.success && Array.isArray(response.data.data) ? response.data.data : [];
-
-      console.log('Données de marques:', brandsData);
-      setBrands(brandsData);
-      setError(null);
-    } catch (error) {
-      setError('Erreur lors du chargement des marques');
-      console.error('Erreur:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    invalidateCache();
+    fetchBrands(true); // forceRefresh = true
   };
 
   const handleSync = async (id) => {
     setSyncStatus((prev) => ({ ...prev, [id]: 'loading' }));
     try {
-      await apiService.post(`/api/brands/${id}/sync`);
+      await syncBrand(id);
       setSyncStatus((prev) => ({ ...prev, [id]: 'success' }));
       setTimeout(() => {
         setSyncStatus((prev) => {
@@ -42,7 +27,6 @@ function BrandsTable() {
           return newStatus;
         });
       }, 2000);
-      fetchBrands(); // Rafraîchir les données
     } catch (error) {
       setSyncStatus((prev) => ({ ...prev, [id]: 'error' }));
       console.error('Erreur de synchronisation:', error);
@@ -64,31 +48,12 @@ function BrandsTable() {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette marque?')) return;
 
     try {
-      await apiService.delete(`/api/brands/${id}`);
-      fetchBrands();
+      await deleteBrand(id);
     } catch (error) {
       alert('Erreur lors de la suppression');
       console.error('Erreur:', error);
     }
   };
-
-  useEffect(() => {
-    fetchBrands();
-
-    // S'abonner aux événements websocket
-    const onBrandUpdate = () => fetchBrands();
-    const websocketService = window.websocketService || { on: () => {}, off: () => {} };
-
-    websocketService.on('brands_updated', onBrandUpdate);
-    websocketService.on('brands_created', onBrandUpdate);
-    websocketService.on('brands_deleted', onBrandUpdate);
-
-    return () => {
-      websocketService.off('brands_updated', onBrandUpdate);
-      websocketService.off('brands_created', onBrandUpdate);
-      websocketService.off('brands_deleted', onBrandUpdate);
-    };
-  }, []);
 
   const renderSyncStatus = (id) => {
     switch (syncStatus[id]) {
@@ -111,69 +76,57 @@ function BrandsTable() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{error}</div>
-    );
-  }
-
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
       <div className="flex justify-between items-center p-4 border-b">
         <h2 className="text-lg font-semibold text-gray-800">Marques</h2>
-        <button
-          onClick={() => (window.location.href = '/products/brands/new')}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-        >
-          Nouvelle marque
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleRefresh}
+            className="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors flex items-center"
+            title="Rafraîchir"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" /> Rafraîchir
+          </button>
+          <button
+            onClick={() => (window.location.href = '/products/brands/new')}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            Nouvelle marque
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Image
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Nom
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Description
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Statut WC
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {brands.length === 0 ? (
+            {(brands || []).length === 0 ? (
               <tr>
                 <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
                   Aucune marque trouvée
                 </td>
               </tr>
             ) : (
-              brands.map((brand) => (
+              (brands || []).map((brand) => (
                 <tr key={brand._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {brand.image ? (
@@ -215,12 +168,14 @@ function BrandsTable() {
                       <button
                         onClick={() => handleEdit(brand._id)}
                         className="text-indigo-600 hover:text-indigo-900"
+                        title="Modifier"
                       >
                         <Pencil className="h-5 w-5" />
                       </button>
                       <button
                         onClick={() => handleDelete(brand._id)}
                         className="text-red-600 hover:text-red-900"
+                        title="Supprimer"
                       >
                         <Trash2 className="h-5 w-5" />
                       </button>
@@ -232,6 +187,7 @@ function BrandsTable() {
                             : 'hover:text-blue-900'
                         } text-blue-600`}
                         disabled={syncStatus[brand._id] === 'loading'}
+                        title="Synchroniser"
                       >
                         {renderSyncStatus(brand._id)}
                       </button>

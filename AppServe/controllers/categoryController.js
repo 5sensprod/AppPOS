@@ -66,11 +66,32 @@ class CategoryController extends BaseController {
         });
       }
 
+      // Si l'entité est synchronisée avec WooCommerce, la supprimer d'abord de WC
+      if (item.woo_id) {
+        try {
+          console.log(
+            `[WS-DEBUG] Suppression de la catégorie ${item._id} de WooCommerce (woo_id: ${item.woo_id})`
+          );
+          const categoryWooService = require('../services/CategoryWooCommerceService');
+          await categoryWooService.deleteCategory(item._id);
+          console.log(`[WS-DEBUG] Catégorie supprimée de WooCommerce avec succès`);
+        } catch (wcError) {
+          console.error(`[WS-DEBUG] Erreur lors de la suppression WooCommerce:`, wcError);
+          // On continue malgré l'erreur pour supprimer en local
+        }
+      }
+
       await this.handleImageDeletion(item);
-      await this.handleWooCommerceDelete(item);
       await this.model.delete(req.params.id);
 
-      return ResponseHandler.success(res, { message: 'Catégorie supprimée avec succès' });
+      // Notification WebSocket
+      const websocketManager = require('../websocket/websocketManager');
+      websocketManager.notifyEntityDeleted('categories', req.params.id);
+
+      return ResponseHandler.success(res, {
+        message: 'Catégorie supprimée avec succès',
+        woo_status: item.woo_id ? 'synchronized' : 'not_applicable',
+      });
     } catch (error) {
       return ResponseHandler.error(res, error);
     }

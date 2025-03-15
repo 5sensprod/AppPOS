@@ -1,39 +1,30 @@
-// src/components/CategoriesTable.jsx
-import React, { useState, useEffect } from 'react';
-import { Pencil, Trash2, RotateCw, CheckCircle, XCircle } from 'lucide-react';
-import apiService from '../services/api';
+// src/components/CategoriesTable.jsx - Version corrigée
+import React, { useState } from 'react';
+import { Pencil, Trash2, RotateCw, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { useCategory, useCategoryExtras } from '../features/categories/contexts/categoryContext';
 import imageProxyService from '../services/imageProxyService';
 
 function CategoriesTable() {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    categorys, // ← ATTENTION: C'est bien "categorys" (sans "ie")
+    loading,
+    fetchCategorys, // ← ATTENTION: C'est bien "fetchCategorys" (sans "ie")
+    deleteCategory,
+    invalidateCache,
+  } = useCategory();
+
+  const { syncCategory } = useCategoryExtras();
   const [syncStatus, setSyncStatus] = useState({});
 
-  const fetchCategories = async () => {
-    setLoading(true);
-    try {
-      const response = await apiService.get('/api/categories');
-      console.log('Réponse API:', response);
-
-      // Extraire le tableau de catégories de la structure imbriquée
-      const categoriesData =
-        response.data.success && Array.isArray(response.data.data) ? response.data.data : [];
-
-      console.log('Données de catégories:', categoriesData);
-      setCategories(categoriesData);
-      setError(null);
-    } catch (error) {
-      setError('Erreur lors du chargement des catégories');
-      console.error('Erreur:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    invalidateCache();
+    fetchCategorys(true); // forceRefresh = true
   };
+
   const handleSync = async (id) => {
     setSyncStatus((prev) => ({ ...prev, [id]: 'loading' }));
     try {
-      await apiService.post(`/api/categories/${id}/sync`);
+      await syncCategory(id);
       setSyncStatus((prev) => ({ ...prev, [id]: 'success' }));
       setTimeout(() => {
         setSyncStatus((prev) => {
@@ -42,7 +33,6 @@ function CategoriesTable() {
           return newStatus;
         });
       }, 2000);
-      fetchCategories(); // Rafraîchir les données
     } catch (error) {
       setSyncStatus((prev) => ({ ...prev, [id]: 'error' }));
       console.error('Erreur de synchronisation:', error);
@@ -64,31 +54,12 @@ function CategoriesTable() {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette catégorie?')) return;
 
     try {
-      await apiService.delete(`/api/categories/${id}`);
-      fetchCategories();
+      await deleteCategory(id);
     } catch (error) {
       alert('Erreur lors de la suppression');
       console.error('Erreur:', error);
     }
   };
-
-  useEffect(() => {
-    fetchCategories();
-
-    // S'abonner aux événements websocket
-    const onCategoryUpdate = () => fetchCategories();
-    const websocketService = window.websocketService || { on: () => {}, off: () => {} };
-
-    websocketService.on('categories_updated', onCategoryUpdate);
-    websocketService.on('categories_created', onCategoryUpdate);
-    websocketService.on('categories_deleted', onCategoryUpdate);
-
-    return () => {
-      websocketService.off('categories_updated', onCategoryUpdate);
-      websocketService.off('categories_created', onCategoryUpdate);
-      websocketService.off('categories_deleted', onCategoryUpdate);
-    };
-  }, []);
 
   const renderSyncStatus = (id) => {
     switch (syncStatus[id]) {
@@ -111,75 +82,60 @@ function CategoriesTable() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{error}</div>
-    );
-  }
-
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
       <div className="flex justify-between items-center p-4 border-b">
         <h2 className="text-lg font-semibold text-gray-800">Catégories</h2>
-        <button
-          onClick={() => (window.location.href = '/products/categories/new')}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-        >
-          Nouvelle catégorie
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleRefresh}
+            className="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors flex items-center"
+            title="Rafraîchir"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" /> Rafraîchir
+          </button>
+          <button
+            onClick={() => (window.location.href = '/products/categories/new')}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            Nouvelle catégorie
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Image
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Nom
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Description
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Niveau
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Statut WC
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {(categories || []).length === 0 ? (
+            {(categorys || []).length === 0 ? (
               <tr>
                 <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
                   Aucune catégorie trouvée
                 </td>
               </tr>
             ) : (
-              (categories || []).map((category) => (
+              (categorys || []).map((category) => (
                 <tr key={category._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {category.image ? (
@@ -224,12 +180,14 @@ function CategoriesTable() {
                       <button
                         onClick={() => handleEdit(category._id)}
                         className="text-indigo-600 hover:text-indigo-900"
+                        title="Modifier"
                       >
                         <Pencil className="h-5 w-5" />
                       </button>
                       <button
                         onClick={() => handleDelete(category._id)}
                         className="text-red-600 hover:text-red-900"
+                        title="Supprimer"
                       >
                         <Trash2 className="h-5 w-5" />
                       </button>
@@ -241,6 +199,7 @@ function CategoriesTable() {
                             : 'hover:text-blue-900'
                         } text-blue-600`}
                         disabled={syncStatus[category._id] === 'loading'}
+                        title="Synchroniser"
                       >
                         {renderSyncStatus(category._id)}
                       </button>
