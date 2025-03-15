@@ -1,7 +1,7 @@
 // src/features/suppliers/components/SupplierTable.jsx
 import React, { useEffect } from 'react';
 import { useSupplier } from '../contexts/supplierContext';
-import { EntityTable } from '../../../components/common';
+import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 
 function SupplierTable(props) {
@@ -33,7 +33,7 @@ function SupplierTable(props) {
       batchActions={['delete', 'sync']}
       pagination={{
         enabled: true,
-        pageSize: 10,
+        pageSize: 5,
         showPageSizeOptions: true,
         pageSizeOptions: [5, 10, 25, 50],
       }}
