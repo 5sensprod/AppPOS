@@ -137,30 +137,6 @@ class BrandSyncStrategy extends SyncStrategy {
     return wcData;
   }
 
-  async _mapLocalToWooCommerce(brand) {
-    const wcData = {
-      name: brand.name,
-      description: brand.description || '',
-      slug: brand.slug || this._generateSlug(brand.name),
-    };
-
-    // Correction du mapping des images
-    if (brand.image?.wp_id) {
-      wcData.image = {
-        id: parseInt(brand.image.wp_id),
-        src: brand.image.url,
-        alt: brand.name,
-      };
-    }
-
-    // Ajout des métadonnées si nécessaire
-    if (brand.meta_data && brand.meta_data.length > 0) {
-      wcData.meta_data = brand.meta_data;
-    }
-
-    return wcData;
-  }
-
   _generateSlug(name) {
     return name
       .toLowerCase()
@@ -177,6 +153,7 @@ class BrandSyncStrategy extends SyncStrategy {
         const response = await client.put(`${this.endpoint}/${brand.woo_id}`, wcData);
         await Brand.update(brand._id, {
           last_sync: new Date(),
+          pending_sync: false,
           // Mettre à jour les données de l'image si nécessaire
           ...(response.data.image && {
             image: {
@@ -192,6 +169,7 @@ class BrandSyncStrategy extends SyncStrategy {
         await Brand.update(brand._id, {
           woo_id: response.data.id,
           last_sync: new Date(),
+          pending_sync: false,
           // Mettre à jour les données de l'image si nécessaire
           ...(response.data.image && {
             image: {

@@ -21,44 +21,23 @@ class BrandWooCommerceService {
       }
 
       const brands = Array.isArray(input) ? input : [input];
+
       for (const brand of brands) {
-        const wcData = await this.strategy._mapLocalToWooCommerce(brand);
-
-        // Ajout explicite des données d'image
-        if (brand.image?.wp_id) {
-          wcData.image = {
-            id: parseInt(brand.image.wp_id),
-            src: brand.image.url,
-            alt: brand.name,
-          };
-        }
-
-        if (brand.woo_id) {
-          const response = await this.client.put(`${this.endpoint}/${brand.woo_id}`, wcData);
-          await Brand.update(brand._id, {
-            last_sync: new Date(),
-            image: brand.image,
-            woo_id: brand.woo_id,
-          });
-          results.updated++;
-        } else {
-          // Pour une nouvelle marque, d'abord créer la marque
-          const response = await this.client.post(this.endpoint, wcData);
-          await Brand.update(brand._id, {
-            woo_id: response.data.id,
-            last_sync: new Date(),
-            image: brand.image,
-          });
-          results.created++;
+        try {
+          const result = await this.strategy.syncToWooCommerce(brand, this.client, results);
+          if (!result.success) {
+            this.errorHandler.handleSyncError(result.error, results, brand._id);
+          }
+        } catch (error) {
+          this.errorHandler.handleSyncError(error, results, brand._id);
         }
       }
 
-      // Retourner les données mises à jour
-      const updatedBrands = await Promise.all(brands.map((brand) => Brand.findById(brand._id)));
-
       return {
         success: true,
-        data: Array.isArray(input) ? updatedBrands : updatedBrands[0],
+        data: Array.isArray(input)
+          ? await Promise.all(brands.map((b) => Brand.findById(b._id)))
+          : [await Brand.findById(input._id)],
         ...results,
       };
     } catch (error) {
