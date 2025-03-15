@@ -1,19 +1,14 @@
 // src/components/BrandsTable.jsx
 import React, { useState } from 'react';
-import { Pencil, Trash2, RotateCw, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Pencil, Trash2, RotateCw, CheckCircle, XCircle } from 'lucide-react';
 import { useBrand, useBrandExtras } from '../features/brands/contexts/brandContext';
 import imageProxyService from '../services/imageProxyService';
 
 function BrandsTable() {
-  const { brands, loading, fetchBrands, deleteBrand, invalidateCache } = useBrand();
+  const { brands, loading, deleteBrand } = useBrand();
 
   const { syncBrand } = useBrandExtras();
   const [syncStatus, setSyncStatus] = useState({});
-
-  const handleRefresh = () => {
-    invalidateCache();
-    fetchBrands(true); // forceRefresh = true
-  };
 
   const handleSync = async (id) => {
     setSyncStatus((prev) => ({ ...prev, [id]: 'loading' }));
@@ -80,21 +75,12 @@ function BrandsTable() {
     <div className="bg-white shadow rounded-lg overflow-hidden">
       <div className="flex justify-between items-center p-4 border-b">
         <h2 className="text-lg font-semibold text-gray-800">Marques</h2>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={handleRefresh}
-            className="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors flex items-center"
-            title="Rafraîchir"
-          >
-            <RefreshCw className="h-4 w-4 mr-1" /> Rafraîchir
-          </button>
-          <button
-            onClick={() => (window.location.href = '/products/brands/new')}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-          >
-            Nouvelle marque
-          </button>
-        </div>
+        <button
+          onClick={() => (window.location.href = '/products/brands/new')}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+        >
+          Nouvelle marque
+        </button>
       </div>
 
       <div className="overflow-x-auto">
