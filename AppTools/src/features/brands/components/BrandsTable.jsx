@@ -1,8 +1,8 @@
 // src/components/BrandsTable.jsx
 import React, { useState } from 'react';
 import { Pencil, Trash2, RotateCw, CheckCircle, XCircle } from 'lucide-react';
-import { useBrand, useBrandExtras } from '../features/brands/contexts/brandContext';
-import imageProxyService from '../services/imageProxyService';
+import { useBrand, useBrandExtras } from '../contexts/brandContext';
+import imageProxyService from '../../../services/imageProxyService';
 
 function BrandsTable() {
   const { brands, loading, deleteBrand } = useBrand();

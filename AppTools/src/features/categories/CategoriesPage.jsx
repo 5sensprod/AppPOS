@@ -1,7 +1,7 @@
 // src/pages/CategoriesPage.jsx
 import React, { useEffect } from 'react';
-import { CategoryProvider, useCategory } from '../features/categories/contexts/categoryContext';
-import CategoriesTable from '../components/CategoriesTable';
+import { CategoryProvider, useCategory } from './contexts/categoryContext';
+import CategoriesTable from './components/CategoriesTable';
 
 // Composant interne qui utilise le hook useCategory
 function CategoriesContent() {

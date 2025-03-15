@@ -23,8 +23,8 @@ import ProductForm from './features/products/components/ProductForm';
 import SuppliersPage from './features/suppliers/SuppliersPage';
 import SupplierDetail from './features/suppliers/components/SupplierDetail';
 import SupplierForm from './features/suppliers/components/SupplierForm';
-import CategoriesPage from './pages/CategoriesPage';
-import BrandsPage from './pages/BrandsPage';
+import CategoriesPage from './features/categories/CategoriesPage';
+import BrandsPage from './features/brands/BrandsPage';
 
 // **Loader pour l'initialisation des services**
 const Loader = ({ message }) => (

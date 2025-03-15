@@ -1,8 +1,8 @@
 // src/components/CategoriesTable.jsx - Version sans bouton de rafraîchissement
 import React, { useState } from 'react';
 import { Pencil, Trash2, RotateCw, CheckCircle, XCircle } from 'lucide-react';
-import { useCategory, useCategoryExtras } from '../features/categories/contexts/categoryContext';
-import imageProxyService from '../services/imageProxyService';
+import { useCategory, useCategoryExtras } from '../contexts/categoryContext';
+import imageProxyService from '../../../services/imageProxyService';
 
 function CategoriesTable() {
   const { categorys, loading, deleteCategory } = useCategory();

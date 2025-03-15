@@ -1,7 +1,7 @@
 // src/pages/BrandsPage.jsx
 import React, { useEffect } from 'react';
-import { BrandProvider, useBrand } from '../features/brands/contexts/brandContext';
-import BrandsTable from '../components/BrandsTable';
+import { BrandProvider, useBrand } from './contexts/brandContext';
+import BrandsTable from './components/BrandsTable';
 
 // Composant interne qui utilise le hook useBrand
 function BrandsContent() {
