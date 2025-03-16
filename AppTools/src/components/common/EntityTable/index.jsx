@@ -40,14 +40,20 @@ const EntityTable = ({
 }) => {
   const navigate = useNavigate();
 
-  // Utiliser les hooks personnalisés
-  const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(data);
-
+  // D'abord le tri
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
 
+  // Ensuite le filtrage
   const { searchTerm, activeFilters, filteredData, handleSearchChange, handleFilterChange } =
     useTableFilter(sortedData, searchFields, filters, onSearch, onFilter);
 
+  // Puis la sélection
+  const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(
+    data,
+    filteredData
+  );
+
+  // Enfin la pagination
   const {
     currentPage,
     pageSize,
@@ -141,7 +147,6 @@ const EntityTable = ({
             selectAll={selectAll}
             allSelected={
               paginatedData.length > 0 &&
-              selectedItems.length === paginatedData.length &&
               paginatedData.every((item) => selectedItems.includes(item._id))
             }
           />
