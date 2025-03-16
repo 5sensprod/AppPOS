@@ -1,5 +1,6 @@
 // Composant principal EntityTable (index.jsx) AppTools\src\components\common\EntityTable\index.jsx
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SearchBar } from './components/SearchBar';
 import { FilterBar } from './components/FilterBar';
 import { BatchActions } from './components/BatchActions';
@@ -37,6 +38,8 @@ const EntityTable = ({
   searchFields = ['name'],
   filters = [],
 }) => {
+  const navigate = useNavigate();
+
   // Utiliser les hooks personnalisés
   const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(data);
 
