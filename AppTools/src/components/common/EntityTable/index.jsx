@@ -149,6 +149,11 @@ const EntityTable = ({
               paginatedData.length > 0 &&
               paginatedData.every((item) => selectedItems.includes(item._id))
             }
+            someSelected={
+              selectedItems.length > 0 &&
+              paginatedData.some((item) => selectedItems.includes(item._id)) &&
+              !paginatedData.every((item) => selectedItems.includes(item._id))
+            }
           />
 
           <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">

@@ -1,13 +1,24 @@
 // src/components/common/EntityTable/components/TableHeader.jsx
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
-export const TableHeader = ({ columns, sort, onSort, selectAll, allSelected }) => {
+export const TableHeader = ({ columns, sort, onSort, selectAll, allSelected, someSelected }) => {
+  // Référence à l'élément input pour définir la propriété indeterminate
+  const checkboxRef = useRef(null);
+
+  // Mettre à jour la propriété indeterminate quand someSelected change
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = someSelected && !allSelected;
+    }
+  }, [someSelected, allSelected]);
+
   return (
     <thead className="bg-gray-50 dark:bg-gray-700">
       <tr>
         <th className="px-4 py-3 w-8">
           <input
+            ref={checkboxRef}
             type="checkbox"
             onChange={(e) => selectAll(e.target.checked)}
             checked={allSelected}
