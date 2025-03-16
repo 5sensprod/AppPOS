@@ -142,7 +142,7 @@ function CategoriesTable(props) {
           <div className="flex items-center">
             <div style={{ width: `${level * 16}px` }} className="flex-shrink-0"></div>
             {expandButton}
-            <span className="truncate font-medium">{cat.name}</span>
+            <span className="truncate text-gray-900 dark:text-gray-100">{cat.name}</span>
           </div>
         );
 
