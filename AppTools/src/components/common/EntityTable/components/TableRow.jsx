@@ -49,6 +49,22 @@ export const TableRow = ({
     }
   };
 
+  // Fonction pour rendre la valeur de cellule (supporte les éléments React)
+  const renderCellValue = (item, column) => {
+    if (column.render) {
+      return column.render(item);
+    }
+
+    const value = item[column.key];
+
+    // Vérifier si la valeur est un élément React valide
+    if (React.isValidElement(value)) {
+      return value;
+    }
+
+    return value || '-';
+  };
+
   return (
     <tr
       onClick={handleRowClick}
@@ -70,7 +86,7 @@ export const TableRow = ({
       {columns.map((column) => (
         <td key={column.key} className="px-4 py-4 whitespace-nowrap">
           <div className="text-sm text-gray-900 dark:text-gray-200">
-            {column.render ? column.render(item) : item[column.key]}
+            {renderCellValue(item, column)}
           </div>
         </td>
       ))}
