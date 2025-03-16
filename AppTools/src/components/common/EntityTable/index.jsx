@@ -36,13 +36,14 @@ const EntityTable = ({
   onFilter,
   searchFields = ['name'],
   filters = [],
+  searchProcessor,
 }) => {
   // D'abord le tri
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
 
   // Ensuite le filtrage
   const { searchTerm, activeFilters, filteredData, handleSearchChange, handleFilterChange } =
-    useTableFilter(sortedData, searchFields, filters, onSearch, onFilter);
+    useTableFilter(sortedData, searchFields, filters, onSearch, onFilter, searchProcessor);
 
   // Puis la sélection
   const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(
