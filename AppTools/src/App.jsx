@@ -102,7 +102,7 @@ function AppRoutes() {
 
   return (
     <>
-      {isAuthenticated && <NetworkAccess />}
+      {isAuthenticated}
       <Routes>
         <Route path="/login" element={<Login />} />
 
@@ -181,6 +181,7 @@ const Dashboard = () => (
   <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
     <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Tableau de bord</h1>
     <UpdateChecker />
+    <NetworkAccess />
     <div className="mt-6">
       <ApiTest />
     </div>

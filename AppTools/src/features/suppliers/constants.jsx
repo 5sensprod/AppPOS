@@ -12,7 +12,7 @@ export const ENTITY_CONFIG = {
       key: 'image',
       label: 'Logo',
       render: (supplier) => (
-        <div className="h-12 w-12 flex-shrink-0">
+        <div className="h-10 w-10 flex-shrink-0">
           {supplier.image && supplier.image.src ? (
             <img
               src={imageProxyService.getImageUrl(supplier.image.src)}
@@ -118,6 +118,6 @@ export const ENTITY_CONFIG = {
     { id: 'general', label: 'Général' },
     { id: 'contact', label: 'Contact' },
     { id: 'payment', label: 'Paiement' },
-    { id: 'images', label: 'Images' },
+    // { id: 'images', label: 'Images' },
   ],
 };
