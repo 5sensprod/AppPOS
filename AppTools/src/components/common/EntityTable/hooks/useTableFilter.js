@@ -1,14 +1,7 @@
 // src/components/common/EntityTable/hooks/useTableFilter.js
 import { useState, useMemo } from 'react';
 
-export const useTableFilter = (
-  data,
-  searchFields,
-  filters,
-  onSearch,
-  onFilter,
-  searchProcessor
-) => {
+export const useTableFilter = (data, searchFields, filters, onSearch, onFilter) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState({});
 
@@ -16,6 +9,7 @@ export const useTableFilter = (
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
+
     if (onSearch) {
       onSearch(value, searchFields);
     }
@@ -27,6 +21,7 @@ export const useTableFilter = (
       ...prev,
       [filterId]: value,
     }));
+
     if (onFilter) {
       onFilter({ ...activeFilters, [filterId]: value });
     }
@@ -34,47 +29,47 @@ export const useTableFilter = (
 
   // Appliquer les filtres et la recherche aux données
   const filteredData = useMemo(() => {
-    // Appliquer d'abord les filtres
-    const dataAfterFilters = data.filter((item) => {
+    return data.filter((item) => {
+      // Vérifier si l'élément correspond au terme de recherche
+      const matchesSearch =
+        !searchTerm ||
+        searchFields.some((field) => {
+          const value = item[field];
+          if (value === undefined || value === null) return false;
+          return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+        });
+
       // Vérifier si l'élément correspond aux filtres
-      return Object.entries(activeFilters).every(([filterId, filterValue]) => {
+      const matchesFilters = Object.entries(activeFilters).every(([filterId, filterValue]) => {
         if (!filterValue || filterValue === 'all') return true;
+
         const filterConfig = filters.find((f) => f.id === filterId);
         if (!filterConfig) return true;
+
         if (filterConfig.type === 'select') {
           return item[filterId] === filterValue;
         }
+
         if (filterConfig.type === 'boolean') {
           return item[filterId] === (filterValue === 'true');
         }
+
         if (filterConfig.type === 'range') {
           const value = item[filterId];
           if (value === undefined) return false;
+
           const min = filterValue.min !== undefined ? filterValue.min : -Infinity;
           const max = filterValue.max !== undefined ? filterValue.max : Infinity;
+
           return value >= min && value <= max;
         }
+
         return true;
       });
+
+      return matchesSearch && matchesFilters;
     });
-
-    // Ensuite appliquer la recherche
-    if (!searchTerm) return dataAfterFilters;
-
-    // Utiliser le processeur de recherche personnalisé s'il est fourni
-    if (searchProcessor && typeof searchProcessor === 'function') {
-      return searchProcessor(dataAfterFilters, searchTerm);
-    }
-
-    // Comportement de recherche par défaut
-    return dataAfterFilters.filter((item) =>
-      searchFields.some((field) => {
-        const value = item[field];
-        if (value === undefined || value === null) return false;
-        return String(value).toLowerCase().includes(searchTerm.toLowerCase());
-      })
-    );
-  }, [data, searchTerm, activeFilters, searchFields, filters, searchProcessor]);
+  }, [data, searchTerm, activeFilters, searchFields, filters]);
 
   return {
     searchTerm,
