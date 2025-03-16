@@ -104,16 +104,28 @@ async function getHierarchicalCategories(req, res) {
     // Récupération de toutes les catégories
     const allCategories = await Category.findAll();
 
+    // Récupération de tous les produits pour compter
+    const Product = require('../models/Product');
+    const allProducts = await Product.findAll();
+
     // Organiser les catégories par niveau
     const rootCategories = [];
     const categoriesMap = new Map();
 
-    // Première passe : créer la map des catégories
+    // Première passe : créer la map des catégories avec compteur de produits
     allCategories.forEach((category) => {
-      // Pour chaque catégorie, ajouter un tableau children vide
+      // Comptage des produits pour cette catégorie
+      const productCount = allProducts.filter(
+        (product) =>
+          (product.categories && product.categories.includes(category._id)) ||
+          product.category_id === category._id
+      ).length;
+
+      // Pour chaque catégorie, ajouter un tableau children vide et le compteur
       categoriesMap.set(category._id, {
         ...category,
         children: [],
+        productCount: productCount,
       });
     });
 
@@ -171,5 +183,5 @@ module.exports = {
   uploadImage: categoryController.uploadImage,
   updateImageMetadata: categoryController.updateImageMetadata,
   deleteImage: categoryController.deleteImage,
-  getHierarchicalCategories: getHierarchicalCategories, // Ajout de la nouvelle fonction
+  getHierarchicalCategories: getHierarchicalCategories,
 };
