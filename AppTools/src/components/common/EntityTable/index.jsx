@@ -59,11 +59,7 @@ const EntityTable = ({
   } = useTablePagination(filteredData, pagination);
 
   // Handlers pour les actions
-  const handleRowClick = (item) => {
-    if (actions.includes('view')) {
-      navigate(`${baseRoute}/${item._id}`);
-    }
-  };
+  const handleRowClick = (item) => {};
 
   const handleBatchDelete = () => {
     if (
@@ -143,7 +139,11 @@ const EntityTable = ({
             sort={sort}
             onSort={handleSort}
             selectAll={selectAll}
-            allSelected={paginatedData.length > 0 && selectedItems.length === paginatedData.length}
+            allSelected={
+              paginatedData.length > 0 &&
+              selectedItems.length === paginatedData.length &&
+              paginatedData.every((item) => selectedItems.includes(item._id))
+            }
           />
 
           <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">

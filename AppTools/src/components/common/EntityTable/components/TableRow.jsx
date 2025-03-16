@@ -1,4 +1,3 @@
-// src/components/common/EntityTable/components/TableRow.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Edit, Trash, RefreshCw } from 'lucide-react';
@@ -34,24 +33,40 @@ export const TableRow = ({
     onSync(item._id);
   };
 
+  const handleCheckboxClick = (e) => {
+    e.stopPropagation();
+    onToggleSelection(item._id, !isSelected);
+  };
+
+  // Nouvelle fonction pour gérer la navigation vers la vue détaillée
+  const handleRowClick = () => {
+    if (actions.includes('view')) {
+      navigate(`${baseRoute}/${item._id}`);
+    }
+    // Appeler aussi le onRowClick original si nécessaire
+    if (onRowClick) {
+      onRowClick(item);
+    }
+  };
+
   return (
     <tr
-      onClick={() => onRowClick(item)}
+      onClick={handleRowClick}
       className={`${
         actions.includes('view') ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : ''
       }`}
     >
-      <td className="px-4 py-4 whitespace-nowrap">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={(e) => {
-            e.stopPropagation();
-            onToggleSelection(item._id, e.target.checked);
-          }}
-          className="h-4 w-4 text-blue-600 dark:text-blue-400 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500"
-        />
+      <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <div onClick={handleCheckboxClick}>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => {}} // Géré par handleCheckboxClick
+            className="h-4 w-4 text-blue-600 dark:text-blue-400 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500"
+          />
+        </div>
       </td>
+
       {columns.map((column) => (
         <td key={column.key} className="px-4 py-4 whitespace-nowrap">
           <div className="text-sm text-gray-900 dark:text-gray-200">
@@ -59,6 +74,7 @@ export const TableRow = ({
           </div>
         </td>
       ))}
+
       <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
         <div className="flex justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
           {actions.includes('edit') && (
