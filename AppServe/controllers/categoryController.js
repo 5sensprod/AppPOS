@@ -114,18 +114,26 @@ async function getHierarchicalCategories(req, res) {
 
     // Première passe : créer la map des catégories avec compteur de produits
     allCategories.forEach((category) => {
-      // Comptage des produits pour cette catégorie
-      const productCount = allProducts.filter(
+      // Filtrer les produits pour cette catégorie
+      const categoryProducts = allProducts.filter(
         (product) =>
           (product.categories && product.categories.includes(category._id)) ||
           product.category_id === category._id
-      ).length;
+      );
 
-      // Pour chaque catégorie, ajouter un tableau children vide et le compteur
+      // Collecter les IDs et noms des produits pour référence rapide
+      const productsList = categoryProducts.map((product) => ({
+        _id: product._id,
+        name: product.name,
+        sku: product.sku || null,
+      }));
+
+      // Pour chaque catégorie, ajouter un tableau children vide, le compteur et les produits
       categoriesMap.set(category._id, {
         ...category,
         children: [],
-        productCount: productCount,
+        productCount: categoryProducts.length,
+        products: productsList,
       });
     });
 
