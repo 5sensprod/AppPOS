@@ -1,6 +1,5 @@
 // Composant principal EntityTable (index.jsx) AppTools\src\components\common\EntityTable\index.jsx
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { SearchBar } from './components/SearchBar';
 import { FilterBar } from './components/FilterBar';
 import { BatchActions } from './components/BatchActions';
@@ -38,8 +37,6 @@ const EntityTable = ({
   searchFields = ['name'],
   filters = [],
 }) => {
-  const navigate = useNavigate();
-
   // D'abord le tri
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
 
