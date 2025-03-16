@@ -10,6 +10,7 @@ const Category = require('../models/Category');
 
 // Routes principales des catégories
 router.get('/', categoryController.getAll);
+router.get('/hierarchical', categoryController.getHierarchicalCategories); // Nouvelle route
 router.get('/:id', categoryController.getById);
 router.post('/', validateSchema(createCategorySchema), categoryController.create);
 router.put('/:id', validateSchema(updateCategorySchema), categoryController.update);

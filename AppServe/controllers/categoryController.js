@@ -98,6 +98,69 @@ class CategoryController extends BaseController {
   }
 }
 
+// Nouvelle fonction pour les catégories hiérarchiques
+async function getHierarchicalCategories(req, res) {
+  try {
+    // Récupération de toutes les catégories
+    const allCategories = await Category.findAll();
+
+    // Organiser les catégories par niveau
+    const rootCategories = [];
+    const categoriesMap = new Map();
+
+    // Première passe : créer la map des catégories
+    allCategories.forEach((category) => {
+      // Pour chaque catégorie, ajouter un tableau children vide
+      categoriesMap.set(category._id, {
+        ...category,
+        children: [],
+      });
+    });
+
+    // Deuxième passe : organiser la hiérarchie
+    allCategories.forEach((category) => {
+      const categoryWithChildren = categoriesMap.get(category._id);
+
+      if (!category.parent_id) {
+        // C'est une catégorie racine (niveau 0)
+        rootCategories.push(categoryWithChildren);
+      } else {
+        // C'est une sous-catégorie, l'ajouter aux enfants du parent
+        const parentCategory = categoriesMap.get(category.parent_id);
+        if (parentCategory) {
+          parentCategory.children.push(categoryWithChildren);
+        } else {
+          // Si le parent n'existe pas, traiter comme une catégorie racine
+          console.warn(
+            `Parent introuvable pour la catégorie ${category._id} (parent_id: ${category.parent_id})`
+          );
+          rootCategories.push(categoryWithChildren);
+        }
+      }
+    });
+
+    // Trier les catégories par nom
+    rootCategories.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Trier récursivement les enfants
+    const sortChildren = (categories) => {
+      categories.forEach((category) => {
+        if (category.children && category.children.length > 0) {
+          category.children.sort((a, b) => a.name.localeCompare(b.name));
+          sortChildren(category.children);
+        }
+      });
+    };
+
+    sortChildren(rootCategories);
+
+    return ResponseHandler.success(res, rootCategories);
+  } catch (error) {
+    console.error('Erreur dans getHierarchicalCategories:', error);
+    return ResponseHandler.error(res, error);
+  }
+}
+
 const categoryController = new CategoryController();
 module.exports = {
   getAll: categoryController.getAll.bind(categoryController),
@@ -108,4 +171,5 @@ module.exports = {
   uploadImage: categoryController.uploadImage,
   updateImageMetadata: categoryController.updateImageMetadata,
   deleteImage: categoryController.deleteImage,
+  getHierarchicalCategories: getHierarchicalCategories, // Ajout de la nouvelle fonction
 };
