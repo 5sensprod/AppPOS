@@ -3,6 +3,7 @@ import React from 'react';
 import { CategoryProvider } from './contexts/categoryContext';
 import CategoriesTable from './components/CategoriesTable';
 import { Folder, Plus } from 'lucide-react';
+import HierarchicalCategories from './components/HierarchicalCategories';
 
 function CategoriesPage() {
   return (
@@ -28,7 +29,7 @@ function CategoriesPage() {
         </div>
 
         {/* Tableau des produits */}
-        <CategoriesTable />
+        <HierarchicalCategories />
       </div>
     </CategoryProvider>
   );
