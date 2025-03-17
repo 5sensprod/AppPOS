@@ -6,14 +6,52 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 
 function CategoriesTable(props) {
   const { categorys, loading, error, fetchCategorys, deleteCategory } = useCategory();
-  const { syncCategory } = useCategoryExtras();
+  const { syncCategory, getHierarchicalCategories } = useCategoryExtras();
   const [expandedCategories, setExpandedCategories] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [localSort, setLocalSort] = useState(ENTITY_CONFIG.defaultSort);
+  const [hierarchicalData, setHierarchicalData] = useState([]);
+  const [loadingHierarchical, setLoadingHierarchical] = useState(false);
 
+  // Charger les catégories normales
   useEffect(() => {
     fetchCategorys();
   }, [fetchCategorys]);
+
+  // Charger les données hiérarchiques incluant le nombre de produits
+  useEffect(() => {
+    const fetchHierarchicalData = async () => {
+      setLoadingHierarchical(true);
+      try {
+        const hierarchicalCategories = await getHierarchicalCategories();
+        // Créer un mapping des données hiérarchiques pour un accès facile
+        const productCountMap = {};
+
+        // Fonction récursive pour traiter les catégories et leurs enfants
+        const processCategory = (category) => {
+          productCountMap[category._id] = {
+            productCount: category.productCount || 0,
+          };
+
+          if (category.children && category.children.length > 0) {
+            category.children.forEach(processCategory);
+          }
+        };
+
+        // Traiter toutes les catégories
+        hierarchicalCategories.forEach(processCategory);
+
+        // Stocker le mapping dans l'état
+        setHierarchicalData(productCountMap);
+      } catch (error) {
+        console.error('Erreur lors du chargement des données hiérarchiques:', error);
+      } finally {
+        setLoadingHierarchical(false);
+      }
+    };
+
+    fetchHierarchicalData();
+  }, [getHierarchicalCategories]);
 
   const toggleCategory = (categoryId) => {
     setExpandedCategories((prev) => ({
@@ -70,7 +108,7 @@ function CategoriesTable(props) {
     [categorys]
   );
 
-  const hierarchicalData = useMemo(() => {
+  const processedData = useMemo(() => {
     if (!categorys) return [];
 
     const categoryMap = {};
@@ -119,6 +157,10 @@ function CategoriesTable(props) {
       categories.forEach((cat) => {
         const isExpanded = expandedCategories[cat._id] || false;
         const hasChildren = cat.children && cat.children.length > 0;
+        const childrenCount = hasChildren ? cat.children.length : 0;
+
+        // Obtenir le nombre de produits à partir des données hiérarchiques
+        const productCount = hierarchicalData[cat._id]?.productCount || 0;
 
         const expandButton = hasChildren ? (
           <button
@@ -143,6 +185,11 @@ function CategoriesTable(props) {
             <div style={{ width: `${level * 16}px` }} className="flex-shrink-0"></div>
             {expandButton}
             <span className="truncate text-gray-900 dark:text-gray-100">{cat.name}</span>
+            {hasChildren && (
+              <span className="ml-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                ({childrenCount})
+              </span>
+            )}
           </div>
         );
 
@@ -151,6 +198,8 @@ function CategoriesTable(props) {
           name: indentedName,
           _originalName: cat.name,
           _level: level,
+          _childrenCount: childrenCount,
+          product_count: productCount,
           // Propriété spéciale pour désactiver le tri standard
           _no_sort: true,
         });
@@ -163,7 +212,7 @@ function CategoriesTable(props) {
 
     flatten(sortedRootCategories);
     return flattenedCategories;
-  }, [categorys, expandedCategories, searchTerm, localSort]);
+  }, [categorys, expandedCategories, searchTerm, localSort, hierarchicalData]);
 
   const filters = [
     {
@@ -187,8 +236,8 @@ function CategoriesTable(props) {
 
   return (
     <EntityTable
-      data={hierarchicalData || []}
-      isLoading={loading}
+      data={processedData || []}
+      isLoading={loading || loadingHierarchical}
       error={error}
       columns={ENTITY_CONFIG.columns}
       entityName="catégorie"

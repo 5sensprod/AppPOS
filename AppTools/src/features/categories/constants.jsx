@@ -33,10 +33,21 @@ export const ENTITY_CONFIG = {
       label: 'Description',
       render: (category) => <div className="max-w-xs truncate">{category.description || '-'}</div>,
     },
-    { key: 'level', label: 'Niveau', sortable: true },
+    {
+      key: 'product_count',
+      label: 'Articles',
+      sortable: true,
+      render: (category) => (
+        <div className="text-center">
+          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+            {category.product_count || 0}
+          </span>
+        </div>
+      ),
+    },
     {
       key: 'woo_status',
-      label: 'Statut WC',
+      label: 'Statut WEB',
       render: (category) => (
         <div className="flex">
           {category.woo_id ? (
