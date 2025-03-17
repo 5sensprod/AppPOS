@@ -58,9 +58,54 @@ function HierarchicalCategories(props) {
     }));
   };
 
-  const handleSearch = useCallback((value) => {
-    setSearchTerm(value);
-  }, []);
+  // Fonction de recherche modifiée
+  const handleSearch = useCallback(
+    (value) => {
+      setSearchTerm(value);
+
+      // Si la recherche est vide, on ne change pas l'état des catégories dépliées
+      if (!value) return;
+
+      // Si recherche, déplier toutes les catégories parentes pour voir les résultats
+      const lowerSearchTerm = value.toLowerCase();
+
+      // Trouver les catégories qui correspondent à la recherche
+      const matchingCategories = categorys.filter(
+        (cat) =>
+          (cat.name || '').toLowerCase().includes(lowerSearchTerm) ||
+          (cat.description || '').toLowerCase().includes(lowerSearchTerm)
+      );
+
+      // Identifier tous les parents à déplier
+      const parentsToExpand = new Set();
+
+      // Fonction récursive pour ajouter tous les parents
+      const addParents = (categoryId) => {
+        const category = categorys.find((cat) => cat._id === categoryId);
+        if (category && category.parent_id) {
+          parentsToExpand.add(category.parent_id);
+          addParents(category.parent_id);
+        }
+      };
+
+      // Ajouter les parents pour chaque catégorie correspondante
+      matchingCategories.forEach((category) => {
+        if (category.parent_id) {
+          parentsToExpand.add(category.parent_id);
+          addParents(category.parent_id);
+        }
+      });
+
+      // Mettre à jour l'état des catégories dépliées
+      const newExpandedState = { ...expandedCategories };
+      parentsToExpand.forEach((id) => {
+        newExpandedState[id] = true;
+      });
+
+      setExpandedCategories(newExpandedState);
+    },
+    [categorys, expandedCategories]
+  );
 
   const customSort = (field) => {
     setLocalSort((prev) => ({
@@ -69,38 +114,39 @@ function HierarchicalCategories(props) {
     }));
   };
 
+  // SearchProcessor modifié
   const searchProcessor = useCallback(
     (items, term) => {
       if (!term) return items;
 
       const lowerSearchTerm = term.toLowerCase();
 
-      const matches = categorys
-        .filter(
-          (cat) =>
-            (cat._originalName || cat.name).toLowerCase().includes(lowerSearchTerm) ||
-            (cat.description && cat.description.toLowerCase().includes(lowerSearchTerm))
-        )
-        .map((cat) => cat._id);
-
-      const parentsToShow = new Set();
-      const addParents = (categoryId) => {
-        const category = categorys.find((cat) => cat._id === categoryId);
-        if (category && category.parent_id) {
-          parentsToShow.add(category.parent_id);
-          addParents(category.parent_id);
-        }
-      };
-
-      matches.forEach((id) => addParents(id));
-
-      return items.filter(
-        (item) =>
-          matches.includes(item._id) ||
-          parentsToShow.has(item._id) ||
+      // En mode recherche, nous devons filtrer les résultats basés sur le terme
+      // mais nous devons inclure tous les éléments dans la hiérarchie
+      return items.filter((item) => {
+        // Vérifier si l'élément correspond directement à la recherche
+        const directMatch =
           (item._originalName && item._originalName.toLowerCase().includes(lowerSearchTerm)) ||
-          (item.description && item.description.toLowerCase().includes(lowerSearchTerm))
-      );
+          (item.description && item.description.toLowerCase().includes(lowerSearchTerm));
+
+        if (directMatch) return true;
+
+        // Pour les éléments qui ne correspondent pas directement, vérifier s'ils font partie
+        // de la hiérarchie d'un élément correspondant (comme parent)
+        const categoryId = item._id;
+        const hasMatchingChild = categorys.some((cat) => {
+          if (cat.parent_id === categoryId) {
+            const childMatches =
+              (cat.name && cat.name.toLowerCase().includes(lowerSearchTerm)) ||
+              (cat.description && cat.description.toLowerCase().includes(lowerSearchTerm));
+
+            return childMatches;
+          }
+          return false;
+        });
+
+        return hasMatchingChild;
+      });
     },
     [categorys]
   );
@@ -108,10 +154,14 @@ function HierarchicalCategories(props) {
   // ✅ Construction de la table des catégories hiérarchiques
   const tableData = React.useMemo(() => {
     const flattenCategories = [];
+    const isSearchActive = searchTerm && searchTerm.length > 0;
 
-    const processCategory = (category, level = 0) => {
+    const processCategory = (category, level = 0, forceShow = false) => {
       const isExpanded = expandedCategories[category._id] || false;
       const hasChildren = category.children && category.children.length > 0;
+
+      // En mode recherche, on montre tout ce qui correspond même si parent n'est pas déplié
+      const shouldShowThisLevel = isSearchActive || forceShow;
 
       const indentedName = (
         <div className="flex items-center">
@@ -142,14 +192,17 @@ function HierarchicalCategories(props) {
         _level: level,
       });
 
-      if (hasChildren && isExpanded) {
-        category.children.forEach((child) => processCategory(child, level + 1));
+      // Afficher les enfants si la catégorie est dépliée OU si on est en mode recherche
+      if (hasChildren && (isExpanded || shouldShowThisLevel)) {
+        category.children.forEach((child) =>
+          processCategory(child, level + 1, shouldShowThisLevel)
+        );
       }
     };
 
     categories.forEach((category) => processCategory(category));
     return flattenCategories;
-  }, [categories, expandedCategories]);
+  }, [categories, expandedCategories, toggleCategory, searchTerm]);
 
   const filters = [
     {
