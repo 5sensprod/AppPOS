@@ -155,7 +155,12 @@ export function createEntityContext(options) {
     useEffect(() => {
       // S'assurer que le nom utilisé pour les abonnements est correct
       // Note: entityPlural normalise le nom pour l'API WebSocket
-      const entityPlural = entityName.endsWith('s') ? entityName : `${entityName}s`;
+      const entityPlural =
+        entityName === 'category'
+          ? 'categories'
+          : entityName === 'supplier'
+            ? 'suppliers'
+            : `${entityName}s`;
       const entityType = entityName.endsWith('y')
         ? `${entityName.slice(0, -1)}ies` // category -> categories
         : entityName.endsWith('s')

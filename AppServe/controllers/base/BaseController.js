@@ -15,7 +15,12 @@ class BaseController {
 
     // Standardisation : toujours en pluriel
     const singularName = model.constructor.name.toLowerCase().replace('model', '');
-    this.entityName = singularName.endsWith('s') ? singularName : `${singularName}s`;
+    const entityMap = {
+      category: 'categories',
+      supplier: 'suppliers',
+    };
+    this.entityName =
+      entityMap[singularName] || (singularName.endsWith('s') ? singularName : `${singularName}s`);
 
     if (imageOptions?.entity) {
       this.imageController = new BaseImageController(this.entityName, {
