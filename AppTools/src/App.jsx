@@ -24,7 +24,9 @@ import SuppliersPage from './features/suppliers/SuppliersPage';
 import SupplierDetail from './features/suppliers/components/SupplierDetail';
 import SupplierForm from './features/suppliers/components/SupplierForm';
 import CategoriesPage from './features/categories/CategoriesPage';
+import CategorieDetail from './features/categories/components/CategorieDetail';
 import BrandsPage from './features/brands/BrandsPage';
+import BrandDetail from './features/brands/components/BrandDetail';
 
 // **Loader pour l'initialisation des services**
 const Loader = ({ message }) => (
@@ -57,7 +59,7 @@ const entityRoutes = [
     component: CategoriesPage,
     // Utiliser des composants temporaires pour éviter les erreurs
     provider: CategoryProvider,
-    details: () => <div>Détails de la catégorie</div>,
+    details: CategorieDetail,
     form: () => <div>Formulaire de catégorie</div>,
   },
   {
@@ -71,7 +73,7 @@ const entityRoutes = [
     path: 'products/brands',
     component: BrandsPage,
     provider: BrandProvider, // Utilise maintenant le BrandProvider
-    details: () => <div>Détails de la marque</div>, // À remplacer par vos composants réels
+    details: BrandDetail, // À remplacer par vos composants réels
     form: () => <div>Formulaire de marque</div>, // À remplacer par vos composants réels
   },
 ];
