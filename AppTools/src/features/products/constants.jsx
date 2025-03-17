@@ -78,12 +78,25 @@ export const ENTITY_CONFIG = {
       },
     },
     {
-      key: 'sync',
-      label: 'Synchronisation',
+      key: 'woo_status',
+      label: 'Statut WEB',
       render: (product) => (
-        <span className={product.woo_id ? 'text-green-500' : 'text-gray-400'}>
-          {product.woo_id ? 'Synchronisé' : 'Non synchronisé'}
-        </span>
+        <div className="flex">
+          {product.woo_id ? (
+            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+              Synchronisé
+            </span>
+          ) : (
+            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+              Non synchronisé
+            </span>
+          )}
+          {product.pending_sync && (
+            <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+              Modifié
+            </span>
+          )}
+        </div>
       ),
     },
   ],
@@ -127,6 +140,6 @@ export const ENTITY_CONFIG = {
     { id: 'general', label: 'Général' },
     { id: 'inventory', label: 'Inventaire' },
     { id: 'images', label: 'Images' },
-    { id: 'woocommerce', label: 'WooCommerce' },
+    { id: 'woocommerce', label: 'Site WEB' },
   ],
 };

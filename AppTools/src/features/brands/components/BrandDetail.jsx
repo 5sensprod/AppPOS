@@ -208,10 +208,10 @@ function BrandDetail() {
                     </div>
                     <div className="ml-3">
                       <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
-                        Marque synchronisée avec WooCommerce
+                        Marque synchronisée avec la boutique en ligne
                       </h3>
                       <div className="mt-2 text-sm text-green-700 dark:text-green-300">
-                        <p>ID WooCommerce : {brand.woo_id}</p>
+                        <p>ID internet : {brand.woo_id}</p>
                         {brand.last_sync && (
                           <p>
                             Dernière synchronisation : {new Date(brand.last_sync).toLocaleString()}

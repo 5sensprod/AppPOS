@@ -397,15 +397,28 @@ function ProductDetail() {
                     </div>
                     <div className="ml-3">
                       <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
-                        Produit synchronisé avec WooCommerce
+                        Produit synchronisé avec la boutique en ligne
                       </h3>
                       <div className="mt-2 text-sm text-green-700 dark:text-green-300">
-                        <p>ID WooCommerce : {product.woo_id}</p>
+                        <p>ID Internet : {product.woo_id}</p>
                         {product.last_sync && (
                           <p>
                             Dernière synchronisation :{' '}
                             {new Date(product.last_sync).toLocaleString()}
                           </p>
+                        )}
+                        {product.pending_sync && (
+                          <div className="mt-2">
+                            <p className="text-yellow-600 dark:text-yellow-300">
+                              Des modifications locales sont en attente de synchronisation
+                            </p>
+                            <button
+                              onClick={() => handleSync(id)}
+                              className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-800 dark:text-blue-100 dark:hover:bg-blue-700"
+                            >
+                              Synchroniser les modifications
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>

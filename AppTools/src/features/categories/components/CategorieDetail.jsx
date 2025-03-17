@@ -217,10 +217,10 @@ function CategorieDetail() {
                     </div>
                     <div className="ml-3">
                       <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
-                        Catégorie synchronisée avec WooCommerce
+                        Catégorie synchronisée avec la boutique en ligne
                       </h3>
                       <div className="mt-2 text-sm text-green-700 dark:text-green-300">
-                        <p>ID WooCommerce : {category.woo_id}</p>
+                        <p>ID Internet : {category.woo_id}</p>
                         {category.last_sync && (
                           <p>
                             Dernière synchronisation :{' '}

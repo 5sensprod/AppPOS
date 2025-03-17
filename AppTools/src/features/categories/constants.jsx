@@ -84,6 +84,6 @@ export const ENTITY_CONFIG = {
   tabs: [
     { id: 'general', label: 'Général' },
     { id: 'images', label: 'Images' },
-    { id: 'woocommerce', label: 'WooCommerce' },
+    { id: 'woocommerce', label: 'Site WEB' },
   ],
 };

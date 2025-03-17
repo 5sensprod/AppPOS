@@ -35,7 +35,7 @@ export const ENTITY_CONFIG = {
     },
     {
       key: 'woo_status',
-      label: 'Statut WC',
+      label: 'Statut WEB',
       render: (brand) => (
         <div className="flex">
           {brand.woo_id ? (
@@ -71,6 +71,6 @@ export const ENTITY_CONFIG = {
   tabs: [
     { id: 'general', label: 'Général' },
     { id: 'images', label: 'Images' },
-    { id: 'woocommerce', label: 'WooCommerce' },
+    { id: 'woocommerce', label: 'Site WEB' },
   ],
 };
