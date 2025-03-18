@@ -1,10 +1,12 @@
 // src/features/categories/CategoriesPage.jsx
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CategoryProvider } from './contexts/categoryContext';
 import CategoriesTable from './components/CategoriesTable';
 import { Folder, Plus } from 'lucide-react';
 
 function CategoriesPage() {
+  const navigate = useNavigate();
   return (
     <CategoryProvider>
       <div className="container mx-auto px-4 py-6">
@@ -19,7 +21,7 @@ function CategoriesPage() {
           </div>
 
           <button
-            onClick={() => navigate('/products/new')}
+            onClick={() => navigate('/products/categories/new')}
             className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
           >
             <Plus className="h-5 w-5 mr-2" />

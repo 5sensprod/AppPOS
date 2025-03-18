@@ -237,7 +237,7 @@ function CategoryForm() {
       if (isNew) {
         await createCategory(formattedData);
         setSuccess('Catégorie créée avec succès');
-        setTimeout(() => navigate('/categories'), 1500);
+        navigate('/products/categories');
       } else {
         await updateCategory(id, formattedData);
         setSuccess('Catégorie mise à jour avec succès');
@@ -259,7 +259,7 @@ function CategoryForm() {
 
   // Gestionnaire d'annulation
   const handleCancel = () => {
-    navigate('/categories');
+    navigate(isNew ? '/products/categories/' : `/products/categories/${id}`);
   };
 
   // Rendu conditionnel de l'onglet images
