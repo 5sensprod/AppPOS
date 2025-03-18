@@ -27,6 +27,7 @@ import CategoriesPage from './features/categories/CategoriesPage';
 import CategorieDetail from './features/categories/components/CategorieDetail';
 import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
+import CategoryForm from './features/categories/components/CategoryForm';
 
 // **Loader pour l'initialisation des services**
 const Loader = ({ message }) => (
@@ -60,7 +61,7 @@ const entityRoutes = [
     // Utiliser des composants temporaires pour éviter les erreurs
     provider: CategoryProvider,
     details: CategorieDetail,
-    form: () => <div>Formulaire de catégorie</div>,
+    form: CategoryForm,
   },
   {
     path: 'products/suppliers',

@@ -17,23 +17,27 @@ const imageMetadataSchema = Joi.object({
   position: Joi.number().min(0),
 });
 
+// Schéma de création des catégories
 const createCategorySchema = Joi.object({
   name: Joi.string().required(),
-  parent_id: Joi.string(),
-  slug: Joi.string(),
-  description: Joi.string(),
-  website_url: Joi.string().uri(),
-});
-
-const updateCategorySchema = Joi.object({
-  name: Joi.string(),
-  parent_id: Joi.string(),
-  slug: Joi.string(),
-  description: Joi.string(),
-  website_url: Joi.string().uri(),
+  parent_id: Joi.string().allow(null, ''),
+  slug: Joi.string().allow(''),
+  description: Joi.string().allow(''),
+  website_url: Joi.string().uri().allow(''),
   image: imageSchema,
+  status: Joi.string().valid('published', 'draft').default('draft'),
+  is_featured: Joi.boolean().default(false),
+  meta_title: Joi.string().allow(''),
+  meta_description: Joi.string().allow(''),
+  meta_keywords: Joi.string().allow(''),
 });
 
+// Schéma de mise à jour des catégories - tous les champs sont optionnels
+// On utilise fork pour rendre tous les champs optionnels
+const updateCategorySchema = createCategorySchema.fork(
+  Object.keys(createCategorySchema.describe().keys),
+  (schema) => schema.optional()
+);
 const createBrandSchema = Joi.object({
   name: Joi.string().required(),
   slug: Joi.string(),
