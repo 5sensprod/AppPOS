@@ -73,6 +73,10 @@
       {
         "from": "../AppServe/node_modules",
         "to": "resources/AppServe/node_modules"
+      },
+      {
+        "from": "C:\\nvm4w\\nodejs\\node.exe",
+        "to": "resources/node.exe"
       }
     ],
     "directories": {

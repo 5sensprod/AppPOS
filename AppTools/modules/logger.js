@@ -42,7 +42,45 @@ function setupFileLogging(app) {
   };
 }
 
+function setupApiLogging(app, apiProcess) {
+  if (!apiProcess) return;
+
+  const apiLogPath = path.join(app.getPath('userData'), 'api-server.log');
+  console.log(`Les logs API seront écrits dans: ${apiLogPath}`);
+
+  const apiLogStream = fs.createWriteStream(apiLogPath, { flags: 'a' });
+  apiLogStream.write(`[LOG ${new Date().toISOString()}] === DÉMARRAGE SERVEUR API ===\n`);
+
+  // Rediriger la sortie standard et d'erreur du processus API
+  apiProcess.stdout.on('data', (data) => {
+    const output = data.toString().trim();
+    console.log(`API: ${output}`);
+    apiLogStream.write(`[API-OUT ${new Date().toISOString()}] ${output}\n`);
+  });
+
+  apiProcess.stderr.on('data', (data) => {
+    const output = data.toString().trim();
+    console.error(`API Error: ${output}`);
+    apiLogStream.write(`[API-ERR ${new Date().toISOString()}] ${output}\n`);
+  });
+
+  // Journaliser les événements du processus
+  apiProcess.on('error', (err) => {
+    console.error(`API Process Error: ${err.message}`);
+    apiLogStream.write(`[API-PROCESS-ERROR ${new Date().toISOString()}] ${err.message}\n`);
+  });
+
+  apiProcess.on('exit', (code, signal) => {
+    console.log(`API Process Exit: code=${code}, signal=${signal}`);
+    apiLogStream.write(`[API-EXIT ${new Date().toISOString()}] code=${code}, signal=${signal}\n`);
+  });
+
+  return apiLogStream;
+}
+
+// N'oubliez pas d'exporter la nouvelle fonction
 module.exports = {
   setupLogs,
   setupFileLogging,
+  setupApiLogging,
 };
