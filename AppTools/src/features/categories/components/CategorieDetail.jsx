@@ -6,7 +6,6 @@ import { EntityDetail, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import websocketService from '../../../services/websocketService';
-import imageProxyService from '../../../services/imageProxyService';
 
 function CategorieDetail() {
   const { id } = useParams();
@@ -144,10 +143,10 @@ function CategorieDetail() {
                     <p className="mt-1 text-gray-900 dark:text-gray-100">{category.name}</p>
                   </div>
 
-                  <div>
+                  {/* <div>
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Slug</h3>
                     <p className="mt-1 text-gray-900 dark:text-gray-100">{category.slug || '-'}</p>
-                  </div>
+                  </div> */}
 
                   <div>
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">

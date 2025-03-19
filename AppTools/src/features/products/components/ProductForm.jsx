@@ -5,6 +5,9 @@ import { EntityForm } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { useProduct } from '../contexts/productContext';
 import apiService from '../../../services/api';
+import * as yup from 'yup';
+
+// ... Puis modifiez le composant ProductForm comme ceci
 
 function ProductForm() {
   const { id } = useParams();
@@ -23,6 +26,61 @@ function ProductForm() {
   });
   const hasTabs = ENTITY_CONFIG.tabs && ENTITY_CONFIG.tabs.length > 0;
   const [activeTab, setActiveTab] = useState(hasTabs ? 'general' : null);
+
+  // Créer un schéma de validation Yup pour le formulaire
+  const productSchema = yup.object().shape({
+    name: yup.string().required('Le nom est requis'),
+    sku: yup.string().transform((value) => (value === null ? '' : value)),
+    description: yup.string().transform((value) => (value === null ? '' : value)),
+    price: yup
+      .number()
+      .transform((value, originalValue) =>
+        originalValue === '' || originalValue === null ? undefined : value
+      )
+      .required('Le prix est requis')
+      .typeError('Le prix doit être un nombre'),
+    regular_price: yup
+      .number()
+      .transform((value, originalValue) =>
+        originalValue === '' || originalValue === null ? undefined : value
+      )
+      .nullable()
+      .typeError('Le prix régulier doit être un nombre'),
+    sale_price: yup
+      .number()
+      .transform((value, originalValue) =>
+        originalValue === '' || originalValue === null ? undefined : value
+      )
+      .nullable()
+      .typeError('Le prix promotionnel doit être un nombre'),
+    purchase_price: yup
+      .number()
+      .transform((value, originalValue) =>
+        originalValue === '' || originalValue === null ? undefined : value
+      )
+      .nullable()
+      .typeError("Le prix d'achat doit être un nombre"),
+    stock: yup
+      .number()
+      .transform((value, originalValue) =>
+        originalValue === '' || originalValue === null ? undefined : value
+      )
+      .required('Le stock est requis')
+      .typeError('Le stock doit être un nombre'),
+    min_stock: yup
+      .number()
+      .transform((value, originalValue) =>
+        originalValue === '' || originalValue === null ? undefined : value
+      )
+      .nullable()
+      .typeError('Le stock minimum doit être un nombre'),
+    manage_stock: yup.boolean().default(false),
+    status: yup.string().default('draft'),
+    category_id: yup.string().nullable(),
+    categories: yup.array().of(yup.string()).default([]),
+    brand_id: yup.string().nullable(),
+    supplier_id: yup.string().nullable(),
+  });
 
   // Récupérer les données du produit en mode édition
   useEffect(() => {
@@ -66,6 +124,7 @@ function ProductForm() {
 
   // Préparer les champs du formulaire avec les options
   const formFields = ENTITY_CONFIG.formFields.map((field) => {
+    // ... [aucun changement dans cette partie]
     let updatedField = { ...field };
 
     // Ajouter les onglets à chaque champ
@@ -130,49 +189,108 @@ function ProductForm() {
     return product || {};
   };
 
-  // Gestionnaire de soumission du formulaire
+  // Version simplifiée du gestionnaire de soumission
   const handleSubmit = async (data) => {
     setLoading(true);
     setError(null);
     setSuccess(null);
 
-    // Formatage des données
-    const formattedData = { ...data };
-
-    // Convertir les chaînes vides en null
-    ['sku', 'category_id', 'brand_id', 'supplier_id'].forEach((field) => {
-      if (formattedData[field] === '') formattedData[field] = null;
-    });
-
-    // Convertir les valeurs numériques
-    ['price', 'regular_price', 'sale_price', 'purchase_price', 'stock', 'min_stock'].forEach(
-      (field) => {
-        if (formattedData[field]) formattedData[field] = Number(formattedData[field]);
-      }
-    );
-
     try {
+      // Vérifier et corriger manuellement certains champs problématiques
+      // avant le traitement par Yup
+      const fixedData = { ...data };
+
+      // S'assurer que description n'est jamais null
+      if (fixedData.description === null || fixedData.description === undefined) {
+        fixedData.description = '';
+      }
+
+      // S'assurer que sku n'est jamais null
+      if (fixedData.sku === null || fixedData.sku === undefined) {
+        fixedData.sku = '';
+      }
+
+      // Gérer les champs de prix vides
+      const priceFields = ['regular_price', 'sale_price', 'purchase_price'];
+      priceFields.forEach((field) => {
+        if (fixedData[field] === '' || fixedData[field] === null) {
+          fixedData[field] = null; // Pour la base de données
+          delete fixedData[field]; // Ne pas inclure dans les mises à jour
+        }
+      });
+
+      // Traitement simple : Yup s'est déjà occupé des conversions de types
       if (isNew) {
-        await createProduct(formattedData);
+        // En mode création, on envoie tout
+        console.log('Données produit pour création:', fixedData);
+        await createProduct(fixedData);
         setSuccess('Produit créé avec succès');
         navigate('/products');
       } else {
-        await updateProduct(id, formattedData);
-        setSuccess('Produit mis à jour avec succès');
-        // Recharger les données du produit
-        const updatedProduct = await getProductById(id);
-        setProduct(updatedProduct);
-      }
+        // En mode mise à jour, on ne récupère que les champs modifiés
+        const initialValues = getInitialValues();
+        const updates = {};
 
-      setLoading(false);
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde du produit:', error);
-      if (error.response) {
-        console.error("Détails de l'erreur:", error.response.data);
-        setError(`Erreur: ${error.response.data.error || 'Problème lors de la sauvegarde'}`);
+        // Comparer et ne garder que ce qui a changé
+        Object.keys(fixedData).forEach((key) => {
+          // Ignorer les champs système
+          if (
+            [
+              '_id',
+              '__v',
+              'createdAt',
+              'updatedAt',
+              'woo_id',
+              'last_sync',
+              'pending_sync',
+              'created_at',
+              'updated_at',
+            ].includes(key)
+          ) {
+            return;
+          }
+
+          const initialValue = initialValues[key];
+          const newValue = fixedData[key];
+
+          // Comparer les valeurs de manière appropriée selon le type
+          if (Array.isArray(newValue) && Array.isArray(initialValue)) {
+            // Pour les tableaux, comparaison indépendante de l'ordre
+            const sortedNew = [...newValue].sort();
+            const sortedInit = [...initialValue].sort();
+            if (JSON.stringify(sortedNew) !== JSON.stringify(sortedInit)) {
+              updates[key] = newValue;
+            }
+          } else if (
+            (newValue === '' && (initialValue === null || initialValue === '')) ||
+            (newValue === null && (initialValue === '' || initialValue === null))
+          ) {
+            // Ne pas considérer comme modifié si vide <-> null ou vide <-> vide
+            // Rien à faire
+          } else if (newValue !== initialValue) {
+            updates[key] = newValue;
+          }
+        });
+
+        // S'il n'y a pas de modifications, afficher un message
+        if (Object.keys(updates).length === 0) {
+          setSuccess('Aucune modification détectée');
+        } else {
+          console.log('Données modifiées pour API:', updates);
+          await updateProduct(id, updates);
+          setSuccess('Produit mis à jour avec succès');
+          setProduct((prev) => ({ ...prev, ...updates }));
+        }
+      }
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde du produit:', err);
+      if (err.response) {
+        console.error("Détails de l'erreur:", err.response.data);
+        setError(`Erreur: ${err.response.data.error || 'Problème lors de la sauvegarde'}`);
       } else {
         setError('Erreur lors de la sauvegarde du produit. Veuillez réessayer.');
       }
+    } finally {
       setLoading(false);
     }
   };
@@ -202,6 +320,7 @@ function ProductForm() {
           tabs={hasTabs ? ENTITY_CONFIG.tabs : []}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
+          schema={productSchema} // Passez le schéma Yup au composant EntityForm
         />
       )}
     </div>

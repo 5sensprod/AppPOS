@@ -71,7 +71,7 @@ export const ENTITY_CONFIG = {
   formFields: [
     { name: 'name', label: 'Nom', type: 'text', required: true },
     { name: 'description', label: 'Description', type: 'textarea', rows: 4 },
-    { name: 'slug', label: 'Slug', type: 'text' },
+    // { name: 'slug', label: 'Slug', type: 'text' },
     { name: 'parent_id', label: 'Catégorie parente', type: 'select', options: [] },
   ],
   defaultSort: {

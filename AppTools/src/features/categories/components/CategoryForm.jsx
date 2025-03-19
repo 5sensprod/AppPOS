@@ -29,7 +29,7 @@ function CategoryForm() {
   // Schéma de validation Yup pour les catégories
   const schema = yup.object().shape({
     name: yup.string().required('Le nom est requis'),
-    slug: yup.string(),
+    // slug: yup.string(),
     description: yup.string(),
     parent_id: yup.string().nullable(),
     status: yup.string().required('Le statut est requis'),
@@ -175,7 +175,7 @@ function CategoryForm() {
     if (isNew) {
       return {
         name: '',
-        slug: '',
+        // slug: '',
         description: '',
         parent_id: '',
         status: 'draft',
@@ -196,62 +196,68 @@ function CategoryForm() {
     setSuccess(null);
 
     try {
-      // Nettoyage des données selon le schéma de validation du backend
+      // Création d'une copie des données
       const formattedData = { ...data };
 
-      // Traiter les chaînes vides comme undefined pour qu'elles ne soient pas envoyées
-      // au backend (le backend conservera la valeur existante)
-      Object.keys(formattedData).forEach((key) => {
-        if (formattedData[key] === '') {
-          delete formattedData[key]; // Ne pas envoyer ce champ plutôt que d'envoyer null
+      // 1. Traitement des champs selon leur type
+      Object.keys(formattedData).forEach((field) => {
+        const value = formattedData[field];
+
+        // Déterminer le type de traitement pour chaque champ
+        switch (field) {
+          // Champs qui doivent être null quand vides
+          case 'parent_id':
+            if (value === '') formattedData[field] = null;
+            break;
+
+          // Champs à exclure systématiquement
+          case 'woo_id':
+          case 'last_sync':
+          case 'createdAt':
+          case 'updatedAt':
+          case 'pending_sync':
+          case '_id':
+          case '__v':
+          case 'created_at':
+          case 'updated_at':
+          case 'level':
+          case 'product_count':
+          case 'gallery_images':
+            delete formattedData[field];
+            break;
+
+          // Traitement par défaut pour les autres champs
+          default:
+            // Supprimer les champs vides
+            if (value === '') {
+              delete formattedData[field];
+            }
+            break;
         }
       });
 
-      // Traitement spécifique pour parent_id s'il est vide
-      if (formattedData.parent_id === '') {
-        formattedData.parent_id = null; // La catégorie racine a parent_id = null
+      // Log pour débogage en développement uniquement
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Données catégorie formatées pour API:', formattedData);
       }
 
-      // Supprimer le champ level s'il existe - il est calculé automatiquement par le contrôleur
-      delete formattedData.level;
-
-      // Supprimer d'autres champs qui ne sont pas dans le schéma de validation
-      const fieldsToExclude = [
-        'woo_id',
-        'last_sync',
-        'createdAt',
-        'updatedAt',
-        'pending_sync',
-        '_id',
-        '__v',
-        'product_count',
-        'gallery_images',
-      ];
-
-      fieldsToExclude.forEach((field) => {
-        delete formattedData[field];
-      });
-
-      console.log('Données formatées pour API:', formattedData);
-
+      // 2. Exécution de la requête API appropriée
       if (isNew) {
-        await createCategory(formattedData);
+        const newCategory = await createCategory(formattedData);
         setSuccess('Catégorie créée avec succès');
         navigate('/products/categories');
+        return newCategory;
       } else {
-        await updateCategory(id, formattedData);
+        const updatedCategory = await updateCategory(id, formattedData);
         setSuccess('Catégorie mise à jour avec succès');
-        // Mise à jour locale au lieu d'une requête API supplémentaire
-        setCategory((prev) => ({ ...prev, ...formattedData }));
+        setCategory((prev) => updatedCategory || { ...prev, ...formattedData });
+        return updatedCategory;
       }
     } catch (err) {
+      const errorMessage = err.response?.data?.error || 'Problème lors de la sauvegarde';
       console.error('Erreur lors de la sauvegarde de la catégorie:', err);
-      if (err.response) {
-        console.error("Détails de l'erreur:", err.response.data);
-        setError(`Erreur: ${err.response.data.error || 'Problème lors de la sauvegarde'}`);
-      } else {
-        setError('Erreur lors de la sauvegarde de la catégorie. Veuillez réessayer.');
-      }
+      setError(`Erreur: ${errorMessage}`);
+      return null;
     } finally {
       setLoading(false);
     }
