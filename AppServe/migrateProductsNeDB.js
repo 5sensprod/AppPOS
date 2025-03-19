@@ -329,6 +329,7 @@ async function migrateProducts(shouldReset = false) {
           category_id: oldProduct.categorie || null,
           image: images.mainImage,
           gallery_images: images.galleryImages,
+          designation: oldProduct.designation || '',
           specifications: oldProduct.descriptionCourte
             ? { content: oldProduct.descriptionCourte }
             : null,
