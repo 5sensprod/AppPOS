@@ -113,6 +113,8 @@ const createProductSchema = Joi.object({
   name: Joi.string().required(),
   sku: Joi.string().allow('', null).optional(),
   description: Joi.string().allow('', null),
+  description_short: Joi.string().allow('', null),
+  designation: Joi.string().allow('', null),
   purchase_price: Joi.number().min(0),
   regular_price: Joi.number().min(0),
   price: Joi.number().min(0).required(),
