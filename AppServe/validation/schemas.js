@@ -135,10 +135,8 @@ const createProductSchema = Joi.object({
   category_id: Joi.string().allow('', null),
   categories: Joi.array().items(Joi.string()).default([]),
   category_path: Joi.array().items(Joi.string()),
-  // supplier_id: Joi.string().required(),
   supplier_id: Joi.string().allow('', null),
   brand_id: Joi.string().allow('', null),
-  // brand_id: Joi.string().required(),
   status: Joi.string().valid('draft', 'published', 'archived').default('draft'),
   manage_stock: Joi.boolean().default(true),
   stock_status: Joi.string().valid('instock', 'outofstock', 'onbackorder').default('instock'),
@@ -147,12 +145,8 @@ const createProductSchema = Joi.object({
     Joi.object({
       key: Joi.string(),
       value: Joi.string(),
-      // key: Joi.string().required(),
-      // value: Joi.string().required(),
     })
   ),
-  //   website_url: Joi.string().uri().allow('', null),
-  // }).required();
   website_url: Joi.string().uri().allow('', null),
 });
 

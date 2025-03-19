@@ -84,6 +84,54 @@ class ProductWooCommerceService {
     }
   }
 
+  async getProductUrl(productId) {
+    try {
+      const product = await Product.findById(productId);
+
+      if (!product) {
+        throw new Error('Produit non trouvé');
+      }
+
+      // Si l'URL du produit est déjà enregistrée et récente (sync récent)
+      if (product.website_url && product.last_sync) {
+        const syncAge = Date.now() - new Date(product.last_sync).getTime();
+        // Si la sync date de moins de 24h, utiliser l'URL stockée
+        if (syncAge < 24 * 60 * 60 * 1000) {
+          return { success: true, url: product.website_url };
+        }
+      }
+
+      // Si pas d'URL ou sync trop ancienne, récupérer depuis WooCommerce
+      if (product.woo_id) {
+        const response = await this.client.get(`${this.endpoint}/${product.woo_id}`);
+
+        if (response.data && response.data.permalink) {
+          // Mettre à jour l'URL dans la base de données
+          await Product.update(productId, {
+            website_url: response.data.permalink,
+            last_sync: new Date(),
+          });
+
+          return { success: true, url: response.data.permalink };
+        }
+      }
+
+      // Si pas de woo_id ou pas d'URL trouvée
+      return {
+        success: false,
+        error: 'URL du produit non disponible',
+        message:
+          "Le produit n'a pas encore été synchronisé avec WooCommerce ou l'URL n'est pas disponible",
+      };
+    } catch (error) {
+      this.errorHandler.handleError(error, 'product', productId);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
   async testConnection() {
     return this.client.testConnection(this.endpoint);
   }

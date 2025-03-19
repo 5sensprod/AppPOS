@@ -127,6 +127,7 @@ class ProductSyncStrategy extends SyncStrategy {
       manage_stock: wcProduct.manage_stock,
       stock: wcProduct.stock_quantity,
       woo_id: wcProduct.id,
+      website_url: wcProduct.permalink || null,
       categories: wcProduct.categories?.map((cat) => cat.id) || [],
       meta_data: wcProduct.meta_data || [],
     };
@@ -247,6 +248,8 @@ class ProductSyncStrategy extends SyncStrategy {
     const updateData = {
       woo_id: wcData.id,
       last_sync: new Date(),
+      // Ajouter l'URL du produit depuis WooCommerce
+      website_url: wcData.permalink || null,
     };
 
     // Obtenir les données actuelles du produit
