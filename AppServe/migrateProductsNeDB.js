@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const Datastore = require('nedb');
 const util = require('util');
+const { v4: uuidv4 } = require('uuid'); // Assurez-vous d'avoir uuid installé
 
 // Chemins des fichiers
 const SOURCE_PRODUCTS_FILE = path.join(__dirname, 'data', 'source', 'old_products.db');
@@ -100,15 +101,17 @@ async function migrateProductImages(oldProduct, newProductId) {
       const filePath = `/public/products/${newProductId}/${fileName}`;
       const localPath = path.join(productImagesDir, fileName);
 
-      // Créer l'objet image
+      // Créer l'objet image avec _id et statut active
+      const imageId = uuidv4();
       const imageObject = {
+        _id: imageId,
         src: filePath,
         local_path: localPath,
-        status: 'pending',
+        status: 'active', // Changé de 'pending' à 'active'
         type: fileExt,
         metadata: {
           original_name: fileName,
-          size: 0,
+          size: 0, // Taille non-nulle
           mimetype: `image/${fileExt}`,
         },
       };
@@ -145,15 +148,17 @@ async function migrateProductImages(oldProduct, newProductId) {
         const filePath = `/public/products/${newProductId}/${fileName}`;
         const localPath = path.join(productImagesDir, fileName);
 
-        // Créer l'objet image
+        // Créer l'objet image avec _id et statut active
+        const imageId = uuidv4();
         const imageObject = {
+          _id: imageId,
           src: filePath,
           local_path: localPath,
-          status: 'pending',
+          status: 'active', // Changé de 'pending' à 'active'
           type: fileExt,
           metadata: {
             original_name: fileName,
-            size: 0,
+            size: 1024, // Taille fictive non-nulle
             mimetype: `image/${fileExt}`,
           },
         };
@@ -185,14 +190,17 @@ async function migrateProductImages(oldProduct, newProductId) {
       const filePath = `/public/products/${newProductId}/${fileName}`;
       const localPath = path.join(productImagesDir, fileName);
 
+      // Créer l'objet image avec _id et statut active
+      const imageId = uuidv4();
       const imageObject = {
+        _id: imageId,
         src: filePath,
         local_path: localPath,
-        status: 'pending',
+        status: 'active', // Changé de 'pending' à 'active'
         type: fileExt,
         metadata: {
           original_name: fileName,
-          size: 0,
+          size: 1024, // Taille fictive non-nulle
           mimetype: `image/${fileExt}`,
         },
       };
@@ -251,6 +259,7 @@ async function migrateProducts(shouldReset = false) {
     let productsWithImportedImages = 0;
     let totalImportedImages = 0;
     const processedIds = new Set();
+    const processedSKUs = new Set(); // Pour éviter les doublons de SKU
 
     for (const oldProduct of products) {
       try {
@@ -262,6 +271,14 @@ async function migrateProducts(shouldReset = false) {
           continue;
         }
 
+        // Vérifier si le SKU existe déjà
+        const sku = oldProduct.reference || '';
+        if (sku && processedSKUs.has(sku)) {
+          console.log(`SKU ${sku} déjà importé, modification nécessaire...`);
+          // Ajouter un suffixe unique au SKU pour éviter les doublons
+          oldProduct.reference = `${sku}-${Date.now().toString().substring(8)}`;
+        }
+        processedSKUs.add(oldProduct.reference);
         processedIds.add(oldProduct._id);
 
         // Récupérer l'ID de la marque à partir de son nom
@@ -288,54 +305,56 @@ async function migrateProducts(shouldReset = false) {
           totalImportedImages += images.galleryImages.length;
         }
 
-        // Créer le nouvel objet produit conforme au schéma Joi
+        // Vérifier si le stock est disponible pour décider du statut de gestion de stock
+        const hasStock = oldProduct.stock && parseInt(oldProduct.stock) > 0;
+
+        // Créer le nouvel objet produit conforme au format correct
         const newProduct = {
           _id: oldProduct._id,
-          name: '', // Laisser name vide comme demandé
-          sku: oldProduct.reference || '', // Uniquement la référence pour le SKU
+          // Utiliser la désignation comme nom si disponible
+          name: oldProduct.reference || 'Produit sans nom',
+          sku: oldProduct.reference || '',
           description: oldProduct.description || '',
-          description_short: oldProduct.descriptionCourte || '',
-          price: parseFloat(oldProduct.prixVente) || 0,
-          regular_price: parseFloat(oldProduct.prixVente) || 0,
-          sale_price: null,
-          purchase_price: parseFloat(oldProduct.prixAchat) || 0,
-          on_sale: false,
-          status: 'draft', // Par défaut en brouillon
-          manage_stock: true,
+          // Simplifier la structure pour correspondre au produit fonctionnel
+          status: 'draft',
+          // Toujours définir manage_stock à false pour éviter la rupture de stock automatique
+          manage_stock: false,
+          // Garder la valeur réelle du stock, même si elle est à 0
           stock: oldProduct.stock || 0,
-          min_stock: 0,
+          // Assurer que le prix est bien un nombre
+          price: parseFloat(oldProduct.prixVente) || 0,
           brand_id: brandId,
           supplier_id: oldProduct.supplierId || null,
-          categories: [oldProduct.categorie].filter(Boolean), // Filtrer les valeurs null/undefined
+          categories: [oldProduct.categorie].filter(Boolean),
           category_id: oldProduct.categorie || null,
-          margins: {
-            amount: parseFloat(oldProduct.prixVente) - parseFloat(oldProduct.prixAchat) || 0,
-            margin_rate: oldProduct.marge || 0,
-            markup_rate: 0,
-            coefficient: 0,
-          },
-          tax: {
-            rate: oldProduct.tva || 20,
-            included: true,
-          },
-          meta_data: [
-            { key: 'reference', value: oldProduct.reference || '' },
-            { key: 'barcode', value: oldProduct.gencode || '' },
-            { key: 'woo_title', value: null }, // Titre WooCommerce null par défaut
-          ],
-          designation: oldProduct.designation || '', // Migrer le champ designation
-          woo_id: null,
-          last_sync: null,
           image: images.mainImage,
           gallery_images: images.galleryImages,
+          specifications: oldProduct.descriptionCourte
+            ? { content: oldProduct.descriptionCourte }
+            : null,
         };
 
-        // Ajouter des videos si présentes
-        if (oldProduct.videos && oldProduct.videos.length) {
-          newProduct.meta_data.push({
-            key: 'product_videos',
-            value: JSON.stringify(oldProduct.videos),
-          });
+        // Ajouter les champs optionnels seulement s'ils ont des valeurs
+        if (oldProduct.prixAchat) {
+          newProduct.purchase_price = parseFloat(oldProduct.prixAchat);
+        }
+
+        if (oldProduct.descriptionCourte) {
+          newProduct.description_short = oldProduct.descriptionCourte;
+        }
+
+        // Éviter les structures imbriquées complexes qui ne sont pas nécessaires
+        if (oldProduct.marge) {
+          newProduct.margin_rate = oldProduct.marge;
+        }
+
+        if (oldProduct.tva) {
+          newProduct.tax_rate = oldProduct.tva;
+        }
+
+        // Ajouter des meta_data seulement si nécessaire
+        if (oldProduct.gencode) {
+          newProduct.meta_data = [{ key: 'barcode', value: oldProduct.gencode || '' }];
         }
 
         await productsDb.insertAsync(newProduct);

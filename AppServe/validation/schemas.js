@@ -141,6 +141,7 @@ const createProductSchema = Joi.object({
   // brand_id: Joi.string().required(),
   status: Joi.string().valid('draft', 'published', 'archived').default('draft'),
   manage_stock: Joi.boolean().default(true),
+  stock_status: Joi.string().valid('instock', 'outofstock', 'onbackorder').default('instock'),
   specifications: Joi.object().allow(null),
   meta_data: Joi.array().items(
     Joi.object({
