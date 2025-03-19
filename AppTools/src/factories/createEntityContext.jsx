@@ -377,9 +377,7 @@ export function createEntityContext(options) {
       ? useCallback(async (id) => {
           dispatch({ type: ACTIONS.FETCH_START });
           try {
-            const response = await apiService.post(
-              `/api/sync${apiEndpoint.replace('/api', '')}/${id}/sync`
-            );
+            const response = await apiService.post(`/api/products/${id}/sync`);
             dispatch({ type: ACTIONS.SYNC_SUCCESS, payload: response.data.data });
             return response.data;
           } catch (error) {
