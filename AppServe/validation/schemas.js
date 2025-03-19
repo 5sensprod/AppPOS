@@ -42,7 +42,15 @@ const createBrandSchema = Joi.object({
   name: Joi.string().required(),
   slug: Joi.string(),
   description: Joi.string(),
-  suppliers: Joi.array().items(Joi.string()).default([]), // IDs des fournisseurs
+  suppliers: Joi.array().items(Joi.string()).default([]),
+  suppliersRefs: Joi.array()
+    .items(
+      Joi.object({
+        id: Joi.string(),
+        name: Joi.string(),
+      })
+    )
+    .default([]),
   meta_data: Joi.array().items(
     Joi.object({
       key: Joi.string(),
@@ -71,7 +79,15 @@ const createSupplierSchema = Joi.object({
   supplier_code: Joi.string(),
   customer_code: Joi.string(),
   name: Joi.string().required(),
-  brands: Joi.array().items(Joi.string()).default([]), // IDs des marques
+  brands: Joi.array().items(Joi.string()).default([]),
+  brandsRefs: Joi.array()
+    .items(
+      Joi.object({
+        id: Joi.string(),
+        name: Joi.string(),
+      })
+    )
+    .default([]),
   contact: Joi.object({
     name: Joi.string(),
     email: Joi.string().email(),

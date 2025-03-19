@@ -15,6 +15,8 @@ function createDatastore(filePath) {
   db.findAsync = util.promisify(db.find);
   db.insertAsync = util.promisify(db.insert);
   db.removeAsync = util.promisify(db.remove);
+  db.findOneAsync = util.promisify(db.findOne);
+  db.updateAsync = util.promisify(db.update);
   return db;
 }
 
@@ -84,7 +86,8 @@ async function migrateSuppliersBrands(shouldReset = false) {
 
     // Map pour stocker les correspondances entre marques et fournisseurs
     const brandToSupplierMap = new Map();
-    const supplierMap = new Map(); // Pour stocker les IDs des fournisseurs
+    const brandNameToInfoMap = new Map(); // Stockage des informations des marques (ID et nom)
+    const supplierIdMap = new Map(); // Pour stocker les IDs des fournisseurs
 
     // Vérifier les doublons d'ID avant la migration
     const processedIds = new Set();
@@ -116,6 +119,10 @@ async function migrateSuppliersBrands(shouldReset = false) {
           _id: oldSupplier._id,
           name: oldSupplier.name || 'Fournisseur sans nom',
           supplier_code: supplierCode,
+          // Initialiser le tableau brands avec un format qui inclut les IDs
+          // Ce tableau sera complété plus tard une fois que toutes les marques auront été créées
+          brands: [], // Ceci sera mis à jour avec les références complètes (ID et nom)
+          brandsRefs: [], // Nouveau tableau pour stocker les références {id, name}
           contact: {
             name: oldSupplier.contact || '',
             email: oldSupplier.email || '',
@@ -134,9 +141,7 @@ async function migrateSuppliersBrands(shouldReset = false) {
 
         // Vérifier si la base contient déjà un enregistrement avec cet ID
         try {
-          const existing = await util.promisify(suppliersDb.findOne.bind(suppliersDb))({
-            _id: oldSupplier._id,
-          });
+          const existing = await suppliersDb.findOneAsync({ _id: oldSupplier._id });
           if (existing) {
             console.log(`Fournisseur ${oldSupplier._id} existe déjà dans la base cible, ignoré`);
             continue;
@@ -146,7 +151,7 @@ async function migrateSuppliersBrands(shouldReset = false) {
         }
 
         await suppliersDb.insertAsync(newSupplier);
-        supplierMap.set(oldSupplier._id, newSupplier);
+        supplierIdMap.set(oldSupplier._id, oldSupplier._id); // Stocker l'ID pour référence
         importedSuppliers++;
 
         // Stocker les marques associées à ce fournisseur
@@ -168,42 +173,157 @@ async function migrateSuppliersBrands(shouldReset = false) {
     for (const [brandName, supplierIds] of brandToSupplierMap.entries()) {
       try {
         // Vérifier si la marque existe déjà dans la base cible
+        let brandId;
         try {
-          const existing = await util.promisify(brandsDb.findOne.bind(brandsDb))({
-            name: brandName,
-          });
+          const existing = await brandsDb.findOneAsync({ name: brandName });
           if (existing) {
             console.log(
               `Marque ${brandName} existe déjà dans la base cible, mise à jour des fournisseurs`
             );
-            await util.promisify(brandsDb.update.bind(brandsDb))(
+
+            // Récupérer les références existantes des fournisseurs
+            const currentSuppliersRefs = Array.isArray(existing.suppliersRefs)
+              ? existing.suppliersRefs
+              : [];
+            const currentSupplierIds = currentSuppliersRefs.map((ref) => ref.id);
+
+            // Ajouter les nouveaux fournisseurs qui ne sont pas déjà référencés
+            const newSuppliersRefs = [];
+            for (const supplierId of supplierIds) {
+              if (!currentSupplierIds.includes(supplierId)) {
+                try {
+                  const supplier = await suppliersDb.findOneAsync({ _id: supplierId });
+                  if (supplier) {
+                    newSuppliersRefs.push({
+                      id: supplierId,
+                      name: supplier.name || 'Fournisseur sans nom',
+                    });
+                  }
+                } catch (error) {
+                  console.warn(
+                    `Impossible de trouver le fournisseur ${supplierId} pour la référence`
+                  );
+                }
+              }
+            }
+
+            await brandsDb.updateAsync(
               { _id: existing._id },
               {
-                $set: { suppliers: [...new Set([...(existing.suppliers || []), ...supplierIds])] },
+                $set: {
+                  suppliers: [...new Set([...(existing.suppliers || []), ...supplierIds])],
+                  suppliersRefs: [...currentSuppliersRefs, ...newSuppliersRefs],
+                },
               },
               {}
             );
             importedBrands++;
-            continue;
+            brandId = existing._id;
+          } else {
+            // Créer les références des fournisseurs pour cette marque
+            const suppliersRefs = [];
+            for (const supplierId of supplierIds) {
+              try {
+                const supplier = await suppliersDb.findOneAsync({ _id: supplierId });
+                if (supplier) {
+                  suppliersRefs.push({
+                    id: supplierId,
+                    name: supplier.name || 'Fournisseur sans nom',
+                  });
+                }
+              } catch (error) {
+                console.warn(
+                  `Impossible de trouver le fournisseur ${supplierId} pour la référence`
+                );
+              }
+            }
+
+            const newBrand = {
+              name: brandName,
+              slug: generateSlug(brandName),
+              description: '',
+              suppliers: supplierIds,
+              suppliersRefs: suppliersRefs,
+              woo_id: null,
+              last_sync: null,
+            };
+
+            const insertedBrand = await brandsDb.insertAsync(newBrand);
+            importedBrands++;
+            brandId = insertedBrand._id;
           }
-        } catch (findError) {
-          // Ignorer l'erreur de recherche et tenter l'insertion
+
+          // Stocker l'ID et le nom de la marque pour référence ultérieure
+          brandNameToInfoMap.set(brandName, { id: brandId, name: brandName });
+        } catch (error) {
+          console.error(`Erreur lors de la gestion de la marque ${brandName}:`, error.message);
+          continue;
         }
-
-        const newBrand = {
-          name: brandName,
-          slug: generateSlug(brandName),
-          description: '',
-          suppliers: supplierIds,
-          woo_id: null,
-          last_sync: null,
-        };
-
-        await brandsDb.insertAsync(newBrand);
-        importedBrands++;
       } catch (error) {
         console.error(`Erreur lors de l'import de la marque ${brandName}:`, error.message);
         errorCount++;
+      }
+    }
+
+    // Phase finale: Mettre à jour les fournisseurs avec leurs marques associées (références complètes)
+    console.log('Mise à jour des fournisseurs avec les références complètes des marques...');
+
+    // Pour chaque marque, mettre à jour les fournisseurs associés
+    for (const [brandName, supplierIds] of brandToSupplierMap.entries()) {
+      // Récupérer les informations complètes de la marque
+      const brandInfo = brandNameToInfoMap.get(brandName);
+      if (!brandInfo) {
+        console.warn(`Information de marque non trouvée pour ${brandName}, ignoré`);
+        continue;
+      }
+
+      for (const supplierId of supplierIds) {
+        try {
+          // Vérifier que le fournisseur existe
+          const supplier = await suppliersDb.findOneAsync({ _id: supplierId });
+          if (!supplier) {
+            console.warn(`Fournisseur ${supplierId} non trouvé lors de la mise à jour des marques`);
+            continue;
+          }
+
+          // Assurer que les tableaux existent
+          const currentBrands = Array.isArray(supplier.brands) ? supplier.brands : [];
+          const currentBrandsRefs = Array.isArray(supplier.brandsRefs) ? supplier.brandsRefs : [];
+
+          // Vérifier si cette marque est déjà référencée dans le fournisseur
+          const hasNameInArray = currentBrands.includes(brandName);
+          const hasIdInRefs = currentBrandsRefs.some((ref) => ref.id === brandInfo.id);
+
+          // Mise à jour des tableaux de marques
+          if (!hasNameInArray) {
+            currentBrands.push(brandName);
+          }
+
+          if (!hasIdInRefs) {
+            currentBrandsRefs.push({ id: brandInfo.id, name: brandName });
+          }
+
+          // Mettre à jour le fournisseur avec les deux formats
+          await suppliersDb.updateAsync(
+            { _id: supplierId },
+            {
+              $set: {
+                brands: currentBrands,
+                brandsRefs: currentBrandsRefs,
+              },
+            },
+            {}
+          );
+          console.log(
+            `Marque "${brandName}" (ID: ${brandInfo.id}) ajoutée au fournisseur ${supplierId}`
+          );
+        } catch (error) {
+          console.error(
+            `Erreur lors de la mise à jour du fournisseur ${supplierId} avec la marque ${brandName}:`,
+            error.message
+          );
+          errorCount++;
+        }
       }
     }
 
