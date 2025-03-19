@@ -124,14 +124,21 @@ export function createEntityContext(options) {
 
       case ACTIONS.SYNC_SUCCESS: {
         const syncedItem = action.payload;
+
+        // S'assurer que pending_sync est à false dans l'item synchronisé
+        const updatedSyncedItem = {
+          ...syncedItem,
+          pending_sync: false,
+        };
+
         const updatedItems = state.items.map((item) =>
-          item._id === syncedItem._id ? syncedItem : item
+          item._id === updatedSyncedItem._id ? updatedSyncedItem : item
         );
 
         return {
           ...state,
           items: updatedItems,
-          itemsById: { ...state.itemsById, [syncedItem._id]: syncedItem },
+          itemsById: { ...state.itemsById, [updatedSyncedItem._id]: updatedSyncedItem },
           loading: false,
         };
       }
@@ -317,7 +324,8 @@ export function createEntityContext(options) {
         delete cleanedData.last_sync;
         delete cleanedData.createdAt;
         delete cleanedData.updatedAt;
-        delete cleanedData.gallery_images;
+        // Ne pas supprimer gallery_images lors des mises à jour
+        // delete cleanedData.gallery_images;
         delete cleanedData.image;
         delete cleanedData.pending_sync;
         delete cleanedData.SKU;

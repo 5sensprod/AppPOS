@@ -1,13 +1,10 @@
-// src/features/products/components/ProductForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import * as yup from 'yup';
 import { EntityForm } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { useProduct } from '../contexts/productContext';
 import apiService from '../../../services/api';
-import * as yup from 'yup';
-
-// ... Puis modifiez le composant ProductForm comme ceci
 
 function ProductForm() {
   const { id } = useParams();
@@ -27,60 +24,131 @@ function ProductForm() {
   const hasTabs = ENTITY_CONFIG.tabs && ENTITY_CONFIG.tabs.length > 0;
   const [activeTab, setActiveTab] = useState(hasTabs ? 'general' : null);
 
-  // Créer un schéma de validation Yup pour le formulaire
-  const productSchema = yup.object().shape({
-    name: yup.string().required('Le nom est requis'),
-    sku: yup.string().transform((value) => (value === null ? '' : value)),
-    description: yup.string().transform((value) => (value === null ? '' : value)),
-    price: yup
-      .number()
-      .transform((value, originalValue) =>
-        originalValue === '' || originalValue === null ? undefined : value
-      )
-      .required('Le prix est requis')
-      .typeError('Le prix doit être un nombre'),
-    regular_price: yup
-      .number()
-      .transform((value, originalValue) =>
-        originalValue === '' || originalValue === null ? undefined : value
-      )
-      .nullable()
-      .typeError('Le prix régulier doit être un nombre'),
-    sale_price: yup
-      .number()
-      .transform((value, originalValue) =>
-        originalValue === '' || originalValue === null ? undefined : value
-      )
-      .nullable()
-      .typeError('Le prix promotionnel doit être un nombre'),
-    purchase_price: yup
-      .number()
-      .transform((value, originalValue) =>
-        originalValue === '' || originalValue === null ? undefined : value
-      )
-      .nullable()
-      .typeError("Le prix d'achat doit être un nombre"),
-    stock: yup
-      .number()
-      .transform((value, originalValue) =>
-        originalValue === '' || originalValue === null ? undefined : value
-      )
-      .required('Le stock est requis')
-      .typeError('Le stock doit être un nombre'),
-    min_stock: yup
-      .number()
-      .transform((value, originalValue) =>
-        originalValue === '' || originalValue === null ? undefined : value
-      )
-      .nullable()
-      .typeError('Le stock minimum doit être un nombre'),
-    manage_stock: yup.boolean().default(false),
-    status: yup.string().default('draft'),
-    category_id: yup.string().nullable(),
-    categories: yup.array().of(yup.string()).default([]),
-    brand_id: yup.string().nullable(),
-    supplier_id: yup.string().nullable(),
-  });
+  // Créer un schéma de validation Yup différent selon le mode (création ou édition)
+  const getValidationSchema = () => {
+    // Schéma pour la création (validation complète)
+    if (isNew) {
+      return yup.object().shape({
+        name: yup.string().required('Le nom est requis'),
+        sku: yup.string().transform((value) => (value === null ? '' : value)),
+        description: yup.string().transform((value) => (value === null ? '' : value)),
+        price: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .required('Le prix est requis')
+          .typeError('Le prix doit être un nombre'),
+        regular_price: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .nullable()
+          .typeError('Le prix régulier doit être un nombre'),
+        sale_price: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .nullable()
+          .typeError('Le prix promotionnel doit être un nombre'),
+        purchase_price: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .nullable()
+          .typeError("Le prix d'achat doit être un nombre"),
+        stock: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .required('Le stock est requis')
+          .typeError('Le stock doit être un nombre'),
+        min_stock: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .nullable()
+          .typeError('Le stock minimum doit être un nombre'),
+        manage_stock: yup.boolean().default(false),
+        status: yup.string().default('draft'),
+        category_id: yup.string().nullable(),
+        categories: yup.array().of(yup.string()).default([]),
+        brand_id: yup.string().nullable(),
+        supplier_id: yup.string().nullable(),
+      });
+    }
+    // Schéma pour l'édition (tous les champs optionnels)
+    else {
+      return yup.object().shape({
+        name: yup.string().optional(),
+        sku: yup
+          .string()
+          .transform((value) => (value === null ? '' : value))
+          .optional(),
+        description: yup
+          .string()
+          .transform((value) => (value === null ? '' : value))
+          .optional(),
+        price: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .optional()
+          .typeError('Le prix doit être un nombre'),
+        regular_price: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .nullable()
+          .optional()
+          .typeError('Le prix régulier doit être un nombre'),
+        sale_price: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .nullable()
+          .optional()
+          .typeError('Le prix promotionnel doit être un nombre'),
+        purchase_price: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .nullable()
+          .optional()
+          .typeError("Le prix d'achat doit être un nombre"),
+        stock: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .optional()
+          .typeError('Le stock doit être un nombre'),
+        min_stock: yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null ? undefined : value
+          )
+          .nullable()
+          .optional()
+          .typeError('Le stock minimum doit être un nombre'),
+        manage_stock: yup.boolean().optional(),
+        status: yup.string().optional(),
+        category_id: yup.string().nullable().optional(),
+        categories: yup.array().of(yup.string()).optional(),
+        brand_id: yup.string().nullable().optional(),
+        supplier_id: yup.string().nullable().optional(),
+      });
+    }
+  };
 
   // Récupérer les données du produit en mode édition
   useEffect(() => {
@@ -124,7 +192,6 @@ function ProductForm() {
 
   // Préparer les champs du formulaire avec les options
   const formFields = ENTITY_CONFIG.formFields.map((field) => {
-    // ... [aucun changement dans cette partie]
     let updatedField = { ...field };
 
     // Ajouter les onglets à chaque champ
@@ -196,44 +263,32 @@ function ProductForm() {
     setSuccess(null);
 
     try {
-      // Vérifier et corriger manuellement certains champs problématiques
-      // avant le traitement par Yup
-      const fixedData = { ...data };
+      // Prétraitement des données pour gérer les cas spéciaux
+      const processedData = { ...data };
 
-      // S'assurer que description n'est jamais null
-      if (fixedData.description === null || fixedData.description === undefined) {
-        fixedData.description = '';
+      // S'assurer que description et sku ne sont jamais null
+      if (processedData.description === null || processedData.description === undefined) {
+        processedData.description = '';
+      }
+      if (processedData.sku === null || processedData.sku === undefined) {
+        processedData.sku = '';
       }
 
-      // S'assurer que sku n'est jamais null
-      if (fixedData.sku === null || fixedData.sku === undefined) {
-        fixedData.sku = '';
-      }
-
-      // Gérer les champs de prix vides
-      const priceFields = ['regular_price', 'sale_price', 'purchase_price'];
-      priceFields.forEach((field) => {
-        if (fixedData[field] === '' || fixedData[field] === null) {
-          fixedData[field] = null; // Pour la base de données
-          delete fixedData[field]; // Ne pas inclure dans les mises à jour
-        }
-      });
-
-      // Traitement simple : Yup s'est déjà occupé des conversions de types
+      // Traitement différent selon le mode création ou édition
       if (isNew) {
-        // En mode création, on envoie tout
-        console.log('Données produit pour création:', fixedData);
-        await createProduct(fixedData);
+        // En mode création, on envoie toutes les données
+        console.log('Données produit pour création:', processedData);
+        await createProduct(processedData);
         setSuccess('Produit créé avec succès');
         navigate('/products');
       } else {
-        // En mode mise à jour, on ne récupère que les champs modifiés
+        // En mode édition, on ne récupère que les champs modifiés
         const initialValues = getInitialValues();
         const updates = {};
 
-        // Comparer et ne garder que ce qui a changé
-        Object.keys(fixedData).forEach((key) => {
-          // Ignorer les champs système
+        // Parcourir chaque champ et comparer avec la valeur initiale
+        Object.keys(processedData).forEach((key) => {
+          // Ignorer les champs systèmes
           if (
             [
               '_id',
@@ -251,28 +306,63 @@ function ProductForm() {
           }
 
           const initialValue = initialValues[key];
-          const newValue = fixedData[key];
+          const newValue = processedData[key];
 
-          // Comparer les valeurs de manière appropriée selon le type
+          // Traitement spécifique selon le type de champ
+          let hasChanged = false;
+
+          // Pour les tableaux (comme categories)
           if (Array.isArray(newValue) && Array.isArray(initialValue)) {
-            // Pour les tableaux, comparaison indépendante de l'ordre
             const sortedNew = [...newValue].sort();
-            const sortedInit = [...initialValue].sort();
-            if (JSON.stringify(sortedNew) !== JSON.stringify(sortedInit)) {
-              updates[key] = newValue;
-            }
-          } else if (
-            (newValue === '' && (initialValue === null || initialValue === '')) ||
-            (newValue === null && (initialValue === '' || initialValue === null))
+            const sortedOld = [...initialValue].sort();
+            hasChanged = JSON.stringify(sortedNew) !== JSON.stringify(sortedOld);
+          }
+          // Pour les champs numériques
+          else if (
+            [
+              'price',
+              'regular_price',
+              'sale_price',
+              'purchase_price',
+              'stock',
+              'min_stock',
+            ].includes(key)
           ) {
-            // Ne pas considérer comme modifié si vide <-> null ou vide <-> vide
-            // Rien à faire
-          } else if (newValue !== initialValue) {
+            const newNum = newValue === '' || newValue === null ? null : Number(newValue);
+            const oldNum =
+              initialValue === '' || initialValue === null ? null : Number(initialValue);
+            hasChanged = newNum !== oldNum;
+
+            if (hasChanged) {
+              updates[key] = newNum;
+            }
+          }
+          // Pour les champs texte spéciaux (sku, description)
+          else if (['sku', 'description'].includes(key)) {
+            const newStr = newValue === null ? '' : String(newValue);
+            const oldStr = initialValue === null ? '' : String(initialValue);
+            hasChanged = newStr !== oldStr;
+
+            if (hasChanged) {
+              updates[key] = newStr;
+            }
+          }
+          // Pour les champs qui peuvent être null
+          else if (['category_id', 'brand_id', 'supplier_id'].includes(key)) {
+            const newVal = newValue === '' ? null : newValue;
+            const oldVal = initialValue === '' ? null : initialValue;
+            hasChanged = newVal !== oldVal;
+
+            if (hasChanged) {
+              updates[key] = newVal;
+            }
+          }
+          // Cas général
+          else if (newValue !== initialValue) {
             updates[key] = newValue;
           }
         });
 
-        // S'il n'y a pas de modifications, afficher un message
         if (Object.keys(updates).length === 0) {
           setSuccess('Aucune modification détectée');
         } else {
@@ -320,7 +410,7 @@ function ProductForm() {
           tabs={hasTabs ? ENTITY_CONFIG.tabs : []}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          schema={productSchema} // Passez le schéma Yup au composant EntityForm
+          schema={getValidationSchema()} // Schéma de validation différent selon le mode
         />
       )}
     </div>

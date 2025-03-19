@@ -147,7 +147,7 @@ export function useProductExtras() {
     if (dispatch) {
       try {
         const formData = new FormData();
-        formData.append('image', imageFile);
+        formData.append('images', imageFile);
 
         const response = await apiService.post(`/api/products/${productId}/image`, formData, {
           headers: {
