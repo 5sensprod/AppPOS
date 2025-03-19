@@ -9,6 +9,8 @@ const { v4: uuidv4 } = require('uuid'); // Assurez-vous d'avoir uuid installé
 const SOURCE_PRODUCTS_FILE = path.join(__dirname, 'data', 'source', 'old_products.db');
 const TARGET_PRODUCTS_FILE = path.join(__dirname, 'data', 'products.db');
 const BRANDS_FILE = path.join(__dirname, 'data', 'brands.db');
+const SUPPLIERS_FILE = path.join(__dirname, 'data', 'suppliers.db');
+const CATEGORIES_FILE = path.join(__dirname, 'data', 'categories.db');
 const SOURCE_IMAGES_DIR = path.join(__dirname, 'public', 'products');
 
 // Promisify nedb functions
@@ -47,16 +49,102 @@ async function prepareDestinationFiles() {
   }
 }
 
-// Fonction pour récupérer l'ID de la marque à partir de son nom
-async function getBrandIdByName(brandName, brandsDb) {
+// Fonction pour récupérer l'ID et le nom de la marque à partir de son nom
+async function getBrandInfoByName(brandName, brandsDb) {
   try {
     const brand = await brandsDb.findOneAsync({ name: brandName });
     if (brand) {
-      return brand._id;
+      return {
+        id: brand._id,
+        name: brand.name,
+      };
     }
     return null;
   } catch (error) {
     console.warn(`Erreur lors de la recherche de la marque ${brandName}:`, error.message);
+    return null;
+  }
+}
+
+// Fonction pour récupérer les infos d'un fournisseur à partir de son ID
+async function getSupplierInfoById(supplierId, suppliersDb) {
+  try {
+    if (!supplierId) return null;
+
+    const supplier = await suppliersDb.findOneAsync({ _id: supplierId });
+    if (supplier) {
+      return {
+        id: supplier._id,
+        name: supplier.name,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.warn(`Erreur lors de la recherche du fournisseur ${supplierId}:`, error.message);
+    return null;
+  }
+}
+
+// Fonction pour charger toutes les catégories en une seule fois
+async function loadAllCategories(categoriesDb) {
+  try {
+    const categories = await categoriesDb.findAsync({});
+    const categoryMap = {};
+
+    categories.forEach((cat) => {
+      categoryMap[cat._id] = cat;
+    });
+
+    return categoryMap;
+  } catch (error) {
+    console.error('Erreur lors du chargement des catégories:', error);
+    return {};
+  }
+}
+
+// Fonction pour récupérer la hiérarchie complète d'une catégorie
+function getCategoryHierarchy(categoryId, categoryMap, maxDepth = 10) {
+  const hierarchy = [];
+  let currentId = categoryId;
+  let depth = 0;
+
+  // Remonter la hiérarchie jusqu'à la racine ou la profondeur maximale
+  while (currentId && depth < maxDepth) {
+    const category = categoryMap[currentId];
+    if (!category) break;
+
+    hierarchy.unshift({
+      id: category._id,
+      name: category.name,
+      level: category.level || 0,
+    });
+
+    currentId = category.parent_id;
+    depth++;
+  }
+
+  return hierarchy;
+}
+
+// Fonction pour récupérer le nom d'une catégorie à partir de son ID
+async function getCategoryInfoWithHierarchy(categoryId, categoryMap) {
+  try {
+    if (!categoryId) return null;
+
+    const category = categoryMap[categoryId];
+    if (!category) return null;
+
+    // Récupérer la hiérarchie complète
+    const hierarchy = getCategoryHierarchy(categoryId, categoryMap);
+
+    return {
+      id: category._id,
+      name: category.name,
+      level: category.level || 0,
+      hierarchy: hierarchy,
+    };
+  } catch (error) {
+    console.warn(`Erreur lors de la recherche de la catégorie ${categoryId}:`, error.message);
     return null;
   }
 }
@@ -252,6 +340,13 @@ async function migrateProducts(shouldReset = false) {
     // 2. Connexion aux bases
     const productsDb = createDatastore(TARGET_PRODUCTS_FILE);
     const brandsDb = createDatastore(BRANDS_FILE);
+    const suppliersDb = createDatastore(SUPPLIERS_FILE);
+    const categoriesDb = createDatastore(CATEGORIES_FILE);
+
+    // Charger toutes les catégories en une seule fois pour optimiser
+    console.log('Chargement de toutes les catégories...');
+    const categoryMap = await loadAllCategories(categoriesDb);
+    console.log(`${Object.keys(categoryMap).length} catégories chargées.`);
 
     // 3. Migrer les données
     let importedCount = 0;
@@ -281,9 +376,22 @@ async function migrateProducts(shouldReset = false) {
         processedSKUs.add(oldProduct.reference);
         processedIds.add(oldProduct._id);
 
-        // Récupérer l'ID de la marque à partir de son nom
+        // Récupérer les informations de la marque à partir de son nom
         const brandName = oldProduct.marque || oldProduct.brand;
-        const brandId = await getBrandIdByName(brandName, brandsDb);
+        const brandInfo = await getBrandInfoByName(brandName, brandsDb);
+
+        // Récupérer les informations du fournisseur à partir de son ID
+        const supplierInfo = await getSupplierInfoById(oldProduct.supplierId, suppliersDb);
+
+        // Récupérer les informations de la catégorie avec hiérarchie
+        const categoryId = oldProduct.categorie;
+        const categoryInfo = await getCategoryInfoWithHierarchy(categoryId, categoryMap);
+
+        // Créer le tableau de références des catégories
+        const categoriesRefs = [];
+        if (categoryInfo) {
+          categoriesRefs.push(categoryInfo);
+        }
 
         // Vérifier si le produit existe déjà dans la base cible
         try {
@@ -323,10 +431,19 @@ async function migrateProducts(shouldReset = false) {
           stock: oldProduct.stock || 0,
           // Assurer que le prix est bien un nombre
           price: parseFloat(oldProduct.prixVente) || 0,
-          brand_id: brandId,
-          supplier_id: oldProduct.supplierId || null,
-          categories: [oldProduct.categorie].filter(Boolean),
-          category_id: oldProduct.categorie || null,
+          // Ajouter les références d'ID
+          brand_id: brandInfo ? brandInfo.id : null,
+          // Ajouter la référence complète de la marque
+          brand_ref: brandInfo ? brandInfo : null,
+          supplier_id: supplierInfo ? supplierInfo.id : null,
+          // Ajouter la référence complète du fournisseur
+          supplier_ref: supplierInfo ? supplierInfo : null,
+          categories: categoryInfo ? [categoryInfo.id] : [],
+          // Ajouter les références complètes des catégories avec hiérarchie
+          categories_refs: categoriesRefs,
+          category_id: categoryInfo ? categoryInfo.id : null,
+          // Ajouter la référence complète de la catégorie principale avec hiérarchie
+          category_ref: categoryInfo,
           image: images.mainImage,
           gallery_images: images.galleryImages,
           designation: oldProduct.designation || '',

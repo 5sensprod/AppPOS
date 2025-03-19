@@ -150,9 +150,29 @@ const createProductSchema = Joi.object({
   min_stock: Joi.number().min(0).default(0),
   category_id: Joi.string().allow('', null),
   categories: Joi.array().items(Joi.string()).default([]),
+  category_id: Joi.string().allow(null),
   category_path: Joi.array().items(Joi.string()),
   supplier_id: Joi.string().allow('', null),
   brand_id: Joi.string().allow('', null),
+  // Références complètes (objets avec id et name)
+  brand_ref: Joi.object({
+    id: Joi.string(),
+    name: Joi.string(),
+  }).allow(null),
+
+  supplier_ref: Joi.object({
+    id: Joi.string(),
+    name: Joi.string(),
+  }).allow(null),
+
+  categories_refs: Joi.array()
+    .items(
+      Joi.object({
+        id: Joi.string(),
+        name: Joi.string(),
+      })
+    )
+    .default([]),
   status: Joi.string().valid('draft', 'published', 'archived').default('draft'),
   manage_stock: Joi.boolean().default(true),
   stock_status: Joi.string().valid('instock', 'outofstock', 'onbackorder').default('instock'),
