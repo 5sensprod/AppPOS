@@ -1,23 +1,11 @@
 // repositories/CategoryRepository.js
+const BaseRepository = require('./BaseRepository');
 const Category = require('../models/Category');
 const Product = require('../models/Product');
 
-/**
- * Repository pour les opérations de base de données liées aux catégories
- */
-class CategoryRepository {
-  /**
-   * Récupère toutes les catégories
-   */
-  async findAll() {
-    return await Category.findAll();
-  }
-
-  /**
-   * Récupère une catégorie par son ID
-   */
-  async findById(id) {
-    return await Category.findById(id);
+class CategoryRepository extends BaseRepository {
+  constructor() {
+    super(Category);
   }
 
   /**
@@ -26,27 +14,6 @@ class CategoryRepository {
   async findChildCategories(parentId) {
     const allCategories = await this.findAll();
     return allCategories.filter((category) => category.parent_id === parentId);
-  }
-
-  /**
-   * Crée une nouvelle catégorie
-   */
-  async create(categoryData) {
-    return await Category.create(categoryData);
-  }
-
-  /**
-   * Met à jour une catégorie existante
-   */
-  async update(id, updateData) {
-    return await Category.update(id, updateData);
-  }
-
-  /**
-   * Supprime une catégorie
-   */
-  async delete(id) {
-    return await Category.delete(id);
   }
 
   /**
@@ -63,7 +30,6 @@ class CategoryRepository {
 
   /**
    * Vérifie si la catégorie peut être supprimée
-   * (pas de sous-catégories ni de produits liés)
    */
   async canDelete(categoryId) {
     const category = await this.findById(categoryId);
@@ -190,6 +156,13 @@ class CategoryRepository {
         this._sortCategoriesRecursively(category.children);
       }
     });
+  }
+
+  /**
+   * Méthode pour accéder aux produits
+   */
+  async findAllProducts() {
+    return await Product.findAll();
   }
 }
 

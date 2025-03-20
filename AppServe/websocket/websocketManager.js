@@ -1,6 +1,8 @@
 // server/websocket/websocketManager.js
 const WebSocket = require('ws');
 const logger = require('../utils/logger');
+const eventBus = require('../events/eventBus');
+const EVENTS = require('../events/eventTypes');
 
 class WebSocketManager {
   constructor() {
@@ -108,6 +110,44 @@ class WebSocketManager {
         client.send(JSON.stringify({ type, payload }));
       }
     });
+  }
+
+  _registerEventListeners() {
+    // Écoute générique pour tous les types d'entités
+    Object.entries(EVENTS.ENTITY).forEach(([entityType, events]) => {
+      const entityName = entityType.toLowerCase() + 's'; // pluriel
+
+      eventBus.on(events.CREATED, ({ data }) => {
+        this.broadcast('entity_created', { entityType: entityName, data }, [entityName]);
+      });
+
+      eventBus.on(events.UPDATED, ({ id, data }) => {
+        this.broadcast('entity_updated', { entityType: entityName, entityId: id, data }, [
+          entityName,
+        ]);
+      });
+
+      eventBus.on(events.DELETED, ({ id }) => {
+        this.broadcast('entity_deleted', { entityType: entityName, entityId: id }, [entityName]);
+      });
+    });
+
+    // Événements spéciaux
+    eventBus.on(EVENTS.CATEGORY_TREE_CHANGED, () => {
+      this.broadcast('category_tree_changed', { timestamp: Date.now() }, ['categories']);
+    });
+  }
+
+  close() {
+    if (this.wss) {
+      // Fermer toutes les connexions clients
+      this.wss.clients.forEach((client) => {
+        client.terminate();
+      });
+
+      this.wss.close();
+      console.log('WebSocket serveur fermé');
+    }
   }
 }
 
