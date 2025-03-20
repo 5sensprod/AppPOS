@@ -1,7 +1,6 @@
 // controllers/SupplierController.js
 const BaseController = require('./base/BaseController');
 const Supplier = require('../models/Supplier');
-const supplierService = require('../services/SupplierService');
 const ResponseHandler = require('../handlers/ResponseHandler');
 
 class SupplierController extends BaseController {
@@ -13,9 +12,7 @@ class SupplierController extends BaseController {
     });
   }
 
-  _getService() {
-    return supplierService;
-  }
+  // Ajout potentiel de méthodes spécifiques aux fournisseurs ici
 }
 
 const supplierController = new SupplierController();
