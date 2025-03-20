@@ -50,7 +50,20 @@ class ProductController extends BaseController {
       }
 
       req.body.categories = categories;
-      return super.create(req, res);
+      req.body.category_id = categories.length > 0 ? categories[0] : null;
+
+      const result = await super.create(req, res);
+
+      // Notifier du changement de l'arborescence
+      if (categories.length > 0) {
+        console.log(
+          "[WS-DEBUG] Création d'un produit avec catégorie, envoi de category_tree_changed"
+        );
+        const websocketManager = require('../websocket/websocketManager');
+        websocketManager.notifyCategoryTreeChange();
+      }
+
+      return result;
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
@@ -58,6 +71,8 @@ class ProductController extends BaseController {
 
   async update(req, res) {
     try {
+      let categoryChanged = false;
+
       if ('category_id' in req.body || 'categories' in req.body) {
         const categories =
           req.body.categories || (req.body.category_id ? [req.body.category_id] : []);
@@ -66,11 +81,30 @@ class ProductController extends BaseController {
           await this.validateCategories(categories);
         }
 
+        // Vérifier si la catégorie a changé
+        const existingProduct = await this.model.findById(req.params.id);
+        if (existingProduct) {
+          const oldCategories = existingProduct.categories || [];
+          if (JSON.stringify(oldCategories.sort()) !== JSON.stringify(categories.sort())) {
+            categoryChanged = true;
+          }
+        }
+
         req.body.categories = categories;
         req.body.category_id = categories.length > 0 ? categories[0] : null;
       }
 
-      return super.update(req, res);
+      const result = await super.update(req, res);
+
+      if (categoryChanged) {
+        console.log(
+          "[WS-DEBUG] La catégorie d'un produit a changé, envoi de category_tree_changed"
+        );
+        const websocketManager = require('../websocket/websocketManager');
+        websocketManager.notifyCategoryTreeChange();
+      }
+
+      return result;
     } catch (error) {
       return ResponseHandler.error(res, error);
     }

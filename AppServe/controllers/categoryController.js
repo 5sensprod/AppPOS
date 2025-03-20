@@ -13,22 +13,42 @@ class CategoryController extends BaseController {
     });
   }
 
-  async create(req, res) {
-    try {
-      req.body.level = await calculateLevel(req.body.parent_id);
-      return super.create(req, res);
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
-  }
-
   async update(req, res) {
     try {
-      if (req.body.parent_id) {
-        req.body.level = await calculateLevel(req.body.parent_id);
+      // Vérifier si la catégorie existe
+      const category = await this.model.findById(req.params.id);
+      if (!category) {
+        console.error('[WS-DEBUG] Catégorie introuvable pour mise à jour:', req.params.id);
+        return ResponseHandler.notFound(res, 'Catégorie non trouvée');
       }
-      return super.update(req, res);
+
+      // Vérifier et recalculer le niveau de la catégorie si le parent_id a changé
+      if (req.body.parent_id && req.body.parent_id !== category.parent_id) {
+        try {
+          req.body.level = await calculateLevel(req.body.parent_id);
+        } catch (levelError) {
+          console.error('[WS-DEBUG] Erreur lors du calcul du niveau:', levelError);
+          return ResponseHandler.error(res, 'Erreur lors du calcul du niveau');
+        }
+      }
+
+      // Mise à jour de la catégorie
+      const result = await super.update(req, res);
+
+      // Vérifier si le nom ou la hiérarchie a changé avant d'envoyer un événement WebSocket
+      if (req.body.name || req.body.parent_id) {
+        try {
+          console.log('[WS-DEBUG] Mise à jour de la catégorie, envoi de category_tree_changed');
+          const websocketManager = require('../websocket/websocketManager');
+          websocketManager.notifyCategoryTreeChange();
+        } catch (wsError) {
+          console.error("[WS-DEBUG] Erreur lors de l'envoi de category_tree_changed:", wsError);
+        }
+      }
+
+      return result;
     } catch (error) {
+      console.error('[WS-DEBUG] Erreur dans update() de categoryController:', error);
       return ResponseHandler.error(res, error);
     }
   }
@@ -87,7 +107,7 @@ class CategoryController extends BaseController {
       // Notification WebSocket
       const websocketManager = require('../websocket/websocketManager');
       websocketManager.notifyEntityDeleted('categories', req.params.id);
-
+      websocketManager.notifyCategoryTreeChange();
       return ResponseHandler.success(res, {
         message: 'Catégorie supprimée avec succès',
         woo_status: item.woo_id ? 'synchronized' : 'not_applicable',

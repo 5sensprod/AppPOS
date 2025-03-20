@@ -84,6 +84,11 @@ class WebSocketManager {
     this.broadcast('entity_deleted', { entityType: entityPlural, entityId }, [entityPlural]);
   }
 
+  notifyCategoryTreeChange() {
+    this.broadcast('category_tree_changed', { timestamp: Date.now() }, ['categories']);
+    console.log("[WS-DEBUG] Notification de changement dans l'arborescence des catégories envoyée");
+  }
+
   // Envoyer à un client spécifique
   sendToClient(client, type, payload) {
     if (client.readyState === WebSocket.OPEN) {
