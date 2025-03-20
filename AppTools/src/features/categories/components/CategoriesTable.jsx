@@ -235,9 +235,6 @@ function CategoriesTable(props) {
 
   const filters = [];
 
-  // Désactiver le tri standard
-  const sortProcessor = useCallback((data) => data, []);
-
   // Gérer la suppression d'une catégorie
   const handleDeleteCategory = useCallback(
     async (id) => {
@@ -341,7 +338,6 @@ function CategoriesTable(props) {
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
         sort={localSort}
-        onRefresh={refreshData}
         customRowClassName={customRowClassName}
         {...props}
       />
