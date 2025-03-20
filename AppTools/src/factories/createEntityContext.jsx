@@ -272,13 +272,30 @@ export function createEntityContext(options) {
 
     // Actions CRUD standard
     const fetchItems = useCallback(async (params = {}) => {
+      console.log(`[CONTEXT] Début de fetchItems pour ${apiEndpoint}`);
       dispatch({ type: ACTIONS.FETCH_START });
       try {
-        console.log(`Appel API pour ${apiEndpoint}`);
+        console.log(`[CONTEXT] Appel API pour ${apiEndpoint}`, params);
         const response = await apiService.get(apiEndpoint, { params });
+        console.log(`[CONTEXT] Réponse API reçue:`, response.data.data.length, 'éléments');
+
+        // Pour le débogage, affichez le premier élément (si disponible)
+        if (response.data.data.length > 0 && entityName === 'product') {
+          const firstItem = response.data.data[0];
+          console.log(`[CONTEXT] Exemple de produit:`, {
+            id: firstItem._id,
+            name: firstItem.name,
+            categories: firstItem.categories,
+            category_id: firstItem.category_id,
+            categories_refs: firstItem.categories_refs,
+            category_ref: firstItem.category_ref,
+          });
+        }
+
         dispatch({ type: ACTIONS.FETCH_SUCCESS, payload: response.data.data });
         return response.data;
       } catch (error) {
+        console.error(`[CONTEXT] Erreur dans fetchItems pour ${apiEndpoint}:`, error);
         dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
         throw error;
       }

@@ -27,8 +27,19 @@ export const ENTITY_CONFIG = {
         </div>
       ),
     },
-    { key: 'name', label: 'Nom', sortable: true },
-    { key: 'sku', label: 'SKU', sortable: true },
+    {
+      key: 'sku',
+      label: 'Référence',
+      render: (product) => (product.sku ? product.sku : product.name),
+      sortable: true,
+    },
+    {
+      key: 'purchase_price',
+      label: 'Achat',
+      sortable: true,
+      render: (product) =>
+        `${product.purchase_price ? product.purchase_price.toFixed(2) : '0.00'} €`,
+    },
     {
       key: 'price',
       label: 'Prix',
@@ -50,8 +61,43 @@ export const ENTITY_CONFIG = {
       sortable: true,
     },
     {
-      key: 'status',
-      label: 'Statut',
+      key: 'category',
+      label: 'Catégorie',
+      render: (product) => {
+        // Utiliser categories_refs si disponible, sinon utiliser category_ref
+        if (product.categories_refs && product.categories_refs.length > 0) {
+          // Afficher la première catégorie (principale)
+          return (
+            <div className="flex flex-col">
+              <span>{product.categories_refs[0].name}</span>
+              {product.categories_refs.length > 1 && (
+                <span className="text-xs text-gray-500">
+                  (+{product.categories_refs.length - 1} autres)
+                </span>
+              )}
+            </div>
+          );
+        } else if (product.category_ref) {
+          // Utiliser category_ref si pas de categories_refs
+          return (
+            <>
+              {product.category_ref.name}
+              {product.category_ref.hierarchy && product.category_ref.hierarchy.length > 1 && (
+                <span className="text-xs text-gray-500 ml-2">
+                  ({product.category_ref.hierarchy.map((cat) => cat.name).join(' > ')})
+                </span>
+              )}
+            </>
+          );
+        } else {
+          return '-';
+        }
+      },
+      sortable: false,
+    },
+    {
+      key: 'woo_status',
+      label: 'Statut WEB',
       render: (product) => {
         const statusMap = {
           published: {
@@ -68,36 +114,34 @@ export const ENTITY_CONFIG = {
           },
         };
 
-        const status = statusMap[product.status] || statusMap.draft;
-
         return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
-            {status.label}
-          </span>
+          <div className="flex items-center space-x-2">
+            {product.woo_id ? (
+              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                Synchronisé
+              </span>
+            ) : (
+              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                Non synchronisé
+              </span>
+            )}
+
+            {product.pending_sync && (
+              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                Modifié
+              </span>
+            )}
+
+            {product.woo_id && product.status && statusMap[product.status] && (
+              <span
+                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMap[product.status].color}`}
+              >
+                {statusMap[product.status].label}
+              </span>
+            )}
+          </div>
         );
       },
-    },
-    {
-      key: 'woo_status',
-      label: 'Statut WEB',
-      render: (product) => (
-        <div className="flex">
-          {product.woo_id ? (
-            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-              Synchronisé
-            </span>
-          ) : (
-            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-              Non synchronisé
-            </span>
-          )}
-          {product.pending_sync && (
-            <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-              Modifié
-            </span>
-          )}
-        </div>
-      ),
     },
   ],
   formFields: [

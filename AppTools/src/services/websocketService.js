@@ -9,6 +9,7 @@ class WebSocketService {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000;
+    this.subscriptions = []; // Garder une trace des abonnements actifs
   }
 
   init(baseUrl) {
@@ -20,7 +21,7 @@ class WebSocketService {
       ? baseUrl.replace(/^http(s)?:/, wsProtocol)
       : `${wsProtocol}//${window.location.host}`;
 
-    console.log(`Nouvelle connexion WebSocket à ${wsUrl}/ws`);
+    console.log(`[WS-CLIENT] Nouvelle connexion WebSocket à ${wsUrl}/ws`);
 
     this.socket = new WebSocket(`${wsUrl}/ws`);
     this.setupEventListeners();
@@ -28,53 +29,77 @@ class WebSocketService {
 
   setupEventListeners() {
     this.socket.addEventListener('open', () => {
-      console.log('WebSocket connecté');
+      console.log('[WS-CLIENT] WebSocket connecté');
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.isReconnecting = false; // 🔹 Connexion réussie, stoppe la reconnexion
+
+      // Réabonner aux entités précédemment suivies
+      console.log(
+        `[WS-CLIENT] Réabonnement aux ${this.subscriptions.length} souscriptions précédentes`
+      );
+      this.subscriptions.forEach((entityType) => {
+        this.subscribe(entityType);
+      });
+
       this.triggerEvent('connect');
     });
 
     this.socket.addEventListener('message', ({ data }) => {
       try {
         const { type, payload } = JSON.parse(data);
-        console.log('Message reçu:', { type, payload });
+        console.log('[WS-CLIENT] Message reçu:', { type, payload });
 
         const actions = {
           entity_updated: () => this.handleEntityUpdate(payload),
           entity_created: () => this.handleEntityCreate(payload),
           entity_deleted: () => this.handleEntityDelete(payload),
+          category_tree_changed: () =>
+            console.log("[WS-CLIENT] Changement d'arborescence de catégorie détecté"),
         };
 
-        actions[type]?.();
+        if (actions[type]) {
+          actions[type]();
+        }
+
+        // Vérifier si nous avons des écouteurs pour cet événement
+        const hasListeners = this.eventHandlers[type] && this.eventHandlers[type].length > 0;
+        console.log(
+          `[WS-CLIENT] Événement '${type}' a ${hasListeners ? this.eventHandlers[type].length : 0} écouteurs`
+        );
+
         this.triggerEvent(type, payload);
       } catch (error) {
-        console.error('Erreur de traitement WebSocket:', error);
+        console.error('[WS-CLIENT] Erreur de traitement WebSocket:', error);
       }
     });
 
     this.socket.addEventListener('close', ({ code, reason }) => {
-      console.log(`WebSocket fermé: ${code} ${reason}`);
+      console.log(`[WS-CLIENT] WebSocket fermé: ${code} ${reason}`);
       this.isConnected = false;
       this.attemptReconnect();
       this.triggerEvent('disconnect');
     });
 
     this.socket.addEventListener('error', (error) => {
-      console.error('Erreur WebSocket:', error);
+      console.error('[WS-CLIENT] Erreur WebSocket:', error);
       this.triggerEvent('error', error);
     });
   }
 
   attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts || this.isReconnecting) {
-      console.error(`Reconnexion annulée après ${this.maxReconnectAttempts} tentatives`);
+      console.error(
+        `[WS-CLIENT] Reconnexion annulée après ${this.maxReconnectAttempts} tentatives`
+      );
       return;
     }
 
     this.reconnectAttempts++;
     this.isReconnecting = true; // 🔹 Empêche plusieurs reconnexions en parallèle
-    console.log(`Reconnexion dans ${this.reconnectDelay}ms (Tentative ${this.reconnectAttempts})`);
+    console.log(
+      `[WS-CLIENT] Reconnexion dans ${this.reconnectDelay}ms (Tentative ${this.reconnectAttempts})`
+    );
 
     setTimeout(() => {
       if (!this.isConnected) {
@@ -84,54 +109,100 @@ class WebSocketService {
   }
 
   handleEntityUpdate({ entityType, entityId, data }) {
+    console.log(`[WS-CLIENT] Mise à jour d'entité: ${entityType} (ID: ${entityId})`);
     this.triggerEvent(`${entityType}_updated`, { entityId, data });
   }
 
   handleEntityCreate({ entityType, data }) {
+    console.log(`[WS-CLIENT] Création d'entité: ${entityType}`);
     this.triggerEvent(`${entityType}_created`, { data });
   }
 
   handleEntityDelete({ entityType, entityId }) {
+    console.log(`[WS-CLIENT] Suppression d'entité: ${entityType} (ID: ${entityId})`);
     this.triggerEvent(`${entityType}_deleted`, { entityId });
   }
 
   send(type, payload) {
     if (!this.isConnected) {
-      console.warn('Envoi WebSocket impossible: connexion fermée');
+      console.warn('[WS-CLIENT] Envoi WebSocket impossible: connexion fermée');
       return false;
     }
+    console.log(`[WS-CLIENT] Envoi du message: ${type}`, payload);
     this.socket.send(JSON.stringify({ type, payload }));
     return true;
   }
 
   subscribe(entityType) {
+    console.log(`[WS-CLIENT] Abonnement à: ${entityType}`);
+
+    // Stocker l'abonnement pour réabonnement lors des reconnexions
+    if (!this.subscriptions.includes(entityType)) {
+      this.subscriptions.push(entityType);
+      console.log(`[WS-CLIENT] Liste des abonnements: ${this.subscriptions.join(', ')}`);
+    }
+
     return this.send('subscribe', { entityType });
   }
 
   on(eventName, callback) {
     this.eventHandlers[eventName] = this.eventHandlers[eventName] || [];
     this.eventHandlers[eventName].push(callback);
+    console.log(
+      `[WS-CLIENT] Nouvel écouteur pour '${eventName}'. Total: ${this.eventHandlers[eventName].length}`
+    );
   }
 
   off(eventName, callback) {
-    if (!this.eventHandlers[eventName]) return;
-    this.eventHandlers[eventName] = callback
-      ? this.eventHandlers[eventName].filter((handler) => handler !== callback)
-      : [];
+    if (!this.eventHandlers[eventName]) {
+      console.log(
+        `[WS-CLIENT] Tentative de suppression d'un écouteur pour '${eventName}', mais aucun n'existe`
+      );
+      return;
+    }
+
+    const initialCount = this.eventHandlers[eventName].length;
+
+    if (callback) {
+      this.eventHandlers[eventName] = this.eventHandlers[eventName].filter(
+        (handler) => handler !== callback
+      );
+      console.log(
+        `[WS-CLIENT] Écouteur supprimé pour '${eventName}'. Avant: ${initialCount}, Après: ${this.eventHandlers[eventName].length}`
+      );
+    } else {
+      this.eventHandlers[eventName] = [];
+      console.log(`[WS-CLIENT] Tous les écouteurs (${initialCount}) supprimés pour '${eventName}'`);
+    }
   }
 
   triggerEvent(eventName, data) {
-    this.eventHandlers[eventName]?.forEach((callback) => {
+    if (!this.eventHandlers[eventName] || this.eventHandlers[eventName].length === 0) {
+      console.log(`[WS-CLIENT] Aucun écouteur trouvé pour l'événement '${eventName}'`);
+      return;
+    }
+
+    console.log(
+      `[WS-CLIENT] Déclenchement de l'événement '${eventName}' pour ${this.eventHandlers[eventName].length} écouteur(s)`
+    );
+
+    this.eventHandlers[eventName].forEach((callback, index) => {
       try {
+        console.log(`[WS-CLIENT] Exécution de l'écouteur #${index + 1} pour '${eventName}'`);
         callback(data);
+        console.log(`[WS-CLIENT] Écouteur #${index + 1} pour '${eventName}' exécuté avec succès`);
       } catch (error) {
-        console.error(`Erreur dans le gestionnaire d'événement ${eventName}:`, error);
+        console.error(
+          `[WS-CLIENT] Erreur dans l'écouteur #${index + 1} pour '${eventName}':`,
+          error
+        );
       }
     });
   }
 
   disconnect() {
     if (this.socket) {
+      console.log('[WS-CLIENT] Déconnexion manuelle du WebSocket');
       this.socket.close();
       this.socket = null;
       this.isConnected = false;

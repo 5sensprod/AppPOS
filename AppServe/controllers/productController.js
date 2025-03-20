@@ -1,8 +1,59 @@
+// controllers/productController.js
 const BaseController = require('./base/BaseController');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const productWooCommerceService = require('../services/ProductWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
+
+// Fonction utilitaire pour mettre à jour les références de catégories
+async function updateCategoryRefs(productId, categoryIds) {
+  try {
+    // Si aucune catégorie, effacer les références
+    if (!categoryIds || categoryIds.length === 0) {
+      await Product.update(productId, {
+        categories_refs: [],
+        category_ref: null,
+      });
+      return;
+    }
+
+    // Récupérer les détails des catégories
+    const categories = await Category.findAll();
+    const categoryRefs = categoryIds
+      .map((catId) => {
+        const category = categories.find((c) => c._id === catId);
+        if (category) {
+          return {
+            id: category._id,
+            name: category.name,
+            woo_id: category.woo_id || null,
+          };
+        }
+        return null;
+      })
+      .filter((ref) => ref !== null);
+
+    // Aussi mettre à jour category_ref (première catégorie)
+    const primaryCategoryRef =
+      categoryRefs.length > 0
+        ? {
+            id: categoryRefs[0].id,
+            name: categoryRefs[0].name,
+          }
+        : null;
+
+    // Mettre à jour le produit avec les références de catégories
+    await Product.update(productId, {
+      categories_refs: categoryRefs,
+      category_ref: primaryCategoryRef,
+    });
+
+    console.log(`[WS-DEBUG] Mise à jour des references de catégories pour le produit ${productId}`);
+  } catch (error) {
+    console.error('[WS-DEBUG] Erreur lors de la mise à jour des references de catégories:', error);
+    throw error;
+  }
+}
 
 class ProductController extends BaseController {
   constructor() {
@@ -52,7 +103,16 @@ class ProductController extends BaseController {
       req.body.categories = categories;
       req.body.category_id = categories.length > 0 ? categories[0] : null;
 
-      const result = await super.create(req, res);
+      // Initialiser categories_refs comme un tableau vide
+      req.body.categories_refs = [];
+
+      // Utiliser super.create mais ne pas envoyer la réponse tout de suite
+      const newItem = await this.model.create(req.body);
+
+      // Mise à jour des références de catégories
+      if (categories.length > 0) {
+        await updateCategoryRefs(newItem._id, categories);
+      }
 
       // Notifier du changement de l'arborescence
       if (categories.length > 0) {
@@ -63,7 +123,15 @@ class ProductController extends BaseController {
         websocketManager.notifyCategoryTreeChange();
       }
 
-      return result;
+      // Récupérer le produit mis à jour avec les références de catégories
+      const updatedItem = await this.model.findById(newItem._id);
+
+      // Standardisation des notifications WebSocket (délégué au BaseController)
+      const websocketManager = require('../websocket/websocketManager');
+      websocketManager.notifyEntityCreated(this.entityName, updatedItem);
+
+      // Maintenant envoyer la réponse
+      return ResponseHandler.created(res, updatedItem);
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
@@ -72,6 +140,7 @@ class ProductController extends BaseController {
   async update(req, res) {
     try {
       let categoryChanged = false;
+      let categoriesForRefs = null;
 
       if ('category_id' in req.body || 'categories' in req.body) {
         const categories =
@@ -87,6 +156,7 @@ class ProductController extends BaseController {
           const oldCategories = existingProduct.categories || [];
           if (JSON.stringify(oldCategories.sort()) !== JSON.stringify(categories.sort())) {
             categoryChanged = true;
+            categoriesForRefs = categories;
           }
         }
 
@@ -94,7 +164,23 @@ class ProductController extends BaseController {
         req.body.category_id = categories.length > 0 ? categories[0] : null;
       }
 
-      const result = await super.update(req, res);
+      // Mise à jour directe sans appeler super.update pour éviter l'envoi de réponse
+      const id = req.params.id;
+      const updateData = req.body;
+
+      const existing = await this.model.findById(id);
+      if (!existing) return ResponseHandler.notFound(res);
+
+      if (existing.woo_id) {
+        updateData.pending_sync = true;
+      }
+
+      await this.model.update(id, updateData);
+
+      // Mise à jour des références de catégories si nécessaire
+      if (categoryChanged && categoriesForRefs !== null) {
+        await updateCategoryRefs(id, categoriesForRefs);
+      }
 
       if (categoryChanged) {
         console.log(
@@ -104,7 +190,25 @@ class ProductController extends BaseController {
         websocketManager.notifyCategoryTreeChange();
       }
 
-      return result;
+      // Récupérer le produit mis à jour
+      const updatedItem = await this.model.findById(id);
+
+      // Standardisation des notifications WebSocket
+      const websocketManager = require('../websocket/websocketManager');
+      websocketManager.notifyEntityUpdated(this.entityName, id, updatedItem);
+
+      // Gestion de la synchronisation WooCommerce si nécessaire
+      if (this.shouldSync() && this.wooCommerceService) {
+        try {
+          await this.wooCommerceService.syncToWooCommerce([updatedItem]);
+          await this.model.update(id, { pending_sync: false });
+        } catch (syncError) {
+          return ResponseHandler.partialSuccess(res, updatedItem, syncError);
+        }
+      }
+
+      // Envoyer la réponse une seule fois à la fin
+      return ResponseHandler.success(res, updatedItem);
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
@@ -122,5 +226,6 @@ module.exports = {
   uploadImage: productController.uploadImage,
   updateImageMetadata: productController.updateImageMetadata,
   deleteImage: productController.deleteImage,
-  setMainImage: productController.setMainImage, // Ajout de cette ligne
+  setMainImage: productController.setMainImage,
+  updateCategoryRefs: updateCategoryRefs, // Exposer la fonction pour l'utiliser ailleurs si nécessaire
 };

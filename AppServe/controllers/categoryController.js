@@ -4,6 +4,152 @@ const Category = require('../models/Category');
 const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
 const { calculateLevel } = require('../utils/categoryHelpers');
+// Ajoutez cette fonction au début du fichier categoryController.js, après les imports
+async function updateProductCategoryRefs(categoryId) {
+  try {
+    const Product = require('../models/Product');
+    const Category = require('../models/Category');
+
+    // Obtenir les détails de la catégorie
+    const category = await Category.findById(categoryId);
+    if (!category) {
+      console.error(
+        `[WS-DEBUG] Catégorie ${categoryId} non trouvée pour la mise à jour des références`
+      );
+      return;
+    }
+
+    // Trouver tous les produits liés à cette catégorie
+    const allProducts = await Product.findAll();
+    const linkedProducts = allProducts.filter(
+      (product) =>
+        (product.categories?.length > 0 && product.categories.includes(categoryId)) ||
+        (product.category_id && product.category_id === categoryId)
+    );
+
+    if (linkedProducts.length === 0) {
+      console.log(`[WS-DEBUG] Aucun produit lié à la catégorie ${categoryId} à mettre à jour`);
+      return;
+    }
+
+    // Obtenir toutes les catégories pour les références
+    const allCategories = await Category.findAll();
+
+    // Mettre à jour les références pour chaque produit
+    for (const product of linkedProducts) {
+      if (!product.categories || product.categories.length === 0) continue;
+
+      const categoryRefs = product.categories
+        .map((catId) => {
+          const cat = allCategories.find((c) => c._id === catId);
+          if (cat) {
+            return {
+              id: cat._id,
+              name: cat.name,
+              woo_id: cat.woo_id || null,
+            };
+          }
+          return null;
+        })
+        .filter((ref) => ref !== null);
+
+      // Créer category_ref (première catégorie)
+      const primaryCategoryRef =
+        categoryRefs.length > 0
+          ? {
+              id: categoryRefs[0].id,
+              name: categoryRefs[0].name,
+            }
+          : null;
+
+      await Product.update(product._id, {
+        categories_refs: categoryRefs,
+        category_ref: primaryCategoryRef,
+      });
+
+      console.log(
+        `[WS-DEBUG] Mise à jour des références de catégories pour le produit ${product._id}`
+      );
+    }
+
+    console.log(
+      `[WS-DEBUG] Mise à jour terminée pour ${linkedProducts.length} produits liés à la catégorie ${categoryId}`
+    );
+  } catch (error) {
+    console.error('[WS-DEBUG] Erreur lors de la mise à jour des references de catégories:', error);
+  }
+}
+
+// Fonction pour mettre à jour les produits après la suppression d'une catégorie
+async function updateProductsAfterCategoryDeletion(categoryId) {
+  try {
+    const Product = require('../models/Product');
+    const allProducts = await Product.findAll();
+
+    // Trouver tous les produits qui utilisent cette catégorie
+    const linkedProducts = allProducts.filter(
+      (product) =>
+        (product.categories?.length > 0 && product.categories.includes(categoryId)) ||
+        (product.category_id && product.category_id === categoryId)
+    );
+
+    if (linkedProducts.length === 0) return;
+
+    // Mise à jour de chaque produit
+    for (const product of linkedProducts) {
+      const updatedCategories = product.categories?.filter((id) => id !== categoryId) || [];
+      const updatedCategoryId =
+        product.category_id === categoryId
+          ? updatedCategories.length > 0
+            ? updatedCategories[0]
+            : null
+          : product.category_id;
+
+      // Mise à jour de toutes les références de catégories
+      const Category = require('../models/Category');
+      const allCategories = await Category.findAll();
+
+      const categoryRefs = updatedCategories
+        .map((catId) => {
+          const cat = allCategories.find((c) => c._id === catId);
+          if (cat) {
+            return {
+              id: cat._id,
+              name: cat.name,
+              woo_id: cat.woo_id || null,
+            };
+          }
+          return null;
+        })
+        .filter((ref) => ref !== null);
+
+      // Créer category_ref (première catégorie)
+      const primaryCategoryRef =
+        categoryRefs.length > 0
+          ? {
+              id: categoryRefs[0].id,
+              name: categoryRefs[0].name,
+            }
+          : null;
+
+      await Product.update(product._id, {
+        categories: updatedCategories,
+        category_id: updatedCategoryId,
+        categories_refs: categoryRefs,
+        category_ref: primaryCategoryRef,
+      });
+
+      console.log(
+        `[WS-DEBUG] Produit ${product._id} mis à jour après suppression de la catégorie ${categoryId}`
+      );
+    }
+  } catch (error) {
+    console.error(
+      '[WS-DEBUG] Erreur lors de la mise à jour des produits après suppression de catégorie:',
+      error
+    );
+  }
+}
 
 class CategoryController extends BaseController {
   constructor() {
@@ -41,6 +187,9 @@ class CategoryController extends BaseController {
           console.log('[WS-DEBUG] Mise à jour de la catégorie, envoi de category_tree_changed');
           const websocketManager = require('../websocket/websocketManager');
           websocketManager.notifyCategoryTreeChange();
+
+          // Ajoutez cette ligne pour mettre à jour les références dans les produits
+          await updateProductCategoryRefs(req.params.id);
         } catch (wsError) {
           console.error("[WS-DEBUG] Erreur lors de l'envoi de category_tree_changed:", wsError);
         }
@@ -102,6 +251,7 @@ class CategoryController extends BaseController {
       }
 
       await this.handleImageDeletion(item);
+      await updateProductsAfterCategoryDeletion(req.params.id);
       await this.model.delete(req.params.id);
 
       // Notification WebSocket
