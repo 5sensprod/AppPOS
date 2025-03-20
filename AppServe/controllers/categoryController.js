@@ -2,8 +2,8 @@
 const BaseController = require('./base/BaseController');
 const Category = require('../models/Category');
 const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
+const categoryService = require('../services/CategoryService');
 const ResponseHandler = require('../handlers/ResponseHandler');
-const { calculateLevel } = require('../utils/categoryHelpers');
 
 class CategoryController extends BaseController {
   constructor() {
@@ -15,38 +15,27 @@ class CategoryController extends BaseController {
 
   async update(req, res) {
     try {
-      // Vérifier si la catégorie existe
       const category = await this.model.findById(req.params.id);
       if (!category) {
-        console.error('[WS-DEBUG] Catégorie introuvable pour mise à jour:', req.params.id);
         return ResponseHandler.notFound(res, 'Catégorie non trouvée');
       }
 
-      // Vérifier et recalculer le niveau de la catégorie si le parent_id a changé
-      if (req.body.parent_id && req.body.parent_id !== category.parent_id) {
-        try {
-          req.body.level = await calculateLevel(req.body.parent_id);
-        } catch (levelError) {
-          console.error('[WS-DEBUG] Erreur lors du calcul du niveau:', levelError);
-          return ResponseHandler.error(res, 'Erreur lors du calcul du niveau');
-        }
-      }
+      // Mise à jour des données via le service
+      const updatedData = await categoryService.prepareUpdateData(req.body, category);
 
-      // Mise à jour de la catégorie
+      // Mettre à jour req.body avec les données préparées
+      req.body = updatedData;
+
+      // Appeler la méthode parent avec req et res inchangés
       const result = await super.update(req, res);
 
-      // Vérifier si le nom ou la hiérarchie a changé avant d'envoyer un événement WebSocket
-      if (req.body.name || req.body.parent_id) {
-        try {
-          console.log('[WS-DEBUG] Mise à jour de la catégorie, envoi de category_tree_changed');
-          const websocketManager = require('../websocket/websocketManager');
-          websocketManager.notifyCategoryTreeChange();
-        } catch (wsError) {
-          console.error("[WS-DEBUG] Erreur lors de l'envoi de category_tree_changed:", wsError);
-        }
-      }
+      // Après le retour de super.update(), ne pas continuer car la réponse a déjà été envoyée
+      // Notification WebSocket sans passer toute la réponse
+      const updatedCategory = await this.model.findById(req.params.id);
+      categoryService.notifyCategoryChanges(req.params.id, updatedCategory, 'update');
 
-      return result;
+      // Ne pas retourner de nouvelle réponse
+      return;
     } catch (error) {
       console.error('[WS-DEBUG] Erreur dans update() de categoryController:', error);
       return ResponseHandler.error(res, error);
@@ -55,62 +44,31 @@ class CategoryController extends BaseController {
 
   async delete(req, res) {
     try {
-      const item = await this.model.findById(req.params.id);
-      if (!item) return ResponseHandler.notFound(res);
+      const categoryId = req.params.id;
+      const validationResult = await categoryService.validateDeletion(categoryId);
 
-      // Vérification des sous-catégories
-      if (item.level === 0) {
-        const allCategories = await this.model.findAll();
-        const children = allCategories.filter((cat) => cat.parent_id === req.params.id);
-        if (children.length > 0) {
-          return ResponseHandler.error(res, {
-            status: 400,
-            message: `Impossible de supprimer la catégorie : ${children.length} sous-catégorie(s) existante(s)`,
-          });
-        }
-      }
-
-      // Vérification des produits liés
-      const Product = require('../models/Product');
-      const allProducts = await Product.findAll();
-      const linkedProducts = allProducts.filter(
-        (product) =>
-          (product.categories?.length > 0 && product.categories.includes(item._id)) ||
-          (product.category_id && product.category_id === item._id)
-      );
-
-      if (linkedProducts.length > 0) {
+      if (!validationResult.canDelete) {
         return ResponseHandler.error(res, {
           status: 400,
-          message: `Impossible de supprimer la catégorie : ${linkedProducts.length} produit(s) lié(s)`,
+          message: validationResult.message,
         });
       }
 
-      // Si l'entité est synchronisée avec WooCommerce, la supprimer d'abord de WC
-      if (item.woo_id) {
-        try {
-          console.log(
-            `[WS-DEBUG] Suppression de la catégorie ${item._id} de WooCommerce (woo_id: ${item.woo_id})`
-          );
-          const categoryWooService = require('../services/CategoryWooCommerceService');
-          await categoryWooService.deleteCategory(item._id);
-          console.log(`[WS-DEBUG] Catégorie supprimée de WooCommerce avec succès`);
-        } catch (wcError) {
-          console.error(`[WS-DEBUG] Erreur lors de la suppression WooCommerce:`, wcError);
-          // On continue malgré l'erreur pour supprimer en local
-        }
+      // Supprimer de WooCommerce si nécessaire
+      if (validationResult.category.woo_id) {
+        await categoryService.deleteFromWooCommerce(validationResult.category);
       }
 
-      await this.handleImageDeletion(item);
-      await this.model.delete(req.params.id);
+      // Supprimer les images et la catégorie
+      await this.handleImageDeletion(validationResult.category);
+      await this.model.delete(categoryId);
 
-      // Notification WebSocket
-      const websocketManager = require('../websocket/websocketManager');
-      websocketManager.notifyEntityDeleted('categories', req.params.id);
-      websocketManager.notifyCategoryTreeChange();
+      // Notifications WebSocket via le service
+      categoryService.notifyCategoryChanges(categoryId, null, 'delete');
+
       return ResponseHandler.success(res, {
         message: 'Catégorie supprimée avec succès',
-        woo_status: item.woo_id ? 'synchronized' : 'not_applicable',
+        woo_status: validationResult.category.woo_id ? 'synchronized' : 'not_applicable',
       });
     } catch (error) {
       return ResponseHandler.error(res, error);
@@ -118,116 +76,11 @@ class CategoryController extends BaseController {
   }
 }
 
-// Nouvelle fonction pour les catégories hiérarchiques
 async function getHierarchicalCategories(req, res) {
   try {
     const { search = '' } = req.query;
-
-    // Récupération de toutes les catégories
-    const allCategories = await Category.findAll();
-
-    // Récupération de tous les produits pour compter
-    const Product = require('../models/Product');
-    const allProducts = await Product.findAll();
-
-    // Organiser les catégories par niveau
-    const rootCategories = [];
-    const categoriesMap = new Map();
-
-    // Première passe : créer la map des catégories avec compteur de produits
-    allCategories.forEach((category) => {
-      // Filtrer les produits pour cette catégorie
-      const categoryProducts = allProducts.filter(
-        (product) =>
-          (product.categories && product.categories.includes(category._id)) ||
-          product.category_id === category._id
-      );
-
-      // Collecter les IDs et noms des produits pour référence rapide
-      const productsList = categoryProducts.map((product) => ({
-        _id: product._id,
-        name: product.name,
-        sku: product.sku || null,
-      }));
-
-      // Pour chaque catégorie, ajouter un tableau children vide, le compteur et les produits
-      categoriesMap.set(category._id, {
-        ...category,
-        children: [],
-        productCount: categoryProducts.length,
-        products: productsList,
-      });
-    });
-
-    // Deuxième passe : organiser la hiérarchie
-    allCategories.forEach((category) => {
-      const categoryWithChildren = categoriesMap.get(category._id);
-
-      if (!category.parent_id) {
-        // C'est une catégorie racine (niveau 0)
-        rootCategories.push(categoryWithChildren);
-      } else {
-        // C'est une sous-catégorie, l'ajouter aux enfants du parent
-        const parentCategory = categoriesMap.get(category.parent_id);
-        if (parentCategory) {
-          parentCategory.children.push(categoryWithChildren);
-        } else {
-          // Si le parent n'existe pas, traiter comme une catégorie racine
-          console.warn(
-            `Parent introuvable pour la catégorie ${category._id} (parent_id: ${category.parent_id})`
-          );
-          rootCategories.push(categoryWithChildren);
-        }
-      }
-    });
-
-    // MODIFICATION: Recherche dans l'arborescence complète si search est défini
-    if (search) {
-      const lowerSearch = search.toLowerCase();
-
-      // Fonction récursive pour vérifier si une catégorie ou ses enfants correspondent à la recherche
-      const matchesSearch = (category) => {
-        // Vérifier si la catégorie actuelle correspond
-        const nameMatch = category.name.toLowerCase().includes(lowerSearch);
-        const descMatch =
-          category.description && category.description.toLowerCase().includes(lowerSearch);
-
-        // Si cette catégorie correspond, retourner vrai immédiatement
-        if (nameMatch || descMatch) return true;
-
-        // Sinon, vérifier récursivement tous les enfants
-        if (category.children && category.children.length > 0) {
-          return category.children.some((child) => matchesSearch(child));
-        }
-
-        return false;
-      };
-
-      // Filtrer les catégories racines et leurs enfants
-      const filteredCategories = rootCategories.filter((category) => matchesSearch(category));
-
-      // Trier les catégories par nom
-      filteredCategories.sort((a, b) => a.name.localeCompare(b.name));
-
-      return ResponseHandler.success(res, filteredCategories);
-    }
-
-    // Si pas de recherche, retourner toutes les catégories triées
-    rootCategories.sort((a, b) => a.name.localeCompare(b.name));
-
-    // Trier récursivement les enfants
-    const sortChildren = (categories) => {
-      categories.forEach((category) => {
-        if (category.children && category.children.length > 0) {
-          category.children.sort((a, b) => a.name.localeCompare(b.name));
-          sortChildren(category.children);
-        }
-      });
-    };
-
-    sortChildren(rootCategories);
-
-    return ResponseHandler.success(res, rootCategories);
+    const hierarchicalData = await categoryService.getHierarchicalData(search);
+    return ResponseHandler.success(res, hierarchicalData);
   } catch (error) {
     console.error('Erreur dans getHierarchicalCategories:', error);
     return ResponseHandler.error(res, error);
