@@ -15,23 +15,23 @@ function CategoriesTable(props) {
   const [localSort, setLocalSort] = useState(ENTITY_CONFIG.defaultSort);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [lastSearchTerm, setLastSearchTerm] = useState(''); // Pour éviter les requêtes redondantes
 
-  // Utiliser useRef pour suivre si les données ont déjà été chargées
-  const dataLoaded = useRef(false);
   // Utiliser useRef pour suivre si une opération est en cours
   const operationInProgress = useRef(false);
+
   useEffect(() => {
     const handleCategoryTreeChange = async () => {
       console.log('[WS-DEBUG] Rafraîchissement des catégories suite à un événement WebSocket');
 
-      if (operationInProgress.current) return; // Éviter les requêtes simultanées
+      if (operationInProgress.current) return;
 
       operationInProgress.current = true;
       setLoading(true);
 
       try {
-        const updatedCategories = await getHierarchicalCategories();
-        setCategories(updatedCategories);
+        const updatedCategories = await getHierarchicalCategories(searchTerm);
+        setCategories(updatedCategories || []); // Assurer qu'on a au moins un tableau vide
         setError(null);
       } catch (err) {
         console.error('Erreur lors du rafraîchissement des catégories via WebSocket:', err);
@@ -49,26 +49,62 @@ function CategoriesTable(props) {
     return () => {
       websocketService.off('category_tree_changed', handleCategoryTreeChange);
     };
-  }, [getHierarchicalCategories]);
+  }, [getHierarchicalCategories, searchTerm]);
 
-  // Charger les données hiérarchiques une seule fois au montage du composant
+  // Charger les données hiérarchiques
+  // Effet pour le chargement initial
   useEffect(() => {
+    // Chargement initial au montage du composant
+    if (!operationInProgress.current) {
+      refreshData();
+    }
+  }, []); // Dépendance vide pour exécuter au montage uniquement
+
+  // Effet pour la recherche
+  useEffect(() => {
+    // Éviter les requêtes inutiles si le terme de recherche n'a pas changé
+    if (searchTerm === lastSearchTerm && searchTerm !== '') {
+      return;
+    }
+
     const fetchHierarchicalData = async () => {
-      if (dataLoaded.current || operationInProgress.current) {
+      if (operationInProgress.current) {
         return;
       }
 
       operationInProgress.current = true;
       setLoading(true);
+      setLastSearchTerm(searchTerm);
 
       try {
         const hierarchicalCategories = await getHierarchicalCategories(searchTerm);
-        setCategories(hierarchicalCategories);
+        setCategories(hierarchicalCategories || []); // Toujours initialiser avec un tableau vide
+
+        // NOUVEAU: Si recherche active, développer automatiquement toutes les catégories avec des résultats
+        if (searchTerm) {
+          const newExpandedState = {};
+
+          // Fonction récursive pour trouver toutes les catégories à développer
+          const findCategoriesToExpand = (cats) => {
+            if (!cats || cats.length === 0) return;
+
+            cats.forEach((cat) => {
+              if (cat.children && cat.children.length > 0) {
+                newExpandedState[cat._id] = true;
+                findCategoriesToExpand(cat.children);
+              }
+            });
+          };
+
+          findCategoriesToExpand(hierarchicalCategories);
+          setExpandedCategories(newExpandedState);
+        }
+
         setError(null);
-        dataLoaded.current = true;
       } catch (err) {
         console.error('Erreur lors du chargement des catégories hiérarchiques:', err);
         setError(err.message || 'Erreur lors du chargement des données');
+        setCategories([]); // En cas d'erreur, initialiser avec un tableau vide
       } finally {
         setLoading(false);
         operationInProgress.current = false;
@@ -76,7 +112,7 @@ function CategoriesTable(props) {
     };
 
     fetchHierarchicalData();
-  }, [getHierarchicalCategories, searchTerm]);
+  }, [getHierarchicalCategories, searchTerm, lastSearchTerm]);
 
   const toggleCategory = useCallback((categoryId) => {
     setExpandedCategories((prev) => ({
@@ -85,30 +121,16 @@ function CategoriesTable(props) {
     }));
   }, []);
 
-  const handleSearch = useCallback(
-    async (value) => {
-      setSearchTerm(value);
-      dataLoaded.current = false; // Réinitialiser pour forcer le rechargement
+  // Fonction de recherche simplifiée - envoie directement au backend
+  const handleSearch = useCallback((value) => {
+    // Conserver la même logique mais avec value directement
+    setSearchTerm(value);
 
-      if (operationInProgress.current) return;
-
-      operationInProgress.current = true;
-      setLoading(true);
-
-      try {
-        const hierarchicalCategories = await getHierarchicalCategories(value);
-        setCategories(hierarchicalCategories);
-        setError(null);
-      } catch (err) {
-        console.error('Erreur lors de la recherche des catégories:', err);
-        setError(err.message || 'Erreur lors de la recherche');
-      } finally {
-        setLoading(false);
-        operationInProgress.current = false;
-      }
-    },
-    [getHierarchicalCategories]
-  );
+    // Réinitialiser l'état d'expansion si la recherche est vide
+    if (!value) {
+      setExpandedCategories({});
+    }
+  }, []);
 
   // Intercepter le tri et le gérer localement
   const customSort = useCallback((field) => {
@@ -121,7 +143,7 @@ function CategoriesTable(props) {
   // Fonction pour aplatir les données hiérarchiques
   const flattenHierarchy = useCallback(
     (categories, level = 0, parentExpanded = true) => {
-      if (!categories) return [];
+      if (!categories || categories.length === 0) return [];
 
       let result = [];
 
@@ -161,6 +183,13 @@ function CategoriesTable(props) {
             </div>
           );
 
+          // NOUVEAU: Mettre en surbrillance les résultats de recherche quand searchTerm est actif
+          const isSearchMatch =
+            searchTerm &&
+            (category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              (category.description &&
+                category.description.toLowerCase().includes(searchTerm.toLowerCase())));
+
           // Ajouter la catégorie au résultat
           result.push({
             ...category,
@@ -170,73 +199,26 @@ function CategoriesTable(props) {
             _childrenCount: hasChildren ? category.children.length : 0,
             product_count: category.productCount || 0,
             _no_sort: true, // Désactiver le tri standard
+            _highlight: isSearchMatch, // NOUVEAU: Marquer les correspondances
           });
 
-          // Ajouter récursivement les enfants si la catégorie est développée
-          if (hasChildren && isExpanded) {
-            result = result.concat(flattenHierarchy(category.children, level + 1, true));
+          // Ajouter récursivement les enfants si la catégorie est développée ou si recherche active
+          if (hasChildren && (isExpanded || searchTerm)) {
+            result = result.concat(
+              flattenHierarchy(category.children, level + 1, isExpanded || searchTerm)
+            );
           }
         }
       });
 
       return result;
     },
-    [expandedCategories, toggleCategory]
-  );
-
-  // Processeur de recherche personnalisé
-  const searchProcessor = useCallback(
-    (items, term) => {
-      if (!term) return items;
-
-      const lowerSearchTerm = term.toLowerCase();
-
-      // Fonction récursive pour rechercher dans la hiérarchie
-      const searchInHierarchy = (cats, results = []) => {
-        cats.forEach((cat) => {
-          const nameMatch = cat.name.toLowerCase().includes(lowerSearchTerm);
-          const descMatch =
-            cat.description && cat.description.toLowerCase().includes(lowerSearchTerm);
-
-          if (nameMatch || descMatch) {
-            // Formater l'entrée pour l'affichage
-            results.push({
-              ...cat,
-              name: (
-                <div className="flex items-center">
-                  <div style={{ width: `${0}px` }} className="flex-shrink-0"></div>
-                  <span className="truncate text-gray-900 dark:text-gray-100">{cat.name}</span>
-                </div>
-              ),
-              _originalName: cat.name,
-              _level: 0,
-              product_count: cat.productCount || 0,
-              _no_sort: true,
-            });
-          }
-
-          // Rechercher dans les enfants
-          if (cat.children && cat.children.length > 0) {
-            searchInHierarchy(cat.children, results);
-          }
-        });
-
-        return results;
-      };
-
-      return searchInHierarchy(categories);
-    },
-    [categories]
+    [expandedCategories, toggleCategory, searchTerm]
   );
 
   // Traiter les données pour l'affichage
   const processedData = useMemo(() => {
     if (!categories || categories.length === 0) return [];
-
-    // Si une recherche est active, utiliser le processeur de recherche
-    if (searchTerm && searchTerm.length > 0) {
-      return searchProcessor([], searchTerm);
-    }
 
     // Cloner avant de trier pour éviter de modifier les données d'origine
     const sortedRootCategories = [...categories].sort((a, b) => {
@@ -249,7 +231,7 @@ function CategoriesTable(props) {
 
     // Aplatir la hiérarchie pour l'affichage
     return flattenHierarchy(sortedRootCategories);
-  }, [categories, searchTerm, localSort, flattenHierarchy, searchProcessor]);
+  }, [categories, localSort, flattenHierarchy]);
 
   const filters = [];
 
@@ -267,8 +249,8 @@ function CategoriesTable(props) {
       try {
         await deleteCategory(id);
         // Rafraîchir les données après la suppression
-        const updatedCategories = await getHierarchicalCategories();
-        setCategories(updatedCategories);
+        const updatedCategories = await getHierarchicalCategories(searchTerm);
+        setCategories(updatedCategories || []);
       } catch (err) {
         console.error('Erreur lors de la suppression de la catégorie:', err);
         setError(err.message || 'Erreur lors de la suppression');
@@ -277,7 +259,7 @@ function CategoriesTable(props) {
         operationInProgress.current = false;
       }
     },
-    [deleteCategory, getHierarchicalCategories]
+    [deleteCategory, getHierarchicalCategories, searchTerm]
   );
 
   // Gérer la synchronisation d'une catégorie
@@ -291,8 +273,8 @@ function CategoriesTable(props) {
       try {
         await syncCategory(id);
         // Rafraîchir les données après la synchronisation
-        const updatedCategories = await getHierarchicalCategories();
-        setCategories(updatedCategories);
+        const updatedCategories = await getHierarchicalCategories(searchTerm);
+        setCategories(updatedCategories || []);
       } catch (err) {
         console.error('Erreur lors de la synchronisation de la catégorie:', err);
         setError(err.message || 'Erreur lors de la synchronisation');
@@ -301,7 +283,7 @@ function CategoriesTable(props) {
         operationInProgress.current = false;
       }
     },
-    [syncCategory, getHierarchicalCategories]
+    [syncCategory, getHierarchicalCategories, searchTerm]
   );
 
   // Fonction pour rafraîchir les données manuellement
@@ -312,8 +294,8 @@ function CategoriesTable(props) {
     setLoading(true);
 
     try {
-      const updatedCategories = await getHierarchicalCategories();
-      setCategories(updatedCategories);
+      const updatedCategories = await getHierarchicalCategories(searchTerm);
+      setCategories(updatedCategories || []);
       setError(null);
     } catch (err) {
       console.error('Erreur lors du rafraîchissement des données:', err);
@@ -322,12 +304,20 @@ function CategoriesTable(props) {
       setLoading(false);
       operationInProgress.current = false;
     }
-  }, [getHierarchicalCategories]);
+  }, [getHierarchicalCategories, searchTerm]);
+
+  // NOUVEAU: Style CSS pour mettre en surbrillance les résultats de recherche
+  const customRowClassName = useCallback((item) => {
+    return item._highlight ? 'bg-yellow-50 dark:bg-yellow-900' : '';
+  }, []);
+
+  // Toujours avoir des données à afficher, même vides
+  const dataToDisplay = processedData || [];
 
   return (
     <>
       <EntityTable
-        data={processedData}
+        data={dataToDisplay}
         isLoading={loading}
         error={error}
         columns={ENTITY_CONFIG.columns}
@@ -336,8 +326,6 @@ function CategoriesTable(props) {
         baseRoute="/products/categories"
         filters={filters}
         searchFields={['_originalName', 'description']}
-        searchProcessor={searchProcessor}
-        sortProcessor={sortProcessor}
         onSearch={handleSearch}
         onSort={customSort}
         onDelete={handleDeleteCategory}
@@ -354,6 +342,7 @@ function CategoriesTable(props) {
         defaultSort={ENTITY_CONFIG.defaultSort}
         sort={localSort}
         onRefresh={refreshData}
+        customRowClassName={customRowClassName}
         {...props}
       />
     </>
