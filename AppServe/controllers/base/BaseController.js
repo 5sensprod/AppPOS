@@ -2,7 +2,7 @@ const ResponseHandler = require('../../handlers/ResponseHandler');
 const BaseImageController = require('../image/BaseImageController');
 const fs = require('fs').promises;
 const path = require('path');
-const websocketManager = require('../../websocket/websocketManager');
+const apiEventEmitter = require('../../services/apiEventEmitter');
 
 class BaseController {
   constructor(model, wooCommerceService, imageOptions = null) {
@@ -61,7 +61,7 @@ class BaseController {
       const newItem = await this.model.create(req.body);
 
       // Standardisation des notifications WebSocket (toujours pluriel)
-      websocketManager.notifyEntityCreated(this.entityName, newItem);
+      apiEventEmitter.entityCreated(this.entityName, newItem);
 
       if (this.shouldSync() && this.wooCommerceService) {
         try {
@@ -98,7 +98,7 @@ class BaseController {
       const updatedItem = await this.model.findById(id);
 
       // Standardisation des notifications WebSocket
-      websocketManager.notifyEntityUpdated(this.entityName, id, updatedItem);
+      apiEventEmitter.entityCreated(this.entityName, newItem);
 
       if (this.shouldSync() && this.wooCommerceService) {
         try {
@@ -143,7 +143,7 @@ class BaseController {
       await this.model.delete(req.params.id);
 
       // Notifier via WebSocket
-      websocketManager.notifyEntityDeleted(this.entityName, req.params.id);
+      apiEventEmitter.entityDeleted(this.entityName, req.params.id);
 
       return ResponseHandler.success(res, {
         message: 'Item deleted successfully',

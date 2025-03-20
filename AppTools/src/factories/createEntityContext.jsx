@@ -183,7 +183,7 @@ export function createEntityContext(options) {
         dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: data });
       };
 
-      const handleCreate = ({ data }) => {
+      const handleCreate = (data) => {
         console.log(`[WS-DEBUG] Création ${entityType} reçue:`, data);
         dispatch({ type: ACTIONS.CREATE_SUCCESS, payload: data });
       };

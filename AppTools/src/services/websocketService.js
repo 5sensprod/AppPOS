@@ -50,24 +50,35 @@ class WebSocketService {
         const { type, payload } = JSON.parse(data);
         console.log('[WS-CLIENT] Message reçu:', { type, payload });
 
-        const actions = {
-          entity_updated: () => this.handleEntityUpdate(payload),
-          entity_created: () => this.handleEntityCreate(payload),
-          entity_deleted: () => this.handleEntityDelete(payload),
-          category_tree_changed: () =>
-            console.log("[WS-CLIENT] Changement d'arborescence de catégorie détecté"),
+        // Nouveau mapping standardisé
+        const standardizedEvents = {
+          entity_created: () => {
+            const { entityType, data } = payload;
+            console.log(`[WS-CLIENT] Entité créée: ${entityType}`, data);
+            this.triggerEvent(`${entityType}.created`, data);
+          },
+          entity_updated: () => {
+            const { entityType, entityId, data } = payload;
+            console.log(`[WS-CLIENT] Entité mise à jour: ${entityType} (ID: ${entityId})`);
+            this.triggerEvent(`${entityType}.updated`, { entityId, data });
+          },
+          entity_deleted: () => {
+            const { entityType, entityId } = payload;
+            console.log(`[WS-CLIENT] Entité supprimée: ${entityType} (ID: ${entityId})`);
+            this.triggerEvent(`${entityType}.deleted`, { entityId });
+          },
+          category_tree_changed: () => {
+            console.log("[WS-CLIENT] Changement d'arborescence de catégories détecté");
+            this.triggerEvent('categories.tree.changed', payload);
+          },
         };
 
-        if (actions[type]) {
-          actions[type]();
+        // Appliquer la standardisation si possible
+        if (standardizedEvents[type]) {
+          standardizedEvents[type]();
         }
 
-        // Vérifier si nous avons des écouteurs pour cet événement
-        const hasListeners = this.eventHandlers[type] && this.eventHandlers[type].length > 0;
-        console.log(
-          `[WS-CLIENT] Événement '${type}' a ${hasListeners ? this.eventHandlers[type].length : 0} écouteurs`
-        );
-
+        // Conserver aussi le format original pour compatibilité
         this.triggerEvent(type, payload);
       } catch (error) {
         console.error('[WS-CLIENT] Erreur de traitement WebSocket:', error);

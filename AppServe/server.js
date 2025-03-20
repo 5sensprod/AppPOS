@@ -10,6 +10,7 @@ const { setupServerWithHttp } = require('./utils/server-setup');
 const { authMiddleware } = require('./utils/auth');
 // WebSocket Manager
 const websocketManager = require('./websocket/websocketManager');
+const { initializeWebSocketEventBridge } = require('./websocket/websocketEventBridge');
 
 // Créer l'application Express
 const app = express();
@@ -78,6 +79,7 @@ app.get('/', (req, res) => {
 
 // Initialiser WebSocket avec le serveur HTTP
 websocketManager.initialize(server);
+initializeWebSocketEventBridge();
 
 // Démarrer le serveur avec notre setupServer modifié
 setupServerWithHttp(server, app, defaultPort).catch((error) => {

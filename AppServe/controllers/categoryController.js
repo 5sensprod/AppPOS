@@ -4,6 +4,8 @@ const Category = require('../models/Category');
 const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
 const { calculateLevel } = require('../utils/categoryHelpers');
+const apiEventEmitter = require('../services/apiEventEmitter');
+
 // Ajoutez cette fonction au début du fichier categoryController.js, après les imports
 async function updateProductCategoryRefs(categoryId) {
   try {
@@ -178,24 +180,40 @@ class CategoryController extends BaseController {
         }
       }
 
-      // Mise à jour de la catégorie
-      const result = await super.update(req, res);
+      // Mise à jour directe au lieu d'appeler super.update qui renvoie une réponse
+      const id = req.params.id;
+      const updateData = req.body;
 
-      // Vérifier si le nom ou la hiérarchie a changé avant d'envoyer un événement WebSocket
-      if (req.body.name || req.body.parent_id) {
+      if (category.woo_id) {
+        updateData.pending_sync = true;
+      }
+
+      await this.model.update(id, updateData);
+      const updatedItem = await this.model.findById(id);
+
+      // Émettre l'événement de mise à jour
+      apiEventEmitter.entityUpdated(this.entityName, id, updatedItem);
+
+      // Vérifier si le nom ou la hiérarchie a changé
+      if (updateData.name || updateData.parent_id) {
+        console.log('[WS-DEBUG] Mise à jour de la catégorie, émission de categories.tree.changed');
+        apiEventEmitter.categoryTreeChanged();
+
+        // Mettre à jour les références dans les produits
+        await updateProductCategoryRefs(id);
+      }
+
+      // Gestion de la synchronisation WooCommerce si nécessaire
+      if (this.shouldSync() && this.wooCommerceService) {
         try {
-          console.log('[WS-DEBUG] Mise à jour de la catégorie, envoi de category_tree_changed');
-          const websocketManager = require('../websocket/websocketManager');
-          websocketManager.notifyCategoryTreeChange();
-
-          // Ajoutez cette ligne pour mettre à jour les références dans les produits
-          await updateProductCategoryRefs(req.params.id);
-        } catch (wsError) {
-          console.error("[WS-DEBUG] Erreur lors de l'envoi de category_tree_changed:", wsError);
+          await this.wooCommerceService.syncToWooCommerce([updatedItem]);
+          await this.model.update(id, { pending_sync: false });
+        } catch (syncError) {
+          return ResponseHandler.partialSuccess(res, updatedItem, syncError);
         }
       }
 
-      return result;
+      return ResponseHandler.success(res, updatedItem);
     } catch (error) {
       console.error('[WS-DEBUG] Erreur dans update() de categoryController:', error);
       return ResponseHandler.error(res, error);
@@ -256,8 +274,8 @@ class CategoryController extends BaseController {
 
       // Notification WebSocket
       const websocketManager = require('../websocket/websocketManager');
-      websocketManager.notifyEntityDeleted('categories', req.params.id);
-      websocketManager.notifyCategoryTreeChange();
+      apiEventEmitter.notifyEntityDeleted('categories', req.params.id);
+      apiEventEmitter.notifyCategoryTreeChange();
       return ResponseHandler.success(res, {
         message: 'Catégorie supprimée avec succès',
         woo_status: item.woo_id ? 'synchronized' : 'not_applicable',

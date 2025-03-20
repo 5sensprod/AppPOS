@@ -24,7 +24,7 @@ function CategoriesTable(props) {
     const handleCategoryTreeChange = async () => {
       console.log('[WS-DEBUG] Rafraîchissement des catégories suite à un événement WebSocket');
 
-      if (operationInProgress.current) return; // Éviter les requêtes simultanées
+      if (operationInProgress.current) return;
 
       operationInProgress.current = true;
       setLoading(true);
@@ -42,15 +42,15 @@ function CategoriesTable(props) {
       }
     };
 
-    // Abonnement à l'événement WebSocket
+    // S'abonner aux deux formats d'événements
     websocketService.on('category_tree_changed', handleCategoryTreeChange);
+    websocketService.on('categories.tree.changed', handleCategoryTreeChange);
 
-    // Désabonnement à la destruction du composant
     return () => {
       websocketService.off('category_tree_changed', handleCategoryTreeChange);
+      websocketService.off('categories.tree.changed', handleCategoryTreeChange);
     };
   }, [getHierarchicalCategories]);
-
   // Charger les données hiérarchiques une seule fois au montage du composant
   useEffect(() => {
     const fetchHierarchicalData = async () => {

@@ -41,12 +41,13 @@ function ProductTable(props) {
 
   // Écouter les événements de modification de l'arborescence des catégories
   useEffect(() => {
-    console.log("[PRODUCTS] Configuration de l'écouteur d'événements category_tree_changed");
+    console.log(
+      "[PRODUCTS] Configuration de l'écouteur d'événements pour les changements de catégories"
+    );
 
     const handleCategoryTreeChange = async () => {
-      console.log('[PRODUCTS] Événement category_tree_changed reçu!');
+      console.log('[PRODUCTS] Événement de changement de catégories reçu!');
 
-      // Éviter les requêtes simultanées
       if (operationInProgress.current) {
         console.log("[PRODUCTS] Une opération est déjà en cours, on ignore l'événement");
         return;
@@ -57,13 +58,7 @@ function ProductTable(props) {
       console.log('[PRODUCTS] Début du rafraîchissement des produits');
 
       try {
-        // Ajouter un délai court pour s'assurer que le serveur a terminé ses mises à jour
-        console.log(
-          '[PRODUCTS] Attente de 500ms pour laisser le serveur terminer ses mises à jour'
-        );
         await new Promise((resolve) => setTimeout(resolve, 500));
-
-        console.log('[PRODUCTS] Appel de fetchProducts()');
         await fetchProducts();
         console.log('[PRODUCTS] fetchProducts() terminé avec succès');
         setError(null);
@@ -77,16 +72,14 @@ function ProductTable(props) {
       }
     };
 
-    // S'abonner manuellement aux catégories pour être sûr de recevoir les événements
+    // S'abonner aux deux formats d'événements
     websocketService.subscribe('categories');
-
-    // S'abonner aux événements websocket
     websocketService.on('category_tree_changed', handleCategoryTreeChange);
+    websocketService.on('categories.tree.changed', handleCategoryTreeChange);
 
-    // Nettoyage lors de la destruction du composant
     return () => {
-      console.log("[PRODUCTS] Nettoyage de l'écouteur d'événements category_tree_changed");
       websocketService.off('category_tree_changed', handleCategoryTreeChange);
+      websocketService.off('categories.tree.changed', handleCategoryTreeChange);
     };
   }, [fetchProducts]);
 
