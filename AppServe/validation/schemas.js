@@ -125,65 +125,92 @@ const updateSupplierSchema = Joi.object({
   }),
 });
 
+const categoryHierarchyItemSchema = Joi.object({
+  id: Joi.string().allow(null, ''),
+  name: Joi.string().allow(null, ''),
+  level: Joi.number().default(0),
+});
+
 const createProductSchema = Joi.object({
+  // Champs principaux
   name: Joi.string().required(),
-  sku: Joi.string().allow('', null).optional(),
-  description: Joi.string().allow('', null),
-  description_short: Joi.string().allow('', null),
-  designation: Joi.string().allow('', null),
-  purchase_price: Joi.number().min(0),
-  regular_price: Joi.number().min(0),
-  price: Joi.number().min(0).required(),
-  sale_price: Joi.number().min(0),
-  on_sale: Joi.boolean().default(false),
-  margins: Joi.object({
-    amount: Joi.number(),
-    margin_rate: Joi.number(),
-    markup_rate: Joi.number(),
-    coefficient: Joi.number(),
-  }),
-  tax: Joi.object({
-    rate: Joi.number(),
-    included: Joi.boolean(),
-  }),
-  stock: Joi.number().min(0).required(),
-  min_stock: Joi.number().min(0).default(0),
-  category_id: Joi.string().allow('', null),
-  categories: Joi.array().items(Joi.string()).default([]),
-  category_id: Joi.string().allow(null),
-  category_path: Joi.array().items(Joi.string()),
-  supplier_id: Joi.string().allow('', null),
-  brand_id: Joi.string().allow('', null),
+  sku: Joi.string().allow(null, '').default(''),
+  description: Joi.string().allow(null, '').default(''),
+  status: Joi.string().valid('draft', 'published', 'archived').default('draft'),
+
+  // Gestion du stock
+  manage_stock: Joi.boolean().default(false),
+  stock: Joi.number().allow(null).default(0),
+  min_stock: Joi.number().allow(null).default(0),
+
+  // Prix
+  price: Joi.number().allow(null).required(),
+  regular_price: Joi.number().allow(null),
+  sale_price: Joi.number().allow(null),
+  purchase_price: Joi.number().allow(null),
+
+  // IDs standards (acceptant chaînes vides et null)
+  brand_id: Joi.string().allow(null, ''),
+  supplier_id: Joi.string().allow(null, ''),
+  categories: Joi.array().items(Joi.string().allow(null, '')).default([]),
+  category_id: Joi.string().allow(null, ''),
+
   // Références complètes (objets avec id et name)
   brand_ref: Joi.object({
-    id: Joi.string(),
-    name: Joi.string(),
+    id: Joi.string().allow(null, ''),
+    name: Joi.string().allow(null, ''),
   }).allow(null),
 
   supplier_ref: Joi.object({
-    id: Joi.string(),
-    name: Joi.string(),
+    id: Joi.string().allow(null, ''),
+    name: Joi.string().allow(null, ''),
   }).allow(null),
 
+  // Références de catégories avec hiérarchie
   categories_refs: Joi.array()
     .items(
       Joi.object({
-        id: Joi.string(),
-        name: Joi.string(),
+        id: Joi.string().allow(null, ''),
+        name: Joi.string().allow(null, ''),
+        level: Joi.number().default(0),
+        hierarchy: Joi.array().items(categoryHierarchyItemSchema).default([]),
       })
     )
     .default([]),
-  status: Joi.string().valid('draft', 'published', 'archived').default('draft'),
-  manage_stock: Joi.boolean().default(true),
-  stock_status: Joi.string().valid('instock', 'outofstock', 'onbackorder').default('instock'),
-  specifications: Joi.object().allow(null),
-  meta_data: Joi.array().items(
-    Joi.object({
-      key: Joi.string(),
-      value: Joi.string(),
-    })
-  ),
-  website_url: Joi.string().uri().allow('', null),
+
+  // Référence de catégorie principale avec hiérarchie
+  category_ref: Joi.object({
+    id: Joi.string().allow(null, ''),
+    name: Joi.string().allow(null, ''),
+    level: Joi.number().default(0),
+    hierarchy: Joi.array().items(categoryHierarchyItemSchema).default([]),
+  }).allow(null),
+
+  // Images
+  image: Joi.object().allow(null),
+  gallery_images: Joi.array().items(Joi.object()).default([]),
+
+  // Champs additionnels
+  designation: Joi.string().allow(null, '').default(''),
+  description_short: Joi.string().allow(null, '').default(''),
+  margin_rate: Joi.number().allow(null),
+  tax_rate: Joi.number().allow(null),
+
+  specifications: Joi.object({
+    content: Joi.string().allow(null, ''),
+  }).allow(null),
+
+  meta_data: Joi.array()
+    .items(
+      Joi.object({
+        key: Joi.string().allow(null, ''),
+        value: Joi.any(),
+      })
+    )
+    .default([]),
+}).options({
+  stripUnknown: true,
+  abortEarly: false,
 });
 
 const updateProductSchema = createProductSchema.fork(

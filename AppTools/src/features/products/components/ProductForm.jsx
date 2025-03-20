@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import * as yup from 'yup';
 import { EntityForm } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { useProduct } from '../contexts/productContext';
 import apiService from '../../../services/api';
+import getValidationSchema from './validationSchema/getValidationSchema';
 
 function ProductForm() {
   const { id } = useParams();
@@ -23,132 +23,6 @@ function ProductForm() {
   });
   const hasTabs = ENTITY_CONFIG.tabs && ENTITY_CONFIG.tabs.length > 0;
   const [activeTab, setActiveTab] = useState(hasTabs ? 'general' : null);
-
-  // Créer un schéma de validation Yup différent selon le mode (création ou édition)
-  const getValidationSchema = () => {
-    // Schéma pour la création (validation complète)
-    if (isNew) {
-      return yup.object().shape({
-        name: yup.string().required('Le nom est requis'),
-        sku: yup.string().transform((value) => (value === null ? '' : value)),
-        description: yup.string().transform((value) => (value === null ? '' : value)),
-        price: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .required('Le prix est requis')
-          .typeError('Le prix doit être un nombre'),
-        regular_price: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .nullable()
-          .typeError('Le prix régulier doit être un nombre'),
-        sale_price: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .nullable()
-          .typeError('Le prix promotionnel doit être un nombre'),
-        purchase_price: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .nullable()
-          .typeError("Le prix d'achat doit être un nombre"),
-        stock: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .required('Le stock est requis')
-          .typeError('Le stock doit être un nombre'),
-        min_stock: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .nullable()
-          .typeError('Le stock minimum doit être un nombre'),
-        manage_stock: yup.boolean().default(false),
-        status: yup.string().default('draft'),
-        category_id: yup.string().nullable(),
-        categories: yup.array().of(yup.string()).default([]),
-        brand_id: yup.string().nullable(),
-        supplier_id: yup.string().nullable(),
-      });
-    }
-    // Schéma pour l'édition (tous les champs optionnels)
-    else {
-      return yup.object().shape({
-        name: yup.string().optional(),
-        sku: yup
-          .string()
-          .transform((value) => (value === null ? '' : value))
-          .optional(),
-        description: yup
-          .string()
-          .transform((value) => (value === null ? '' : value))
-          .optional(),
-        price: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .optional()
-          .typeError('Le prix doit être un nombre'),
-        regular_price: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .nullable()
-          .optional()
-          .typeError('Le prix régulier doit être un nombre'),
-        sale_price: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .nullable()
-          .optional()
-          .typeError('Le prix promotionnel doit être un nombre'),
-        purchase_price: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .nullable()
-          .optional()
-          .typeError("Le prix d'achat doit être un nombre"),
-        stock: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .optional()
-          .typeError('Le stock doit être un nombre'),
-        min_stock: yup
-          .number()
-          .transform((value, originalValue) =>
-            originalValue === '' || originalValue === null ? undefined : value
-          )
-          .nullable()
-          .optional()
-          .typeError('Le stock minimum doit être un nombre'),
-        manage_stock: yup.boolean().optional(),
-        status: yup.string().optional(),
-        category_id: yup.string().nullable().optional(),
-        categories: yup.array().of(yup.string()).optional(),
-        brand_id: yup.string().nullable().optional(),
-        supplier_id: yup.string().nullable().optional(),
-      });
-    }
-  };
 
   // Récupérer les données du produit en mode édition
   useEffect(() => {
@@ -238,22 +112,121 @@ function ProductForm() {
         name: '',
         sku: '',
         description: '',
-        price: '',
-        regular_price: '',
-        sale_price: '',
-        purchase_price: '',
-        stock: '',
-        min_stock: '',
+        price: null,
+        regular_price: null,
+        sale_price: null,
+        purchase_price: null,
+        stock: 0,
+        min_stock: null,
         manage_stock: false,
         status: 'draft',
-        category_id: '',
+        category_id: null,
         categories: [],
-        brand_id: '',
-        supplier_id: '',
+        brand_id: null,
+        supplier_id: null,
+        // Ajouter des champs vides pour les références
+        category_ref: null,
+        categories_refs: [],
+        brand_ref: null,
+        supplier_ref: null,
       };
     }
 
-    return product || {};
+    // En mode édition, s'assurer que les valeurs null ou undefined sont correctement traitées
+    const safeProduct = { ...product };
+    if (!safeProduct) return {};
+
+    // Normaliser les valeurs pour éviter les problèmes
+    return {
+      ...safeProduct,
+      sku: safeProduct.sku === null || safeProduct.sku === undefined ? '' : safeProduct.sku,
+      description:
+        safeProduct.description === null || safeProduct.description === undefined
+          ? ''
+          : safeProduct.description,
+      price: safeProduct.price === '' ? null : safeProduct.price,
+      regular_price: safeProduct.regular_price === '' ? null : safeProduct.regular_price,
+      sale_price: safeProduct.sale_price === '' ? null : safeProduct.sale_price,
+      purchase_price: safeProduct.purchase_price === '' ? null : safeProduct.purchase_price,
+      stock: safeProduct.stock === null || safeProduct.stock === undefined ? 0 : safeProduct.stock,
+      min_stock: safeProduct.min_stock === '' ? null : safeProduct.min_stock,
+      category_id: safeProduct.category_id === '' ? null : safeProduct.category_id,
+      categories: Array.isArray(safeProduct.categories) ? safeProduct.categories : [],
+      brand_id: safeProduct.brand_id === '' ? null : safeProduct.brand_id,
+      supplier_id: safeProduct.supplier_id === '' ? null : safeProduct.supplier_id,
+    };
+  };
+
+  // Pré-traiter les données avant soumission
+  const preprocessData = (data) => {
+    const processedData = { ...data };
+
+    // Traiter les chaînes vides comme null pour les ID de relation
+    if (processedData.category_id === '') processedData.category_id = null;
+    if (processedData.brand_id === '') processedData.brand_id = null;
+    if (processedData.supplier_id === '') processedData.supplier_id = null;
+
+    // S'assurer que description et sku ne sont jamais null
+    if (processedData.description === null || processedData.description === undefined) {
+      processedData.description = '';
+    }
+    if (processedData.sku === null || processedData.sku === undefined) {
+      processedData.sku = '';
+    }
+
+    // S'assurer que stock est au moins 0
+    if (processedData.stock === null || processedData.stock === undefined) {
+      processedData.stock = 0;
+    }
+
+    // Ajouter les références aux entités liées
+    // Ces champs seront remplis côté serveur lors de la création/mise à jour
+    if (processedData.category_id) {
+      const category = relatedData.categories.find((cat) => cat._id === processedData.category_id);
+      if (category) {
+        processedData.category_ref = {
+          id: category._id,
+          name: category.name,
+        };
+      }
+    }
+
+    if (processedData.brand_id) {
+      const brand = relatedData.brands.find((b) => b._id === processedData.brand_id);
+      if (brand) {
+        processedData.brand_ref = {
+          id: brand._id,
+          name: brand.name,
+        };
+      }
+    }
+
+    if (processedData.supplier_id) {
+      const supplier = relatedData.suppliers.find((s) => s._id === processedData.supplier_id);
+      if (supplier) {
+        processedData.supplier_ref = {
+          id: supplier._id,
+          name: supplier.name,
+        };
+      }
+    }
+
+    if (Array.isArray(processedData.categories) && processedData.categories.length > 0) {
+      processedData.categories_refs = processedData.categories
+        .map((catId) => {
+          const category = relatedData.categories.find((cat) => cat._id === catId);
+          if (category) {
+            return {
+              id: category._id,
+              name: category.name,
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
+    }
+
+    return processedData;
   };
 
   // Version simplifiée du gestionnaire de soumission
@@ -264,15 +237,7 @@ function ProductForm() {
 
     try {
       // Prétraitement des données pour gérer les cas spéciaux
-      const processedData = { ...data };
-
-      // S'assurer que description et sku ne sont jamais null
-      if (processedData.description === null || processedData.description === undefined) {
-        processedData.description = '';
-      }
-      if (processedData.sku === null || processedData.sku === undefined) {
-        processedData.sku = '';
-      }
+      const processedData = preprocessData(data);
 
       // Traitement différent selon le mode création ou édition
       if (isNew) {
@@ -316,6 +281,10 @@ function ProductForm() {
             const sortedNew = [...newValue].sort();
             const sortedOld = [...initialValue].sort();
             hasChanged = JSON.stringify(sortedNew) !== JSON.stringify(sortedOld);
+
+            if (hasChanged) {
+              updates[key] = newValue;
+            }
           }
           // Pour les champs numériques
           else if (
@@ -328,9 +297,9 @@ function ProductForm() {
               'min_stock',
             ].includes(key)
           ) {
-            const newNum = newValue === '' || newValue === null ? null : Number(newValue);
+            const newNum = newValue === '' || newValue === undefined ? null : Number(newValue);
             const oldNum =
-              initialValue === '' || initialValue === null ? null : Number(initialValue);
+              initialValue === '' || initialValue === undefined ? null : Number(initialValue);
             hasChanged = newNum !== oldNum;
 
             if (hasChanged) {
@@ -339,8 +308,9 @@ function ProductForm() {
           }
           // Pour les champs texte spéciaux (sku, description)
           else if (['sku', 'description'].includes(key)) {
-            const newStr = newValue === null ? '' : String(newValue);
-            const oldStr = initialValue === null ? '' : String(initialValue);
+            const newStr = newValue === null || newValue === undefined ? '' : String(newValue);
+            const oldStr =
+              initialValue === null || initialValue === undefined ? '' : String(initialValue);
             hasChanged = newStr !== oldStr;
 
             if (hasChanged) {
@@ -362,6 +332,72 @@ function ProductForm() {
             updates[key] = newValue;
           }
         });
+
+        // Ajouter les références supplémentaires des entités liées
+        if (updates.category_id !== undefined) {
+          const categoryId = updates.category_id;
+          if (categoryId) {
+            const category = relatedData.categories.find((cat) => cat._id === categoryId);
+            if (category) {
+              updates.category_ref = {
+                id: category._id,
+                name: category.name,
+              };
+            }
+          } else {
+            updates.category_ref = null;
+          }
+        }
+
+        if (updates.brand_id !== undefined) {
+          const brandId = updates.brand_id;
+          if (brandId) {
+            const brand = relatedData.brands.find((b) => b._id === brandId);
+            if (brand) {
+              updates.brand_ref = {
+                id: brand._id,
+                name: brand.name,
+              };
+            }
+          } else {
+            updates.brand_ref = null;
+          }
+        }
+
+        if (updates.supplier_id !== undefined) {
+          const supplierId = updates.supplier_id;
+          if (supplierId) {
+            const supplier = relatedData.suppliers.find((s) => s._id === supplierId);
+            if (supplier) {
+              updates.supplier_ref = {
+                id: supplier._id,
+                name: supplier.name,
+              };
+            }
+          } else {
+            updates.supplier_ref = null;
+          }
+        }
+
+        if (updates.categories !== undefined) {
+          const categoryIds = updates.categories;
+          if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+            updates.categories_refs = categoryIds
+              .map((catId) => {
+                const category = relatedData.categories.find((cat) => cat._id === catId);
+                if (category) {
+                  return {
+                    id: category._id,
+                    name: category.name,
+                  };
+                }
+                return null;
+              })
+              .filter(Boolean);
+          } else {
+            updates.categories_refs = [];
+          }
+        }
 
         if (Object.keys(updates).length === 0) {
           setSuccess('Aucune modification détectée');
@@ -410,7 +446,7 @@ function ProductForm() {
           tabs={hasTabs ? ENTITY_CONFIG.tabs : []}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          schema={getValidationSchema()} // Schéma de validation différent selon le mode
+          schema={getValidationSchema(isNew)} // Schéma de validation différent selon le mode
         />
       )}
     </div>
