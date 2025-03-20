@@ -318,7 +318,7 @@ function ProductDetail() {
                     Stock minimum
                   </h3>
                   <p className="mt-1 text-gray-900 dark:text-gray-100">
-                    {product.min_stock !== undefined ? product.min_stock : '-'}
+                    {product.min_stock !== undefined ? product.min_stock : 'Non défini'}
                   </p>
                 </div>
 
@@ -350,8 +350,7 @@ function ProductDetail() {
                         {product.category_ref.hierarchy &&
                           product.category_ref.hierarchy.length > 1 && (
                             <span className="text-xs text-gray-500 ml-2">
-                              (Chemin:{' '}
-                              {product.category_ref.hierarchy.map((cat) => cat.name).join(' > ')})
+                              ({product.category_ref.hierarchy.map((cat) => cat.name).join(' > ')})
                             </span>
                           )}
                       </>
@@ -363,7 +362,9 @@ function ProductDetail() {
 
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Marque</h3>
-                  <p className="mt-1 text-gray-900 dark:text-gray-100">{product.brand_id || '-'}</p>
+                  <p className="mt-1 text-gray-900 dark:text-gray-100">
+                    {product.brand_ref?.name || 'Aucune'}
+                  </p>
                 </div>
 
                 <div>
@@ -371,7 +372,8 @@ function ProductDetail() {
                     Fournisseur
                   </h3>
                   <p className="mt-1 text-gray-900 dark:text-gray-100">
-                    {product.supplier_id || '-'}
+                    {/* {product.supplier_id || '-'} */}
+                    {product.supplier_ref?.name || 'Aucun'}
                   </p>
                 </div>
               </div>
