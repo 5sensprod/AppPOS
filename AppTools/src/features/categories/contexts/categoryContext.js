@@ -124,9 +124,10 @@ export function useCategoryExtras() {
     }
   };
 
-  const getHierarchicalCategories = async () => {
+  const getHierarchicalCategories = async (searchTerm = '') => {
     try {
-      const response = await apiService.get('/api/categories/hierarchical');
+      const params = searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : '';
+      const response = await apiService.get(`/api/categories/hierarchical${params}`);
       return response.data.data;
     } catch (error) {
       console.error('Erreur lors du chargement des catégories hiérarchiques:', error);

@@ -54,7 +54,6 @@ function CategoriesTable(props) {
   // Charger les données hiérarchiques une seule fois au montage du composant
   useEffect(() => {
     const fetchHierarchicalData = async () => {
-      // Vérifier si les données sont déjà chargées ou si une opération est en cours
       if (dataLoaded.current || operationInProgress.current) {
         return;
       }
@@ -63,7 +62,7 @@ function CategoriesTable(props) {
       setLoading(true);
 
       try {
-        const hierarchicalCategories = await getHierarchicalCategories();
+        const hierarchicalCategories = await getHierarchicalCategories(searchTerm);
         setCategories(hierarchicalCategories);
         setError(null);
         dataLoaded.current = true;
@@ -77,7 +76,7 @@ function CategoriesTable(props) {
     };
 
     fetchHierarchicalData();
-  }, [getHierarchicalCategories]); // Dépendance unique
+  }, [getHierarchicalCategories, searchTerm]);
 
   const toggleCategory = useCallback((categoryId) => {
     setExpandedCategories((prev) => ({
@@ -86,9 +85,30 @@ function CategoriesTable(props) {
     }));
   }, []);
 
-  const handleSearch = useCallback((value) => {
-    setSearchTerm(value);
-  }, []);
+  const handleSearch = useCallback(
+    async (value) => {
+      setSearchTerm(value);
+      dataLoaded.current = false; // Réinitialiser pour forcer le rechargement
+
+      if (operationInProgress.current) return;
+
+      operationInProgress.current = true;
+      setLoading(true);
+
+      try {
+        const hierarchicalCategories = await getHierarchicalCategories(value);
+        setCategories(hierarchicalCategories);
+        setError(null);
+      } catch (err) {
+        console.error('Erreur lors de la recherche des catégories:', err);
+        setError(err.message || 'Erreur lors de la recherche');
+      } finally {
+        setLoading(false);
+        operationInProgress.current = false;
+      }
+    },
+    [getHierarchicalCategories]
+  );
 
   // Intercepter le tri et le gérer localement
   const customSort = useCallback((field) => {

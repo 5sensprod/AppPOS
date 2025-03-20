@@ -121,6 +121,8 @@ class CategoryController extends BaseController {
 // Nouvelle fonction pour les catégories hiérarchiques
 async function getHierarchicalCategories(req, res) {
   try {
+    const { search = '' } = req.query;
+
     // Récupération de toutes les catégories
     const allCategories = await Category.findAll();
 
@@ -179,7 +181,38 @@ async function getHierarchicalCategories(req, res) {
       }
     });
 
-    // Trier les catégories par nom
+    // MODIFICATION: Recherche dans l'arborescence complète si search est défini
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+
+      // Fonction récursive pour vérifier si une catégorie ou ses enfants correspondent à la recherche
+      const matchesSearch = (category) => {
+        // Vérifier si la catégorie actuelle correspond
+        const nameMatch = category.name.toLowerCase().includes(lowerSearch);
+        const descMatch =
+          category.description && category.description.toLowerCase().includes(lowerSearch);
+
+        // Si cette catégorie correspond, retourner vrai immédiatement
+        if (nameMatch || descMatch) return true;
+
+        // Sinon, vérifier récursivement tous les enfants
+        if (category.children && category.children.length > 0) {
+          return category.children.some((child) => matchesSearch(child));
+        }
+
+        return false;
+      };
+
+      // Filtrer les catégories racines et leurs enfants
+      const filteredCategories = rootCategories.filter((category) => matchesSearch(category));
+
+      // Trier les catégories par nom
+      filteredCategories.sort((a, b) => a.name.localeCompare(b.name));
+
+      return ResponseHandler.success(res, filteredCategories);
+    }
+
+    // Si pas de recherche, retourner toutes les catégories triées
     rootCategories.sort((a, b) => a.name.localeCompare(b.name));
 
     // Trier récursivement les enfants
