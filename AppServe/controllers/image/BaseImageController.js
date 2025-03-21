@@ -2,7 +2,7 @@
 const ImageService = require('../../services/image/ImageService');
 const ResponseHandler = require('../../handlers/ResponseHandler');
 const websocketManager = require('../../websocket/websocketManager');
-const apiEventEmitter = require('../../services/apiEventEmitter');
+const { getEntityEventService } = require('../../services/events/entityEvents');
 
 class BaseImageController {
   constructor(entity, options = { type: 'single' }) {
@@ -13,6 +13,8 @@ class BaseImageController {
     console.log(
       `[WS-DEBUG] BaseImageController initialisé pour l'entité: ${this.imageService.entity}`
     );
+
+    this.eventService = getEntityEventService(this.entityName);
   }
 
   validateOptions(options) {
@@ -86,22 +88,18 @@ class BaseImageController {
       console.log(`[WS-DEBUG] Item mis à jour récupéré: ${updatedItem ? 'OK' : 'NULL'}`);
 
       try {
-        // Utiliser apiEventEmitter au lieu de websocketManager
-        console.log(
-          `[EVENT] Émission d'événement après mise à jour de l'image pour ${this.entityName}:${req.params.id}`
-        );
-        apiEventEmitter.entityUpdated(this.entityName, req.params.id, updatedItem);
+        // Utiliser le service d'événements centralisé
+        const { getEntityEventService } = require('../../services/events/entityEvents');
+        const eventService = getEntityEventService(this.entityName);
 
-        // Pour les catégories, émettre également un événement de changement d'arborescence
-        if (this.entityName === 'categories') {
-          console.log(`[EVENT] Émission de categories.tree.changed pour mise à jour d'image`);
-          apiEventEmitter.categoryTreeChanged();
-        }
+        console.log(
+          `[EVENT] Notification d'image mise à jour pour ${this.entityName}:${req.params.id}`
+        );
+        // Cette méthode gérera aussi l'émission de categoryTreeChanged si nécessaire
+        eventService.imageUpdated(req.params.id, updatedItem);
       } catch (eventError) {
         console.error(`[EVENT] Erreur lors de l'émission d'événement:`, eventError);
       }
-
-      // ... reste du code ...
 
       return ResponseHandler.success(res, {
         message: 'Images téléversées avec succès',
@@ -150,17 +148,10 @@ class BaseImageController {
       const updatedItem = await Model.findById(req.params.id);
 
       try {
-        // Utiliser apiEventEmitter au lieu de websocketManager
         console.log(
-          `[EVENT] Émission d'événement après suppression d'image pour ${this.entityName}:${req.params.id}`
+          `[EVENT] Notification d'image supprimée pour ${this.entityName}:${req.params.id}`
         );
-        apiEventEmitter.entityUpdated(this.entityName, req.params.id, updatedItem);
-
-        // Pour les catégories, émettre également un événement de changement d'arborescence
-        if (this.entityName === 'categories') {
-          console.log(`[EVENT] Émission de categories.tree.changed pour suppression d'image`);
-          apiEventEmitter.categoryTreeChanged();
-        }
+        this.eventService.imageUpdated(req.params.id, updatedItem);
       } catch (eventError) {
         console.error(`[EVENT] Erreur lors de l'émission d'événement:`, eventError);
       }

@@ -4,10 +4,13 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const productWooCommerceService = require('../services/ProductWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
+const { getEntityEventService } = require('../services/events/entityEvents');
 
 // Fonction utilitaire pour mettre à jour les références de catégories
 async function updateCategoryRefs(productId, categoryIds) {
   try {
+    const eventService = getEntityEventService('products');
+
     // Si aucune catégorie, effacer les références
     if (!categoryIds || categoryIds.length === 0) {
       await Product.update(productId, {
@@ -61,6 +64,8 @@ class ProductController extends BaseController {
       entity: 'products',
       type: 'gallery',
     });
+    // Initialiser le service d'événements
+    this.eventService = getEntityEventService(this.entityName);
   }
 
   async validateCategories(categoryIds) {
@@ -114,21 +119,21 @@ class ProductController extends BaseController {
         await updateCategoryRefs(newItem._id, categories);
       }
 
-      // Notifier du changement de l'arborescence
+      // Notifier du changement de l'arborescence avec le service d'événements
       if (categories.length > 0) {
         console.log(
           "[WS-DEBUG] Création d'un produit avec catégorie, envoi de category_tree_changed"
         );
-        const websocketManager = require('../websocket/websocketManager');
-        websocketManager.notifyCategoryTreeChange();
+        // Obtenir le service d'événements pour les catégories
+        const categoryEventService = getEntityEventService('categories');
+        categoryEventService.categoryTreeChanged();
       }
 
       // Récupérer le produit mis à jour avec les références de catégories
       const updatedItem = await this.model.findById(newItem._id);
 
-      // Standardisation des notifications WebSocket (délégué au BaseController)
-      const websocketManager = require('../websocket/websocketManager');
-      websocketManager.notifyEntityCreated(this.entityName, updatedItem);
+      // Émettre l'événement de création
+      this.eventService.created(updatedItem);
 
       // Maintenant envoyer la réponse
       return ResponseHandler.created(res, updatedItem);
@@ -186,16 +191,16 @@ class ProductController extends BaseController {
         console.log(
           "[WS-DEBUG] La catégorie d'un produit a changé, envoi de category_tree_changed"
         );
-        const websocketManager = require('../websocket/websocketManager');
-        websocketManager.notifyCategoryTreeChange();
+        // Obtenir le service d'événements pour les catégories
+        const categoryEventService = getEntityEventService('categories');
+        categoryEventService.categoryTreeChanged();
       }
 
       // Récupérer le produit mis à jour
       const updatedItem = await this.model.findById(id);
 
-      // Standardisation des notifications WebSocket
-      const websocketManager = require('../websocket/websocketManager');
-      websocketManager.notifyEntityUpdated(this.entityName, id, updatedItem);
+      // Émettre l'événement de mise à jour
+      this.eventService.updated(id, updatedItem);
 
       // Gestion de la synchronisation WooCommerce si nécessaire
       if (this.shouldSync() && this.wooCommerceService) {

@@ -1,8 +1,7 @@
 const ResponseHandler = require('../../handlers/ResponseHandler');
 const BaseImageController = require('../image/BaseImageController');
 const fs = require('fs').promises;
-const path = require('path');
-const apiEventEmitter = require('../../services/apiEventEmitter');
+const { getEntityEventService } = require('../../services/events/entityEvents');
 
 class BaseController {
   constructor(model, wooCommerceService, imageOptions = null) {
@@ -21,6 +20,8 @@ class BaseController {
     };
     this.entityName =
       entityMap[singularName] || (singularName.endsWith('s') ? singularName : `${singularName}s`);
+
+    this.eventService = getEntityEventService(this.entityName);
 
     if (imageOptions?.entity) {
       this.imageController = new BaseImageController(this.entityName, {
@@ -60,8 +61,8 @@ class BaseController {
     try {
       const newItem = await this.model.create(req.body);
 
-      // Standardisation des notifications WebSocket (toujours pluriel)
-      apiEventEmitter.entityCreated(this.entityName, newItem);
+      // Utiliser le service d'événements
+      this.eventService.created(newItem);
 
       if (this.shouldSync() && this.wooCommerceService) {
         try {
@@ -94,22 +95,22 @@ class BaseController {
         updateData.pending_sync = true;
       }
 
-      const updated = await this.model.update(id, updateData);
+      await this.model.update(id, updateData);
       const updatedItem = await this.model.findById(id);
 
-      // Standardisation des notifications WebSocket
-      apiEventEmitter.entityCreated(this.entityName, newItem);
+      // Utiliser le service d'événements
+      this.eventService.updated(id, updatedItem);
 
       if (this.shouldSync() && this.wooCommerceService) {
         try {
           await this.wooCommerceService.syncToWooCommerce([updatedItem]);
           await this.model.update(id, { pending_sync: false });
         } catch (syncError) {
-          return ResponseHandler.partialSuccess(res, updated, syncError);
+          return ResponseHandler.partialSuccess(res, updatedItem, syncError);
         }
       }
 
-      return ResponseHandler.success(res, updated);
+      return ResponseHandler.success(res, updatedItem);
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
@@ -139,11 +140,8 @@ class BaseController {
         }
       }
 
-      // Supprimer l'entité en local
-      await this.model.delete(req.params.id);
-
-      // Notifier via WebSocket
-      apiEventEmitter.entityDeleted(this.entityName, req.params.id);
+      // Utiliser le service d'événements
+      this.eventService.deleted(req.params.id);
 
       return ResponseHandler.success(res, {
         message: 'Item deleted successfully',

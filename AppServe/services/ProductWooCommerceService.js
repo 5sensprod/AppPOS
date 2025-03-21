@@ -3,6 +3,7 @@ const WooCommerceClient = require('./base/WooCommerceClient');
 const ProductSyncStrategy = require('./sync/ProductSync');
 const SyncErrorHandler = require('./base/SyncErrorHandler');
 const Product = require('../models/Product');
+const { getEntityEventService } = require('./events/entityEvents');
 
 class ProductWooCommerceService {
   constructor() {
@@ -10,6 +11,7 @@ class ProductWooCommerceService {
     this.strategy = new ProductSyncStrategy();
     this.errorHandler = new SyncErrorHandler();
     this.endpoint = 'products';
+    this.eventService = getEntityEventService('products');
   }
 
   async syncToWooCommerce(input = null) {
@@ -26,6 +28,9 @@ class ProductWooCommerceService {
         const result = await this.strategy.syncToWooCommerce(product, this.client, results);
         if (!result.success) {
           this.errorHandler.handleSyncError(result.error, results, product._id);
+        } else if (result.product) {
+          // Ajouter cette condition pour émettre un événement après synchronisation réussie
+          this.eventService.syncCompleted(product._id, result.product);
         }
       }
 

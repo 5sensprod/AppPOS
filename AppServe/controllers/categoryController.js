@@ -4,13 +4,14 @@ const Category = require('../models/Category');
 const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
 const { calculateLevel } = require('../utils/categoryHelpers');
-const apiEventEmitter = require('../services/apiEventEmitter');
+const { getEntityEventService } = require('../services/events/entityEvents');
 
 // Ajoutez cette fonction au début du fichier categoryController.js, après les imports
 async function updateProductCategoryRefs(categoryId) {
   try {
     const Product = require('../models/Product');
     const Category = require('../models/Category');
+    const eventService = getEntityEventService('categories');
 
     // Obtenir les détails de la catégorie
     const category = await Category.findById(categoryId);
@@ -86,6 +87,7 @@ async function updateProductCategoryRefs(categoryId) {
 async function updateProductsAfterCategoryDeletion(categoryId) {
   try {
     const Product = require('../models/Product');
+    const eventService = getEntityEventService('categories');
     const allProducts = await Product.findAll();
 
     // Trouver tous les produits qui utilisent cette catégorie
@@ -159,6 +161,8 @@ class CategoryController extends BaseController {
       entity: 'categories',
       type: 'single',
     });
+    // S'assurer que le service d'événements est initialisé
+    this.eventService = getEntityEventService(this.entityName);
   }
 
   async create(req, res) {
@@ -179,12 +183,10 @@ class CategoryController extends BaseController {
       // Création de la catégorie
       const newCategory = await this.model.create(req.body);
 
-      // Émettre l'événement de création explicitement
+      // Émettre l'événement de création via le service d'événements
       console.log(`[EVENT] Émission d'événement de création de catégorie: ${newCategory._id}`);
-      apiEventEmitter.entityCreated(this.entityName, newCategory);
-
-      // Si un changement de l'arborescence est nécessaire
-      apiEventEmitter.categoryTreeChanged();
+      this.eventService.created(newCategory);
+      // Le service eventService.created s'occupe déjà d'émettre categoryTreeChanged si nécessaire
 
       if (this.shouldSync() && this.wooCommerceService) {
         try {
@@ -236,14 +238,13 @@ class CategoryController extends BaseController {
       await this.model.update(id, updateData);
       const updatedItem = await this.model.findById(id);
 
-      // Émettre l'événement de mise à jour
-      apiEventEmitter.entityUpdated(this.entityName, id, updatedItem);
+      // Émettre l'événement de mise à jour via le service d'événements
+      this.eventService.updated(id, updatedItem);
+      // La méthode updated gère également l'émission de categoryTreeChanged si nécessaire
 
       // Vérifier si le nom ou la hiérarchie a changé
       if (updateData.name || updateData.parent_id) {
         console.log('[WS-DEBUG] Mise à jour de la catégorie, émission de categories.tree.changed');
-        apiEventEmitter.categoryTreeChanged();
-
         // Mettre à jour les références dans les produits
         await updateProductCategoryRefs(id);
       }
@@ -317,10 +318,9 @@ class CategoryController extends BaseController {
       await updateProductsAfterCategoryDeletion(req.params.id);
       await this.model.delete(req.params.id);
 
-      // Notification WebSocket
-      const websocketManager = require('../websocket/websocketManager');
-      apiEventEmitter.notifyEntityDeleted('categories', req.params.id);
-      apiEventEmitter.notifyCategoryTreeChange();
+      // Notification via le service d'événements
+      this.eventService.deleted(req.params.id);
+
       return ResponseHandler.success(res, {
         message: 'Catégorie supprimée avec succès',
         woo_status: item.woo_id ? 'synchronized' : 'not_applicable',

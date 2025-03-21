@@ -3,7 +3,7 @@ const WooCommerceClient = require('./base/WooCommerceClient');
 const CategorySyncStrategy = require('./sync/CategorySync');
 const SyncErrorHandler = require('./base/SyncErrorHandler');
 const Category = require('../models/Category');
-const apiEventEmitter = require('../services/apiEventEmitter');
+const { getEntityEventService } = require('./events/entityEvents');
 
 class CategoryWooCommerceService {
   constructor() {
@@ -11,6 +11,7 @@ class CategoryWooCommerceService {
     this.strategy = new CategorySyncStrategy();
     this.errorHandler = new SyncErrorHandler();
     this.endpoint = 'products/categories';
+    this.eventService = getEntityEventService('categories');
   }
 
   async syncToWooCommerce(input = null) {
@@ -36,11 +37,11 @@ class CategoryWooCommerceService {
               this.errorHandler.handleSyncError(result.error, results, category._id);
             }
           } else if (result.category) {
-            // ⚠️ AJOUTER CE BLOC : Émettre un événement après la synchronisation
+            // ⚠️ UTILISER LE SERVICE D'ÉVÉNEMENTS : Émettre un événement après la synchronisation
             console.log(
               `[EVENT] Émission d'événement après synchronisation de la catégorie ${category._id}`
             );
-            apiEventEmitter.entityUpdated('categories', category._id, result.category);
+            this.eventService.syncCompleted(category._id, result.category);
           }
         } catch (error) {
           this.errorHandler.handleSyncError(error, results, category._id);
@@ -50,7 +51,7 @@ class CategoryWooCommerceService {
       // Si c'est une seule catégorie et qu'elle a été synchronisée avec succès,
       // émettre un événement de mise à jour de l'arborescence
       if (!Array.isArray(input) && results.errors.length === 0) {
-        apiEventEmitter.categoryTreeChanged();
+        this.eventService.categoryTreeChanged();
       }
 
       return {
