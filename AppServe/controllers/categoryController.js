@@ -161,6 +161,51 @@ class CategoryController extends BaseController {
     });
   }
 
+  async create(req, res) {
+    try {
+      // Vérifier les conditions préalables (ex. niveau si parent_id est présent)
+      if (req.body.parent_id) {
+        try {
+          req.body.level = await calculateLevel(req.body.parent_id);
+        } catch (levelError) {
+          console.error('[WS-DEBUG] Erreur lors du calcul du niveau:', levelError);
+          return ResponseHandler.error(res, 'Erreur lors du calcul du niveau');
+        }
+      } else {
+        // Pour les catégories racines, le niveau est 0
+        req.body.level = 0;
+      }
+
+      // Création de la catégorie
+      const newCategory = await this.model.create(req.body);
+
+      // Émettre l'événement de création explicitement
+      console.log(`[EVENT] Émission d'événement de création de catégorie: ${newCategory._id}`);
+      apiEventEmitter.entityCreated(this.entityName, newCategory);
+
+      // Si un changement de l'arborescence est nécessaire
+      apiEventEmitter.categoryTreeChanged();
+
+      if (this.shouldSync() && this.wooCommerceService) {
+        try {
+          const syncResult = await this.wooCommerceService.syncToWooCommerce([newCategory]);
+          if (syncResult.errors.length > 0) {
+            return ResponseHandler.partialSuccess(res, newCategory, {
+              message: syncResult.errors.join(', '),
+            });
+          }
+        } catch (syncError) {
+          return ResponseHandler.partialSuccess(res, newCategory, syncError);
+        }
+      }
+
+      return ResponseHandler.created(res, newCategory);
+    } catch (error) {
+      console.error('[WS-DEBUG] Erreur dans create() de categoryController:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   async update(req, res) {
     try {
       // Vérifier si la catégorie existe

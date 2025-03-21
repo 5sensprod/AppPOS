@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useProduct } from '../contexts/productContext';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
-import websocketService from '../../../services/websocketService';
+import { useEntityEvents } from '@/hooks/useEntityEvents';
 
 function ProductTable(props) {
   const {
@@ -39,49 +39,63 @@ function ProductTable(props) {
     setError(contextError);
   }, [products, contextError]);
 
-  // Écouter les événements de modification de l'arborescence des catégories
-  useEffect(() => {
-    console.log(
-      "[PRODUCTS] Configuration de l'écouteur d'événements pour les changements de catégories"
-    );
+  // Définir le gestionnaire pour les événements de catégories
+  const handleCategoryTreeChange = useCallback(async () => {
+    console.log('[PRODUCTS] Événement category_tree_changed reçu!');
 
-    const handleCategoryTreeChange = async () => {
-      console.log('[PRODUCTS] Événement de changement de catégories reçu!');
+    // Éviter les requêtes simultanées
+    if (operationInProgress.current) {
+      console.log("[PRODUCTS] Une opération est déjà en cours, on ignore l'événement");
+      return;
+    }
 
-      if (operationInProgress.current) {
-        console.log("[PRODUCTS] Une opération est déjà en cours, on ignore l'événement");
-        return;
-      }
+    operationInProgress.current = true;
+    setLoading(true);
+    console.log('[PRODUCTS] Début du rafraîchissement des produits');
 
-      operationInProgress.current = true;
-      setLoading(true);
-      console.log('[PRODUCTS] Début du rafraîchissement des produits');
+    try {
+      // Ajouter un délai court pour s'assurer que le serveur a terminé ses mises à jour
+      console.log('[PRODUCTS] Attente de 500ms pour laisser le serveur terminer ses mises à jour');
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        await fetchProducts();
-        console.log('[PRODUCTS] fetchProducts() terminé avec succès');
-        setError(null);
-      } catch (err) {
-        console.error('[PRODUCTS] Erreur lors du rafraîchissement des produits:', err);
-        setError(err.message || 'Erreur de rafraîchissement');
-      } finally {
-        setLoading(false);
-        operationInProgress.current = false;
-        console.log('[PRODUCTS] Fin du rafraîchissement des produits');
-      }
-    };
-
-    // S'abonner aux deux formats d'événements
-    websocketService.subscribe('categories');
-    websocketService.on('category_tree_changed', handleCategoryTreeChange);
-    websocketService.on('categories.tree.changed', handleCategoryTreeChange);
-
-    return () => {
-      websocketService.off('category_tree_changed', handleCategoryTreeChange);
-      websocketService.off('categories.tree.changed', handleCategoryTreeChange);
-    };
+      console.log('[PRODUCTS] Appel de fetchProducts()');
+      await fetchProducts();
+      console.log('[PRODUCTS] fetchProducts() terminé avec succès');
+      setError(null);
+    } catch (err) {
+      console.error('[PRODUCTS] Erreur lors du rafraîchissement des produits:', err);
+      setError(err.message || 'Erreur de rafraîchissement');
+    } finally {
+      setLoading(false);
+      operationInProgress.current = false;
+      console.log('[PRODUCTS] Fin du rafraîchissement des produits');
+    }
   }, [fetchProducts]);
+
+  // Utiliser notre hook pour les événements de produits et de catégories
+  useEntityEvents('product', {
+    onCreated: (data) => {
+      console.log('[PRODUCTS] Nouveau produit créé:', data);
+      if (!operationInProgress.current) {
+        fetchProducts();
+      }
+    },
+    onUpdated: ({ entityId, data }) => {
+      console.log('[PRODUCTS] Produit mis à jour:', data);
+      if (!operationInProgress.current) {
+        fetchProducts();
+      }
+    },
+    onDeleted: ({ entityId }) => {
+      console.log('[PRODUCTS] Produit supprimé:', entityId);
+      if (!operationInProgress.current) {
+        fetchProducts();
+      }
+    },
+    customEvents: {
+      'categories.tree.changed': handleCategoryTreeChange,
+    },
+  });
 
   // Gestionnaire de synchronisation personnalisé pour les produits
   const handleSyncProduct = useCallback(

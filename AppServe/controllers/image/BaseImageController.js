@@ -2,6 +2,7 @@
 const ImageService = require('../../services/image/ImageService');
 const ResponseHandler = require('../../handlers/ResponseHandler');
 const websocketManager = require('../../websocket/websocketManager');
+const apiEventEmitter = require('../../services/apiEventEmitter');
 
 class BaseImageController {
   constructor(entity, options = { type: 'single' }) {
@@ -85,47 +86,22 @@ class BaseImageController {
       console.log(`[WS-DEBUG] Item mis à jour récupéré: ${updatedItem ? 'OK' : 'NULL'}`);
 
       try {
-        // Notifier via WebSocket - utiliser le nom d'entité en pluriel
-        websocketManager.notifyEntityUpdated(this.entityName, req.params.id, updatedItem);
-        console.log(`[WS-DEBUG] Notification WebSocket envoyée avec succès`);
-      } catch (wsError) {
-        console.error(`[WS-DEBUG] ERREUR lors de la notification WebSocket:`, wsError);
-      }
-
-      // Synchronisation immédiate avec WooCommerce si demandé via query parameter
-      if (req.query.sync_woo === 'true' && item && item.woo_id) {
+        // Utiliser apiEventEmitter au lieu de websocketManager
         console.log(
-          `[WS-DEBUG] Synchronisation WooCommerce demandée pour ${this.entityName} id:${req.params.id}`
+          `[EVENT] Émission d'événement après mise à jour de l'image pour ${this.entityName}:${req.params.id}`
         );
+        apiEventEmitter.entityUpdated(this.entityName, req.params.id, updatedItem);
 
-        try {
-          // Déterminer le service WooCommerce approprié
-          let syncService;
-          if (this.entityName === 'products') {
-            syncService = require('../../services/ProductWooCommerceService');
-          } else if (this.entityName === 'categories') {
-            syncService = require('../../services/CategoryWooCommerceService');
-          } else if (this.entityName === 'brands') {
-            syncService = require('../../services/BrandWooCommerceService');
-          }
-
-          if (syncService) {
-            const syncResult = await syncService.syncToWooCommerce(updatedItem);
-            console.log(
-              `[WS-DEBUG] Résultat synchronisation WooCommerce:`,
-              syncResult.success ? 'Succès' : 'Échec',
-              syncResult.errors && syncResult.errors.length ? syncResult.errors : ''
-            );
-
-            // Mettre à jour pending_sync après synchronisation réussie
-            if (syncResult.success) {
-              await Model.update(req.params.id, { pending_sync: false });
-            }
-          }
-        } catch (syncError) {
-          console.error(`[WS-DEBUG] ERREUR lors de la synchronisation WooCommerce:`, syncError);
+        // Pour les catégories, émettre également un événement de changement d'arborescence
+        if (this.entityName === 'categories') {
+          console.log(`[EVENT] Émission de categories.tree.changed pour mise à jour d'image`);
+          apiEventEmitter.categoryTreeChanged();
         }
+      } catch (eventError) {
+        console.error(`[EVENT] Erreur lors de l'émission d'événement:`, eventError);
       }
+
+      // ... reste du code ...
 
       return ResponseHandler.success(res, {
         message: 'Images téléversées avec succès',
@@ -174,11 +150,19 @@ class BaseImageController {
       const updatedItem = await Model.findById(req.params.id);
 
       try {
-        // Notifier via WebSocket en utilisant le nom d'entité en pluriel
-        websocketManager.notifyEntityUpdated(this.entityName, req.params.id, updatedItem);
-        console.log(`[WS-DEBUG] Notification WebSocket envoyée avec succès`);
-      } catch (wsError) {
-        console.error(`[WS-DEBUG] ERREUR lors de la notification WebSocket:`, wsError);
+        // Utiliser apiEventEmitter au lieu de websocketManager
+        console.log(
+          `[EVENT] Émission d'événement après suppression d'image pour ${this.entityName}:${req.params.id}`
+        );
+        apiEventEmitter.entityUpdated(this.entityName, req.params.id, updatedItem);
+
+        // Pour les catégories, émettre également un événement de changement d'arborescence
+        if (this.entityName === 'categories') {
+          console.log(`[EVENT] Émission de categories.tree.changed pour suppression d'image`);
+          apiEventEmitter.categoryTreeChanged();
+        }
+      } catch (eventError) {
+        console.error(`[EVENT] Erreur lors de l'émission d'événement:`, eventError);
       }
 
       return ResponseHandler.success(res, {

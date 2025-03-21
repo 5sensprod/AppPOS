@@ -4,6 +4,7 @@ import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import websocketService from '@/services/websocketService';
+import { useEntityEvents } from '../../../hooks/useEntityEvents';
 
 function CategoriesTable(props) {
   const { dispatch, deleteCategory } = useCategory();
@@ -20,37 +21,66 @@ function CategoriesTable(props) {
   const dataLoaded = useRef(false);
   // Utiliser useRef pour suivre si une opération est en cours
   const operationInProgress = useRef(false);
-  useEffect(() => {
-    const handleCategoryTreeChange = async () => {
-      console.log('[WS-DEBUG] Rafraîchissement des catégories suite à un événement WebSocket');
+  const handleCategoryTreeChange = useCallback(async () => {
+    console.log('[WS-DEBUG] Rafraîchissement des catégories suite à un événement WebSocket');
 
-      if (operationInProgress.current) return;
+    if (operationInProgress.current) return; // Éviter les requêtes simultanées
 
-      operationInProgress.current = true;
-      setLoading(true);
+    operationInProgress.current = true;
+    setLoading(true);
 
-      try {
+    try {
+      const updatedCategories = await getHierarchicalCategories();
+      setCategories(updatedCategories);
+      setError(null);
+    } catch (err) {
+      console.error('Erreur lors du rafraîchissement des catégories via WebSocket:', err);
+      setError(err.message || 'Erreur de rafraîchissement');
+    } finally {
+      setLoading(false);
+      operationInProgress.current = false;
+    }
+  }, [getHierarchicalCategories]);
+
+  // Utiliser notre hook pour les événements
+  useEntityEvents('category', {
+    onCreated: async (data) => {
+      console.log('[CATEGORIES] Nouvelle catégorie créée:', data);
+      if (!operationInProgress.current) {
         const updatedCategories = await getHierarchicalCategories();
         setCategories(updatedCategories);
-        setError(null);
-      } catch (err) {
-        console.error('Erreur lors du rafraîchissement des catégories via WebSocket:', err);
-        setError(err.message || 'Erreur de rafraîchissement');
-      } finally {
-        setLoading(false);
-        operationInProgress.current = false;
       }
-    };
+    },
+    onUpdated: async ({ entityId, data }) => {
+      console.log('[CATEGORIES] Catégorie mise à jour reçue:', data);
+      if (!operationInProgress.current) {
+        operationInProgress.current = true;
+        setLoading(true);
+        try {
+          const updatedCategories = await getHierarchicalCategories();
+          setCategories(updatedCategories);
+          setError(null);
+        } catch (err) {
+          console.error('Erreur lors du rafraîchissement des catégories:', err);
+          setError(err.message || 'Erreur de rafraîchissement');
+        } finally {
+          setLoading(false);
+          operationInProgress.current = false;
+        }
+      }
+    },
 
-    // S'abonner aux deux formats d'événements
-    websocketService.on('category_tree_changed', handleCategoryTreeChange);
-    websocketService.on('categories.tree.changed', handleCategoryTreeChange);
-
-    return () => {
-      websocketService.off('category_tree_changed', handleCategoryTreeChange);
-      websocketService.off('categories.tree.changed', handleCategoryTreeChange);
-    };
-  }, [getHierarchicalCategories]);
+    onDeleted: async ({ entityId }) => {
+      console.log('[CATEGORIES] Catégorie supprimée:', entityId);
+      if (!operationInProgress.current) {
+        const updatedCategories = await getHierarchicalCategories();
+        setCategories(updatedCategories);
+      }
+    },
+    customEvents: {
+      'categories.tree.changed': handleCategoryTreeChange,
+    },
+  });
   // Charger les données hiérarchiques une seule fois au montage du composant
   useEffect(() => {
     const fetchHierarchicalData = async () => {
