@@ -1,6 +1,7 @@
 const ResponseHandler = require('../../handlers/ResponseHandler');
 const BaseImageController = require('../image/BaseImageController');
 const fs = require('fs').promises;
+const path = require('path');
 const { getEntityEventService } = require('../../services/events/entityEvents');
 
 class BaseController {
@@ -139,6 +140,9 @@ class BaseController {
           // On continue malgré l'erreur pour supprimer en local
         }
       }
+
+      // Supprimer l'entité dans la base de données
+      await this.model.delete(req.params.id);
 
       // Utiliser le service d'événements
       this.eventService.deleted(req.params.id);
