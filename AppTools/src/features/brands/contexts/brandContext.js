@@ -1,5 +1,6 @@
 // src/features/brands/contexts/brandContext.js
 import { createEntityContext } from '../../../factories/createEntityContext';
+import { createEntityImageHandlers } from '../../../factories/createEntityImageHandlers';
 import apiService from '../../../services/api';
 
 // Configuration de l'entité Brand
@@ -68,50 +69,12 @@ export function useBrandExtras() {
   const context = useBrand();
   const { dispatch } = context;
 
-  // Télécharger une image pour une marque
-  const uploadImage = async (brandId, imageFile) => {
-    if (dispatch) {
-      try {
-        const formData = new FormData();
-        formData.append('image', imageFile);
-
-        const response = await apiService.post(`/api/brands/${brandId}/image`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        dispatch({
-          type: customActions.UPLOAD_IMAGE,
-          payload: { id: brandId, image: response.data.data.image },
-        });
-
-        return response.data;
-      } catch (error) {
-        console.error("Erreur lors du téléchargement de l'image:", error);
-        throw error;
-      }
-    }
-  };
-
-  // Supprimer l'image d'une marque
-  const deleteImage = async (brandId) => {
-    if (dispatch) {
-      try {
-        await apiService.delete(`/api/brands/${brandId}/image`);
-
-        dispatch({
-          type: customActions.DELETE_IMAGE,
-          payload: { id: brandId },
-        });
-
-        return true;
-      } catch (error) {
-        console.error("Erreur lors de la suppression de l'image:", error);
-        throw error;
-      }
-    }
-  };
+  const { uploadImage, deleteImage } = createEntityImageHandlers(
+    'brand',
+    '/api/brands',
+    dispatch,
+    customActions
+  );
 
   return {
     ...context,

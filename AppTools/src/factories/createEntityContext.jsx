@@ -292,8 +292,6 @@ export function createEntityContext(options) {
         delete cleanedData.last_sync;
         delete cleanedData.createdAt;
         delete cleanedData.updatedAt;
-        // Ne pas supprimer gallery_images lors des mises à jour
-        // delete cleanedData.gallery_images;
         delete cleanedData.image;
         delete cleanedData.pending_sync;
         delete cleanedData.SKU;

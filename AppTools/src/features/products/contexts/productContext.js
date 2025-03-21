@@ -2,6 +2,7 @@
 import { createEntityContext } from '../../../factories/createEntityContext';
 import { ENTITY_CONFIG } from '../constants';
 import apiService from '../../../services/api';
+import { createEntityImageHandlers } from '../../../factories/createEntityImageHandlers';
 
 // Actions personnalisées spécifiques aux produits
 const customActions = {
@@ -104,6 +105,13 @@ export function useProductExtras() {
   const context = useProduct();
   const { dispatch } = context;
 
+  const { uploadImage, deleteImage } = createEntityImageHandlers(
+    'product',
+    '/api/products',
+    dispatch,
+    customActions
+  );
+
   // Définir l'image principale d'un produit
   const setMainImage = async (productId, imageIndex) => {
     if (dispatch) {
@@ -118,32 +126,6 @@ export function useProductExtras() {
         return response.data;
       } catch (error) {
         console.error("Erreur lors de la définition de l'image principale:", error);
-        throw error;
-      }
-    }
-  };
-
-  // Télécharger une image pour un produit
-  const uploadImage = async (productId, imageFile) => {
-    if (dispatch) {
-      try {
-        const formData = new FormData();
-        formData.append('images', imageFile);
-
-        const response = await apiService.post(`/api/products/${productId}/image`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        dispatch({
-          type: customActions.UPLOAD_IMAGE,
-          payload: { id: productId, image: response.data.data.image },
-        });
-
-        return response.data;
-      } catch (error) {
-        console.error("Erreur lors du téléchargement de l'image:", error);
         throw error;
       }
     }
@@ -173,25 +155,6 @@ export function useProductExtras() {
         return response.data;
       } catch (error) {
         console.error("Erreur lors du téléchargement de l'image de galerie:", error);
-        throw error;
-      }
-    }
-  };
-
-  // Supprimer l'image d'un produit
-  const deleteImage = async (productId) => {
-    if (dispatch) {
-      try {
-        await apiService.delete(`/api/products/${productId}/image`);
-
-        dispatch({
-          type: customActions.DELETE_IMAGE,
-          payload: { id: productId },
-        });
-
-        return true;
-      } catch (error) {
-        console.error("Erreur lors de la suppression de l'image:", error);
         throw error;
       }
     }
