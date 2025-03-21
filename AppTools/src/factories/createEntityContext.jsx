@@ -193,20 +193,6 @@ export function createEntityContext(options) {
         dispatch({ type: ACTIONS.DELETE_SUCCESS, payload: entityId });
       };
 
-      // IMPORTANT: S'abonner aussi aux événements génériques
-      const handleGenericEvent = (payload) => {
-        if (payload?.entityType === entityType || payload?.entityType === entityPlural) {
-          console.log(`[WS-DEBUG] Événement générique pour ${entityType}:`, payload);
-          if (payload.entityId && payload.data) {
-            dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: payload.data });
-          } else if (payload.data && !payload.entityId) {
-            dispatch({ type: ACTIONS.CREATE_SUCCESS, payload: payload.data });
-          } else if (payload.entityId && !payload.data) {
-            dispatch({ type: ACTIONS.DELETE_SUCCESS, payload: payload.entityId });
-          }
-        }
-      };
-
       // Vérifier la connexion et s'abonner aux mises à jour
       const subscribeToWebSocket = () => {
         if (websocketService.isConnected) {
