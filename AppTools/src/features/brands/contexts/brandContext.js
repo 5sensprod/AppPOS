@@ -113,21 +113,9 @@ export function useBrandExtras() {
     }
   };
 
-  // Synchroniser une marque avec WooCommerce
-  const syncBrand = async (brandId) => {
-    try {
-      const response = await apiService.post(`/api/brands/${brandId}/sync`);
-      return response.data;
-    } catch (error) {
-      console.error('Erreur lors de la synchronisation de la marque:', error);
-      throw error;
-    }
-  };
-
   return {
     ...context,
     uploadImage,
     deleteImage,
-    syncBrand,
   };
 }

@@ -342,17 +342,21 @@ export function createEntityContext(options) {
 
     // Action de synchronisation (conditionnelle)
     const syncItem = syncEnabled
-      ? useCallback(async (id) => {
-          dispatch({ type: ACTIONS.FETCH_START });
-          try {
-            const response = await apiService.post(`/api/products/${id}/sync`);
-            dispatch({ type: ACTIONS.SYNC_SUCCESS, payload: response.data.data });
-            return response.data;
-          } catch (error) {
-            dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
-            throw error;
-          }
-        }, [])
+      ? useCallback(
+          async (id) => {
+            dispatch({ type: ACTIONS.FETCH_START });
+            try {
+              // Utiliser le path standardisé pour tous les types d'entités
+              const response = await apiService.post(`${apiEndpoint}/${id}/sync`);
+              dispatch({ type: ACTIONS.SYNC_SUCCESS, payload: response.data.data });
+              return response.data;
+            } catch (error) {
+              dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
+              throw error;
+            }
+          },
+          [apiEndpoint]
+        )
       : null;
 
     // Construction de la valeur du contexte avec noms adaptés à l'entité

@@ -113,17 +113,6 @@ export function useCategoryExtras() {
     }
   };
 
-  // Synchroniser une catégorie avec WooCommerce
-  const syncCategory = async (categoryId) => {
-    try {
-      const response = await apiService.post(`/api/categories/${categoryId}/sync`);
-      return response.data;
-    } catch (error) {
-      console.error('Erreur lors de la synchronisation de la catégorie:', error);
-      throw error;
-    }
-  };
-
   const getHierarchicalCategories = async () => {
     try {
       const response = await apiService.get('/api/categories/hierarchical');
@@ -138,7 +127,6 @@ export function useCategoryExtras() {
     ...context,
     uploadImage,
     deleteImage,
-    syncCategory,
     getHierarchicalCategories,
   };
 }
