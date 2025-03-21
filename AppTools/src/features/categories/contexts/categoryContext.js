@@ -3,9 +3,9 @@ import { createEntityContext } from '../../../factories/createEntityContext';
 import apiService from '../../../services/api';
 import { createEntityImageHandlers } from '../../../factories/createEntityImageHandlers';
 
-// Configuration de l'entité Category - ATTENTION: le nom est crucial
+// Configuration de l'entité Category
 const CATEGORY_CONFIG = {
-  entityName: 'category', // Ceci génère fetchCategorys et non fetchCategories
+  entityName: 'category',
   apiEndpoint: '/api/categories',
   syncEnabled: true,
   cacheDuration: 5 * 60 * 1000, // 5 minutes

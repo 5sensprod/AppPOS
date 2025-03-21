@@ -5,7 +5,7 @@ import { useBrand, useBrandExtras } from '../contexts/brandContext';
 import { EntityDetail, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { CheckCircle, AlertCircle } from 'lucide-react';
-import websocketService from '../../../services/websocketService';
+import { useEntityEvents } from '../../../hooks/useEntityEvents';
 
 function BrandDetail() {
   const { id } = useParams();
@@ -27,38 +27,19 @@ function BrandDetail() {
       .finally(() => setLoading(false));
   }, [id, getBrandById]);
 
-  useEffect(() => {
-    // S'abonner aux mises à jour WebSocket des marques
-    if (websocketService.isConnected) {
-      console.log('[WS-DEBUG] Abonnement aux mises à jour de marques');
-      websocketService.subscribe('brands');
-    }
-
-    // Gestionnaire pour les mises à jour de marques
-    const handleBrandUpdate = ({ entityId, data }) => {
+  useEntityEvents('brand', {
+    onUpdated: ({ entityId, data }) => {
       console.log('[WS-DEBUG] Mise à jour de marque reçue:', entityId);
       if (entityId === id && data) {
         console.log('[WS-DEBUG] Mise à jour de la marque actuelle avec:', data);
         setBrand(data);
       }
-    };
-
-    // Gestionnaire pour la connexion WebSocket
-    const handleConnect = () => {
-      console.log('[WS-DEBUG] WebSocket connecté, abonnement aux marques');
-      websocketService.subscribe('brands');
-    };
-
-    // S'abonner aux événements
-    websocketService.on('brands_updated', handleBrandUpdate);
-    websocketService.on('connect', handleConnect);
-
-    return () => {
-      // Nettoyer les abonnements
-      websocketService.off('brands_updated', handleBrandUpdate);
-      websocketService.off('connect', handleConnect);
-    };
-  }, [id, getBrandById]);
+    },
+    customEvents: {
+      // Le hook gère automatiquement l'abonnement sur les reconnexions,
+      // donc vous n'avez pas besoin de gérer l'événement 'connect' explicitement
+    },
+  });
 
   // Gérer la synchronisation de la marque
   const handleSync = async (brandId) => {

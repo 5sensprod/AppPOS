@@ -5,7 +5,7 @@ import { useCategory, useCategoryExtras } from '../contexts/categoryContext';
 import { EntityDetail, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { CheckCircle, AlertCircle } from 'lucide-react';
-import websocketService from '../../../services/websocketService';
+import { useEntityEvents } from '../../../hooks/useEntityEvents';
 
 function CategorieDetail() {
   const { id } = useParams();
@@ -27,39 +27,16 @@ function CategorieDetail() {
       .finally(() => setLoading(false));
   }, [id, getCategoryById]);
 
-  useEffect(() => {
-    // S'abonner aux mises à jour WebSocket des catégories
-    if (websocketService.isConnected) {
-      console.log('[WS-DEBUG] Abonnement aux mises à jour de catégories');
-      websocketService.subscribe('categories');
-    }
-
-    // Gestionnaire pour les mises à jour de catégories
-    const handleCategoryUpdate = ({ entityId, data }) => {
+  useEntityEvents('category', {
+    onUpdated: ({ entityId, data }) => {
       console.log('[WS-DEBUG] Mise à jour de catégorie reçue:', entityId);
       if (entityId === id && data) {
         console.log('[WS-DEBUG] Mise à jour de la catégorie actuelle avec:', data);
         setCategory(data);
       }
-    };
-
-    // Gestionnaire pour la connexion WebSocket
-    const handleConnect = () => {
-      console.log('[WS-DEBUG] WebSocket connecté, abonnement aux catégories');
-      websocketService.subscribe('categories');
-    };
-
-    // S'abonner aux événements
-    websocketService.on('categories_updated', handleCategoryUpdate);
-    websocketService.on('connect', handleConnect);
-
-    return () => {
-      // Nettoyer les abonnements
-      websocketService.off('categories_updated', handleCategoryUpdate);
-      websocketService.off('connect', handleConnect);
-    };
-  }, [id, getCategoryById]);
-
+    },
+    // Le hook gère automatiquement l'abonnement et les reconnexions
+  });
   // Gérer la synchronisation de la catégorie
   const handleSync = async (categoryId) => {
     try {
@@ -129,12 +106,6 @@ function CategorieDetail() {
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Nom</h3>
                     <p className="mt-1 text-gray-900 dark:text-gray-100">{category.name}</p>
                   </div>
-
-                  {/* <div>
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Slug</h3>
-                    <p className="mt-1 text-gray-900 dark:text-gray-100">{category.slug || '-'}</p>
-                  </div> */}
-
                   <div>
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Catégorie parente

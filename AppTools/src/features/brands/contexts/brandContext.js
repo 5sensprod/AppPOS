@@ -1,7 +1,6 @@
 // src/features/brands/contexts/brandContext.js
 import { createEntityContext } from '../../../factories/createEntityContext';
 import { createEntityImageHandlers } from '../../../factories/createEntityImageHandlers';
-import apiService from '../../../services/api';
 
 // Configuration de l'entité Brand
 const BRAND_CONFIG = {

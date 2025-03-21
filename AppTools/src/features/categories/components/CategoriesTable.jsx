@@ -22,6 +22,7 @@ function CategoriesTable(props) {
   const operationInProgress = useRef(false);
   const handleCategoryTreeChange = useCallback(async () => {
     console.log('[WS-DEBUG] Rafraîchissement des catégories suite à un événement WebSocket');
+    console.log('[CLIENT] Événement categories.tree.changed reçu');
 
     if (operationInProgress.current) return; // Éviter les requêtes simultanées
 
@@ -40,7 +41,26 @@ function CategoriesTable(props) {
       operationInProgress.current = false;
     }
   }, [getHierarchicalCategories]);
+  // useEffect(() => {
+  //   // Abonnement explicite à "categories" (et non "categorys")
+  //   console.log('[WS-DEBUG] Abonnement explicite à categories');
+  //   websocketService.subscribe('categories');
 
+  //   // Écouteur explicite pour l'événement de mise à jour de l'arborescence
+  //   const handleExplicitTreeChange = (data) => {
+  //     console.log('[WS-DEBUG] Événement categories.tree.changed reçu explicitement:', data);
+  //     // Appeler votre fonction de gestion existante
+  //     handleCategoryTreeChange();
+  //   };
+
+  //   // S'abonner à l'événement spécifique
+  //   websocketService.on('categories.tree.changed', handleExplicitTreeChange);
+
+  //   return () => {
+  //     // Nettoyage
+  //     websocketService.off('categories.tree.changed', handleExplicitTreeChange);
+  //   };
+  // }, [handleCategoryTreeChange]);
   // Utiliser notre hook pour les événements
   useEntityEvents('category', {
     onCreated: async (data) => {
@@ -77,7 +97,7 @@ function CategoriesTable(props) {
       }
     },
     customEvents: {
-      'categories.tree.changed': handleCategoryTreeChange,
+      'categorys.tree.changed': handleCategoryTreeChange,
     },
   });
   // Charger les données hiérarchiques une seule fois au montage du composant
