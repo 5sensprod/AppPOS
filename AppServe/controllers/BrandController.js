@@ -3,6 +3,7 @@ const BaseController = require('./base/BaseController');
 const Brand = require('../models/Brand');
 const brandWooCommerceService = require('../services/BrandWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
+const { getEntityEventService } = require('../services/events/entityEvents');
 
 class BrandController extends BaseController {
   constructor() {
@@ -10,6 +11,8 @@ class BrandController extends BaseController {
       entity: 'brands',
       type: 'single',
     });
+    // Initialiser le service d'événements
+    this.eventService = getEntityEventService(this.entityName);
   }
 
   async getBySupplier(req, res) {
@@ -27,6 +30,9 @@ class BrandController extends BaseController {
       if (!brand) return ResponseHandler.notFound(res);
 
       const updated = await this.model.update(req.params.id, req.body);
+
+      // Émettre l'événement de mise à jour via le service d'événements
+      this.eventService.updated(req.params.id, updated);
 
       if (this.shouldSync() && this.wooCommerceService) {
         const updatedBrand = await this.model.findById(req.params.id);
@@ -59,9 +65,8 @@ class BrandController extends BaseController {
       // Supprimer l'entité localement
       await this.model.delete(req.params.id);
 
-      // Notification WebSocket
-      const websocketManager = require('../websocket/websocketManager');
-      websocketManager.notifyEntityDeleted('brands', req.params.id);
+      // Émettre l'événement de suppression via le service d'événements
+      this.eventService.deleted(req.params.id);
 
       return ResponseHandler.success(res, {
         message: 'Marque supprimée avec succès',

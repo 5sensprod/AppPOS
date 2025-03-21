@@ -3,6 +3,7 @@ const WooCommerceClient = require('./base/WooCommerceClient');
 const BrandSyncStrategy = require('./sync/BrandSync');
 const SyncErrorHandler = require('./base/SyncErrorHandler');
 const Brand = require('../models/Brand');
+const { getEntityEventService } = require('./events/entityEvents');
 
 class BrandWooCommerceService {
   constructor() {
@@ -10,6 +11,7 @@ class BrandWooCommerceService {
     this.strategy = new BrandSyncStrategy();
     this.errorHandler = new SyncErrorHandler();
     this.endpoint = 'products/brands';
+    this.eventService = getEntityEventService('brands');
   }
 
   async syncToWooCommerce(input = null) {
@@ -27,6 +29,12 @@ class BrandWooCommerceService {
           const result = await this.strategy.syncToWooCommerce(brand, this.client, results);
           if (!result.success) {
             this.errorHandler.handleSyncError(result.error, results, brand._id);
+          } else if (result.brand) {
+            // Émettre un événement après synchronisation réussie
+            console.log(
+              `[EVENT] Émission d'événement après synchronisation de la marque ${brand._id}`
+            );
+            this.eventService.syncCompleted(brand._id, result.brand);
           }
         } catch (error) {
           this.errorHandler.handleSyncError(error, results, brand._id);
@@ -72,6 +80,10 @@ class BrandWooCommerceService {
       }
 
       await Brand.delete(brandId);
+
+      // Émettre un événement après suppression réussie
+      this.eventService.deleted(brandId);
+
       return { success: true };
     } catch (error) {
       console.error('Delete error:', error);

@@ -2,6 +2,7 @@
 const BaseController = require('./base/BaseController');
 const Supplier = require('../models/Supplier');
 const ResponseHandler = require('../handlers/ResponseHandler');
+const { getEntityEventService } = require('../services/events/entityEvents');
 
 class SupplierController extends BaseController {
   constructor() {
@@ -10,9 +11,28 @@ class SupplierController extends BaseController {
       entity: 'suppliers',
       type: 'single',
     });
+    // Initialiser le service d'événements
+    this.eventService = getEntityEventService(this.entityName);
   }
 
-  // Ajout potentiel de méthodes spécifiques aux fournisseurs ici
+  // Vous pouvez ajouter ici des méthodes spécifiques aux fournisseurs qui utilisent this.eventService
+  // Exemple:
+  async updateWithMetadata(req, res) {
+    try {
+      const id = req.params.id;
+      const updateData = { ...req.body, updated_at: new Date() };
+
+      await this.model.update(id, updateData);
+      const updatedItem = await this.model.findById(id);
+
+      // Émettre l'événement de mise à jour
+      this.eventService.updated(id, updatedItem);
+
+      return ResponseHandler.success(res, updatedItem);
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
 }
 
 const supplierController = new SupplierController();
@@ -26,4 +46,6 @@ module.exports = {
   uploadImage: supplierController.uploadImage,
   updateImageMetadata: supplierController.updateImageMetadata,
   deleteImage: supplierController.deleteImage,
+  // Si vous ajoutez la méthode updateWithMetadata, exportez-la ici
+  // updateWithMetadata: supplierController.updateWithMetadata.bind(supplierController),
 };
