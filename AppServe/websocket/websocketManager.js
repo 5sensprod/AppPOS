@@ -67,25 +67,25 @@ class WebSocketManager {
   // Notifier les clients après des opérations CRUD
   notifyEntityCreated(entityType, entityData) {
     const entityPlural = entityType.endsWith('s') ? entityType : `${entityType}s`;
-    this.broadcast('entity_created', { entityType: entityPlural, data: entityData }, [
-      entityPlural,
-    ]);
+    // Événement spécifique (nouveau format)
+    this.broadcast(`${entityPlural}.created`, entityData, [entityPlural]);
   }
 
   notifyEntityUpdated(entityType, entityId, entityData) {
     const entityPlural = entityType.endsWith('s') ? entityType : `${entityType}s`;
-    this.broadcast('entity_updated', { entityType: entityPlural, entityId, data: entityData }, [
-      entityPlural,
-    ]);
+    // Événement spécifique (nouveau format)
+    this.broadcast(`${entityPlural}.updated`, { entityId, data: entityData }, [entityPlural]);
   }
 
   notifyEntityDeleted(entityType, entityId) {
     const entityPlural = entityType.endsWith('s') ? entityType : `${entityType}s`;
-    this.broadcast('entity_deleted', { entityType: entityPlural, entityId }, [entityPlural]);
+    // Événement spécifique (nouveau format)
+    this.broadcast(`${entityPlural}.deleted`, { entityId }, [entityPlural]);
   }
 
   notifyCategoryTreeChange() {
-    this.broadcast('category_tree_changed', { timestamp: Date.now() }, ['categories']);
+    // Uniquement l'alias avec point
+    this.broadcast('categories.tree.changed', { timestamp: Date.now() }, ['categories']);
     console.log("[WS-DEBUG] Notification de changement dans l'arborescence des catégories envoyée");
   }
 

@@ -43,17 +43,6 @@ function CategorieDetail() {
       }
     };
 
-    // Gestionnaire pour les événements entity_updated
-    const handleEntityUpdate = (payload) => {
-      if (payload.entityType === 'categories' && payload.entityId === id) {
-        // Force une récupération complète de la catégorie
-        getCategoryById(id).then((updatedCategory) => {
-          console.log('[WS-DEBUG] Catégorie rechargée:', updatedCategory);
-          setCategory(updatedCategory);
-        });
-      }
-    };
-
     // Gestionnaire pour la connexion WebSocket
     const handleConnect = () => {
       console.log('[WS-DEBUG] WebSocket connecté, abonnement aux catégories');
@@ -62,13 +51,11 @@ function CategorieDetail() {
 
     // S'abonner aux événements
     websocketService.on('categories_updated', handleCategoryUpdate);
-    websocketService.on('entity_updated', handleEntityUpdate);
     websocketService.on('connect', handleConnect);
 
     return () => {
       // Nettoyer les abonnements
       websocketService.off('categories_updated', handleCategoryUpdate);
-      websocketService.off('entity_updated', handleEntityUpdate);
       websocketService.off('connect', handleConnect);
     };
   }, [id, getCategoryById]);

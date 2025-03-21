@@ -44,17 +44,6 @@ function ProductDetail() {
       }
     };
 
-    // Gestionnaire pour les événements entity_updated
-    const handleEntityUpdate = (payload) => {
-      if (payload.entityType === 'products' && payload.entityId === id) {
-        // Force une récupération complète du produit
-        getProductById(id).then((updatedProduct) => {
-          console.log('[WS-DEBUG] Produit rechargé:', updatedProduct);
-          setProduct(updatedProduct);
-        });
-      }
-    };
-
     // Gestionnaire pour la connexion WebSocket
     const handleConnect = () => {
       console.log('[WS-DEBUG] WebSocket connecté, abonnement aux produits');
@@ -63,13 +52,11 @@ function ProductDetail() {
 
     // S'abonner aux événements
     websocketService.on('products_updated', handleProductUpdate);
-    websocketService.on('entity_updated', handleEntityUpdate);
     websocketService.on('connect', handleConnect);
 
     return () => {
       // Nettoyer les abonnements
       websocketService.off('products_updated', handleProductUpdate);
-      websocketService.off('entity_updated', handleEntityUpdate);
       websocketService.off('connect', handleConnect);
     };
   }, [id]);

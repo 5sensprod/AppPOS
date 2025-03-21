@@ -104,25 +104,6 @@ export function useProductExtras() {
   const context = useProduct();
   const { dispatch } = context;
 
-  // Mettre à jour le stock d'un produit
-  const updateStock = async (productId, newStock) => {
-    if (dispatch) {
-      try {
-        const response = await apiService.put(`/api/products/${productId}`, {
-          stock: newStock,
-        });
-        dispatch({
-          type: customActions.UPDATE_STOCK,
-          payload: { id: productId, stock: newStock },
-        });
-        return response.data;
-      } catch (error) {
-        console.error('Erreur lors de la mise à jour du stock:', error);
-        throw error;
-      }
-    }
-  };
-
   // Définir l'image principale d'un produit
   const setMainImage = async (productId, imageIndex) => {
     if (dispatch) {
@@ -250,7 +231,6 @@ export function useProductExtras() {
 
   return {
     ...context,
-    updateStock,
     setMainImage,
     uploadImage,
     uploadGalleryImage,

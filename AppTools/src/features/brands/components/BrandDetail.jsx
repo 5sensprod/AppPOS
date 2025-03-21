@@ -6,7 +6,6 @@ import { EntityDetail, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import websocketService from '../../../services/websocketService';
-import imageProxyService from '../../../services/imageProxyService';
 
 function BrandDetail() {
   const { id } = useParams();
@@ -44,17 +43,6 @@ function BrandDetail() {
       }
     };
 
-    // Gestionnaire pour les événements entity_updated
-    const handleEntityUpdate = (payload) => {
-      if (payload.entityType === 'brands' && payload.entityId === id) {
-        // Force une récupération complète de la marque
-        getBrandById(id).then((updatedBrand) => {
-          console.log('[WS-DEBUG] Marque rechargée:', updatedBrand);
-          setBrand(updatedBrand);
-        });
-      }
-    };
-
     // Gestionnaire pour la connexion WebSocket
     const handleConnect = () => {
       console.log('[WS-DEBUG] WebSocket connecté, abonnement aux marques');
@@ -63,13 +51,11 @@ function BrandDetail() {
 
     // S'abonner aux événements
     websocketService.on('brands_updated', handleBrandUpdate);
-    websocketService.on('entity_updated', handleEntityUpdate);
     websocketService.on('connect', handleConnect);
 
     return () => {
       // Nettoyer les abonnements
       websocketService.off('brands_updated', handleBrandUpdate);
-      websocketService.off('entity_updated', handleEntityUpdate);
       websocketService.off('connect', handleConnect);
     };
   }, [id, getBrandById]);

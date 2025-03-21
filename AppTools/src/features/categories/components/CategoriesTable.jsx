@@ -3,7 +3,6 @@ import { useCategory, useCategoryExtras } from '../contexts/categoryContext';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import websocketService from '@/services/websocketService';
 import { useEntityEvents } from '../../../hooks/useEntityEvents';
 
 function CategoriesTable(props) {

@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { useSupplier } from '../contexts/supplierContext';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
+import { useEntityEvents } from '../../../hooks/useEntityEvents';
 
 function SupplierTable(props) {
   const { suppliers, loading, error, fetchSuppliers, deleteSupplier, syncSupplier } = useSupplier();
@@ -11,6 +12,22 @@ function SupplierTable(props) {
   useEffect(() => {
     fetchSuppliers();
   }, [fetchSuppliers]);
+
+  // Utilisation du hook useEntityEvents pour écouter les événements WebSocket
+  useEntityEvents('supplier', {
+    onCreated: () => {
+      console.log('[WS-DEBUG] Nouveau fournisseur créé, actualisation de la liste');
+      fetchSuppliers();
+    },
+    onUpdated: () => {
+      console.log('[WS-DEBUG] Fournisseur mis à jour, actualisation de la liste');
+      fetchSuppliers();
+    },
+    onDeleted: () => {
+      console.log('[WS-DEBUG] Fournisseur supprimé, actualisation de la liste');
+      fetchSuppliers();
+    },
+  });
 
   // Configuration des filtres
   const filters = [];
