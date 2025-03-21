@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import apiService from '../services/api';
 import websocketService from '../services/websocketService';
+import { pluralize } from '../utils/entityUtils';
 
 export function createEntityContext(options) {
   const {
@@ -160,26 +161,14 @@ export function createEntityContext(options) {
     });
 
     useEffect(() => {
-      // S'assurer que le nom utilisé pour les abonnements est correct
-      // Note: entityPlural normalise le nom pour l'API WebSocket
-      const entityPlural =
-        entityName === 'category'
-          ? 'categories'
-          : entityName === 'supplier'
-            ? 'suppliers'
-            : `${entityName}s`;
-      const entityType = entityName.endsWith('y')
-        ? `${entityName.slice(0, -1)}ies` // category -> categories
-        : entityName.endsWith('s')
-          ? entityName
-          : `${entityName}s`; // product -> products
+      const entityPlural = pluralize(entityName);
 
       console.log(
-        `[WS-DEBUG] Configuration WebSocket pour ${entityName} (type: ${entityType}, plural: ${entityPlural})`
+        `[WS-DEBUG] Configuration WebSocket pour ${entityName} (plural: ${entityPlural})`
       );
 
       const handleUpdate = ({ entityId, data }) => {
-        console.log(`[WS-DEBUG] Mise à jour ${entityType} reçue:`, { entityId, data });
+        console.log(`[WS-DEBUG] Mise à jour ${entityPlural} reçue:`, { entityId, data });
         dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: data });
       };
 
@@ -204,9 +193,7 @@ export function createEntityContext(options) {
           websocketService.on(`${entityPlural}.created`, handleCreate);
           websocketService.on(`${entityPlural}.deleted`, handleDelete);
 
-          console.log(
-            `[WS-DEBUG] Abonnement établi pour ${entityName} (${entityPlural}) avec le nouveau format`
-          );
+          console.log(`[WS-DEBUG] Abonnement établi pour ${entityName} (${entityPlural})`);
         } else {
           console.warn(
             `[WS-DEBUG] WebSocket non connecté, impossible de s'abonner pour ${entityName}`
@@ -370,7 +357,7 @@ export function createEntityContext(options) {
 
     // Construction de la valeur du contexte avec noms adaptés à l'entité
     const value = {
-      [`${entityName}s`]: state.items,
+      [`${pluralize(entityName)}`]: state.items,
       [`${entityName}sById`]: state.itemsById,
       loading: state.loading,
       error: state.error,

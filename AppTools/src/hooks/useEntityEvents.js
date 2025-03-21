@@ -1,13 +1,14 @@
 // src/hooks/useEntityEvents.js
 import { useEffect } from 'react';
 import websocketService from '../services/websocketService';
+import { pluralize } from '../utils/entityUtils';
 
 export function useEntityEvents(entityType, handlers = {}) {
   useEffect(() => {
     const cleanupFunctions = [];
 
     // Standardiser le type d'entité (singulier/pluriel)
-    const standardEntityType = entityType.endsWith('s') ? entityType : `${entityType}s`;
+    const standardEntityType = pluralize(entityType);
 
     // S'abonner aux événements
     if (handlers.onCreated) {
