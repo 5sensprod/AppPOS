@@ -1,6 +1,5 @@
 // src/features/categories/contexts/categoryContext.js
 import { createEntityContext } from '../../../factories/createEntityContext';
-import { createEntityImageHandlers } from '../../../factories/createEntityImageHandlers';
 import apiService from '../../../services/api';
 
 // Configuration de l'entité Category
@@ -8,49 +7,8 @@ const CATEGORY_CONFIG = {
   entityName: 'category',
   apiEndpoint: '/api/categories',
   syncEnabled: true,
+  imagesEnabled: true,
   cacheDuration: 5 * 60 * 1000, // 5 minutes
-};
-
-// Actions personnalisées pour les catégories
-const customActions = {
-  UPLOAD_IMAGE: 'UPLOAD_IMAGE',
-  DELETE_IMAGE: 'DELETE_IMAGE',
-};
-
-// Reducers personnalisés pour les catégories
-const customReducers = {
-  UPLOAD_IMAGE: (state, action) => {
-    return {
-      ...state,
-      items: state.items.map((item) =>
-        item._id === action.payload.id ? { ...item, image: action.payload.image } : item
-      ),
-      itemsById: {
-        ...state.itemsById,
-        [action.payload.id]: {
-          ...state.itemsById[action.payload.id],
-          image: action.payload.image,
-        },
-      },
-      loading: false,
-    };
-  },
-  DELETE_IMAGE: (state, action) => {
-    return {
-      ...state,
-      items: state.items.map((item) =>
-        item._id === action.payload.id ? { ...item, image: null } : item
-      ),
-      itemsById: {
-        ...state.itemsById,
-        [action.payload.id]: {
-          ...state.itemsById[action.payload.id],
-          image: null,
-        },
-      },
-      loading: false,
-    };
-  },
 };
 
 // Créer le contexte avec la factory
@@ -58,23 +16,12 @@ export const {
   categoryContext: CategoryContext,
   CategoryProvider,
   useCategory,
-} = createEntityContext({
-  ...CATEGORY_CONFIG,
-  customActions,
-  customReducers,
-});
+  useCategoryExtras: useBaseCategoryExtras,
+} = createEntityContext(CATEGORY_CONFIG);
 
-// Fonction pour exposer des méthodes supplémentaires liées aux catégories
+// Fonction pour exposer des méthodes supplémentaires spécifiques aux catégories
 export function useCategoryExtras() {
-  const context = useCategory();
-  const { dispatch } = context;
-
-  const { uploadImage, deleteImage } = createEntityImageHandlers(
-    'category',
-    '/api/categories',
-    dispatch,
-    customActions
-  );
+  const baseContext = useBaseCategoryExtras();
 
   const getHierarchicalCategories = async () => {
     try {
@@ -87,9 +34,7 @@ export function useCategoryExtras() {
   };
 
   return {
-    ...context,
-    uploadImage,
-    deleteImage,
+    ...baseContext,
     getHierarchicalCategories,
   };
 }

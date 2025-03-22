@@ -3,18 +3,28 @@ import React, { createContext, useContext, useReducer, useCallback, useEffect } 
 import apiService from '../services/api';
 import websocketService from '../services/websocketService';
 import { pluralize, capitalize } from '../utils/entityUtils';
+import { createEntityImageHandlers } from './createEntityImageHandlers';
 
 export function createEntityContext(options) {
   const {
     entityName,
     apiEndpoint,
     syncEnabled = true,
+    imagesEnabled = true, // Nouvelle option pour activer/désactiver la gestion des images
     customActions = {},
     customReducers = {},
   } = options;
 
   // Création du contexte
   const EntityContext = createContext();
+
+  // Actions standards pour les images
+  const standardImageActions = imagesEnabled
+    ? {
+        UPLOAD_IMAGE: 'UPLOAD_IMAGE',
+        DELETE_IMAGE: 'DELETE_IMAGE',
+      }
+    : {};
 
   // Actions standards et personnalisées
   const ACTIONS = {
@@ -25,8 +35,47 @@ export function createEntityContext(options) {
     UPDATE_SUCCESS: 'UPDATE_SUCCESS',
     DELETE_SUCCESS: 'DELETE_SUCCESS',
     SYNC_SUCCESS: 'SYNC_SUCCESS',
+    ...standardImageActions,
     ...customActions,
   };
+
+  // Reducers standards pour les images
+  const standardImageReducers = imagesEnabled
+    ? {
+        UPLOAD_IMAGE: (state, action) => {
+          return {
+            ...state,
+            items: state.items.map((item) =>
+              item._id === action.payload.id ? { ...item, image: action.payload.image } : item
+            ),
+            itemsById: {
+              ...state.itemsById,
+              [action.payload.id]: {
+                ...state.itemsById[action.payload.id],
+                image: action.payload.image,
+              },
+            },
+            loading: false,
+          };
+        },
+        DELETE_IMAGE: (state, action) => {
+          return {
+            ...state,
+            items: state.items.map((item) =>
+              item._id === action.payload.id ? { ...item, image: null } : item
+            ),
+            itemsById: {
+              ...state.itemsById,
+              [action.payload.id]: {
+                ...state.itemsById[action.payload.id],
+                image: null,
+              },
+            },
+            loading: false,
+          };
+        },
+      }
+    : {};
 
   // État initial simplifié
   const initialState = {
@@ -41,6 +90,11 @@ export function createEntityContext(options) {
     // Vérifier si un reducer personnalisé existe pour cette action
     if (customReducers[action.type]) {
       return customReducers[action.type](state, action);
+    }
+
+    // Vérifier si un reducer standard pour images existe pour cette action
+    if (standardImageReducers[action.type]) {
+      return standardImageReducers[action.type](state, action);
     }
 
     // Reducers standards
@@ -326,6 +380,11 @@ export function createEntityContext(options) {
         )
       : null;
 
+    // Fonctions de gestion d'images (conditionnelles)
+    const imageHandlers = imagesEnabled
+      ? createEntityImageHandlers(entityName, apiEndpoint, dispatch, ACTIONS)
+      : {};
+
     // Construction de la valeur du contexte avec noms adaptés à l'entité
     const value = {
       [`${pluralize(entityName)}`]: state.items,
@@ -338,6 +397,10 @@ export function createEntityContext(options) {
       [`update${capitalize(entityName)}`]: updateItem,
       [`delete${capitalize(entityName)}`]: deleteItem,
       ...(syncEnabled && { [`sync${capitalize(entityName)}`]: syncItem }),
+      ...(imagesEnabled && {
+        [`uploadImage`]: imageHandlers.uploadImage,
+        [`deleteImage`]: imageHandlers.deleteImage,
+      }),
       // Exposer dispatch pour permettre des actions personnalisées
       dispatch,
     };
@@ -356,10 +419,19 @@ export function createEntityContext(options) {
     return context;
   }
 
+  // Hook personnalisé pour les fonctionnalités supplémentaires (comme ExtrasHook)
+  function useEntityExtras() {
+    const context = useEntity();
+    return {
+      ...context,
+    };
+  }
+
   // Renvoie un objet avec les exports nommés selon l'entité
   return {
     [`${entityName}Context`]: EntityContext,
     [`${capitalize(entityName)}Provider`]: EntityProvider,
     [`use${capitalize(entityName)}`]: useEntity,
+    [`use${capitalize(entityName)}Extras`]: useEntityExtras,
   };
 }
