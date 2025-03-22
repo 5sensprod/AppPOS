@@ -56,9 +56,8 @@ const entityRoutes = [
     form: ProductForm,
   },
   {
-    path: 'products/categories', // Corriger le chemin
+    path: 'products/categories',
     component: CategoriesPage,
-    // Utiliser des composants temporaires pour éviter les erreurs
     provider: CategoryProvider,
     details: CategorieDetail,
     form: CategoryForm,
@@ -73,9 +72,9 @@ const entityRoutes = [
   {
     path: 'products/brands',
     component: BrandsPage,
-    provider: BrandProvider, // Utilise maintenant le BrandProvider
-    details: BrandDetail, // À remplacer par vos composants réels
-    form: () => <div>Formulaire de marque</div>, // À remplacer par vos composants réels
+    provider: BrandProvider,
+    details: BrandDetail,
+    form: () => <div>Formulaire de marque</div>,
   },
 ];
 
