@@ -5,7 +5,7 @@ import { useProduct, useProductExtras } from '../contexts/productContext';
 import { EntityDetail, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 import { CheckCircle, AlertCircle } from 'lucide-react';
-import websocketService from '../../../services/websocketService';
+import { useEntityEvents } from '../../../hooks/useEntityEvents';
 
 function ProductDetail() {
   const { id } = useParams();
@@ -28,38 +28,16 @@ function ProductDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => {
-    // S'abonner aux mises à jour WebSocket des produits
-    if (websocketService.isConnected) {
-      console.log('[WS-DEBUG] Abonnement aux mises à jour de produits');
-      websocketService.subscribe('products');
-    }
-
-    // Gestionnaire pour les mises à jour de produits
-    const handleProductUpdate = ({ entityId, data }) => {
-      console.log('[WS-DEBUG] Mise à jour de produit reçue:', entityId);
+  useEntityEvents('product', {
+    onUpdated: ({ entityId, data }) => {
+      console.log('[WS-DEBUG] Mise à jour de catégorie reçue:', entityId);
       if (entityId === id && data) {
-        console.log('[WS-DEBUG] Mise à jour du produit actuel avec:', data);
-        setProduct(data);
+        console.log('[WS-DEBUG] Mise à jour de la catégorie actuelle avec:', data);
+        setCategory(data);
       }
-    };
-
-    // Gestionnaire pour la connexion WebSocket
-    const handleConnect = () => {
-      console.log('[WS-DEBUG] WebSocket connecté, abonnement aux produits');
-      websocketService.subscribe('products');
-    };
-
-    // S'abonner aux événements
-    websocketService.on('products_updated', handleProductUpdate);
-    websocketService.on('connect', handleConnect);
-
-    return () => {
-      // Nettoyer les abonnements
-      websocketService.off('products_updated', handleProductUpdate);
-      websocketService.off('connect', handleConnect);
-    };
-  }, [id]);
+    },
+    // Le hook gère automatiquement l'abonnement et les reconnexions
+  });
 
   // Gérer la synchronisation du produit
   const handleSync = async (productId) => {
@@ -403,6 +381,19 @@ function ProductDetail() {
                       </h3>
                       <div className="mt-2 text-sm text-green-700 dark:text-green-300">
                         <p>ID Internet : {product.woo_id}</p>
+                        {product.website_url && (
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            Url :{' '}
+                            <a
+                              href={product.website_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 duration-200 ease-in-out"
+                            >
+                              {product.website_url}
+                            </a>
+                          </p>
+                        )}
                         {product.last_sync && (
                           <p>
                             Dernière synchronisation :{' '}
