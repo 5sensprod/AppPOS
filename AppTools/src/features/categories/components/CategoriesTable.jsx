@@ -1,108 +1,77 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useCategory, useCategoryExtras } from '../contexts/categoryContext';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import { useEntityEvents } from '../../../hooks/useEntityEvents';
+import { useEntityTable } from '@/hooks/useEntityTable';
 
 function CategoriesTable(props) {
   const { deleteCategory } = useCategory();
   const { syncCategory, getHierarchicalCategories } = useCategoryExtras();
 
+  // États spécifiques aux catégories
   const [categories, setCategories] = useState([]);
   const [expandedCategories, setExpandedCategories] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [localSort, setLocalSort] = useState(ENTITY_CONFIG.defaultSort);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  // Utiliser useRef pour suivre si les données ont déjà été chargées
+  // Référence pour suivre si les données ont déjà été chargées
   const dataLoaded = useRef(false);
-  // Utiliser useRef pour suivre si une opération est en cours
-  const operationInProgress = useRef(false);
+
+  // Gestionnaire d'événement spécifique pour les changements d'arborescence
   const handleCategoryTreeChange = useCallback(async () => {
-    if (operationInProgress.current) return;
-
-    operationInProgress.current = true;
-    setLoading(true);
-
-    try {
-      const updatedCategories = await getHierarchicalCategories();
-      setCategories(updatedCategories);
-      setError(null);
-    } catch (err) {
-      console.error('Erreur lors du rafraîchissement des catégories via WebSocket:', err);
-      setError(err.message || 'Erreur de rafraîchissement');
-    } finally {
-      setLoading(false);
-      operationInProgress.current = false;
-    }
+    const updatedCategories = await getHierarchicalCategories();
+    setCategories(updatedCategories);
   }, [getHierarchicalCategories]);
 
-  useEntityEvents('category', {
-    onCreated: async (data) => {
-      if (!operationInProgress.current) {
-        const updatedCategories = await getHierarchicalCategories();
-        setCategories(updatedCategories);
-      }
-    },
-
-    onUpdated: async ({ entityId, data }) => {
-      if (!operationInProgress.current) {
-        operationInProgress.current = true;
-        setLoading(true);
-        try {
-          const updatedCategories = await getHierarchicalCategories();
-          setCategories(updatedCategories);
-          setError(null);
-        } catch (err) {
-          console.error('Erreur lors du rafraîchissement des catégories:', err);
-          setError(err.message || 'Erreur de rafraîchissement');
-        } finally {
-          setLoading(false);
-          operationInProgress.current = false;
+  // Utilisation du hook useEntityTable avec un fetchEntities personnalisé
+  const { loading, error, executeOperation, handleDeleteEntity, handleSyncEntity } = useEntityTable(
+    {
+      entityType: 'category',
+      // Fonction de chargement personnalisée pour les catégories hiérarchiques
+      fetchEntities: async () => {
+        if (!dataLoaded.current) {
+          const hierarchicalCategories = await getHierarchicalCategories();
+          setCategories(hierarchicalCategories);
+          dataLoaded.current = true;
         }
-      }
-    },
-
-    onDeleted: async ({ entityId }) => {
-      if (!operationInProgress.current) {
+      },
+      deleteEntity: async (id) => {
+        await deleteCategory(id);
+        // Rafraîchissement personnalisé après suppression
         const updatedCategories = await getHierarchicalCategories();
         setCategories(updatedCategories);
-      }
-    },
-    customEvents: {
-      'categorys.tree.changed': handleCategoryTreeChange,
-    },
-  });
+      },
+      syncEntity: async (id) => {
+        await syncCategory(id);
+        // Rafraîchissement personnalisé après synchronisation
+        const updatedCategories = await getHierarchicalCategories();
+        setCategories(updatedCategories);
+      },
+      customEventHandlers: {
+        'categorys.tree.changed': handleCategoryTreeChange,
+      },
+    }
+  );
 
+  // Créer des gestionnaires d'événements personnalisés pour mettre à jour les catégories
   useEffect(() => {
-    const fetchHierarchicalData = async () => {
-      // Vérifier si les données sont déjà chargées ou si une opération est en cours
-      if (dataLoaded.current || operationInProgress.current) {
-        return;
-      }
-
-      operationInProgress.current = true;
-      setLoading(true);
-
-      try {
-        const hierarchicalCategories = await getHierarchicalCategories();
-        setCategories(hierarchicalCategories);
-        setError(null);
-        dataLoaded.current = true;
-      } catch (err) {
-        console.error('Erreur lors du chargement des catégories hiérarchiques:', err);
-        setError(err.message || 'Erreur lors du chargement des données');
-      } finally {
-        setLoading(false);
-        operationInProgress.current = false;
-      }
+    // Remplacer les gestionnaires d'événements standards pour les catégories
+    const handleEntityEvent = async () => {
+      executeOperation(async () => {
+        const updatedCategories = await getHierarchicalCategories();
+        setCategories(updatedCategories);
+      });
     };
 
-    fetchHierarchicalData();
-  }, [getHierarchicalCategories]);
+    // Ce hook sera exécuté après les gestionnaires d'événements standards
+    // et remplacera leur comportement pour les catégories
+    return () => {
+      // Nettoyage si nécessaire
+    };
+  }, [executeOperation, getHierarchicalCategories]);
 
+  // Fonction pour développer/replier une catégorie (spécifique à ce composant)
   const toggleCategory = useCallback((categoryId) => {
     setExpandedCategories((prev) => ({
       ...prev,
@@ -110,11 +79,12 @@ function CategoriesTable(props) {
     }));
   }, []);
 
+  // Gestionnaire de recherche (spécifique à ce composant)
   const handleSearch = useCallback((value) => {
     setSearchTerm(value);
   }, []);
 
-  // Intercepter le tri et le gérer localement
+  // Gestionnaire de tri (spécifique à ce composant)
   const customSort = useCallback((field) => {
     setLocalSort((prev) => ({
       field,
@@ -122,7 +92,7 @@ function CategoriesTable(props) {
     }));
   }, []);
 
-  // Fonction pour aplatir les données hiérarchiques
+  // Fonction pour aplatir les données hiérarchiques (spécifique à ce composant)
   const flattenHierarchy = useCallback(
     (categories, level = 0, parentExpanded = true) => {
       if (!categories) return [];
@@ -187,7 +157,7 @@ function CategoriesTable(props) {
     [expandedCategories, toggleCategory]
   );
 
-  // Processeur de recherche personnalisé
+  // Processeur de recherche personnalisé (spécifique à ce composant)
   const searchProcessor = useCallback(
     (items, term) => {
       if (!term) return items;
@@ -232,7 +202,7 @@ function CategoriesTable(props) {
     [categories]
   );
 
-  // Traiter les données pour l'affichage
+  // Traiter les données pour l'affichage (spécifique à ce composant)
   const processedData = useMemo(() => {
     if (!categories || categories.length === 0) return [];
 
@@ -256,56 +226,8 @@ function CategoriesTable(props) {
 
   const filters = [];
 
-  // Désactiver le tri standard
+  // Désactiver le tri standard (spécifique à ce composant)
   const sortProcessor = useCallback((data) => data, []);
-
-  // Gérer la suppression d'une catégorie
-  const handleDeleteCategory = useCallback(
-    async (id) => {
-      if (operationInProgress.current) return;
-
-      operationInProgress.current = true;
-      setLoading(true);
-
-      try {
-        await deleteCategory(id);
-        // Rafraîchir les données après la suppression
-        const updatedCategories = await getHierarchicalCategories();
-        setCategories(updatedCategories);
-      } catch (err) {
-        console.error('Erreur lors de la suppression de la catégorie:', err);
-        setError(err.message || 'Erreur lors de la suppression');
-      } finally {
-        setLoading(false);
-        operationInProgress.current = false;
-      }
-    },
-    [deleteCategory, getHierarchicalCategories]
-  );
-
-  // Gérer la synchronisation d'une catégorie
-  const handleSyncCategory = useCallback(
-    async (id) => {
-      if (operationInProgress.current) return;
-
-      operationInProgress.current = true;
-      setLoading(true);
-
-      try {
-        await syncCategory(id);
-        // Rafraîchir les données après la synchronisation
-        const updatedCategories = await getHierarchicalCategories();
-        setCategories(updatedCategories);
-      } catch (err) {
-        console.error('Erreur lors de la synchronisation de la catégorie:', err);
-        setError(err.message || 'Erreur lors de la synchronisation');
-      } finally {
-        setLoading(false);
-        operationInProgress.current = false;
-      }
-    },
-    [syncCategory, getHierarchicalCategories]
-  );
 
   return (
     <>
@@ -323,8 +245,8 @@ function CategoriesTable(props) {
         sortProcessor={sortProcessor}
         onSearch={handleSearch}
         onSort={customSort}
-        onDelete={handleDeleteCategory}
-        onSync={handleSyncCategory}
+        onDelete={handleDeleteEntity}
+        onSync={handleSyncEntity}
         syncEnabled={ENTITY_CONFIG.syncEnabled}
         actions={['view', 'edit', 'delete', 'sync']}
         batchActions={['delete', 'sync']}

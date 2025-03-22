@@ -1,29 +1,19 @@
 // src/features/suppliers/components/SupplierTable.jsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useSupplier } from '../contexts/supplierContext';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
-import { useEntityEvents } from '../../../hooks/useEntityEvents';
+import { useEntityTable } from '../../../hooks/useEntityTable';
 
 function SupplierTable(props) {
-  const { suppliers, loading, error, fetchSuppliers, deleteSupplier, syncSupplier } = useSupplier();
+  const { suppliers, fetchSuppliers, deleteSupplier, syncSupplier } = useSupplier();
 
-  // Chargement direct des données au montage du composant
-  useEffect(() => {
-    fetchSuppliers();
-  }, [fetchSuppliers]);
-
-  // Utilisation du hook useEntityEvents pour écouter les événements WebSocket
-  useEntityEvents('supplier', {
-    onCreated: () => {
-      fetchSuppliers();
-    },
-    onUpdated: () => {
-      fetchSuppliers();
-    },
-    onDeleted: () => {
-      fetchSuppliers();
-    },
+  // Utilisation du hook useEntityTable avec gestion automatique des événements standard
+  const { loading, error, handleDeleteEntity, handleSyncEntity } = useEntityTable({
+    entityType: 'supplier',
+    fetchEntities: fetchSuppliers,
+    deleteEntity: deleteSupplier,
+    syncEntity: syncSupplier,
   });
 
   // Configuration des filtres
@@ -40,8 +30,8 @@ function SupplierTable(props) {
       baseRoute="/products/suppliers"
       filters={filters}
       searchFields={['name']}
-      onDelete={deleteSupplier}
-      onSync={syncSupplier}
+      onDelete={handleDeleteEntity}
+      onSync={handleSyncEntity}
       syncEnabled={ENTITY_CONFIG.syncEnabled}
       actions={['view', 'edit', 'delete', 'sync']}
       batchActions={['delete', 'sync']}
