@@ -41,27 +41,7 @@ function CategoriesTable(props) {
       operationInProgress.current = false;
     }
   }, [getHierarchicalCategories]);
-  // useEffect(() => {
-  //   // Abonnement explicite à "categories" (et non "categorys")
-  //   console.log('[WS-DEBUG] Abonnement explicite à categories');
-  //   websocketService.subscribe('categories');
 
-  //   // Écouteur explicite pour l'événement de mise à jour de l'arborescence
-  //   const handleExplicitTreeChange = (data) => {
-  //     console.log('[WS-DEBUG] Événement categories.tree.changed reçu explicitement:', data);
-  //     // Appeler votre fonction de gestion existante
-  //     handleCategoryTreeChange();
-  //   };
-
-  //   // S'abonner à l'événement spécifique
-  //   websocketService.on('categories.tree.changed', handleExplicitTreeChange);
-
-  //   return () => {
-  //     // Nettoyage
-  //     websocketService.off('categories.tree.changed', handleExplicitTreeChange);
-  //   };
-  // }, [handleCategoryTreeChange]);
-  // Utiliser notre hook pour les événements
   useEntityEvents('category', {
     onCreated: async (data) => {
       console.log('[CATEGORIES] Nouvelle catégorie créée:', data);
@@ -70,6 +50,7 @@ function CategoriesTable(props) {
         setCategories(updatedCategories);
       }
     },
+
     onUpdated: async ({ entityId, data }) => {
       console.log('[CATEGORIES] Catégorie mise à jour reçue:', data);
       if (!operationInProgress.current) {
@@ -100,7 +81,7 @@ function CategoriesTable(props) {
       'categorys.tree.changed': handleCategoryTreeChange,
     },
   });
-  // Charger les données hiérarchiques une seule fois au montage du composant
+
   useEffect(() => {
     const fetchHierarchicalData = async () => {
       // Vérifier si les données sont déjà chargées ou si une opération est en cours
@@ -126,7 +107,7 @@ function CategoriesTable(props) {
     };
 
     fetchHierarchicalData();
-  }, [getHierarchicalCategories]); // Dépendance unique
+  }, [getHierarchicalCategories]);
 
   const toggleCategory = useCallback((categoryId) => {
     setExpandedCategories((prev) => ({
