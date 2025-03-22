@@ -2,9 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useCategory, useCategoryExtras } from '../contexts/categoryContext';
-import { EntityDetail, EntityImageManager } from '../../../components/common';
+import { EntityDetail } from '../../../components/common';
+import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
+import ImagesTab from '../../../components/common/tabs/ImagesTab';
+import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import { ENTITY_CONFIG } from '../constants';
-import { CheckCircle, AlertCircle } from 'lucide-react';
 import { useEntityEvents } from '../../../hooks/useEntityEvents';
 
 function CategorieDetail() {
@@ -35,6 +37,7 @@ function CategorieDetail() {
     },
     // Le hook gère automatiquement l'abonnement et les reconnexions
   });
+
   // Gérer la synchronisation de la catégorie
   const handleSync = async (categoryId) => {
     try {
@@ -87,136 +90,35 @@ function CategorieDetail() {
     }
   };
 
-  // Rendu du contenu des onglets
+  // Rendu du contenu des onglets avec les composants réutilisables
   const renderTabContent = (category, activeTab) => {
     switch (activeTab) {
       case 'general':
         return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                  Informations générales
-                </h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Nom</h3>
-                    <p className="mt-1 text-gray-900 dark:text-gray-100">{category.name}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Catégorie parente
-                    </h3>
-                    <p className="mt-1 text-gray-900 dark:text-gray-100">
-                      {category.parent_id ? category.parent_name || category.parent_id : 'Aucune'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Nombre d'articles
-                    </h3>
-                    <p className="mt-1">
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        {category.product_count || 0}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                  Description
-                </h2>
-                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md min-h-[200px]">
-                  {category.description ? (
-                    <div dangerouslySetInnerHTML={{ __html: category.description }} />
-                  ) : (
-                    <p className="text-gray-500 dark:text-gray-400 italic">Aucune description</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <GeneralInfoTab
+            entity={category}
+            fields={['name', 'parent_id']}
+            productCount={category.product_count}
+            description={category.description}
+          />
         );
 
       case 'images':
         return (
-          <EntityImageManager
+          <ImagesTab
             entity={category}
             entityId={id}
             entityType="category"
             galleryMode={false}
-            onUploadImage={(id, file) => handleUploadImage(id, file)}
-            onDeleteImage={() => handleDeleteImage(id)}
+            onUploadImage={handleUploadImage}
+            onDeleteImage={handleDeleteImage}
             isLoading={loading}
             error={error}
           />
         );
 
       case 'woocommerce':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                Statut de synchronisation
-              </h2>
-
-              {category.woo_id ? (
-                <div className="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <CheckCircle className="h-5 w-5 text-green-400" />
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
-                        Catégorie synchronisée avec la boutique en ligne
-                      </h3>
-                      <div className="mt-2 text-sm text-green-700 dark:text-green-300">
-                        <p>ID Internet : {category.woo_id}</p>
-                        {category.last_sync && (
-                          <p>
-                            Dernière synchronisation :{' '}
-                            {new Date(category.last_sync).toLocaleString()}
-                          </p>
-                        )}
-                        {category.pending_sync && (
-                          <p className="mt-2 text-yellow-600 dark:text-yellow-300">
-                            Des modifications locales sont en attente de synchronisation
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <AlertCircle className="h-5 w-5 text-yellow-400" />
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                        Catégorie non synchronisée
-                      </h3>
-                      <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                        <p>Cette catégorie n'a pas encore été synchronisée avec WooCommerce.</p>
-                        <button
-                          onClick={() => handleSync(id)}
-                          className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-800 dark:text-yellow-100 dark:hover:bg-yellow-700"
-                        >
-                          Synchroniser maintenant
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        );
+        return <WooCommerceTab entity={category} entityType="category" onSync={handleSync} />;
 
       default:
         return null;
@@ -229,7 +131,7 @@ function CategorieDetail() {
       entityId={id}
       entityName="catégorie"
       entityNamePlural="catégories"
-      baseRoute="/products/categories" // Chemin modifié selon votre structure de route
+      baseRoute="/products/categories"
       tabs={ENTITY_CONFIG.tabs}
       renderTabContent={renderTabContent}
       actions={['edit', 'delete']}
