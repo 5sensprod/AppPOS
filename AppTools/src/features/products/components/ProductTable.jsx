@@ -102,26 +102,6 @@ function ProductTable(props) {
     [syncProduct, fetchProducts]
   );
 
-  // Fonction pour rafraîchir les données manuellement
-  const refreshData = useCallback(async () => {
-    if (operationInProgress.current) {
-      return;
-    }
-
-    operationInProgress.current = true;
-    setLoading(true);
-
-    try {
-      await fetchProducts();
-      setError(null);
-    } catch (err) {
-      setError(err.message || 'Erreur lors du rafraîchissement');
-    } finally {
-      setLoading(false);
-      operationInProgress.current = false;
-    }
-  }, [fetchProducts]);
-
   // Configuration des filtres
   const filters = [
     {
@@ -159,7 +139,6 @@ function ProductTable(props) {
         pageSizeOptions: [5, 10, 25, 50],
       }}
       defaultSort={ENTITY_CONFIG.defaultSort}
-      onRefresh={refreshData}
       {...props}
     />
   );

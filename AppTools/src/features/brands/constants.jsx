@@ -1,6 +1,6 @@
 // src/features/brands/constants.js
 import React from 'react';
-import { BookOpen, CheckCircle, XCircle } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import imageProxyService from '../../services/imageProxyService';
 
 export const ENTITY_CONFIG = {

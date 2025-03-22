@@ -6,7 +6,7 @@ import { ENTITY_CONFIG } from '../constants';
 import { useEntityEvents } from '../../../hooks/useEntityEvents';
 
 function BrandsTable(props) {
-  const { brands, loading, error, fetchBrands, deleteBrand, dispatch } = useBrand();
+  const { brands, loading, error, fetchBrands, deleteBrand } = useBrand();
   const { syncBrand } = useBrandExtras();
 
   // Chargement direct des données au montage du composant

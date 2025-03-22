@@ -6,7 +6,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityEvents } from '../../../hooks/useEntityEvents';
 
 function CategoriesTable(props) {
-  const { dispatch, deleteCategory } = useCategory();
+  const { deleteCategory } = useCategory();
   const { syncCategory, getHierarchicalCategories } = useCategoryExtras();
 
   const [categories, setCategories] = useState([]);
@@ -307,26 +307,6 @@ function CategoriesTable(props) {
     [syncCategory, getHierarchicalCategories]
   );
 
-  // Fonction pour rafraîchir les données manuellement
-  const refreshData = useCallback(async () => {
-    if (operationInProgress.current) return;
-
-    operationInProgress.current = true;
-    setLoading(true);
-
-    try {
-      const updatedCategories = await getHierarchicalCategories();
-      setCategories(updatedCategories);
-      setError(null);
-    } catch (err) {
-      console.error('Erreur lors du rafraîchissement des données:', err);
-      setError(err.message || 'Erreur lors du rafraîchissement');
-    } finally {
-      setLoading(false);
-      operationInProgress.current = false;
-    }
-  }, [getHierarchicalCategories]);
-
   return (
     <>
       <EntityTable
@@ -356,7 +336,6 @@ function CategoriesTable(props) {
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
         sort={localSort}
-        onRefresh={refreshData}
         {...props}
       />
     </>
