@@ -1,6 +1,6 @@
 // src/features/suppliers/constants.js
 import React from 'react';
-import { Truck, Mail, Phone, Building, User } from 'lucide-react';
+import { Truck, Mail, Phone, Building, User, Image } from 'lucide-react';
 import imageProxyService from '../../services/imageProxyService';
 
 export const ENTITY_CONFIG = {
@@ -113,11 +113,12 @@ export const ENTITY_CONFIG = {
     main: Truck,
     contact: User,
     payment: Building,
+    images: Image,
   },
   tabs: [
     { id: 'general', label: 'Général' },
     { id: 'contact', label: 'Contact' },
     { id: 'payment', label: 'Paiement' },
-    // { id: 'images', label: 'Images' },
+    { id: 'images', label: 'Images' },
   ],
 };
