@@ -21,10 +21,7 @@ function CategoriesTable(props) {
   // Utiliser useRef pour suivre si une opération est en cours
   const operationInProgress = useRef(false);
   const handleCategoryTreeChange = useCallback(async () => {
-    console.log('[WS-DEBUG] Rafraîchissement des catégories suite à un événement WebSocket');
-    console.log('[CLIENT] Événement categories.tree.changed reçu');
-
-    if (operationInProgress.current) return; // Éviter les requêtes simultanées
+    if (operationInProgress.current) return;
 
     operationInProgress.current = true;
     setLoading(true);
@@ -44,7 +41,6 @@ function CategoriesTable(props) {
 
   useEntityEvents('category', {
     onCreated: async (data) => {
-      console.log('[CATEGORIES] Nouvelle catégorie créée:', data);
       if (!operationInProgress.current) {
         const updatedCategories = await getHierarchicalCategories();
         setCategories(updatedCategories);
@@ -52,7 +48,6 @@ function CategoriesTable(props) {
     },
 
     onUpdated: async ({ entityId, data }) => {
-      console.log('[CATEGORIES] Catégorie mise à jour reçue:', data);
       if (!operationInProgress.current) {
         operationInProgress.current = true;
         setLoading(true);
@@ -71,7 +66,6 @@ function CategoriesTable(props) {
     },
 
     onDeleted: async ({ entityId }) => {
-      console.log('[CATEGORIES] Catégorie supprimée:', entityId);
       if (!operationInProgress.current) {
         const updatedCategories = await getHierarchicalCategories();
         setCategories(updatedCategories);
@@ -171,7 +165,6 @@ function CategoriesTable(props) {
             </div>
           );
 
-          // Ajouter la catégorie au résultat
           result.push({
             ...category,
             name: indentedName,
@@ -179,7 +172,7 @@ function CategoriesTable(props) {
             _level: level,
             _childrenCount: hasChildren ? category.children.length : 0,
             product_count: category.productCount || 0,
-            _no_sort: true, // Désactiver le tri standard
+            _no_sort: true,
           });
 
           // Ajouter récursivement les enfants si la catégorie est développée

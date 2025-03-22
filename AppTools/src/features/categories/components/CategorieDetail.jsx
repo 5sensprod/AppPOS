@@ -29,9 +29,7 @@ function CategorieDetail() {
 
   useEntityEvents('category', {
     onUpdated: ({ entityId, data }) => {
-      console.log('[WS-DEBUG] Mise à jour de catégorie reçue:', entityId);
       if (entityId === id && data) {
-        console.log('[WS-DEBUG] Mise à jour de la catégorie actuelle avec:', data);
         setCategory(data);
       }
     },

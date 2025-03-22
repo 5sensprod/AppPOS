@@ -24,70 +24,52 @@ function ProductTable(props) {
 
   // Chargement initial des données
   useEffect(() => {
-    console.log('[PRODUCTS] Chargement initial des produits');
     fetchProducts();
   }, [fetchProducts]);
 
   // Mettre à jour l'état local lorsque les produits changent
   useEffect(() => {
-    console.log(
-      '[PRODUCTS] Mise à jour des produits locaux:',
-      products ? products.length : 0,
-      'produits'
-    );
     setLocalProducts(products || []);
     setError(contextError);
   }, [products, contextError]);
 
   // Définir le gestionnaire pour les événements de catégories
   const handleCategoryTreeChange = useCallback(async () => {
-    console.log('[PRODUCTS] Événement category_tree_changed reçu!');
-
     // Éviter les requêtes simultanées
     if (operationInProgress.current) {
-      console.log("[PRODUCTS] Une opération est déjà en cours, on ignore l'événement");
       return;
     }
 
     operationInProgress.current = true;
     setLoading(true);
-    console.log('[PRODUCTS] Début du rafraîchissement des produits');
 
     try {
       // Ajouter un délai court pour s'assurer que le serveur a terminé ses mises à jour
-      console.log('[PRODUCTS] Attente de 500ms pour laisser le serveur terminer ses mises à jour');
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      console.log('[PRODUCTS] Appel de fetchProducts()');
       await fetchProducts();
-      console.log('[PRODUCTS] fetchProducts() terminé avec succès');
       setError(null);
     } catch (err) {
-      console.error('[PRODUCTS] Erreur lors du rafraîchissement des produits:', err);
       setError(err.message || 'Erreur de rafraîchissement');
     } finally {
       setLoading(false);
       operationInProgress.current = false;
-      console.log('[PRODUCTS] Fin du rafraîchissement des produits');
     }
   }, [fetchProducts]);
 
   // Utiliser notre hook pour les événements de produits et de catégories
   useEntityEvents('product', {
     onCreated: (data) => {
-      console.log('[PRODUCTS] Nouveau produit créé:', data);
       if (!operationInProgress.current) {
         fetchProducts();
       }
     },
     onUpdated: ({ entityId, data }) => {
-      console.log('[PRODUCTS] Produit mis à jour:', data);
       if (!operationInProgress.current) {
         fetchProducts();
       }
     },
     onDeleted: ({ entityId }) => {
-      console.log('[PRODUCTS] Produit supprimé:', entityId);
       if (!operationInProgress.current) {
         fetchProducts();
       }
@@ -111,7 +93,6 @@ function ProductTable(props) {
         // Rafraîchir les données après la synchronisation
         await fetchProducts();
       } catch (err) {
-        console.error('Erreur lors de la synchronisation du produit:', err);
         setError(err.message || 'Erreur lors de la synchronisation');
       } finally {
         setLoading(false);
@@ -123,11 +104,7 @@ function ProductTable(props) {
 
   // Fonction pour rafraîchir les données manuellement
   const refreshData = useCallback(async () => {
-    console.log('[PRODUCTS] Rafraîchissement manuel demandé');
     if (operationInProgress.current) {
-      console.log(
-        '[PRODUCTS] Une opération est déjà en cours, le rafraîchissement manuel est ignoré'
-      );
       return;
     }
 
@@ -135,17 +112,13 @@ function ProductTable(props) {
     setLoading(true);
 
     try {
-      console.log('[PRODUCTS] Appel de fetchProducts() pour le rafraîchissement manuel');
       await fetchProducts();
-      console.log('[PRODUCTS] Rafraîchissement manuel terminé avec succès');
       setError(null);
     } catch (err) {
-      console.error('[PRODUCTS] Erreur lors du rafraîchissement manuel des données:', err);
       setError(err.message || 'Erreur lors du rafraîchissement');
     } finally {
       setLoading(false);
       operationInProgress.current = false;
-      console.log('[PRODUCTS] Fin du rafraîchissement manuel');
     }
   }, [fetchProducts]);
 
@@ -162,14 +135,6 @@ function ProductTable(props) {
       ],
     },
   ];
-
-  // Log des produits pour le débogage
-  console.log(
-    '[PRODUCTS] Rendu avec',
-    localProducts.length,
-    'produits. Loading:',
-    loading || contextLoading
-  );
 
   return (
     <EntityTable

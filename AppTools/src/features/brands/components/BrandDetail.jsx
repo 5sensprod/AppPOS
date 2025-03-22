@@ -29,9 +29,7 @@ function BrandDetail() {
 
   useEntityEvents('brand', {
     onUpdated: ({ entityId, data }) => {
-      console.log('[WS-DEBUG] Mise à jour de marque reçue:', entityId);
       if (entityId === id && data) {
-        console.log('[WS-DEBUG] Mise à jour de la marque actuelle avec:', data);
         setBrand(data);
       }
     },

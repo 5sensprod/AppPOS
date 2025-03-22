@@ -16,15 +16,12 @@ function SupplierTable(props) {
   // Utilisation du hook useEntityEvents pour écouter les événements WebSocket
   useEntityEvents('supplier', {
     onCreated: () => {
-      console.log('[WS-DEBUG] Nouveau fournisseur créé, actualisation de la liste');
       fetchSuppliers();
     },
     onUpdated: () => {
-      console.log('[WS-DEBUG] Fournisseur mis à jour, actualisation de la liste');
       fetchSuppliers();
     },
     onDeleted: () => {
-      console.log('[WS-DEBUG] Fournisseur supprimé, actualisation de la liste');
       fetchSuppliers();
     },
   });
