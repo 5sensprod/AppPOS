@@ -1,7 +1,7 @@
 // src/features/categories/contexts/categoryContext.js
 import { createEntityContext } from '../../../factories/createEntityContext';
-import apiService from '../../../services/api';
 import { createEntityImageHandlers } from '../../../factories/createEntityImageHandlers';
+import apiService from '../../../services/api';
 
 // Configuration de l'entité Category
 const CATEGORY_CONFIG = {

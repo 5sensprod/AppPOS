@@ -1,8 +1,8 @@
 // src/features/products/contexts/productContext.js
 import { createEntityContext } from '../../../factories/createEntityContext';
+import { createEntityImageHandlers } from '../../../factories/createEntityImageHandlers';
 import { ENTITY_CONFIG } from '../constants';
 import apiService from '../../../services/api';
-import { createEntityImageHandlers } from '../../../factories/createEntityImageHandlers';
 
 // Actions personnalisées spécifiques aux produits
 const customActions = {
@@ -89,7 +89,6 @@ const customReducers = {
 };
 
 // Créer le contexte avec la factory
-console.log('ENTITY_CONFIG:', ENTITY_CONFIG);
 export const {
   productContext: ProductContext,
   ProductProvider,
@@ -136,7 +135,6 @@ export function useProductExtras() {
     if (dispatch) {
       try {
         const formData = new FormData();
-        // Utilisez le même nom de champ que Postman
         formData.append('images', imageFile);
 
         const response = await apiService.post(`/api/products/${productId}/image`, formData, {
@@ -144,8 +142,6 @@ export function useProductExtras() {
             'Content-Type': 'multipart/form-data',
           },
         });
-
-        console.log('Réponse upload:', response.data);
 
         dispatch({
           type: customActions.UPLOAD_GALLERY_IMAGE,
