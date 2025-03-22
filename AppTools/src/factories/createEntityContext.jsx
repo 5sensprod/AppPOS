@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import apiService from '../services/api';
 import websocketService from '../services/websocketService';
-import { pluralize } from '../utils/entityUtils';
+import { pluralize, capitalize } from '../utils/entityUtils';
 
 export function createEntityContext(options) {
   const {
@@ -31,7 +31,7 @@ export function createEntityContext(options) {
   // État initial simplifié
   const initialState = {
     items: [],
-    itemsById: {}, // Cache par ID
+    itemsById: {},
     loading: false,
     error: null,
   };
@@ -72,7 +72,6 @@ export function createEntityContext(options) {
         const itemExists = state.items.some((item) => item._id === newItem._id);
 
         if (itemExists) {
-          console.log(`[REDUCER] Élément ${newItem._id} déjà présent, mise à jour au lieu d'ajout`);
           const updatedItems = state.items.map((item) =>
             item._id === newItem._id ? newItem : item
           );
@@ -163,22 +162,15 @@ export function createEntityContext(options) {
     useEffect(() => {
       const entityPlural = pluralize(entityName);
 
-      console.log(
-        `[WS-DEBUG] Configuration WebSocket pour ${entityName} (plural: ${entityPlural})`
-      );
-
       const handleUpdate = ({ entityId, data }) => {
-        console.log(`[WS-DEBUG] Mise à jour ${entityPlural} reçue:`, { entityId, data });
         dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: data });
       };
 
       const handleCreate = (data) => {
-        console.log(`[WS-DEBUG] Création ${entityType} reçue:`, data);
         dispatch({ type: ACTIONS.CREATE_SUCCESS, payload: data });
       };
 
       const handleDelete = ({ entityId }) => {
-        console.log(`[WS-DEBUG] Suppression ${entityType} reçue:`, entityId);
         dispatch({ type: ACTIONS.DELETE_SUCCESS, payload: entityId });
       };
 
@@ -192,8 +184,6 @@ export function createEntityContext(options) {
           websocketService.on(`${entityPlural}.updated`, handleUpdate);
           websocketService.on(`${entityPlural}.created`, handleCreate);
           websocketService.on(`${entityPlural}.deleted`, handleDelete);
-
-          console.log(`[WS-DEBUG] Abonnement établi pour ${entityName} (${entityPlural})`);
         } else {
           console.warn(
             `[WS-DEBUG] WebSocket non connecté, impossible de s'abonner pour ${entityName}`
@@ -205,7 +195,6 @@ export function createEntityContext(options) {
 
       // Écouter les reconnexions WebSocket et réabonner si nécessaire
       const handleReconnect = () => {
-        console.log(`[WS-DEBUG] Reconnexion WebSocket détectée, réabonnement à ${entityPlural}`);
         subscribeToWebSocket();
       };
 
@@ -223,30 +212,12 @@ export function createEntityContext(options) {
 
     // Actions CRUD standard
     const fetchItems = useCallback(async (params = {}) => {
-      console.log(`[CONTEXT] Début de fetchItems pour ${apiEndpoint}`);
       dispatch({ type: ACTIONS.FETCH_START });
       try {
-        console.log(`[CONTEXT] Appel API pour ${apiEndpoint}`, params);
         const response = await apiService.get(apiEndpoint, { params });
-        console.log(`[CONTEXT] Réponse API reçue:`, response.data.data.length, 'éléments');
-
-        // Pour le débogage, affichez le premier élément (si disponible)
-        if (response.data.data.length > 0 && entityName === 'product') {
-          const firstItem = response.data.data[0];
-          console.log(`[CONTEXT] Exemple de produit:`, {
-            id: firstItem._id,
-            name: firstItem.name,
-            categories: firstItem.categories,
-            category_id: firstItem.category_id,
-            categories_refs: firstItem.categories_refs,
-            category_ref: firstItem.category_ref,
-          });
-        }
-
         dispatch({ type: ACTIONS.FETCH_SUCCESS, payload: response.data.data });
         return response.data;
       } catch (error) {
-        console.error(`[CONTEXT] Erreur dans fetchItems pour ${apiEndpoint}:`, error);
         dispatch({ type: ACTIONS.FETCH_ERROR, payload: error.message });
         throw error;
       }
@@ -310,8 +281,6 @@ export function createEntityContext(options) {
             });
           }
         });
-
-        console.log(`Données nettoyées pour mise à jour de ${entityName}:`, cleanedData);
 
         const response = await apiService.put(`${apiEndpoint}/${id}`, cleanedData);
         dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: response.data.data });
@@ -385,12 +354,6 @@ export function createEntityContext(options) {
       );
     }
     return context;
-  }
-
-  // Helper pour capitaliser la première lettre
-  function capitalize(string) {
-    if (!string) return '';
-    return string.charAt(0).toUpperCase() + string.slice(1);
   }
 
   // Renvoie un objet avec les exports nommés selon l'entité
