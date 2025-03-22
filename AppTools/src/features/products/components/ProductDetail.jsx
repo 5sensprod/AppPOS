@@ -1,7 +1,7 @@
 // src/features/products/components/ProductDetail.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useProduct, useProductExtras } from '../contexts/productContext';
+import { useProduct, useProductExtras } from '../stores/productStore'; // Import depuis le store Zustand
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import InventoryTab from './tabs/InventoryTab';
@@ -13,9 +13,17 @@ import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
 function ProductDetail() {
   const { id } = useParams();
-  const { getProductById, deleteProduct, syncProduct, updateProduct } = useProduct();
+  const { getProductById, deleteProduct, syncProduct, updateProduct, initWebSocketListeners } =
+    useProduct();
+
   const { uploadImage, uploadGalleryImage, deleteImage, deleteGalleryImage, setMainImage } =
     useProductExtras();
+
+  // Initialiser les écouteurs WebSocket au montage du composant
+  useEffect(() => {
+    const cleanup = initWebSocketListeners();
+    return cleanup;
+  }, [initWebSocketListeners]);
 
   // Utiliser le hook personnalisé pour gérer les détails du produit
   const {

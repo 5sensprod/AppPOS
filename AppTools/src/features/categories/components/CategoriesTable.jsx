@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useCategory, useCategoryExtras } from '../contexts/categoryContext';
+import { useCategory, useCategoryExtras } from '../stores/categoryStore'; // Import depuis le store Zustand
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function CategoriesTable(props) {
-  const { deleteCategory } = useCategory();
+  const { deleteCategory, initWebSocketListeners } = useCategory();
+
   const { syncCategory, getHierarchicalCategories } = useCategoryExtras();
 
   // États spécifiques aux catégories
@@ -17,6 +18,12 @@ function CategoriesTable(props) {
 
   // Référence pour suivre si les données ont déjà été chargées
   const dataLoaded = useRef(false);
+
+  // Initialiser les écouteurs WebSocket au montage du composant
+  useEffect(() => {
+    const cleanup = initWebSocketListeners();
+    return cleanup;
+  }, [initWebSocketListeners]);
 
   // Gestionnaire d'événement spécifique pour les changements d'arborescence
   const handleCategoryTreeChange = useCallback(async () => {

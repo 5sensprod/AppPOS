@@ -1,13 +1,19 @@
 // src/features/brands/components/BrandsTable.jsx
-import React from 'react';
-import { useBrand, useBrandExtras } from '../contexts/brandContext';
+import React, { useEffect } from 'react';
+import { useBrand, useBrandExtras } from '../stores/brandStore'; // Import depuis le store Zustand
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function BrandsTable(props) {
-  const { brands, fetchBrands, deleteBrand } = useBrand();
+  const { brands, fetchBrands, deleteBrand, initWebSocketListeners } = useBrand();
   const { syncBrand } = useBrandExtras();
+
+  // Initialiser les écouteurs WebSocket au montage du composant
+  useEffect(() => {
+    const cleanup = initWebSocketListeners();
+    return cleanup;
+  }, [initWebSocketListeners]);
 
   // Utilisation du hook useEntityTable avec gestion automatique des événements standard
   const { loading, error, handleDeleteEntity, handleSyncEntity } = useEntityTable({

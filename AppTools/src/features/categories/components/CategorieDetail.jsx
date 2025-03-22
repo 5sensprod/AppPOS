@@ -1,7 +1,7 @@
-// AppTools\src\features\categories\components\CategorieDetail.jsx
-import React from 'react';
+// AppTools\src\features\categories\components\CategoryDetail.jsx
+import React, { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useCategory, useCategoryExtras } from '../contexts/categoryContext';
+import { useCategory, useCategoryExtras } from '../stores/categoryStore'; // Import depuis le store Zustand
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
@@ -9,10 +9,17 @@ import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
-function CategorieDetail() {
+function CategoryDetail() {
   const { id } = useParams();
-  const { getCategoryById, deleteCategory } = useCategory();
+  const { getCategoryById, deleteCategory, initWebSocketListeners } = useCategory();
+
   const { uploadImage, deleteImage, syncCategory } = useCategoryExtras();
+
+  // Initialiser les écouteurs WebSocket au montage du composant
+  useEffect(() => {
+    const cleanup = initWebSocketListeners();
+    return cleanup;
+  }, [initWebSocketListeners]);
 
   // Utiliser le hook personnalisé pour gérer les détails de la catégorie
   const {
@@ -85,4 +92,4 @@ function CategorieDetail() {
   );
 }
 
-export default CategorieDetail;
+export default CategoryDetail;

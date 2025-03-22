@@ -1,7 +1,7 @@
 // AppTools\src\features\brands\components\BrandDetail.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useBrand, useBrandExtras } from '../contexts/brandContext';
+import { useBrand, useBrandExtras } from '../stores/brandStore'; // Import depuis le store Zustand
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
@@ -11,8 +11,14 @@ import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
 function BrandDetail() {
   const { id } = useParams();
-  const { getBrandById, deleteBrand } = useBrand();
+  const { getBrandById, deleteBrand, initWebSocketListeners } = useBrand();
   const { uploadImage, deleteImage, syncBrand } = useBrandExtras();
+
+  // Initialiser les écouteurs WebSocket au montage du composant
+  useEffect(() => {
+    const cleanup = initWebSocketListeners();
+    return cleanup;
+  }, [initWebSocketListeners]);
 
   // Utiliser le hook personnalisé pour gérer les détails de la marque
   const {

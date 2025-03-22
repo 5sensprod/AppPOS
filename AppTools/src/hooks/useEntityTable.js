@@ -4,6 +4,7 @@ import { useEntityEvents } from './useEntityEvents';
 
 /**
  * Hook pour gérer les opérations communes des tables d'entités
+ * Compatible avec Zustand
  *
  * @param {Object} options - Options de configuration
  * @param {string} options.entityType - Type d'entité (ex: 'product', 'supplier', 'category', 'brand')
@@ -64,7 +65,8 @@ export const useEntityTable = ({
     async (id) => {
       return executeOperation(async () => {
         await deleteEntity(id);
-        // Rafraîchir les données après la suppression
+        // Avec Zustand, le store est mis à jour automatiquement via les réducteurs
+        // mais on peut rafraîchir les données pour être sûr
         await fetchEntities();
       });
     },
@@ -78,7 +80,8 @@ export const useEntityTable = ({
 
       return executeOperation(async () => {
         await syncEntity(id);
-        // Rafraîchir les données après la synchronisation
+        // Avec Zustand, le store est mis à jour automatiquement via les réducteurs
+        // mais on peut rafraîchir les données pour être sûr
         await fetchEntities();
       });
     },

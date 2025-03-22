@@ -2,6 +2,14 @@
 import { useEffect } from 'react';
 import websocketService from '../services/websocketService';
 
+/**
+ * Hook pour gérer les événements WebSocket liés à une entité
+ * Fonctionne avec les stores Zustand
+ *
+ * @param {string} entityType - Type d'entité (ex: 'product', 'supplier', 'category', 'brand')
+ * @param {Object} handlers - Gestionnaires d'événements
+ * @returns {function} - Fonction de nettoyage pour useEffect
+ */
 export function useEntityEvents(entityType, handlers = {}) {
   useEffect(() => {
     const cleanupFunctions = [];
@@ -58,4 +66,42 @@ export function useEntityEvents(entityType, handlers = {}) {
       cleanupFunctions.forEach((cleanup) => cleanup());
     };
   }, [entityType, handlers]);
+}
+
+/**
+ * Cette fonction peut être utilisée pour initialiser les écouteurs WebSocket
+ * dans les composants qui utilisent useEntityStore
+ *
+ * @param {string} entityType - Type d'entité
+ * @param {function} fetchCallback - Fonction de chargement à appeler lors des événements
+ * @returns {function} - Fonction de nettoyage pour useEffect
+ */
+export function initEntityWebSocketListeners(entityType, fetchCallback) {
+  // Standardiser le type d'entité
+  let standardEntityType;
+  if (entityType === 'category') {
+    standardEntityType = 'categories';
+  } else {
+    standardEntityType = entityType.endsWith('s') ? entityType : `${entityType}s`;
+  }
+
+  // S'abonner aux événements
+  websocketService.subscribe(standardEntityType);
+
+  // Configurer les écouteurs
+  const handleEntityEvent = () => {
+    console.log(`[WS-DEBUG] Événement reçu pour ${standardEntityType}, rechargement des données`);
+    fetchCallback();
+  };
+
+  websocketService.on(`${standardEntityType}.created`, handleEntityEvent);
+  websocketService.on(`${standardEntityType}.updated`, handleEntityEvent);
+  websocketService.on(`${standardEntityType}.deleted`, handleEntityEvent);
+
+  // Retourner une fonction de nettoyage pour useEffect
+  return () => {
+    websocketService.off(`${standardEntityType}.created`, handleEntityEvent);
+    websocketService.off(`${standardEntityType}.updated`, handleEntityEvent);
+    websocketService.off(`${standardEntityType}.deleted`, handleEntityEvent);
+  };
 }

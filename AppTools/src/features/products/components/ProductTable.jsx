@@ -1,6 +1,6 @@
 // src/features/products/components/ProductTable.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { useProduct } from '../contexts/productContext';
+import { useProduct } from '../stores/productStore'; // Import depuis le store Zustand
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
@@ -13,11 +13,18 @@ function ProductTable(props) {
     fetchProducts,
     deleteProduct,
     syncProduct,
+    initWebSocketListeners,
   } = useProduct();
 
   // États spécifiques aux produits
   const [localProducts, setLocalProducts] = useState([]);
   const [error, setError] = useState(null);
+
+  // Initialiser les écouteurs WebSocket au montage du composant
+  useEffect(() => {
+    const cleanup = initWebSocketListeners();
+    return cleanup;
+  }, [initWebSocketListeners]);
 
   // Gestionnaire d'événement spécifique pour les changements d'arborescence de catégories
   const handleCategoryTreeChange = useCallback(async () => {

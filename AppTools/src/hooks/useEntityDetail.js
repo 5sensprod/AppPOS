@@ -1,9 +1,10 @@
 // src/hooks/useEntityDetail.js
 import { useState, useEffect } from 'react';
-import { useEntityEvents } from '../hooks/useEntityEvents';
+import { useEntityEvents } from './useEntityEvents';
 
 /**
  * Hook personnalisé pour gérer les détails d'une entité
+ * Compatible avec Zustand
  *
  * @param {Object} options - Options de configuration
  * @param {string} options.id - ID de l'entité
@@ -61,8 +62,9 @@ export function useEntityDetail({
 
     try {
       setLoading(true);
+      // Avec Zustand, la synchronisation met à jour le store automatiquement
       await syncEntity(entityId);
-      // Recharger l'entité pour obtenir les données à jour
+      // Mais on recharge quand même l'entité pour notre état local
       const updatedEntity = await getEntityById(id);
       setEntity(updatedEntity);
       return updatedEntity;
@@ -80,8 +82,9 @@ export function useEntityDetail({
 
     try {
       setLoading(true);
+      // Avec Zustand, la mise à jour met à jour le store automatiquement
       await updateEntity(entityId, updatedData);
-      // Recharger l'entité pour obtenir les données à jour
+      // Mais on recharge quand même l'entité pour notre état local
       const updatedEntity = await getEntityById(id);
       setEntity(updatedEntity);
       return true;
@@ -99,15 +102,17 @@ export function useEntityDetail({
     try {
       setLoading(true);
       if (isGallery && uploadGalleryImage) {
+        // Avec Zustand, le téléversement met à jour le store automatiquement
         await uploadGalleryImage(entityId, file);
       } else if (uploadImage) {
+        // Avec Zustand, le téléversement met à jour le store automatiquement
         await uploadImage(entityId, file);
       } else {
         console.warn('Fonction uploadImage non disponible');
         return false;
       }
 
-      // Recharger l'entité pour avoir les dernières images
+      // Mais on recharge quand même l'entité pour notre état local
       const updatedEntity = await getEntityById(id);
       setEntity(updatedEntity);
       return true;
@@ -125,15 +130,17 @@ export function useEntityDetail({
     try {
       setLoading(true);
       if (isGallery && deleteGalleryImage) {
+        // Avec Zustand, la suppression met à jour le store automatiquement
         await deleteGalleryImage(entityId, imageIndex);
       } else if (deleteImage) {
+        // Avec Zustand, la suppression met à jour le store automatiquement
         await deleteImage(entityId);
       } else {
         console.warn('Fonction deleteImage non disponible');
         return false;
       }
 
-      // Recharger l'entité pour avoir les dernières images
+      // Mais on recharge quand même l'entité pour notre état local
       const updatedEntity = await getEntityById(id);
       setEntity(updatedEntity);
       return true;
@@ -152,8 +159,9 @@ export function useEntityDetail({
 
     try {
       setLoading(true);
+      // Avec Zustand, la définition de l'image principale met à jour le store automatiquement
       await setMainImage(entityId, imageIndex);
-      // Recharger l'entité pour avoir les dernières images
+      // Mais on recharge quand même l'entité pour notre état local
       const updatedEntity = await getEntityById(id);
       setEntity(updatedEntity);
       return true;

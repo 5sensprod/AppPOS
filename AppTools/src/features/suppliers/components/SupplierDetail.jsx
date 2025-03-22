@@ -1,7 +1,7 @@
 // src/features/suppliers/components/SupplierDetail.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useSupplier, useSupplierExtras } from '../contexts/supplierContext';
+import { useSupplier, useSupplierExtras } from '../stores/supplierStore'; // Import depuis le store Zustand
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ContactInfoTab from '../../../components/common/tabs/ContactInfoTab';
@@ -12,8 +12,14 @@ import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
 function SupplierDetail() {
   const { id } = useParams();
-  const { getSupplierById, deleteSupplier } = useSupplier();
+  const { getSupplierById, deleteSupplier, initWebSocketListeners } = useSupplier();
   const { uploadImage, deleteImage } = useSupplierExtras();
+
+  // Initialiser les écouteurs WebSocket au montage du composant
+  useEffect(() => {
+    const cleanup = initWebSocketListeners();
+    return cleanup;
+  }, [initWebSocketListeners]);
 
   // Utiliser le hook personnalisé pour gérer les détails du fournisseur
   const {
