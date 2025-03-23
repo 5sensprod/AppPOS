@@ -1,6 +1,5 @@
 // src/hooks/useEntityTable.js
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useEntityEvents } from './useEntityEvents';
 
 /**
  * Hook pour gérer les opérations communes des tables d'entités
@@ -87,25 +86,6 @@ export const useEntityTable = ({
     },
     [syncEntity, fetchEntities, executeOperation]
   );
-
-  // Configuration des gestionnaires d'événements standards
-  const standardEventHandlers = {
-    onCreated: () => {
-      if (!operationInProgress.current) {
-        loadEntities();
-      }
-    },
-    onUpdated: () => {
-      if (!operationInProgress.current) {
-        loadEntities();
-      }
-    },
-    onDeleted: () => {
-      if (!operationInProgress.current) {
-        loadEntities();
-      }
-    },
-  };
 
   return {
     loading,
