@@ -241,13 +241,11 @@ export function useProduct() {
 
   return {
     ...productStore,
-    // Cette méthode est conservée pour rétro-compatibilité
-    // mais ne sera plus utilisée activement dans le nouveau modèle
     initWebSocketListeners: () => {
-      console.log(
-        '[PRODUCT-LEGACY] initWebSocketListeners appelé - utiliser useProductDataStore.initWebSocket() à la place'
-      );
-      return () => {};
+      console.log('[PRODUCT] Redirection vers useProductDataStore.initWebSocket()');
+      const dataStore = useProductDataStore.getState();
+      dataStore.initWebSocket();
+      return dataStore.cleanup;
     },
   };
 }

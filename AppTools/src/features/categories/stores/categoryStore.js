@@ -1,6 +1,7 @@
 // src/features/categories/stores/categoryStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import apiService from '../../../services/api';
+import { useCategoryHierarchyStore } from './categoryHierarchyStore';
 
 // Configuration de l'entité Category
 const CATEGORY_CONFIG = {
@@ -12,7 +13,26 @@ const CATEGORY_CONFIG = {
 };
 
 // Créer le store avec la factory
-export const { useCategory, useEntityStore: useCategoryStore } = createEntityStore(CATEGORY_CONFIG);
+const { useCategory: useCategoryBase, useEntityStore: useCategoryStore } =
+  createEntityStore(CATEGORY_CONFIG);
+
+// Export du hook de base avec support WebSocket
+export function useCategory() {
+  const categoryStore = useCategoryBase();
+
+  return {
+    ...categoryStore,
+    initWebSocketListeners: () => {
+      console.log('[CATEGORY] Redirection vers useCategoryHierarchyStore.initWebSocket()');
+      const dataStore = useCategoryHierarchyStore.getState();
+      dataStore.initWebSocket();
+      return dataStore.cleanup;
+    },
+  };
+}
+
+// Réexporter useCategoryStore pour maintenir la compatibilité
+export { useCategoryStore };
 
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux catégories
 export function useCategoryExtras() {

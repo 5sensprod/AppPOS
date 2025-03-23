@@ -160,13 +160,11 @@ export function useBrand() {
 
   return {
     ...brandStore,
-    // Cette méthode est conservée pour rétro-compatibilité
-    // mais ne sera plus utilisée activement dans le nouveau modèle
     initWebSocketListeners: () => {
-      console.log(
-        '[BRAND-LEGACY] initWebSocketListeners appelé - utiliser useBrandHierarchyStore.initWebSocket() à la place'
-      );
-      return () => {};
+      console.log('[BRAND] Redirection vers useBrandHierarchyStore.initWebSocket()');
+      const dataStore = useBrandHierarchyStore.getState();
+      dataStore.initWebSocket();
+      return dataStore.cleanup;
     },
   };
 }

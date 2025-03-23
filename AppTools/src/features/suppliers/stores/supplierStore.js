@@ -165,13 +165,11 @@ export function useSupplier() {
 
   return {
     ...supplierStore,
-    // Cette méthode est conservée pour rétro-compatibilité
-    // mais ne sera plus utilisée activement dans le nouveau modèle
     initWebSocketListeners: () => {
-      console.log(
-        '[SUPPLIER-LEGACY] initWebSocketListeners appelé - utiliser useSupplierDataStore.initWebSocket() à la place'
-      );
-      return () => {};
+      console.log('[SUPPLIER] Redirection vers useSupplierDataStore.initWebSocket()');
+      const dataStore = useSupplierDataStore.getState();
+      dataStore.initWebSocket();
+      return dataStore.cleanup;
     },
   };
 }
