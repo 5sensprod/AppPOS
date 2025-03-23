@@ -1,27 +1,46 @@
 // src/features/brands/components/BrandsTable.jsx
 import React, { useEffect } from 'react';
-import { useBrand, useBrandExtras } from '../stores/brandStore'; // Import depuis le store Zustand
+import { useBrand, useBrandExtras } from '../stores/brandStore';
+import { useBrandHierarchyStore } from '../stores/brandStore';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function BrandsTable(props) {
-  const { brands, fetchBrands, deleteBrand, initWebSocketListeners } = useBrand();
+  const { deleteBrand } = useBrand();
   const { syncBrand } = useBrandExtras();
 
-  // Initialiser les écouteurs WebSocket au montage du composant
-  useEffect(() => {
-    const cleanup = initWebSocketListeners();
-    return cleanup;
-  }, [initWebSocketListeners]);
+  // Utiliser le nouveau store hiérarchique
+  const { brands, loading: brandsLoading, fetchBrands, initWebSocket } = useBrandHierarchyStore();
 
-  // Utilisation du hook useEntityTable avec gestion automatique des événements standard
-  const { loading, error, handleDeleteEntity, handleSyncEntity } = useEntityTable({
+  // Initialiser les WebSockets et charger les données si nécessaire
+  useEffect(() => {
+    initWebSocket();
+    if (brands.length === 0) {
+      fetchBrands();
+    }
+  }, [initWebSocket, fetchBrands, brands.length]);
+
+  // Utilisation du hook useEntityTable sans les abonnements WebSocket
+  const {
+    loading: operationLoading,
+    error,
+    handleDeleteEntity,
+    handleSyncEntity,
+  } = useEntityTable({
     entityType: 'brand',
     fetchEntities: fetchBrands,
-    deleteEntity: deleteBrand,
-    syncEntity: syncBrand,
+    deleteEntity: async (id) => {
+      await deleteBrand(id);
+    },
+    syncEntity: async (id) => {
+      await syncBrand(id);
+    },
+    // Ne pas spécifier de customEventHandlers pour éviter les abonnements doublons
   });
+
+  // Combinaison de l'état de chargement du store et des opérations
+  const isLoading = brandsLoading || operationLoading;
 
   // Configuration des filtres si nécessaire
   const filters = [];
@@ -29,7 +48,7 @@ function BrandsTable(props) {
   return (
     <EntityTable
       data={brands || []}
-      isLoading={loading}
+      isLoading={isLoading}
       error={error}
       columns={ENTITY_CONFIG.columns}
       entityName="marque"

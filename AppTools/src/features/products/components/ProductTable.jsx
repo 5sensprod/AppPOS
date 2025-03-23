@@ -1,54 +1,65 @@
 // src/features/products/components/ProductTable.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { useProduct } from '../stores/productStore'; // Import depuis le store Zustand
+import React, { useState, useEffect } from 'react';
+import { useProduct } from '../stores/productStore';
+import { useProductDataStore } from '../stores/productStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function ProductTable(props) {
+  const { deleteProduct } = useProduct();
+
+  // Utiliser le nouveau store dédié
   const {
     products,
-    loading: contextLoading,
-    error: contextError,
+    loading: productsLoading,
+    error: productsError,
     fetchProducts,
-    deleteProduct,
-    syncProduct,
-    initWebSocketListeners,
-  } = useProduct();
+    initWebSocket,
+  } = useProductDataStore();
 
-  // États spécifiques aux produits
+  // États locaux pour les produits
   const [localProducts, setLocalProducts] = useState([]);
   const [error, setError] = useState(null);
 
-  // Initialiser les écouteurs WebSocket au montage du composant
+  // Initialiser les WebSockets et charger les données si nécessaire
   useEffect(() => {
-    const cleanup = initWebSocketListeners();
-    return cleanup;
-  }, [initWebSocketListeners]);
+    // Initialiser les écouteurs WebSocket
+    initWebSocket();
 
-  // Gestionnaire d'événement spécifique pour les changements d'arborescence de catégories
-  const handleCategoryTreeChange = useCallback(async () => {
-    // Ajouter un délai court pour s'assurer que le serveur a terminé ses mises à jour
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await fetchProducts();
-  }, [fetchProducts]);
+    // Charger les produits seulement s'ils ne sont pas déjà chargés
+    if (products.length === 0) {
+      fetchProducts();
+    }
+  }, [initWebSocket, fetchProducts, products.length]);
 
-  // Utilisation du hook useEntityTable pour la gestion commune
-  const { loading, handleDeleteEntity, handleSyncEntity } = useEntityTable({
-    entityType: 'product',
-    fetchEntities: fetchProducts,
-    deleteEntity: deleteProduct,
-    syncEntity: syncProduct,
-    customEventHandlers: {
-      'categories.tree.changed': handleCategoryTreeChange,
-    },
-  });
-
-  // Mettre à jour l'état local lorsque les produits changent
+  // Mettre à jour l'état local lorsque les produits ou les erreurs changent
   useEffect(() => {
     setLocalProducts(products || []);
-    setError(contextError);
-  }, [products, contextError]);
+    setError(productsError);
+  }, [products, productsError]);
+
+  // Utilisation du hook useEntityTable sans les abonnements WebSocket
+  const {
+    loading: operationLoading,
+    handleDeleteEntity,
+    handleSyncEntity,
+  } = useEntityTable({
+    entityType: 'product',
+    fetchEntities: fetchProducts,
+    deleteEntity: async (id) => {
+      await deleteProduct(id);
+      // Le refresh se fera automatiquement via les événements WebSocket
+    },
+    syncEntity: async (id) => {
+      // Fonction de synchronisation gérée par le composant useEntityTable
+      // Le refresh se fera automatiquement via les événements WebSocket
+    },
+    // Ne pas spécifier de customEventHandlers pour éviter les abonnements doublons
+  });
+
+  // Combinaison de l'état de chargement
+  const isLoading = productsLoading || operationLoading;
 
   // Configuration des filtres (spécifique à ce composant)
   const filters = [
@@ -67,7 +78,7 @@ function ProductTable(props) {
   return (
     <EntityTable
       data={localProducts}
-      isLoading={loading || contextLoading}
+      isLoading={isLoading}
       error={error}
       columns={ENTITY_CONFIG.columns}
       entityName="produit"

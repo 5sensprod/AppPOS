@@ -25,10 +25,7 @@ function CategoriesTable(props) {
 
   // Initialiser les WebSockets une seule fois au montage du composant
   useEffect(() => {
-    console.log('[TABLE] Initialisation du composant CategoriesTable');
-    // Initialiser les écouteurs WebSocket
     initWebSocket();
-    // Charger les catégories si elles ne sont pas déjà chargées
     if (hierarchicalCategories.length === 0) {
       fetchHierarchicalCategories();
     }

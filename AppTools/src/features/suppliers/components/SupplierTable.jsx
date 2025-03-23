@@ -1,27 +1,50 @@
 // src/features/suppliers/components/SupplierTable.jsx
 import React, { useEffect } from 'react';
-import { useSupplier } from '../stores/supplierStore'; // Import depuis le store Zustand
+import { useSupplier } from '../stores/supplierStore';
+import { useSupplierDataStore } from '../stores/supplierStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '../../../hooks/useEntityTable';
 
 function SupplierTable(props) {
-  const { suppliers, fetchSuppliers, deleteSupplier, syncSupplier, initWebSocketListeners } =
-    useSupplier();
+  const { deleteSupplier } = useSupplier();
 
-  // Initialiser les écouteurs WebSocket au montage du composant
+  // Utiliser le store dédié (non-hiérarchique)
+  const {
+    suppliers,
+    loading: suppliersLoading,
+    fetchSuppliers,
+    initWebSocket,
+  } = useSupplierDataStore();
+
+  // Initialiser les WebSockets et charger les données si nécessaire
   useEffect(() => {
-    const cleanup = initWebSocketListeners();
-    return cleanup;
-  }, [initWebSocketListeners]);
+    // Initialiser les écouteurs WebSocket
+    initWebSocket();
 
-  // Utilisation du hook useEntityTable avec gestion automatique des événements standard
-  const { loading, error, handleDeleteEntity, handleSyncEntity } = useEntityTable({
+    // Charger les fournisseurs seulement s'ils ne sont pas déjà chargés
+    if (suppliers.length === 0) {
+      fetchSuppliers();
+    }
+  }, [initWebSocket, fetchSuppliers, suppliers.length]);
+
+  // Utilisation du hook useEntityTable sans les abonnements WebSocket
+  const {
+    loading: operationLoading,
+    error,
+    handleDeleteEntity,
+  } = useEntityTable({
     entityType: 'supplier',
     fetchEntities: fetchSuppliers,
-    deleteEntity: deleteSupplier,
-    syncEntity: syncSupplier,
+    deleteEntity: async (id) => {
+      await deleteSupplier(id);
+      // Le refresh se fera automatiquement via les événements WebSocket
+    },
+    syncEntity: null, // Les fournisseurs n'ont pas de synchronisation (syncEnabled: false)
   });
+
+  // Combinaison de l'état de chargement du store et des opérations
+  const isLoading = suppliersLoading || operationLoading;
 
   // Configuration des filtres
   const filters = [];
@@ -29,7 +52,7 @@ function SupplierTable(props) {
   return (
     <EntityTable
       data={suppliers || []}
-      isLoading={loading}
+      isLoading={isLoading}
       error={error}
       columns={ENTITY_CONFIG.columns}
       entityName="fournisseur"
@@ -38,10 +61,10 @@ function SupplierTable(props) {
       filters={filters}
       searchFields={['name']}
       onDelete={handleDeleteEntity}
-      onSync={handleSyncEntity}
+      onSync={null} // Pas de synchronisation pour les fournisseurs
       syncEnabled={ENTITY_CONFIG.syncEnabled}
-      actions={['view', 'edit', 'delete', 'sync']}
-      batchActions={['delete', 'sync']}
+      actions={['view', 'edit', 'delete']} // Retrait de 'sync' car non applicable
+      batchActions={['delete']} // Retrait de 'sync' car non applicable
       pagination={{
         enabled: true,
         pageSize: 5,
