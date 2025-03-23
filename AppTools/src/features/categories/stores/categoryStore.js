@@ -2,6 +2,7 @@
 import { createEntityStore } from '../../../factories/createEntityStore';
 import apiService from '../../../services/api';
 import { useCategoryHierarchyStore } from './categoryHierarchyStore';
+import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
 
 // Configuration de l'entité Category
 const CATEGORY_CONFIG = {
@@ -22,12 +23,7 @@ export function useCategory() {
 
   return {
     ...categoryStore,
-    initWebSocketListeners: () => {
-      console.log('[CATEGORY] Redirection vers useCategoryHierarchyStore.initWebSocket()');
-      const dataStore = useCategoryHierarchyStore.getState();
-      dataStore.initWebSocket();
-      return dataStore.cleanup;
-    },
+    initWebSocketListeners: createWebSocketRedirection('category', useCategoryHierarchyStore),
   };
 }
 

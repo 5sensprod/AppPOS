@@ -8,8 +8,10 @@ import websocketService from '../services/websocketService';
  * @param {Object} options - Options de configuration
  * @param {string} options.entityName - Nom de l'entité (ex: 'product', 'supplier')
  * @param {string} options.apiEndpoint - Endpoint API pour charger les données
- * @param {Array<string>} options.additionalChannels - Canaux WebSocket additionnels à écouter
- * @param {Array<string>} options.additionalEvents - Événements additionnels à écouter
+ * @param {string} [options.dataPropertyName] - Nom personnalisé pour la propriété de données (ex: 'hierarchicalCategories')
+ * @param {string} [options.fetchMethodName] - Nom personnalisé pour la méthode de chargement (ex: 'fetchHierarchicalCategories')
+ * @param {Array<string>} [options.additionalChannels] - Canaux WebSocket additionnels à écouter
+ * @param {Array<Object>} [options.additionalEvents] - Événements additionnels à écouter
  * @param {Function} options.apiService - Service API pour charger les données
  * @returns {Function} - Hook Zustand pour le store WebSocket
  */
@@ -17,6 +19,8 @@ export function createWebSocketStore(options) {
   const {
     entityName,
     apiEndpoint,
+    dataPropertyName,
+    fetchMethodName,
     additionalChannels = [],
     additionalEvents = [],
     apiService,
@@ -25,7 +29,12 @@ export function createWebSocketStore(options) {
   const entityNameLower = entityName.toLowerCase();
   const entityNamePlural = entityNameLower + 's'; // Simplification de la pluralisation
   const entityNameUpper = entityNameLower.toUpperCase();
-  const fetchMethodName = `fetch${entityNamePlural.charAt(0).toUpperCase() + entityNamePlural.slice(1)}`;
+
+  // Utiliser les noms personnalisés s'ils existent, sinon les noms standards
+  const statePropertyName = dataPropertyName || entityNamePlural;
+  const methodName =
+    fetchMethodName ||
+    `fetch${entityNamePlural.charAt(0).toUpperCase() + entityNamePlural.slice(1)}`;
 
   return create((set, get) => {
     // Fonction pour gérer les abonnements WebSocket
@@ -46,13 +55,13 @@ export function createWebSocketStore(options) {
       // Gestionnaire pour l'événement de création
       const handleCreated = (data) => {
         console.log(`[${entityNameUpper}] Événement ${entityNamePlural}.created reçu`, data);
-        get()[fetchMethodName]();
+        get()[methodName]();
       };
 
       // Gestionnaire pour l'événement de mise à jour
       const handleUpdated = (data) => {
         console.log(`[${entityNameUpper}] Événement ${entityNamePlural}.updated reçu`, data);
-        get()[fetchMethodName]();
+        get()[methodName]();
       };
 
       // Gestionnaire amélioré pour l'événement de suppression
@@ -76,7 +85,7 @@ export function createWebSocketStore(options) {
         }
 
         console.log(`[${entityNameUpper}] ${entityName} supprimé avec ID: ${deletedId}`);
-        get()[fetchMethodName]();
+        get()[methodName]();
       };
 
       // Gestionnaire global pour entity.deleted
@@ -86,7 +95,7 @@ export function createWebSocketStore(options) {
             `[${entityNameUpper}] Événement entity.deleted pour ${entityNamePlural} reçu ✨`,
             data
           );
-          get()[fetchMethodName]();
+          get()[methodName]();
         }
       };
 
@@ -127,7 +136,7 @@ export function createWebSocketStore(options) {
 
         // Construire un objet pour stocker les données de manière dynamique
         const stateUpdate = {
-          [entityNamePlural]: responseData,
+          [statePropertyName]: responseData,
           loading: false,
           lastUpdate: Date.now(),
         };
@@ -145,18 +154,18 @@ export function createWebSocketStore(options) {
       }
     };
 
-    // Préparer l'objet de retour dynamiquement
+    // Préparer l'objet de retour dynamiquement avec les noms personnalisés
     const returnObject = {
-      // État dynamique
-      [entityNamePlural]: [],
+      // État dynamique avec nom personnalisé
+      [statePropertyName]: [],
       loading: false,
       error: null,
       lastUpdate: null,
       listenersInitialized: false,
       eventHandlers: {},
 
-      // Action de chargement dynamique
-      [fetchMethodName]: fetchMethod,
+      // Action de chargement dynamique avec nom personnalisé
+      [methodName]: fetchMethod,
 
       // Initialiser les écouteurs WebSocket
       initWebSocket: () => {
