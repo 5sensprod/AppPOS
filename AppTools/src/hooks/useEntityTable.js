@@ -107,12 +107,6 @@ export const useEntityTable = ({
     },
   };
 
-  // Utilisation du hook useEntityEvents pour écouter les événements WebSocket
-  useEntityEvents(entityType, {
-    ...standardEventHandlers,
-    customEvents: customEventHandlers,
-  });
-
   return {
     loading,
     error,
