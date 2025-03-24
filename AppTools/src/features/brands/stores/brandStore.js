@@ -16,7 +16,7 @@ const BRAND_CONFIG = {
 
 // Stores existants...
 const { useBrand: useBrandBase, useEntityStore: useBrandStore } = createEntityStore(BRAND_CONFIG);
-export const useBrandHierarchyStore = createWebSocketStore({
+export const useBrandDataStore = createWebSocketStore({
   entityName: 'brand',
   apiEndpoint: '/api/brands',
   apiService,
@@ -56,7 +56,7 @@ export function useBrand() {
   const brandStore = useBrandBase();
   return {
     ...brandStore,
-    initWebSocketListeners: createWebSocketRedirection('brand', useBrandHierarchyStore),
+    initWebSocketListeners: createWebSocketRedirection('brand', useBrandDataStore),
   };
 }
 
