@@ -1,9 +1,15 @@
+// src/features/categories/components/CategoriesTable.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useCategory, useCategoryExtras } from '../stores/categoryStore';
+import {
+  useCategory,
+  useCategoryExtras,
+  useCategoryTablePreferences,
+} from '../stores/categoryStore';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
+import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 
 function CategoriesTable(props) {
   // Utiliser useCategoryExtras qui inclut maintenant les données hiérarchiques
@@ -16,10 +22,20 @@ function CategoriesTable(props) {
     initWebSocketListeners,
   } = useCategoryExtras();
 
+  // Utiliser les préférences de table
+  const {
+    preferences: tablePreferences,
+    updatePreference: updateTablePreference,
+    resetSection: resetPreferenceSection,
+  } = useCategoryTablePreferences();
+
+  // Restaurer la position de défilement
+  useScrollRestoration(tablePreferences, 'category');
+
   // États locaux pour le composant
   const [expandedCategories, setExpandedCategories] = useState({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [localSort, setLocalSort] = useState(ENTITY_CONFIG.defaultSort);
+  const [searchTerm, setSearchTerm] = useState(tablePreferences.search.term || '');
+  const [localSort, setLocalSort] = useState(tablePreferences.sort || ENTITY_CONFIG.defaultSort);
 
   // Initialiser les WebSockets une seule fois au montage du composant
   useEffect(() => {
@@ -68,17 +84,34 @@ function CategoriesTable(props) {
   }, []);
 
   // Gestionnaire de recherche
-  const handleSearch = useCallback((value) => {
-    setSearchTerm(value);
-  }, []);
+  const handleSearch = useCallback(
+    (value) => {
+      setSearchTerm(value);
+      // Mettre à jour les préférences
+      updateTablePreference('search', { ...tablePreferences.search, term: value });
+    },
+    [tablePreferences.search, updateTablePreference]
+  );
 
   // Gestionnaire de tri
-  const customSort = useCallback((field) => {
-    setLocalSort((prev) => ({
-      field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  }, []);
+  const customSort = useCallback(
+    (field) => {
+      const newSort = {
+        field,
+        direction: localSort.field === field && localSort.direction === 'asc' ? 'desc' : 'asc',
+      };
+      setLocalSort(newSort);
+      // Mettre à jour les préférences
+      updateTablePreference('sort', newSort);
+    },
+    [localSort, updateTablePreference]
+  );
+
+  // Gestionnaire pour réinitialiser les filtres
+  const handleResetFilters = useCallback(() => {
+    resetPreferenceSection('search');
+    setSearchTerm('');
+  }, [resetPreferenceSection]);
 
   // Fonction pour aplatir les données hiérarchiques
   const flattenHierarchy = useCallback(
@@ -212,16 +245,33 @@ function CategoriesTable(props) {
     return flattenHierarchy(sortedRootCategories);
   }, [hierarchicalCategories, searchTerm, localSort, flattenHierarchy, searchProcessor]);
 
-  const filters = [];
-
   // Désactiver le tri standard
   const sortProcessor = useCallback((data) => data, []);
 
   // Combinaison de l'état de chargement du store et des opérations
   const isLoading = hierarchicalLoading || operationLoading;
 
+  // Gestionnaire pour mettre à jour les préférences
+  const handlePreferencesChange = useCallback(
+    (section, value) => {
+      updateTablePreference(section, value);
+    },
+    [updateTablePreference]
+  );
+
   return (
-    <>
+    <div className="space-y-4">
+      {Object.keys(tablePreferences.search.activeFilters).length > 0 && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleResetFilters}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md"
+          >
+            Réinitialiser les filtres
+          </button>
+        </div>
+      )}
+
       <EntityTable
         data={processedData}
         isLoading={isLoading}
@@ -230,7 +280,7 @@ function CategoriesTable(props) {
         entityName="catégorie"
         entityNamePlural="catégories"
         baseRoute="/products/categories"
-        filters={filters}
+        filters={[]}
         searchFields={['_originalName', 'description']}
         searchProcessor={searchProcessor}
         sortProcessor={sortProcessor}
@@ -243,15 +293,17 @@ function CategoriesTable(props) {
         batchActions={['delete', 'sync']}
         pagination={{
           enabled: true,
-          pageSize: 5,
+          pageSize: ENTITY_CONFIG.defaultPageSize || 5,
           showPageSizeOptions: true,
           pageSizeOptions: [5, 10, 25, 50],
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
         sort={localSort}
+        tablePreferences={tablePreferences}
+        onPreferencesChange={handlePreferencesChange}
         {...props}
       />
-    </>
+    </div>
   );
 }
 

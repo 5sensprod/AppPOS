@@ -45,13 +45,15 @@ const EntityTable = ({
   const initialSort = tablePreferences?.sort || defaultSort;
   const { sort, sortedData, handleSort } = useTableSort(data, initialSort);
 
-  // Mise à jour des préférences de tri lorsqu'elles changent
+  // Mise à jour des préférences de tri seulement si nécessaire
   useEffect(() => {
-    if (onPreferencesChange && sort !== initialSort) {
+    if (
+      onPreferencesChange &&
+      (sort.field !== initialSort.field || sort.direction !== initialSort.direction)
+    ) {
       onPreferencesChange('sort', sort);
     }
-  }, [sort, initialSort, onPreferencesChange]);
-
+  }, [sort.field, sort.direction]);
   // État initial pour la recherche
   const initialSearch = tablePreferences?.search?.term || '';
   const initialFilters = tablePreferences?.search?.activeFilters || {};

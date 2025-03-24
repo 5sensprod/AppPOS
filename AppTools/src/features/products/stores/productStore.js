@@ -2,6 +2,7 @@
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
+import { createTablePreferencesStore } from '../../../factories/createTablePreferencesStore';
 import { ENTITY_CONFIG } from '../constants';
 import apiService from '../../../services/api';
 
@@ -196,5 +197,79 @@ export function useProductExtras() {
     setMainImage,
     uploadGalleryImage,
     deleteGalleryImage,
+  };
+}
+
+// Créer le store de préférences pour les tables de produits
+export const useProductTablePreferencesStore = createTablePreferencesStore({
+  entityType: 'product',
+  defaultPreferences: {
+    pagination: {
+      currentPage: 1,
+      pageSize: ENTITY_CONFIG.defaultPageSize || 10,
+    },
+    search: {
+      term: '',
+      activeFilters: {},
+    },
+    sort: {
+      ...ENTITY_CONFIG.defaultSort,
+    },
+    selection: {
+      focusedItemId: null,
+      selectedItems: [],
+    },
+    detail: {
+      activeTab: 'info',
+      scrollPosition: 0,
+    },
+  },
+});
+
+// Hook pour exposer les préférences de table pour les produits
+export function useProductTablePreferences() {
+  const tablePreferences = useProductTablePreferencesStore();
+
+  return {
+    preferences: {
+      pagination: tablePreferences.pagination,
+      search: tablePreferences.search,
+      sort: tablePreferences.sort,
+      selection: tablePreferences.selection,
+      detail: tablePreferences.detail,
+    },
+    updatePreference: (section, value) => {
+      switch (section) {
+        case 'pagination':
+          tablePreferences.setPagination(value);
+          break;
+        case 'search':
+          tablePreferences.setSearch(value);
+          break;
+        case 'sort':
+          tablePreferences.setSort(value);
+          break;
+        case 'selection':
+          if (value.focusedItemId) {
+            const element = document.getElementById(`row-${value.focusedItemId}`);
+            if (element) {
+              tablePreferences.setDetail({
+                ...tablePreferences.detail,
+                scrollPosition: window.scrollY,
+                lastFocusedElementId: value.focusedItemId,
+              });
+            }
+          }
+          tablePreferences.setSelection(value);
+          break;
+        case 'detail':
+          tablePreferences.setDetail(value);
+          break;
+        default:
+          console.warn(`Section de préférences inconnue: ${section}`);
+      }
+    },
+    resetPreferences: tablePreferences.resetPreferences,
+    resetSection: tablePreferences.resetSection,
   };
 }

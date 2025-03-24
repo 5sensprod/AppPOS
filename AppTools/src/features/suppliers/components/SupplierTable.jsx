@@ -1,82 +1,46 @@
 // src/features/suppliers/components/SupplierTable.jsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   useSupplier,
   useSupplierExtras,
   useSupplierHierarchyStore,
   useSupplierTablePreferences,
 } from '../stores/supplierStore';
+import { useEntityWithPreferences } from '@/hooks/useEntityWithPreferences';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
-import { useEntityTable } from '@/hooks/useEntityTable';
-import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 
 function SupplierTable(props) {
   const { deleteSupplier } = useSupplier();
   const { syncSupplier } = useSupplierExtras();
 
-  // Utiliser le store hiérarchique
   const {
-    suppliers,
-    loading: suppliersLoading,
-    fetchSuppliers,
-    initWebSocket,
-  } = useSupplierHierarchyStore();
-
-  // Utiliser les préférences de table
-  const {
-    preferences: tablePreferences,
-    updatePreference: updateTablePreference,
-    resetSection: resetPreferenceSection,
-  } = useSupplierTablePreferences();
-
-  // Restaurer la position de défilement
-  useScrollRestoration(tablePreferences, 'supplier');
-
-  // Initialiser les WebSockets et charger les données si nécessaire
-  useEffect(() => {
-    initWebSocket();
-    if (suppliers.length === 0) {
-      fetchSuppliers();
-    }
-  }, [initWebSocket, fetchSuppliers, suppliers.length]);
-
-  // Utilisation du hook useEntityTable sans les abonnements WebSocket
-  const {
-    loading: operationLoading,
+    entities: suppliers,
+    tablePreferences,
+    isLoading,
     error,
     handleDeleteEntity,
     handleSyncEntity,
-  } = useEntityTable({
+    handlePreferencesChange,
+    handleResetFilters,
+  } = useEntityWithPreferences({
     entityType: 'supplier',
-    fetchEntities: fetchSuppliers,
-    deleteEntity: async (id) => {
-      await deleteSupplier(id);
+    entityStore: {
+      data: useSupplierHierarchyStore().suppliers,
+      loading: useSupplierHierarchyStore().loading,
+      fetchEntities: useSupplierHierarchyStore().fetchSuppliers,
+      initWebSocket: useSupplierHierarchyStore().initWebSocket,
     },
-    syncEntity: async (id) => {
-      await syncSupplier(id);
-    },
+    preferencesStore: useSupplierTablePreferences(),
+    deleteEntityFn: async (id) => await deleteSupplier(id),
+    syncEntityFn: async (id) => await syncSupplier(id),
   });
 
-  // Combinaison de l'état de chargement du store et des opérations
-  const isLoading = suppliersLoading || operationLoading;
-
-  // Configuration des filtres si nécessaire
+  // Configuration des filtres
   const filters = ENTITY_CONFIG.filters || [];
-
-  // Gestionnaire pour mettre à jour les préférences de table
-  const handlePreferencesChange = (section, value) => {
-    updateTablePreference(section, value);
-  };
-
-  // Réinitialiser les filtres si nécessaire
-  const handleResetFilters = () => {
-    resetPreferenceSection('search');
-  };
 
   return (
     <div className="space-y-4">
-      {/* Bouton pour réinitialiser les filtres si des filtres sont actifs */}
       {Object.keys(tablePreferences.search.activeFilters).length > 0 && (
         <div className="flex justify-end">
           <button
