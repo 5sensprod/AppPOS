@@ -1,84 +1,79 @@
 // src/features/suppliers/components/SupplierTable.jsx
-import React from 'react';
-import {
-  useSupplier,
-  useSupplierExtras,
-  useSupplierHierarchyStore,
-  useSupplierTablePreferences,
-} from '../stores/supplierStore';
-import { useEntityWithPreferences } from '@/hooks/useEntityWithPreferences';
-import EntityTable from '@/components/common/EntityTable/index';
+import React, { useEffect } from 'react';
+import { useSupplier } from '../stores/supplierStore';
+import { useSupplierDataStore } from '../stores/supplierStore';
+import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
+import { useEntityTable } from '../../../hooks/useEntityTable';
 
 function SupplierTable(props) {
   const { deleteSupplier } = useSupplier();
-  const { syncSupplier } = useSupplierExtras();
 
+  // Utiliser le store dédié (non-hiérarchique)
   const {
-    entities: suppliers,
-    tablePreferences,
-    isLoading,
+    suppliers,
+    loading: suppliersLoading,
+    fetchSuppliers,
+    initWebSocket,
+  } = useSupplierDataStore();
+
+  // Initialiser les WebSockets et charger les données si nécessaire
+  useEffect(() => {
+    // Initialiser les écouteurs WebSocket
+    initWebSocket();
+
+    // Charger les fournisseurs seulement s'ils ne sont pas déjà chargés
+    if (suppliers.length === 0) {
+      fetchSuppliers();
+    }
+  }, [initWebSocket, fetchSuppliers, suppliers.length]);
+
+  // Utilisation du hook useEntityTable sans les abonnements WebSocket
+  const {
+    loading: operationLoading,
     error,
     handleDeleteEntity,
-    handleSyncEntity,
-    handlePreferencesChange,
-    handleResetFilters,
-  } = useEntityWithPreferences({
+  } = useEntityTable({
     entityType: 'supplier',
-    entityStore: {
-      data: useSupplierHierarchyStore().suppliers,
-      loading: useSupplierHierarchyStore().loading,
-      fetchEntities: useSupplierHierarchyStore().fetchSuppliers,
-      initWebSocket: useSupplierHierarchyStore().initWebSocket,
+    fetchEntities: fetchSuppliers,
+    deleteEntity: async (id) => {
+      await deleteSupplier(id);
+      // Le refresh se fera automatiquement via les événements WebSocket
     },
-    preferencesStore: useSupplierTablePreferences(),
-    deleteEntityFn: async (id) => await deleteSupplier(id),
-    syncEntityFn: async (id) => await syncSupplier(id),
+    syncEntity: null, // Les fournisseurs n'ont pas de synchronisation (syncEnabled: false)
   });
 
+  // Combinaison de l'état de chargement du store et des opérations
+  const isLoading = suppliersLoading || operationLoading;
+
   // Configuration des filtres
-  const filters = ENTITY_CONFIG.filters || [];
+  const filters = [];
 
   return (
-    <div className="space-y-4">
-      {Object.keys(tablePreferences.search.activeFilters).length > 0 && (
-        <div className="flex justify-end">
-          <button
-            onClick={handleResetFilters}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md"
-          >
-            Réinitialiser les filtres
-          </button>
-        </div>
-      )}
-
-      <EntityTable
-        data={suppliers || []}
-        isLoading={isLoading}
-        error={error}
-        columns={ENTITY_CONFIG.columns}
-        entityName="fournisseur"
-        entityNamePlural="fournisseurs"
-        baseRoute="/products/suppliers"
-        filters={filters}
-        searchFields={['name', 'description', 'contactName', 'email']}
-        onDelete={handleDeleteEntity}
-        onSync={handleSyncEntity}
-        syncEnabled={ENTITY_CONFIG.syncEnabled}
-        actions={['view', 'edit', 'delete', 'sync']}
-        batchActions={['delete', 'sync']}
-        pagination={{
-          enabled: true,
-          pageSize: ENTITY_CONFIG.defaultPageSize || 10,
-          showPageSizeOptions: true,
-          pageSizeOptions: [5, 10, 25, 50],
-        }}
-        defaultSort={ENTITY_CONFIG.defaultSort}
-        tablePreferences={tablePreferences}
-        onPreferencesChange={handlePreferencesChange}
-        {...props}
-      />
-    </div>
+    <EntityTable
+      data={suppliers || []}
+      isLoading={isLoading}
+      error={error}
+      columns={ENTITY_CONFIG.columns}
+      entityName="fournisseur"
+      entityNamePlural="fournisseurs"
+      baseRoute="/products/suppliers"
+      filters={filters}
+      searchFields={['name']}
+      onDelete={handleDeleteEntity}
+      onSync={null} // Pas de synchronisation pour les fournisseurs
+      syncEnabled={ENTITY_CONFIG.syncEnabled}
+      actions={['view', 'edit', 'delete']} // Retrait de 'sync' car non applicable
+      batchActions={['delete']} // Retrait de 'sync' car non applicable
+      pagination={{
+        enabled: true,
+        pageSize: 5,
+        showPageSizeOptions: true,
+        pageSizeOptions: [5, 10, 25, 50],
+      }}
+      defaultSort={ENTITY_CONFIG.defaultSort}
+      {...props}
+    />
   );
 }
 
