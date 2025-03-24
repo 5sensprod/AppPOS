@@ -5,7 +5,7 @@ import {
   useCategoryTablePreferences,
 } from '../stores/categoryStore';
 import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
-import { useEntityWithPreferences } from '@/hooks/useEntityWithPreferences';
+import { useEntityTableWithPreferences } from '@/hooks/useEntityTableWithPreferences';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
@@ -25,7 +25,7 @@ function CategoriesTable(props) {
     handleSyncEntity,
     handlePreferencesChange,
     handleResetFilters,
-  } = useEntityWithPreferences({
+  } = useEntityTableWithPreferences({
     entityType: 'category',
     entityStore: {
       data: categoryHierarchyStore.hierarchicalCategories,

@@ -1,9 +1,9 @@
-// src/hooks/useEntityWithPreferences.js
+// src/hooks/useEntityTableWithPreferences.js
 import { useEffect } from 'react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 
-export function useEntityWithPreferences({
+export function useEntityTableWithPreferences({
   entityType,
   entityStore,
   preferencesStore,

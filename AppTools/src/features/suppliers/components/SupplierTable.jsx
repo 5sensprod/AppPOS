@@ -4,7 +4,7 @@ import {
   useSupplierDataStore,
   useSupplierTablePreferences,
 } from '../stores/supplierStore';
-import { useEntityWithPreferences } from '@/hooks/useEntityWithPreferences';
+import { useEntityTableWithPreferences } from '@/hooks/useEntityTableWithPreferences';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 
@@ -20,7 +20,7 @@ function SupplierTable(props) {
     handleDeleteEntity,
     handlePreferencesChange,
     handleResetFilters,
-  } = useEntityWithPreferences({
+  } = useEntityTableWithPreferences({
     entityType: 'supplier',
     entityStore: {
       data: useSupplierDataStore().suppliers,

@@ -5,7 +5,7 @@ import {
   useProductDataStore,
   useProductTablePreferences,
 } from '../stores/productStore';
-import { useEntityWithPreferences } from '@/hooks/useEntityWithPreferences';
+import { useEntityTableWithPreferences } from '@/hooks/useEntityTableWithPreferences';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 
@@ -21,7 +21,7 @@ function ProductTable(props) {
     handleSyncEntity,
     handlePreferencesChange,
     handleResetFilters,
-  } = useEntityWithPreferences({
+  } = useEntityTableWithPreferences({
     entityType: 'product',
     entityStore: {
       data: useProductDataStore().products,
