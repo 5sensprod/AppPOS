@@ -11,6 +11,9 @@ export function createEntityStore(options) {
     apiEndpoint,
     syncEnabled = true,
     imagesEnabled = true,
+    hierarchicalEnabled = false,
+    hierarchicalEndpoint = null,
+    webSocketIntegration = null,
     customActions = {},
     customReducers = {},
   } = options;
@@ -32,6 +35,11 @@ export function createEntityStore(options) {
     UPDATE_SUCCESS: 'UPDATE_SUCCESS',
     DELETE_SUCCESS: 'DELETE_SUCCESS',
     SYNC_SUCCESS: 'SYNC_SUCCESS',
+    ...(hierarchicalEnabled && {
+      HIERARCHICAL_FETCH_START: 'HIERARCHICAL_FETCH_START',
+      HIERARCHICAL_FETCH_SUCCESS: 'HIERARCHICAL_FETCH_SUCCESS',
+      HIERARCHICAL_FETCH_ERROR: 'HIERARCHICAL_FETCH_ERROR',
+    }),
     ...standardImageActions,
     ...customActions,
   };
@@ -76,6 +84,11 @@ export function createEntityStore(options) {
     itemsById: {},
     loading: false,
     error: null,
+    ...(hierarchicalEnabled && {
+      hierarchicalItems: [],
+      hierarchicalLoading: false,
+      hierarchicalError: null,
+    }),
   };
 
   // Création du store Zustand
@@ -166,13 +179,7 @@ export function createEntityStore(options) {
 
         case ACTIONS.SYNC_SUCCESS: {
           const syncedItem = action.payload;
-
-          // S'assurer que pending_sync est à false dans l'item synchronisé
-          const updatedSyncedItem = {
-            ...syncedItem,
-            pending_sync: false,
-          };
-
+          const updatedSyncedItem = { ...syncedItem, pending_sync: false };
           set({
             items: state.items.map((item) =>
               item._id === updatedSyncedItem._id ? updatedSyncedItem : item
@@ -182,6 +189,22 @@ export function createEntityStore(options) {
           });
           break;
         }
+
+        // Ajout des reducers pour les données hiérarchiques
+        case ACTIONS.HIERARCHICAL_FETCH_START:
+          set({ hierarchicalLoading: true, hierarchicalError: null });
+          break;
+
+        case ACTIONS.HIERARCHICAL_FETCH_SUCCESS:
+          set({
+            hierarchicalItems: action.payload,
+            hierarchicalLoading: false,
+          });
+          break;
+
+        case ACTIONS.HIERARCHICAL_FETCH_ERROR:
+          set({ hierarchicalError: action.payload, hierarchicalLoading: false });
+          break;
 
         default:
           break;
@@ -193,7 +216,7 @@ export function createEntityStore(options) {
       ? createEntityImageHandlers(entityName, apiEndpoint, dispatch, ACTIONS)
       : {};
 
-    return {
+    const storeActions = {
       // État initial
       ...initialState,
 
@@ -315,67 +338,96 @@ export function createEntityStore(options) {
         deleteImage: imageHandlers.deleteImage,
       }),
 
-      // Initialisation des écouteurs WebSocket
-      initWebSocketListeners: () => {
-        const entityPlural = pluralize(entityName);
-
-        const handleUpdate = ({ entityId, data }) => {
-          dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: data });
-        };
-
-        const handleCreate = (data) => {
-          dispatch({ type: ACTIONS.CREATE_SUCCESS, payload: data });
-        };
-
-        const handleDelete = ({ entityId }) => {
-          dispatch({ type: ACTIONS.DELETE_SUCCESS, payload: entityId });
-        };
-
-        // S'abonner aux mises à jour WebSocket
-        if (websocketService.isConnected) {
-          websocketService.subscribe(entityPlural);
-
-          // Écouter les événements spécifiques
-          websocketService.on(`${entityPlural}.updated`, handleUpdate);
-          websocketService.on(`${entityPlural}.created`, handleCreate);
-          websocketService.on(`${entityPlural}.deleted`, handleDelete);
-        } else {
-          console.warn(
-            `[WS-DEBUG] WebSocket non connecté, impossible de s'abonner pour ${entityName}`
-          );
-        }
-
-        // Écouter les reconnexions WebSocket
-        const handleReconnect = () => {
-          if (websocketService.isConnected) {
-            websocketService.subscribe(entityPlural);
+      // Fonctions pour données hiérarchiques (si activées)
+      ...(hierarchicalEnabled && {
+        fetchHierarchicalItems: async () => {
+          dispatch({ type: ACTIONS.HIERARCHICAL_FETCH_START });
+          try {
+            const response = await apiService.get(
+              hierarchicalEndpoint || `${apiEndpoint}/hierarchical`
+            );
+            dispatch({ type: ACTIONS.HIERARCHICAL_FETCH_SUCCESS, payload: response.data.data });
+            return response.data.data;
+          } catch (error) {
+            dispatch({ type: ACTIONS.HIERARCHICAL_FETCH_ERROR, payload: error.message });
+            throw error;
           }
-        };
+        },
+      }),
 
-        websocketService.on('connect', handleReconnect);
+      // Utiliser l'intégration WebSocket si fournie, sinon utiliser l'implémentation standard
+      initWebSocketListeners: webSocketIntegration
+        ? () => {
+            console.log(
+              `[${entityName.toUpperCase()}] Utilisation de l'intégration WebSocket personnalisée`
+            );
+            const wsStore = webSocketIntegration.storeHook.getState();
+            wsStore.initWebSocket();
+            return wsStore.cleanup;
+          }
+        : () => {
+            const entityPlural = pluralize(entityName);
 
-        // Retourner une fonction de nettoyage pour les composants React
-        return () => {
-          websocketService.off(`${entityPlural}.updated`, handleUpdate);
-          websocketService.off(`${entityPlural}.created`, handleCreate);
-          websocketService.off(`${entityPlural}.deleted`, handleDelete);
-          websocketService.off('connect', handleReconnect);
-        };
-      },
+            const handleUpdate = ({ entityId, data }) => {
+              dispatch({ type: ACTIONS.UPDATE_SUCCESS, payload: data });
+            };
+
+            const handleCreate = (data) => {
+              dispatch({ type: ACTIONS.CREATE_SUCCESS, payload: data });
+            };
+
+            const handleDelete = ({ entityId }) => {
+              dispatch({ type: ACTIONS.DELETE_SUCCESS, payload: entityId });
+            };
+
+            // S'abonner aux mises à jour WebSocket
+            if (websocketService.isConnected) {
+              websocketService.subscribe(entityPlural);
+
+              // Écouter les événements spécifiques
+              websocketService.on(`${entityPlural}.updated`, handleUpdate);
+              websocketService.on(`${entityPlural}.created`, handleCreate);
+              websocketService.on(`${entityPlural}.deleted`, handleDelete);
+            } else {
+              console.warn(
+                `[WS-DEBUG] WebSocket non connecté, impossible de s'abonner pour ${entityName}`
+              );
+            }
+
+            // Écouter les reconnexions WebSocket
+            const handleReconnect = () => {
+              if (websocketService.isConnected) {
+                websocketService.subscribe(entityPlural);
+              }
+            };
+
+            websocketService.on('connect', handleReconnect);
+
+            // Retourner une fonction de nettoyage pour les composants React
+            return () => {
+              websocketService.off(`${entityPlural}.updated`, handleUpdate);
+              websocketService.off(`${entityPlural}.created`, handleCreate);
+              websocketService.off(`${entityPlural}.deleted`, handleDelete);
+              websocketService.off('connect', handleReconnect);
+            };
+          },
     };
+
+    return storeActions;
   });
 
   // Renommer les fonctions pour correspondre à la convention de nommage actuelle
   const renamedStore = {
     [`use${capitalize(entityName)}`]: () => {
       const store = useEntityStore();
+      const entityPlural = pluralize(entityName);
 
       return {
-        [`${pluralize(entityName)}`]: store.items,
+        [`${entityPlural}`]: store.items,
         [`${entityName}sById`]: store.itemsById,
         loading: store.loading,
         error: store.error,
-        [`fetch${capitalize(entityName)}s`]: store.fetchItems,
+        [`fetch${capitalize(entityPlural)}`]: store.fetchItems,
         [`get${capitalize(entityName)}ById`]: store.getItemById,
         [`create${capitalize(entityName)}`]: store.createItem,
         [`update${capitalize(entityName)}`]: store.updateItem,
@@ -384,6 +436,12 @@ export function createEntityStore(options) {
         ...(imagesEnabled && {
           uploadImage: store.uploadImage,
           deleteImage: store.deleteImage,
+        }),
+        ...(hierarchicalEnabled && {
+          hierarchicalItems: store.hierarchicalItems,
+          hierarchicalLoading: store.hierarchicalLoading,
+          hierarchicalError: store.hierarchicalError,
+          [`fetchHierarchical${capitalize(entityPlural)}`]: store.fetchHierarchicalItems,
         }),
         dispatch: store.dispatch,
         initWebSocketListeners: store.initWebSocketListeners,

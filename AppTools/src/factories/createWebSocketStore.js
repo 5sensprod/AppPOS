@@ -12,7 +12,7 @@ import websocketService from '../services/websocketService';
  * @param {string} [options.fetchMethodName] - Nom personnalisé pour la méthode de chargement (ex: 'fetchHierarchicalCategories')
  * @param {Array<string>} [options.additionalChannels] - Canaux WebSocket additionnels à écouter
  * @param {Array<Object>} [options.additionalEvents] - Événements additionnels à écouter
- * @param {Function} options.apiService - Service API pour charger les données
+ * @param {Object} options.apiService - Service API pour charger les données
  * @returns {Function} - Hook Zustand pour le store WebSocket
  */
 export function createWebSocketStore(options) {
@@ -67,12 +67,6 @@ export function createWebSocketStore(options) {
       // Gestionnaire amélioré pour l'événement de suppression
       const handleDeleted = (data) => {
         console.log(`[${entityNameUpper}] Événement ${entityNamePlural}.deleted reçu ✨`, data);
-        console.log(
-          `[${entityNameUpper}] Type de données reçues:`,
-          typeof data,
-          'Contenu:',
-          JSON.stringify(data)
-        );
 
         // Vérifier le format des données pour s'adapter
         let deletedId;
@@ -127,11 +121,11 @@ export function createWebSocketStore(options) {
     };
 
     // Préparer le fetchMethod dynamiquement
-    const fetchMethod = async () => {
+    const fetchMethod = async (params = {}) => {
       set({ loading: true, error: null });
       try {
         console.log(`[${entityNameUpper}] Chargement des ${entityNamePlural}`);
-        const response = await apiService.get(apiEndpoint);
+        const response = await apiService.get(apiEndpoint, { params });
         const responseData = response.data.data;
 
         // Construire un objet pour stocker les données de manière dynamique
