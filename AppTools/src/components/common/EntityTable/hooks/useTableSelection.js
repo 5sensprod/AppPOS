@@ -1,12 +1,22 @@
 // src/components/common/EntityTable/hooks/useTableSelection.js
 import { useState, useEffect } from 'react';
 
-export const useTableSelection = (data, filteredData) => {
-  const [selectedItems, setSelectedItems] = useState([]);
+export const useTableSelection = (data, filteredData, initialSelectedItems = []) => {
+  const [selectedItems, setSelectedItems] = useState(initialSelectedItems);
 
   // Réinitialiser la sélection lors du changement des données
+  // sauf si on a des éléments présélectionnés via les préférences
   useEffect(() => {
-    setSelectedItems([]);
+    // Vérifier si les éléments sélectionnés existent toujours dans les données
+    if (selectedItems.length > 0) {
+      const ids = data.map((item) => item._id);
+      const validSelectedItems = selectedItems.filter((id) => ids.includes(id));
+
+      // Si les éléments sélectionnés ont changé, mettre à jour
+      if (validSelectedItems.length !== selectedItems.length) {
+        setSelectedItems(validSelectedItems);
+      }
+    }
   }, [data]);
 
   const toggleSelection = (id, isSelected) => {
