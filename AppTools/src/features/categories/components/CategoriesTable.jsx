@@ -1,79 +1,156 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useCategory, useCategoryExtras } from '../stores/categoryStore';
+import {
+  useCategory,
+  useCategoryExtras,
+  useCategoryTablePreferences,
+} from '../stores/categoryStore';
 import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
+import { useEntityWithPreferences } from '@/hooks/useEntityWithPreferences';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import { useEntityTable } from '@/hooks/useEntityTable';
 
 function CategoriesTable(props) {
   const { deleteCategory } = useCategory();
   const { syncCategory } = useCategoryExtras();
+  const categoryHierarchyStore = useCategoryHierarchyStore();
 
-  // Utiliser le store hiérarchique pour les catégories
+  // Utiliser le hook personnalisé pour la gestion des préférences
   const {
-    hierarchicalCategories,
-    loading: hierarchyLoading,
-    fetchHierarchicalCategories,
-    initWebSocket,
-  } = useCategoryHierarchyStore();
-
-  // États locaux pour le composant
-  const [expandedCategories, setExpandedCategories] = useState({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [localSort, setLocalSort] = useState(ENTITY_CONFIG.defaultSort);
-
-  // Initialiser les WebSockets une seule fois au montage du composant
-  useEffect(() => {
-    console.log('[TABLE] Initialisation du composant CategoriesTable');
-    // Initialiser les écouteurs WebSocket
-    initWebSocket();
-    // Charger les catégories si elles ne sont pas déjà chargées
-    if (hierarchicalCategories.length === 0) {
-      fetchHierarchicalCategories();
-    }
-  }, [initWebSocket, fetchHierarchicalCategories, hierarchicalCategories.length]);
-
-  // Utilisation du hook useEntityTable sans les abonnements WebSocket
-  const {
-    loading: operationLoading,
+    entities: hierarchicalCategories,
+    tablePreferences,
+    isLoading,
     error,
     handleDeleteEntity,
     handleSyncEntity,
-  } = useEntityTable({
+    handlePreferencesChange,
+    handleResetFilters,
+  } = useEntityWithPreferences({
     entityType: 'category',
-    fetchEntities: fetchHierarchicalCategories,
-    deleteEntity: async (id) => {
-      await deleteCategory(id);
-      // Le refresh se fera automatiquement via les événements WebSocket
+    entityStore: {
+      data: categoryHierarchyStore.hierarchicalCategories,
+      loading: categoryHierarchyStore.loading,
+      fetchEntities: categoryHierarchyStore.fetchHierarchicalCategories,
+      initWebSocket: categoryHierarchyStore.initWebSocket,
     },
-    syncEntity: async (id) => {
-      await syncCategory(id);
-      // Le refresh se fera automatiquement via les événements WebSocket
-    },
-    // Ne pas spécifier de customEventHandlers pour éviter les abonnements doublons
+    preferencesStore: useCategoryTablePreferences(),
+    deleteEntityFn: async (id) => await deleteCategory(id),
+    syncEntityFn: async (id) => await syncCategory(id),
   });
 
+  // États pour l'expansion des catégories
+  const [expandedCategories, setExpandedCategories] = useState({});
+
+  // Restaurer l'état d'expansion depuis les préférences au chargement initial
+  // et ouvrir/fermer les catégories selon la sélection active
+  useEffect(() => {
+    if (tablePreferences.detail?.lastFocusedElementId && hierarchicalCategories.length > 0) {
+      // Si une ligne est sélectionnée, ouvrir uniquement ses parents
+      const findParentPath = (categories, targetId, currentPath = []) => {
+        for (const cat of categories || []) {
+          if (cat._id === targetId) {
+            return [...currentPath, cat._id];
+          }
+
+          if (cat.children && cat.children.length > 0) {
+            const found = findParentPath(cat.children, targetId, [...currentPath, cat._id]);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const parentPath = findParentPath(
+        hierarchicalCategories,
+        tablePreferences.detail.lastFocusedElementId
+      );
+
+      if (parentPath) {
+        const newExpandedState = {};
+        parentPath.forEach((id) => {
+          newExpandedState[id] = true;
+        });
+
+        setExpandedCategories(newExpandedState);
+      }
+    } else if (tablePreferences.detail?.expandedCategories) {
+      // Sinon utiliser l'état d'expansion mémorisé
+      setExpandedCategories(tablePreferences.detail.expandedCategories);
+    }
+  }, [tablePreferences.detail?.lastFocusedElementId, hierarchicalCategories]);
+
   // Fonction pour développer/replier une catégorie
-  const toggleCategory = useCallback((categoryId) => {
-    setExpandedCategories((prev) => ({
-      ...prev,
-      [categoryId]: !prev[categoryId],
-    }));
-  }, []);
+  const toggleCategory = useCallback(
+    (categoryId, event) => {
+      if (event) {
+        event.stopPropagation();
+      }
 
-  // Gestionnaire de recherche
-  const handleSearch = useCallback((value) => {
-    setSearchTerm(value);
-  }, []);
+      // Mettre à jour l'état local
+      const newExpandedState = {
+        ...expandedCategories,
+        [categoryId]: !expandedCategories[categoryId],
+      };
 
-  // Gestionnaire de tri
-  const customSort = useCallback((field) => {
-    setLocalSort((prev) => ({
-      field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  }, []);
+      setExpandedCategories(newExpandedState);
+
+      // Mettre à jour les préférences APRÈS le rendu (via useEffect)
+      setTimeout(() => {
+        handlePreferencesChange('detail', {
+          ...tablePreferences.detail,
+          expandedCategories: newExpandedState,
+          lastFocusedCategoryId: categoryId,
+        });
+      }, 0);
+    },
+    [expandedCategories, tablePreferences.detail, handlePreferencesChange]
+  );
+
+  // Gestion de la sélection de ligne avec repli automatique des autres
+  const handleRowClick = useCallback(
+    (rowData) => {
+      // Si on clique sur une ligne, replier toutes les catégories sauf les parentes de celle-ci
+      if (rowData && rowData._id) {
+        // Déterminer le chemin de la hiérarchie pour cette ligne
+        const findParentPath = (categories, targetId, currentPath = []) => {
+          for (const cat of categories || []) {
+            if (cat._id === targetId) {
+              return [...currentPath, cat._id];
+            }
+
+            if (cat.children && cat.children.length > 0) {
+              const found = findParentPath(cat.children, targetId, [...currentPath, cat._id]);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+
+        const parentPath = findParentPath(hierarchicalCategories, rowData._id);
+
+        if (parentPath) {
+          // Créer un nouvel état d'expansion où seuls les parents de la ligne cliquée sont développés
+          const newExpandedState = {};
+          parentPath.forEach((id) => {
+            newExpandedState[id] = true;
+          });
+
+          setExpandedCategories(newExpandedState);
+
+          // Mettre à jour les préférences
+          setTimeout(() => {
+            handlePreferencesChange('detail', {
+              ...tablePreferences.detail,
+              expandedCategories: newExpandedState,
+              lastFocusedElementId: rowData._id,
+              scrollPosition: window.scrollY,
+            });
+          }, 0);
+        }
+      }
+    },
+    [hierarchicalCategories, tablePreferences.detail, handlePreferencesChange]
+  );
 
   // Fonction pour aplatir les données hiérarchiques
   const flattenHierarchy = useCallback(
@@ -94,10 +171,7 @@ function CategoriesTable(props) {
               <div style={{ width: `${level * 16}px` }} className="flex-shrink-0"></div>
               {hasChildren ? (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleCategory(category._id);
-                  }}
+                  onClick={(e) => toggleCategory(category._id, e)}
                   className="mr-2 focus:outline-none"
                 >
                   {isExpanded ? (
@@ -190,8 +264,8 @@ function CategoriesTable(props) {
     if (!hierarchicalCategories || hierarchicalCategories.length === 0) return [];
 
     // Si une recherche est active, utiliser le processeur de recherche
-    if (searchTerm && searchTerm.length > 0) {
-      return searchProcessor([], searchTerm);
+    if (tablePreferences.search.term && tablePreferences.search.term.length > 0) {
+      return searchProcessor([], tablePreferences.search.term);
     }
 
     // Cloner avant de trier pour éviter de modifier les données d'origine
@@ -200,23 +274,37 @@ function CategoriesTable(props) {
       const bValue = b.name;
 
       const result = aValue.localeCompare(bValue);
-      return localSort.direction === 'asc' ? result : -result;
+      return tablePreferences.sort.direction === 'asc' ? result : -result;
     });
 
     // Aplatir la hiérarchie pour l'affichage
     return flattenHierarchy(sortedRootCategories);
-  }, [hierarchicalCategories, searchTerm, localSort, flattenHierarchy, searchProcessor]);
-
-  const filters = [];
+  }, [
+    hierarchicalCategories,
+    tablePreferences.search.term,
+    tablePreferences.sort.direction,
+    flattenHierarchy,
+    searchProcessor,
+  ]);
 
   // Désactiver le tri standard
   const sortProcessor = useCallback((data) => data, []);
 
-  // Combinaison de l'état de chargement du store et des opérations
-  const isLoading = hierarchyLoading || operationLoading;
+  // Configuration des filtres
+  const filters = ENTITY_CONFIG.filters || [];
 
   return (
-    <>
+    <div className="space-y-4">
+      {Object.keys(tablePreferences.search.activeFilters).length > 0 && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleResetFilters}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md"
+          >
+            Réinitialiser les filtres
+          </button>
+        </div>
+      )}
       <EntityTable
         data={processedData}
         isLoading={isLoading}
@@ -229,8 +317,6 @@ function CategoriesTable(props) {
         searchFields={['_originalName', 'description']}
         searchProcessor={searchProcessor}
         sortProcessor={sortProcessor}
-        onSearch={handleSearch}
-        onSort={customSort}
         onDelete={handleDeleteEntity}
         onSync={handleSyncEntity}
         syncEnabled={ENTITY_CONFIG.syncEnabled}
@@ -238,15 +324,17 @@ function CategoriesTable(props) {
         batchActions={['delete', 'sync']}
         pagination={{
           enabled: true,
-          pageSize: 5,
+          pageSize: tablePreferences.pagination.pageSize,
           showPageSizeOptions: true,
           pageSizeOptions: [5, 10, 25, 50],
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
-        sort={localSort}
+        tablePreferences={tablePreferences}
+        onPreferencesChange={handlePreferencesChange}
+        onRowClick={handleRowClick}
         {...props}
       />
-    </>
+    </div>
   );
 }
 
