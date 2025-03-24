@@ -200,8 +200,8 @@ export function useProductExtras() {
   };
 }
 
-// Créer le store de préférences pour les tables de produits
-export const useProductTablePreferencesStore = createTablePreferencesStore({
+// Créer le store de préférences avec la nouvelle factory
+const { usePreferences: useProductTablePreferences } = createTablePreferencesStore({
   entityType: 'product',
   defaultPreferences: {
     pagination: {
@@ -222,54 +222,10 @@ export const useProductTablePreferencesStore = createTablePreferencesStore({
     detail: {
       activeTab: 'info',
       scrollPosition: 0,
+      expandedCategories: {},
     },
   },
 });
 
-// Hook pour exposer les préférences de table pour les produits
-export function useProductTablePreferences() {
-  const tablePreferences = useProductTablePreferencesStore();
-
-  return {
-    preferences: {
-      pagination: tablePreferences.pagination,
-      search: tablePreferences.search,
-      sort: tablePreferences.sort,
-      selection: tablePreferences.selection,
-      detail: tablePreferences.detail,
-    },
-    updatePreference: (section, value) => {
-      switch (section) {
-        case 'pagination':
-          tablePreferences.setPagination(value);
-          break;
-        case 'search':
-          tablePreferences.setSearch(value);
-          break;
-        case 'sort':
-          tablePreferences.setSort(value);
-          break;
-        case 'selection':
-          if (value.focusedItemId) {
-            const element = document.getElementById(`row-${value.focusedItemId}`);
-            if (element) {
-              tablePreferences.setDetail({
-                ...tablePreferences.detail,
-                scrollPosition: window.scrollY,
-                lastFocusedElementId: value.focusedItemId,
-              });
-            }
-          }
-          tablePreferences.setSelection(value);
-          break;
-        case 'detail':
-          tablePreferences.setDetail(value);
-          break;
-        default:
-          console.warn(`Section de préférences inconnue: ${section}`);
-      }
-    },
-    resetPreferences: tablePreferences.resetPreferences,
-    resetSection: tablePreferences.resetSection,
-  };
-}
+// Export du hook de préférences
+export { useProductTablePreferences };

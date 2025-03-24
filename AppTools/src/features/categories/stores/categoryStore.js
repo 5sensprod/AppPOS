@@ -23,10 +23,8 @@ const CATEGORY_CONFIG = {
 // Créer le store avec la factory améliorée
 const { useCategory, useEntityStore: useCategoryStore } = createEntityStore(CATEGORY_CONFIG);
 
-// Export du hook principal sans passer par une fonction intermédiaire
-export { useCategory, useCategoryStore };
-
-export const useCategoryTablePreferencesStore = createTablePreferencesStore({
+// Créer le store de préférences et le hook d'accès
+const { usePreferences: useCategoryTablePreferences } = createTablePreferencesStore({
   entityType: 'category',
   defaultPreferences: {
     pagination: {
@@ -47,9 +45,13 @@ export const useCategoryTablePreferencesStore = createTablePreferencesStore({
     detail: {
       activeTab: 'info',
       scrollPosition: 0,
+      expandedCategories: {},
     },
   },
 });
+
+// Export du hook principal sans passer par une fonction intermédiaire
+export { useCategory, useCategoryStore, useCategoryTablePreferences };
 
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux catégories
 export function useCategoryExtras() {
@@ -62,52 +64,5 @@ export function useCategoryExtras() {
     // État du store hierarchique
     hierarchicalCategories: hierarchyStore.hierarchicalCategories,
     hierarchicalLoading: hierarchyStore.loading,
-  };
-}
-
-// Nouveau hook pour exposer les préférences de table
-export function useCategoryTablePreferences() {
-  const tablePreferences = useCategoryTablePreferencesStore();
-  return {
-    preferences: {
-      pagination: tablePreferences.pagination,
-      search: tablePreferences.search,
-      sort: tablePreferences.sort,
-      selection: tablePreferences.selection,
-      detail: tablePreferences.detail,
-    },
-    updatePreference: (section, value) => {
-      switch (section) {
-        case 'pagination':
-          tablePreferences.setPagination(value);
-          break;
-        case 'search':
-          tablePreferences.setSearch(value);
-          break;
-        case 'sort':
-          tablePreferences.setSort(value);
-          break;
-        case 'selection':
-          if (value.focusedItemId) {
-            const element = document.getElementById(`row-${value.focusedItemId}`);
-            if (element) {
-              tablePreferences.setDetail({
-                ...tablePreferences.detail,
-                scrollPosition: window.scrollY,
-                lastFocusedElementId: value.focusedItemId,
-              });
-            }
-          }
-          tablePreferences.setSelection(value);
-          break;
-        case 'detail':
-          tablePreferences.setDetail(value);
-          break;
-        default:
-          console.warn(`Section de préférences inconnue: ${section}`);
-      }
-    },
-    resetPreferences: tablePreferences.resetPreferences,
-    resetSection: tablePreferences.resetSection,
   };
 }

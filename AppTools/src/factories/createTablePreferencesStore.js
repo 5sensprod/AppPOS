@@ -3,122 +3,103 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 /**
- * Factory pour créer un store de préférences de table avec persistance
- *
- * @param {Object} config - Configuration du store
- * @param {string} config.entityType - Type d'entité (ex: 'product', 'supplier')
- * @param {Object} config.defaultPreferences - Préférences par défaut
- * @returns {Function} - Hook Zustand pour accéder au store
+ * Crée un store Zustand persistant pour les préférences de table
+ * @param {Object} options - Options de configuration
+ * @param {string} options.entityType - Type d'entité (ex: 'product', 'category')
+ * @param {Object} options.defaultPreferences - Préférences par défaut
+ * @returns {Function} Hook zustand pour les préférences de table
  */
-export const createTablePreferencesStore = ({
-  entityType,
-  defaultPreferences = {
-    pagination: {
-      currentPage: 1,
-      pageSize: 10,
-    },
-    search: {
-      term: '',
-      activeFilters: {},
-    },
-    sort: {
-      field: 'name',
-      direction: 'asc',
-    },
-    selection: {
-      focusedItemId: null,
-      selectedItems: [],
-    },
-    detail: {
-      activeTab: 'info',
-      scrollPosition: 0,
-    },
-  },
-}) => {
-  // Nom unique pour le stockage persistant
-  const storeName = `entity-table-preferences-${entityType}`;
+export const createTablePreferencesStore = ({ entityType, defaultPreferences }) => {
+  // Valider les paramètres obligatoires
+  if (!entityType) throw new Error('entityType est obligatoire');
+  if (!defaultPreferences) throw new Error('defaultPreferences est obligatoire');
 
-  // Middleware pour auto-effacer le focus
-  const createAutoUnfocusMiddleware = (config) => (set, get, api) => {
-    const state = config(set, get, api);
-    return {
-      ...state,
-      setSelection: (selection) => {
-        // Appliquer les changements immédiatement
-        set((state) => ({ selection: { ...state.selection, ...selection } }));
-
-        // Si un élément est focalisé, programmer son effacement après 1.5 secondes
-        if (selection.focusedItemId) {
-          setTimeout(() => {
-            set((state) => ({
-              selection: {
-                ...state.selection,
-                focusedItemId: null,
-              },
-            }));
-          }, 1500);
-        }
-      },
-    };
-  };
-
-  return create(
+  // Créer le store avec persistance
+  const useStore = create(
     persist(
-      createAutoUnfocusMiddleware((set) => ({
-        // État initial avec les préférences par défaut
+      (set) => ({
+        // État par défaut
         ...defaultPreferences,
 
-        // Actions pour mettre à jour les préférences
-        setPagination: (pagination) =>
-          set((state) => ({ pagination: { ...state.pagination, ...pagination } })),
-
-        setSearch: (search) => set((state) => ({ search: { ...state.search, ...search } })),
-
-        setSort: (sort) => set((state) => ({ sort: { ...state.sort, ...sort } })),
-
-        // setSelection est maintenant géré par le middleware
-
-        setDetail: (detail) => set((state) => ({ detail: { ...state.detail, ...detail } })),
-
-        // Réinitialiser toutes les préférences
+        // Actions
+        setPagination: (pagination) => set({ pagination }),
+        setSearch: (search) => set({ search }),
+        setSort: (sort) => set({ sort }),
+        setSelection: (selection) => set({ selection }),
+        setDetail: (detail) => set({ detail }),
         resetPreferences: () => set(defaultPreferences),
-
-        // Réinitialiser une section spécifique
-        resetSection: (section) => set((state) => ({ [section]: defaultPreferences[section] })),
-      })),
+        resetSection: (section) => {
+          if (defaultPreferences[section]) {
+            set({ [section]: defaultPreferences[section] });
+          } else {
+            console.warn(`Section inconnue: ${section}`);
+          }
+        },
+      }),
       {
-        name: storeName,
-        // Vous pouvez personnaliser le stockage ici (localStorage par défaut)
-        // storage: createJSONStorage(() => sessionStorage),
+        name: `${entityType}-table-preferences`, // Nom pour le localStorage
       }
     )
   );
-};
 
-/**
- * Hook pour utiliser les préférences de table
- *
- * @param {Function} usePreferencesStore - Hook du store de préférences
- * @returns {Object} - Préférences et actions
- */
-export const useTablePreferences = (usePreferencesStore) => {
-  const preferences = usePreferencesStore();
+  /**
+   * Crée et retourne le hook d'accès aux préférences avec une API simplifiée
+   * pour les composants
+   */
+  const createPreferencesHook = () => {
+    return () => {
+      const tablePreferences = useStore();
 
+      return {
+        preferences: {
+          pagination: tablePreferences.pagination,
+          search: tablePreferences.search,
+          sort: tablePreferences.sort,
+          selection: tablePreferences.selection,
+          detail: tablePreferences.detail,
+        },
+        updatePreference: (section, value) => {
+          switch (section) {
+            case 'pagination':
+              tablePreferences.setPagination(value);
+              break;
+            case 'search':
+              tablePreferences.setSearch(value);
+              break;
+            case 'sort':
+              tablePreferences.setSort(value);
+              break;
+            case 'selection':
+              if (value.focusedItemId) {
+                const element = document.getElementById(`row-${value.focusedItemId}`);
+                if (element) {
+                  tablePreferences.setDetail({
+                    ...tablePreferences.detail,
+                    scrollPosition: window.scrollY,
+                    lastFocusedElementId: value.focusedItemId,
+                  });
+                }
+              }
+              tablePreferences.setSelection(value);
+              break;
+            case 'detail':
+              tablePreferences.setDetail(value);
+              break;
+            default:
+              console.warn(`Section de préférences inconnue: ${section}`);
+          }
+        },
+        resetPreferences: tablePreferences.resetPreferences,
+        resetSection: tablePreferences.resetSection,
+      };
+    };
+  };
+
+  // Retourner à la fois le store de base et le hook d'accès simplifié
   return {
-    // Préférences
-    pagination: preferences.pagination,
-    search: preferences.search,
-    sort: preferences.sort,
-    selection: preferences.selection,
-    detail: preferences.detail,
-
-    // Actions
-    setPagination: preferences.setPagination,
-    setSearch: preferences.setSearch,
-    setSort: preferences.setSort,
-    setSelection: preferences.setSelection,
-    setDetail: preferences.setDetail,
-    resetPreferences: preferences.resetPreferences,
-    resetSection: preferences.resetSection,
+    useStore,
+    usePreferences: createPreferencesHook(),
   };
 };
+
+export default createTablePreferencesStore;

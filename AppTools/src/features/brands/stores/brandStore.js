@@ -1,4 +1,3 @@
-// src/features/brands/stores/brandStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
@@ -17,7 +16,6 @@ const BRAND_CONFIG = {
 
 // Stores existants...
 const { useBrand: useBrandBase, useEntityStore: useBrandStore } = createEntityStore(BRAND_CONFIG);
-
 export const useBrandHierarchyStore = createWebSocketStore({
   entityName: 'brand',
   apiEndpoint: '/api/brands',
@@ -26,8 +24,8 @@ export const useBrandHierarchyStore = createWebSocketStore({
   additionalEvents: [],
 });
 
-// Nouveau store de préférences pour les tables de marques
-export const useBrandTablePreferencesStore = createTablePreferencesStore({
+// Nouveau store de préférences pour les tables de marques avec la factory améliorée
+const { usePreferences: useBrandTablePreferences } = createTablePreferencesStore({
   entityType: 'brand',
   defaultPreferences: {
     pagination: {
@@ -48,6 +46,7 @@ export const useBrandTablePreferencesStore = createTablePreferencesStore({
     detail: {
       activeTab: 'info',
       scrollPosition: 0,
+      expandedCategories: {},
     },
   },
 });
@@ -61,60 +60,12 @@ export function useBrand() {
   };
 }
 
-export { useBrandStore };
+export { useBrandStore, useBrandTablePreferences };
 
 export function useBrandExtras() {
   const { syncBrand } = useBrandBase();
   return {
     ...useBrand(),
     syncBrand,
-  };
-}
-
-// Nouveau hook pour exposer les préférences de table
-export function useBrandTablePreferences() {
-  const tablePreferences = useBrandTablePreferencesStore();
-
-  return {
-    preferences: {
-      pagination: tablePreferences.pagination,
-      search: tablePreferences.search,
-      sort: tablePreferences.sort,
-      selection: tablePreferences.selection,
-      detail: tablePreferences.detail,
-    },
-    updatePreference: (section, value) => {
-      switch (section) {
-        case 'pagination':
-          tablePreferences.setPagination(value);
-          break;
-        case 'search':
-          tablePreferences.setSearch(value);
-          break;
-        case 'sort':
-          tablePreferences.setSort(value);
-          break;
-        case 'selection':
-          if (value.focusedItemId) {
-            const element = document.getElementById(`row-${value.focusedItemId}`);
-            if (element) {
-              tablePreferences.setDetail({
-                ...tablePreferences.detail,
-                scrollPosition: window.scrollY,
-                lastFocusedElementId: value.focusedItemId,
-              });
-            }
-          }
-          tablePreferences.setSelection(value);
-          break;
-        case 'detail':
-          tablePreferences.setDetail(value);
-          break;
-        default:
-          console.warn(`Section de préférences inconnue: ${section}`);
-      }
-    },
-    resetPreferences: tablePreferences.resetPreferences,
-    resetSection: tablePreferences.resetSection,
   };
 }
