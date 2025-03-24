@@ -2,7 +2,7 @@
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
-import { createTablePreferencesStore } from '../../../factories/createTablePreferencesStore';
+import { createEntityPreferencesStore } from '../../../factories/createEntityPreferencesStore';
 import { ENTITY_CONFIG } from '../constants';
 import apiService from '../../../services/api';
 
@@ -200,32 +200,53 @@ export function useProductExtras() {
   };
 }
 
-// Créer le store de préférences avec la nouvelle factory
-const { usePreferences: useProductTablePreferences } = createTablePreferencesStore({
+// Créer le store de préférences avec la nouvelle factory createEntityPreferencesStore
+const {
+  useTablePreferences: useProductTablePreferences,
+  useDetailPreferences: useProductDetailPreferences,
+  useFormPreferences: useProductFormPreferences,
+  useGlobalPreferences: useProductGlobalPreferences,
+} = createEntityPreferencesStore({
   entityType: 'product',
   defaultPreferences: {
-    pagination: {
-      currentPage: 1,
-      pageSize: ENTITY_CONFIG.defaultPageSize || 10,
-    },
-    search: {
-      term: '',
-      activeFilters: {},
-    },
-    sort: {
-      ...ENTITY_CONFIG.defaultSort,
-    },
-    selection: {
-      focusedItemId: null,
-      selectedItems: [],
+    table: {
+      pagination: {
+        currentPage: 1,
+        pageSize: ENTITY_CONFIG.defaultPageSize || 10,
+      },
+      search: {
+        term: '',
+        activeFilters: {},
+      },
+      sort: {
+        ...ENTITY_CONFIG.defaultSort,
+      },
+      selection: {
+        focusedItemId: null,
+        selectedItems: [],
+      },
     },
     detail: {
-      activeTab: 'info',
+      activeTab: 'general',
       scrollPosition: 0,
-      expandedCategories: {},
+      expandedSections: {},
+      lastViewedItems: [],
+    },
+    form: {
+      lastValues: {},
+      expandedSections: {},
+      activeStep: 0,
+    },
+    global: {
+      viewMode: 'list',
     },
   },
 });
 
-// Export du hook de préférences
-export { useProductTablePreferences };
+// Export des hooks de préférences
+export {
+  useProductTablePreferences,
+  useProductDetailPreferences,
+  useProductFormPreferences,
+  useProductGlobalPreferences,
+};

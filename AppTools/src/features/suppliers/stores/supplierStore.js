@@ -1,7 +1,6 @@
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
-import { createTablePreferencesStore } from '../../../factories/createTablePreferencesStore';
 import { createEntityPreferencesStore } from '../../../factories/createEntityPreferencesStore';
 import apiService from '../../../services/api';
 import { ENTITY_CONFIG } from '../constants';
@@ -86,35 +85,6 @@ export {
   useSupplierFormPreferences,
   useSupplierGlobalPreferences,
 };
-
-// Créer le store de préférences avec la nouvelle factory
-// const { usePreferences: useSupplierTablePreferences } = createTablePreferencesStore({
-//   entityType: 'supplier',
-//   defaultPreferences: {
-//     pagination: {
-//       currentPage: 1,
-//       pageSize: ENTITY_CONFIG.defaultPageSize || 5,
-//     },
-//     search: {
-//       term: '',
-//       activeFilters: {},
-//     },
-//     sort: {
-//       ...ENTITY_CONFIG.defaultSort,
-//     },
-//     selection: {
-//       focusedItemId: null,
-//       selectedItems: [],
-//     },
-//     detail: {
-//       activeTab: 'info',
-//       scrollPosition: 0,
-//     },
-//   },
-// });
-
-// Réexporter useSupplierStore pour maintenir la compatibilité
-// export { useSupplierStore, useSupplierTablePreferences };
 
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux fournisseurs
 export function useSupplierExtras() {
