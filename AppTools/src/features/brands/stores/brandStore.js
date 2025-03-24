@@ -16,6 +16,7 @@ const BRAND_CONFIG = {
 
 // Stores existants...
 const { useBrand: useBrandBase, useEntityStore: useBrandStore } = createEntityStore(BRAND_CONFIG);
+
 export const useBrandDataStore = createWebSocketStore({
   entityName: 'brand',
   apiEndpoint: '/api/brands',
