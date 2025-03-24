@@ -2,8 +2,9 @@ import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
 import { createTablePreferencesStore } from '../../../factories/createTablePreferencesStore';
-import { ENTITY_CONFIG } from '../constants';
+import { createEntityPreferencesStore } from '../../../factories/createEntityPreferencesStore';
 import apiService from '../../../services/api';
+import { ENTITY_CONFIG } from '../constants';
 
 // Configuration de l'entité Supplier
 const SUPPLIER_CONFIG = {
@@ -26,7 +27,50 @@ export const useSupplierDataStore = createWebSocketStore({
   additionalEvents: [],
 });
 
-// Étendre useSupplier avec WebSocket (pour rétro-compatibilité)
+// Store de préférences unifié avec la nouvelle factory
+const {
+  useTablePreferences: useSupplierTablePreferences,
+  useDetailPreferences: useSupplierDetailPreferences,
+  useFormPreferences: useSupplierFormPreferences,
+  useGlobalPreferences: useSupplierGlobalPreferences,
+} = createEntityPreferencesStore({
+  entityType: 'supplier',
+  defaultPreferences: {
+    table: {
+      pagination: {
+        currentPage: 1,
+        pageSize: ENTITY_CONFIG.defaultPageSize || 5,
+      },
+      search: {
+        term: '',
+        activeFilters: {},
+      },
+      sort: {
+        ...ENTITY_CONFIG.defaultSort,
+      },
+      selection: {
+        focusedItemId: null,
+        selectedItems: [],
+      },
+    },
+    detail: {
+      activeTab: 'general',
+      scrollPosition: 0,
+      expandedSections: {},
+      lastViewedItems: [],
+    },
+    form: {
+      lastValues: {},
+      expandedSections: {},
+      activeStep: 0,
+    },
+    global: {
+      viewMode: 'list',
+    },
+  },
+});
+
+// Étendre useSupplier avec WebSocket
 export function useSupplier() {
   const supplierStore = useSupplierBase();
   return {
@@ -35,34 +79,42 @@ export function useSupplier() {
   };
 }
 
+export {
+  useSupplierStore,
+  useSupplierTablePreferences,
+  useSupplierDetailPreferences,
+  useSupplierFormPreferences,
+  useSupplierGlobalPreferences,
+};
+
 // Créer le store de préférences avec la nouvelle factory
-const { usePreferences: useSupplierTablePreferences } = createTablePreferencesStore({
-  entityType: 'supplier',
-  defaultPreferences: {
-    pagination: {
-      currentPage: 1,
-      pageSize: ENTITY_CONFIG.defaultPageSize || 5,
-    },
-    search: {
-      term: '',
-      activeFilters: {},
-    },
-    sort: {
-      ...ENTITY_CONFIG.defaultSort,
-    },
-    selection: {
-      focusedItemId: null,
-      selectedItems: [],
-    },
-    detail: {
-      activeTab: 'info',
-      scrollPosition: 0,
-    },
-  },
-});
+// const { usePreferences: useSupplierTablePreferences } = createTablePreferencesStore({
+//   entityType: 'supplier',
+//   defaultPreferences: {
+//     pagination: {
+//       currentPage: 1,
+//       pageSize: ENTITY_CONFIG.defaultPageSize || 5,
+//     },
+//     search: {
+//       term: '',
+//       activeFilters: {},
+//     },
+//     sort: {
+//       ...ENTITY_CONFIG.defaultSort,
+//     },
+//     selection: {
+//       focusedItemId: null,
+//       selectedItems: [],
+//     },
+//     detail: {
+//       activeTab: 'info',
+//       scrollPosition: 0,
+//     },
+//   },
+// });
 
 // Réexporter useSupplierStore pour maintenir la compatibilité
-export { useSupplierStore, useSupplierTablePreferences };
+// export { useSupplierStore, useSupplierTablePreferences };
 
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux fournisseurs
 export function useSupplierExtras() {

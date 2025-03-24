@@ -1,11 +1,11 @@
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
-import { createTablePreferencesStore } from '../../../factories/createTablePreferencesStore';
+import { createEntityPreferencesStore } from '../../../factories/createEntityPreferencesStore';
 import apiService from '../../../services/api';
 import { ENTITY_CONFIG } from '../constants';
 
-// Configuration existante...
+// Configuration de l'entité Brand
 const BRAND_CONFIG = {
   entityName: 'brand',
   apiEndpoint: '/api/brands',
@@ -14,9 +14,10 @@ const BRAND_CONFIG = {
   cacheDuration: 5 * 60 * 1000,
 };
 
-// Stores existants...
+// Créer le store avec la factory
 const { useBrand: useBrandBase, useEntityStore: useBrandStore } = createEntityStore(BRAND_CONFIG);
 
+// Store Zustand dédié pour la gestion des fournisseurs avec WebSocket
 export const useBrandDataStore = createWebSocketStore({
   entityName: 'brand',
   apiEndpoint: '/api/brands',
@@ -25,34 +26,50 @@ export const useBrandDataStore = createWebSocketStore({
   additionalEvents: [],
 });
 
-// Nouveau store de préférences pour les tables de marques avec la factory améliorée
-const { usePreferences: useBrandTablePreferences } = createTablePreferencesStore({
+// Store de préférences unifié avec la nouvelle factory
+const {
+  useTablePreferences: useBrandTablePreferences,
+  useDetailPreferences: useBrandDetailPreferences,
+  useFormPreferences: useBrandFormPreferences,
+  useGlobalPreferences: useBrandGlobalPreferences,
+} = createEntityPreferencesStore({
   entityType: 'brand',
   defaultPreferences: {
-    pagination: {
-      currentPage: 1,
-      pageSize: ENTITY_CONFIG.defaultPageSize || 5,
-    },
-    search: {
-      term: '',
-      activeFilters: {},
-    },
-    sort: {
-      ...ENTITY_CONFIG.defaultSort,
-    },
-    selection: {
-      focusedItemId: null,
-      selectedItems: [],
+    table: {
+      pagination: {
+        currentPage: 1,
+        pageSize: ENTITY_CONFIG.defaultPageSize || 5,
+      },
+      search: {
+        term: '',
+        activeFilters: {},
+      },
+      sort: {
+        ...ENTITY_CONFIG.defaultSort,
+      },
+      selection: {
+        focusedItemId: null,
+        selectedItems: [],
+      },
     },
     detail: {
-      activeTab: 'info',
+      activeTab: 'general',
       scrollPosition: 0,
-      expandedCategories: {},
+      expandedSections: {},
+      lastViewedItems: [],
+    },
+    form: {
+      lastValues: {},
+      expandedSections: {},
+      activeStep: 0,
+    },
+    global: {
+      viewMode: 'list',
     },
   },
 });
 
-// Functions existantes...
+// Étendre useSupplier avec WebSocket
 export function useBrand() {
   const brandStore = useBrandBase();
   return {
@@ -61,7 +78,13 @@ export function useBrand() {
   };
 }
 
-export { useBrandStore, useBrandTablePreferences };
+export {
+  useBrandStore,
+  useBrandTablePreferences,
+  useBrandDetailPreferences,
+  useBrandFormPreferences,
+  useBrandGlobalPreferences,
+};
 
 export function useBrandExtras() {
   const { syncBrand } = useBrandBase();
