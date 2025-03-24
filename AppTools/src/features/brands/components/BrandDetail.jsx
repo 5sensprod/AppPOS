@@ -1,7 +1,8 @@
-// AppTools\src\features\brands\components\BrandDetail.jsx
-import React, { useEffect } from 'react';
+// src/features/brands/components/BrandDetail.jsx
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { useBrand, useBrandExtras } from '../stores/brandStore'; // Import depuis le store Zustand
+import { useBrand, useBrandExtras } from '../stores/brandStore';
+import { useBrandHierarchyStore } from '../stores/brandStore';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
@@ -11,16 +12,12 @@ import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
 function BrandDetail() {
   const { id } = useParams();
-  const { getBrandById, deleteBrand, initWebSocketListeners } = useBrand();
+  const { getBrandById, deleteBrand } = useBrand();
   const { uploadImage, deleteImage, syncBrand } = useBrandExtras();
 
-  // Initialiser les écouteurs WebSocket au montage du composant
-  useEffect(() => {
-    const cleanup = initWebSocketListeners();
-    return cleanup;
-  }, [initWebSocketListeners]);
+  // Store WebSocket dédié
+  const brandWsStore = useBrandHierarchyStore();
 
-  // Utiliser le hook personnalisé pour gérer les détails de la marque
   const {
     entity: brand,
     loading,
@@ -32,12 +29,12 @@ function BrandDetail() {
     id,
     entityType: 'brand',
     getEntityById: getBrandById,
+    wsStore: brandWsStore,
     syncEntity: syncBrand,
     uploadImage,
     deleteImage,
   });
 
-  // Rendu du contenu des onglets
   const renderTabContent = (brand, activeTab) => {
     switch (activeTab) {
       case 'general':

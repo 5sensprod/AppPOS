@@ -1,7 +1,8 @@
 // src/features/suppliers/components/SupplierDetail.jsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { useSupplier, useSupplierExtras } from '../stores/supplierStore'; // Import depuis le store Zustand
+import { useSupplier, useSupplierExtras } from '../stores/supplierStore';
+import { useSupplierDataStore } from '../stores/supplierStore';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ContactInfoTab from '../../../components/common/tabs/ContactInfoTab';
@@ -12,16 +13,12 @@ import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
 function SupplierDetail() {
   const { id } = useParams();
-  const { getSupplierById, deleteSupplier, initWebSocketListeners } = useSupplier();
+  const { getSupplierById, deleteSupplier } = useSupplier();
   const { uploadImage, deleteImage } = useSupplierExtras();
 
-  // Initialiser les écouteurs WebSocket au montage du composant
-  useEffect(() => {
-    const cleanup = initWebSocketListeners();
-    return cleanup;
-  }, [initWebSocketListeners]);
+  // Store WebSocket dédié
+  const supplierWsStore = useSupplierDataStore();
 
-  // Utiliser le hook personnalisé pour gérer les détails du fournisseur
   const {
     entity: supplier,
     loading,
@@ -32,11 +29,11 @@ function SupplierDetail() {
     id,
     entityType: 'supplier',
     getEntityById: getSupplierById,
+    wsStore: supplierWsStore,
     uploadImage,
     deleteImage,
   });
 
-  // Rendu du contenu des onglets
   const renderTabContent = (supplier, activeTab) => {
     switch (activeTab) {
       case 'general':

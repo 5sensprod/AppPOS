@@ -1,7 +1,8 @@
-// AppTools\src\features\categories\components\CategoryDetail.jsx
-import React, { useEffect } from 'react';
+// src/features/categories/components/CategoryDetail.jsx
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { useCategory, useCategoryExtras } from '../stores/categoryStore'; // Import depuis le store Zustand
+import { useCategory, useCategoryExtras } from '../stores/categoryStore';
+import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
@@ -11,17 +12,12 @@ import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
 function CategoryDetail() {
   const { id } = useParams();
-  const { getCategoryById, deleteCategory, initWebSocketListeners } = useCategory();
-
+  const { getCategoryById, deleteCategory } = useCategory();
   const { uploadImage, deleteImage, syncCategory } = useCategoryExtras();
 
-  // Initialiser les écouteurs WebSocket au montage du composant
-  useEffect(() => {
-    const cleanup = initWebSocketListeners();
-    return cleanup;
-  }, [initWebSocketListeners]);
+  // Store WebSocket dédié
+  const categoryWsStore = useCategoryHierarchyStore();
 
-  // Utiliser le hook personnalisé pour gérer les détails de la catégorie
   const {
     entity: category,
     loading,
@@ -33,12 +29,12 @@ function CategoryDetail() {
     id,
     entityType: 'category',
     getEntityById: getCategoryById,
+    wsStore: categoryWsStore,
     syncEntity: syncCategory,
     uploadImage,
     deleteImage,
   });
 
-  // Rendu du contenu des onglets avec les composants réutilisables
   const renderTabContent = (category, activeTab) => {
     switch (activeTab) {
       case 'general':
@@ -50,7 +46,6 @@ function CategoryDetail() {
             description={category.description}
           />
         );
-
       case 'images':
         return (
           <ImagesTab
@@ -64,10 +59,8 @@ function CategoryDetail() {
             error={error}
           />
         );
-
       case 'woocommerce':
         return <WooCommerceTab entity={category} entityType="category" onSync={handleSync} />;
-
       default:
         return null;
     }

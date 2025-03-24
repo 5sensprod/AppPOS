@@ -1,7 +1,8 @@
 // src/features/products/components/ProductDetail.jsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { useProduct, useProductExtras } from '../stores/productStore'; // Import depuis le store Zustand
+import { useProduct, useProductExtras } from '../stores/productStore';
+import { useProductDataStore } from '../stores/productStore';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import InventoryTab from './tabs/InventoryTab';
@@ -13,19 +14,14 @@ import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
 function ProductDetail() {
   const { id } = useParams();
-  const { getProductById, deleteProduct, syncProduct, updateProduct, initWebSocketListeners } =
-    useProduct();
-
+  const { getProductById, deleteProduct, syncProduct, updateProduct } = useProduct();
   const { uploadImage, uploadGalleryImage, deleteImage, deleteGalleryImage, setMainImage } =
     useProductExtras();
 
-  // Initialiser les écouteurs WebSocket au montage du composant
-  useEffect(() => {
-    const cleanup = initWebSocketListeners();
-    return cleanup;
-  }, [initWebSocketListeners]);
+  // Utiliser le store WebSocket dédié
+  const productWsStore = useProductDataStore();
 
-  // Utiliser le hook personnalisé pour gérer les détails du produit
+  // Utiliser le hook mis à jour avec le store WebSocket
   const {
     entity: product,
     loading,
@@ -39,6 +35,7 @@ function ProductDetail() {
     id,
     entityType: 'product',
     getEntityById: getProductById,
+    wsStore: productWsStore,
     syncEntity: syncProduct,
     updateEntity: updateProduct,
     uploadImage,
