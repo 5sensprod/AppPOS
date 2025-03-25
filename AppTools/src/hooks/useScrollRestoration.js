@@ -8,29 +8,48 @@ import { useEffect } from 'react';
  */
 export const useScrollRestoration = (tablePreferences, entityType) => {
   useEffect(() => {
-    // Restaurer la position de défilement sauvegardée
-    if (tablePreferences?.detail?.scrollPosition) {
+    // Vérifier si nous avons des préférences de scroll
+    const scrollPosition =
+      tablePreferences?.detail?.scrollPosition || tablePreferences?.selection?.scrollPosition || 0;
+
+    console.log(`[ScrollRestoration] Tentative de restauration à position: ${scrollPosition}`);
+
+    if (scrollPosition > 0) {
+      // Utiliser un délai pour s'assurer que le DOM est prêt
       setTimeout(() => {
         window.scrollTo({
-          top: tablePreferences.detail.scrollPosition,
+          top: scrollPosition,
           behavior: 'instant',
         });
-      }, 100);
+        console.log(`[ScrollRestoration] Position restaurée à: ${scrollPosition}`);
+      }, 200); // Augmenter le délai pour donner plus de temps au rendu
     }
 
     // Optionnellement, mettre en surbrillance le dernier élément focalisé
-    const lastFocusedId = tablePreferences?.detail?.lastFocusedElementId;
+    const lastFocusedId =
+      tablePreferences?.detail?.lastFocusedElementId || tablePreferences?.selection?.focusedItemId;
+
     if (lastFocusedId) {
-      const element = document.getElementById(`row-${lastFocusedId}`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      console.log(`[ScrollRestoration] Recherche de l'élément: row-${lastFocusedId}`);
+
+      setTimeout(() => {
+        const element = document.getElementById(`row-${lastFocusedId}`);
+        if (element) {
+          console.log(`[ScrollRestoration] Élément trouvé, défilement vers: row-${lastFocusedId}`);
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('highlight-row'); // Ajouter une classe pour la mise en évidence
+
+          // Retirer la classe après un moment
+          setTimeout(() => {
+            element.classList.remove('highlight-row');
+          }, 2000);
+        } else {
+          console.log(`[ScrollRestoration] Élément non trouvé: row-${lastFocusedId}`);
+        }
+      }, 300);
     }
 
-    // Nettoyer les valeurs après utilisation
-    return () => {
-      // Si vous avez un moyen de réinitialiser ces valeurs, faites-le ici
-    };
+    // Pas besoin de nettoyer les valeurs ici, car elles doivent persister
   }, [tablePreferences, entityType]);
 };
 

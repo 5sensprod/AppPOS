@@ -62,58 +62,6 @@ function CategoriesTable(props) {
     return null;
   }, []);
 
-  // Fonction pour développer uniquement le chemin vers un élément
-  const expandParentsOf = useCallback(
-    (targetId) => {
-      if (!targetId || hierarchicalCategories.length === 0 || isUpdating) return false;
-
-      // Marquer qu'une mise à jour est en cours
-      setIsUpdating(true);
-
-      // Trouver le chemin vers l'élément cible
-      const parentPath = findParentPath(hierarchicalCategories, targetId);
-      console.log('Chemin trouvé pour', targetId, ':', parentPath);
-
-      if (parentPath && parentPath.length > 0) {
-        // Réinitialiser toutes les expansions d'abord
-        const newExpandedState = {};
-
-        // Marquer tous les éléments du chemin comme dépliés, y compris l'élément cible
-        parentPath.forEach((id) => {
-          newExpandedState[id] = true;
-        });
-
-        console.log("Nouvel état d'expansion:", newExpandedState);
-
-        // Mettre à jour l'état local
-        setExpandedCategories(newExpandedState);
-
-        // IMPORTANT: Utiliser la section 'selection' au lieu de 'detail'
-        handlePreferencesChange('selection', {
-          ...tablePreferences.selection,
-          expandedCategories: newExpandedState,
-        });
-
-        // Réinitialiser le flag de mise à jour après un court délai
-        setTimeout(() => {
-          setIsUpdating(false);
-        }, 100);
-
-        return true;
-      }
-
-      setIsUpdating(false);
-      return false;
-    },
-    [
-      hierarchicalCategories,
-      findParentPath,
-      handlePreferencesChange,
-      tablePreferences.selection,
-      isUpdating,
-    ]
-  );
-
   // Fonction pour développer/replier une catégorie
   const toggleCategory = useCallback(
     (categoryId, event) => {
@@ -125,6 +73,11 @@ function CategoriesTable(props) {
       if (isUpdating) return;
 
       setIsUpdating(true);
+      console.log(`[CategoriesTable] Basculement de la catégorie: ${categoryId}`);
+
+      // Capturer la position de défilement actuelle
+      const currentScrollPosition = window.scrollY;
+      console.log(`[CategoriesTable] Position de défilement actuelle: ${currentScrollPosition}`);
 
       // Mettre à jour l'état local
       const newExpandedState = {
@@ -134,58 +87,146 @@ function CategoriesTable(props) {
 
       setExpandedCategories(newExpandedState);
 
-      // Mettre à jour les préférences dans la section 'selection'
+      // Mise à jour synchronisée des préférences
+      // Enregistrer dans selection ET expandedCategories pour assurer la compatibilité
       handlePreferencesChange('selection', {
         ...tablePreferences.selection,
         expandedCategories: newExpandedState,
+        scrollPosition: currentScrollPosition,
+      });
+
+      // Mettre également à jour dans detail pour la compatibilité avec le composant de détail
+      handlePreferencesChange('detail', {
+        ...tablePreferences.detail,
+        expandedCategories: newExpandedState,
+        scrollPosition: currentScrollPosition,
       });
 
       // Réinitialiser le flag de mise à jour après un court délai
       setTimeout(() => {
         setIsUpdating(false);
+
+        // Restaurer la position de défilement après l'expansion/réduction
+        window.scrollTo({
+          top: currentScrollPosition,
+          behavior: 'instant',
+        });
       }, 100);
     },
-    [expandedCategories, tablePreferences.selection, handlePreferencesChange, isUpdating]
+    [
+      expandedCategories,
+      tablePreferences.selection,
+      tablePreferences.detail,
+      handlePreferencesChange,
+      isUpdating,
+    ]
   );
 
   // Initialisation: déplier les parents si un élément est focalisé
   useEffect(() => {
     if (hierarchicalCategories.length > 0 && !initialized && !isUpdating) {
-      console.log('Initialisation des chemins');
+      console.log('[CategoriesTable] Initialisation des chemins et restauration du scroll');
       setInitialized(true);
 
-      // Récupérer l'élément focalisé et les catégories dépliées depuis tablePreferences
-      const focusedItemId = tablePreferences.selection?.focusedItemId;
-      const savedExpandedState = tablePreferences.selection?.expandedCategories;
+      // Récupérer toutes les préférences potentiellement utiles
+      const focusedItemId =
+        tablePreferences.selection?.focusedItemId ||
+        tablePreferences.detail?.focusedItemId ||
+        tablePreferences.detail?.lastFocusedElementId;
 
+      // Récupérer les états d'expansion sauvegardés (chercher dans les deux emplacements)
+      const savedExpandedState =
+        tablePreferences.selection?.expandedCategories ||
+        tablePreferences.detail?.expandedCategories ||
+        {};
+
+      console.log("[CategoriesTable] État d'expansion récupéré:", savedExpandedState);
+      console.log('[CategoriesTable] Élément focalisé récupéré:', focusedItemId);
+
+      // Mettre d'abord à jour l'état local avec les catégories développées sauvegardées
+      setExpandedCategories(savedExpandedState);
+
+      // Si un élément est focalisé, s'assurer que ses parents sont développés
       if (focusedItemId) {
-        console.log('Élément focalisé trouvé:', focusedItemId);
-        // Pour éviter la boucle infinie, on ne met pas à jour les préférences ici
+        console.log('[CategoriesTable] Élément focalisé trouvé, recherche du chemin parent');
         const parentPath = findParentPath(hierarchicalCategories, focusedItemId);
 
         if (parentPath && parentPath.length > 0) {
-          const newExpandedState = {};
+          // Créer un nouvel état qui préserve les expansions existantes et ajoute les nouvelles
+          const newExpandedState = { ...savedExpandedState };
+
           parentPath.forEach((id) => {
             newExpandedState[id] = true;
           });
 
+          console.log("[CategoriesTable] Nouvel état d'expansion calculé:", newExpandedState);
           setExpandedCategories(newExpandedState);
+
+          // Synchroniser avec les préférences pour maintenir la cohérence
+          // sans toutefois modifier la position de défilement qui sera restaurée séparément
+          if (Object.keys(newExpandedState).length !== Object.keys(savedExpandedState).length) {
+            handlePreferencesChange('selection', {
+              ...tablePreferences.selection,
+              expandedCategories: newExpandedState,
+            });
+
+            handlePreferencesChange('detail', {
+              ...tablePreferences.detail,
+              expandedCategories: newExpandedState,
+            });
+          }
         }
-      } else if (savedExpandedState) {
-        console.log("Restauration de l'état d'expansion sauvegardé");
-        setExpandedCategories(savedExpandedState);
+      }
+
+      // Restaurer la position de défilement au plus tôt (si disponible)
+      const scrollPosition =
+        tablePreferences.selection?.scrollPosition || tablePreferences.detail?.scrollPosition;
+
+      if (scrollPosition > 0) {
+        console.log(
+          `[CategoriesTable] Restauration de la position de défilement à ${scrollPosition}`
+        );
+        setTimeout(() => {
+          window.scrollTo({
+            top: scrollPosition,
+            behavior: 'instant',
+          });
+
+          // Mettre en évidence l'élément focalisé s'il existe
+          if (focusedItemId) {
+            setTimeout(() => {
+              const element = document.getElementById(`row-${focusedItemId}`);
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element.classList.add('highlight-row');
+                setTimeout(() => {
+                  element.classList.remove('highlight-row');
+                }, 2000);
+              }
+            }, 200);
+          }
+        }, 100);
       }
     }
-  }, [hierarchicalCategories, tablePreferences.selection, findParentPath, initialized, isUpdating]);
+  }, [
+    hierarchicalCategories,
+    tablePreferences.selection,
+    tablePreferences.detail,
+    findParentPath,
+    initialized,
+    isUpdating,
+    handlePreferencesChange,
+  ]);
 
   // Gestion de la sélection de ligne
   const handleRowClick = useCallback(
     (rowData) => {
       if (rowData && rowData._id && !isUpdating) {
-        console.log('Clic sur la ligne:', rowData._id);
+        console.log('[CategoriesTable] Clic sur la ligne:', rowData._id);
 
         // Éviter de mettre à jour si c'est déjà l'élément focalisé
         if (tablePreferences.selection?.focusedItemId === rowData._id) {
+          console.log('[CategoriesTable] Élément déjà focalisé, pas de mise à jour nécessaire');
           return;
         }
 
@@ -193,25 +234,64 @@ function CategoriesTable(props) {
 
         // Sauvegarder la position de défilement actuelle
         const currentScrollPosition = window.scrollY;
+        console.log(
+          `[CategoriesTable] Position de défilement sauvegardée: ${currentScrollPosition}`
+        );
 
-        // Mettre à jour l'élément focalisé dans les préférences
+        // Mettre à jour l'élément focalisé dans les préférences (section selection)
         handlePreferencesChange('selection', {
           ...tablePreferences.selection,
           focusedItemId: rowData._id,
-          scrollPosition: currentScrollPosition, // Sauvegarder la position
+          scrollPosition: currentScrollPosition,
+        });
+
+        // Mettre également à jour dans detail pour la compatibilité avec le hook useScrollRestoration
+        handlePreferencesChange('detail', {
+          ...tablePreferences.detail,
+          lastFocusedElementId: rowData._id,
+          scrollPosition: currentScrollPosition,
         });
 
         // Trouver le chemin vers l'élément cible
         const parentPath = findParentPath(hierarchicalCategories, rowData._id);
 
         if (parentPath && parentPath.length > 0) {
+          console.log(
+            '[CategoriesTable] Chemin parent trouvé, développement des catégories parents'
+          );
           const newExpandedState = {};
           parentPath.forEach((id) => {
             newExpandedState[id] = true;
           });
 
           setExpandedCategories(newExpandedState);
+
+          // Mettre à jour les deux sections pour maintenir la cohérence
+          handlePreferencesChange('selection', {
+            ...tablePreferences.selection,
+            expandedCategories: newExpandedState,
+            focusedItemId: rowData._id,
+            scrollPosition: currentScrollPosition,
+          });
+
+          handlePreferencesChange('detail', {
+            ...tablePreferences.detail,
+            expandedCategories: newExpandedState,
+            lastFocusedElementId: rowData._id,
+            scrollPosition: currentScrollPosition,
+          });
         }
+
+        // Ajouter une classe pour mettre en évidence temporairement la ligne
+        setTimeout(() => {
+          const element = document.getElementById(`row-${rowData._id}`);
+          if (element) {
+            element.classList.add('highlight-row');
+            setTimeout(() => {
+              element.classList.remove('highlight-row');
+            }, 2000);
+          }
+        }, 300);
 
         // Réinitialiser le flag après un court délai
         setTimeout(() => {
@@ -222,6 +302,7 @@ function CategoriesTable(props) {
     [
       handlePreferencesChange,
       tablePreferences.selection,
+      tablePreferences.detail,
       findParentPath,
       hierarchicalCategories,
       isUpdating,
