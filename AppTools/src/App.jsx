@@ -25,9 +25,10 @@ import SupplierDetail from './features/suppliers/components/SupplierDetail';
 import SupplierForm from './features/suppliers/components/SupplierForm';
 import CategoriesPage from './features/categories/CategoriesPage';
 import CategorieDetail from './features/categories/components/CategorieDetail';
+import CategoryForm from './features/categories/components/CategoryForm';
 import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
-import CategoryForm from './features/categories/components/CategoryForm';
+import BrandForm from './features/brands/components/BrandForm';
 
 // **Loader pour l'initialisation des services**
 const Loader = ({ message }) => (
@@ -74,7 +75,7 @@ const entityRoutes = [
     component: BrandsPage,
     provider: BrandProvider,
     details: BrandDetail,
-    form: () => <div>Formulaire de marque</div>,
+    form: BrandForm,
   },
 ];
 

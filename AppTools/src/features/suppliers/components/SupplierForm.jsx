@@ -1,7 +1,7 @@
 // src/features/suppliers/components/SupplierForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useSupplier } from '../contexts/supplierContext';
+import { useSupplier } from '../stores/supplierStore';
 import { EntityForm, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
 
@@ -10,11 +10,11 @@ function SupplierForm() {
   const navigate = useNavigate();
   const isNew = !id;
 
-  // Hooks de contexte
+  // Hooks Zustand au lieu du context
   const { getSupplierById, createSupplier, updateSupplier, uploadImage, deleteImage } =
     useSupplier();
 
-  // États locaux
+  // États locaux (inchangés)
   const [supplier, setSupplier] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -31,9 +31,9 @@ function SupplierForm() {
       .then(setSupplier)
       .catch(() => setError('Erreur lors du chargement du fournisseur.'))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, getSupplierById]);
 
-  // Valeurs initiales pour le formulaire
+  // Valeurs initiales pour le formulaire (inchangé)
   const getInitialValues = () => {
     if (isNew) {
       return {
@@ -60,7 +60,7 @@ function SupplierForm() {
     return supplier || {};
   };
 
-  // Gestionnaire de soumission du formulaire
+  // Gestionnaire de soumission du formulaire (inchangé)
   const handleSubmit = async (data) => {
     setLoading(true);
     setError(null);
@@ -74,6 +74,7 @@ function SupplierForm() {
 
     let formattedData = data;
 
+    // Nettoyage des champs vides (inchangé)
     Object.keys(formattedData).forEach((key) => {
       if (formattedData[key] === '') {
         delete formattedData[key];
@@ -86,9 +87,7 @@ function SupplierForm() {
       }
     });
 
-    console.log('Données brutes du formulaire:', data);
-
-    // Restructurer les données si nécessaire
+    // Restructurer les données si nécessaire (inchangé)
     if (needsRestructuring) {
       formattedData = {
         ...data,
@@ -124,8 +123,6 @@ function SupplierForm() {
       delete formattedData['payment_terms.discount'];
     }
 
-    console.log("Données formatées pour l'API:", formattedData);
-
     try {
       if (isNew) {
         await createSupplier(formattedData);
@@ -138,8 +135,6 @@ function SupplierForm() {
         const updatedSupplier = await getSupplierById(id);
         setSupplier(updatedSupplier);
       }
-
-      setLoading(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde du fournisseur:', error);
       if (error.response) {
@@ -148,16 +143,17 @@ function SupplierForm() {
       } else {
         setError('Erreur lors de la sauvegarde du fournisseur. Veuillez réessayer.');
       }
+    } finally {
       setLoading(false);
     }
   };
 
-  // Gestionnaire d'annulation
+  // Gestionnaire d'annulation (inchangé)
   const handleCancel = () => {
     navigate(isNew ? '/products/suppliers' : `/products/suppliers/${id}`);
   };
 
-  // Rendu conditionnel de l'onglet images
+  // Rendu conditionnel de l'onglet images (inchangé)
   const renderImageTab = () => {
     if (activeTab !== 'images' || !supplier) return null;
 
@@ -176,7 +172,7 @@ function SupplierForm() {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      {/* Formulaire principal */}
+      {/* Formulaire principal (inchangé) */}
       {(!id || (id && supplier)) && (
         <EntityForm
           fields={ENTITY_CONFIG.formFields}
@@ -195,11 +191,11 @@ function SupplierForm() {
           layout={hasTabs ? 'tabs' : 'default'}
           tabs={hasTabs ? ENTITY_CONFIG.tabs : []}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          onTabChange={setActiveTab}
         />
       )}
 
-      {/* Gestionnaire d'images (affiché uniquement en mode édition) */}
+      {/* Gestionnaire d'images (inchangé) */}
       {!isNew && supplier && renderImageTab()}
     </div>
   );

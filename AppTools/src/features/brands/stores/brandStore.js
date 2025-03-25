@@ -1,7 +1,6 @@
 // src/features/brands/stores/brandStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
-import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
 import apiService from '../../../services/api';
 
 // Configuration de l'entité Brand
@@ -25,13 +24,17 @@ export const useBrandDataStore = createWebSocketStore({
   additionalEvents: [],
 });
 
-// Étendre useBrand avec WebSocket (pour rétro-compatibilité)
+// Étendre useBrand sans utiliser createWebSocketRedirection
 export function useBrand() {
   const brandStore = useBrandBase();
 
   return {
     ...brandStore,
-    initWebSocketListeners: createWebSocketRedirection('brand', useBrandDataStore),
+    // Utiliser directement les méthodes du store WebSocket au lieu de la redirection
+    initWebSocketListeners: () => {
+      const cleanup = useBrandDataStore.getState().initWebSocket();
+      return cleanup;
+    },
   };
 }
 
