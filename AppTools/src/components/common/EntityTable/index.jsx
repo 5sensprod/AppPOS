@@ -1,5 +1,5 @@
-// Composant principal EntityTable (modifié pour supporter les préférences)
-import React, { useEffect } from 'react';
+// Composant principal EntityTable (index.jsx) AppTools\src\components\common\EntityTable\index.jsx
+import React from 'react';
 import { SearchBar } from './components/SearchBar';
 import { FilterBar } from './components/FilterBar';
 import { BatchActions } from './components/BatchActions';
@@ -37,82 +37,21 @@ const EntityTable = ({
   searchFields = ['name'],
   filters = [],
   searchProcessor,
-  // Nouvelles props pour les préférences
-  tablePreferences = null,
-  onPreferencesChange = null,
 }) => {
-  // État initial pour le tri, utiliser les préférences si disponibles
-  const initialSort = tablePreferences?.sort || defaultSort;
-  const { sort, sortedData, handleSort } = useTableSort(data, initialSort);
+  // D'abord le tri
+  const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
 
-  // Mise à jour des préférences de tri seulement si nécessaire
-  useEffect(() => {
-    if (
-      onPreferencesChange &&
-      (sort.field !== initialSort.field || sort.direction !== initialSort.direction)
-    ) {
-      onPreferencesChange('sort', sort);
-    }
-  }, [sort.field, sort.direction]);
-  // État initial pour la recherche
-  const initialSearch = tablePreferences?.search?.term || '';
-  const initialFilters = tablePreferences?.search?.activeFilters || {};
-
-  // Filtrage avec préférences
+  // Ensuite le filtrage
   const { searchTerm, activeFilters, filteredData, handleSearchChange, handleFilterChange } =
-    useTableFilter(
-      sortedData,
-      searchFields,
-      filters,
-      onSearch,
-      onFilter,
-      searchProcessor,
-      initialSearch,
-      initialFilters
-    );
+    useTableFilter(sortedData, searchFields, filters, onSearch, onFilter, searchProcessor);
 
-  // Mise à jour des préférences de recherche
-  useEffect(() => {
-    if (onPreferencesChange) {
-      if (searchTerm !== initialSearch) {
-        onPreferencesChange('search', { ...tablePreferences?.search, term: searchTerm });
-      }
-
-      if (JSON.stringify(activeFilters) !== JSON.stringify(initialFilters)) {
-        onPreferencesChange('search', { ...tablePreferences?.search, activeFilters });
-      }
-    }
-  }, [
-    searchTerm,
-    activeFilters,
-    initialSearch,
-    initialFilters,
-    onPreferencesChange,
-    tablePreferences,
-  ]);
-
-  // Sélection avec préférences
-  const initialSelectedItems = tablePreferences?.selection?.selectedItems || [];
+  // Puis la sélection
   const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(
     data,
-    filteredData,
-    initialSelectedItems
+    filteredData
   );
 
-  // Mise à jour des préférences de sélection
-  useEffect(() => {
-    if (
-      onPreferencesChange &&
-      JSON.stringify(selectedItems) !== JSON.stringify(initialSelectedItems)
-    ) {
-      onPreferencesChange('selection', { ...tablePreferences?.selection, selectedItems });
-    }
-  }, [selectedItems, initialSelectedItems, onPreferencesChange, tablePreferences]);
-
-  // Pagination avec préférences
-  const initialPage = tablePreferences?.pagination?.currentPage || 1;
-  const initialPageSize = tablePreferences?.pagination?.pageSize || pagination.pageSize;
-
+  // Enfin la pagination
   const {
     currentPage,
     pageSize,
@@ -121,33 +60,10 @@ const EntityTable = ({
     setCurrentPage,
     setPageSize,
     paginationInfo,
-  } = useTablePagination(filteredData, {
-    ...pagination,
-    initialPage,
-    initialPageSize,
-  });
+  } = useTablePagination(filteredData, pagination);
 
-  // Mise à jour des préférences de pagination
-  useEffect(() => {
-    if (onPreferencesChange) {
-      if (currentPage !== initialPage || pageSize !== initialPageSize) {
-        onPreferencesChange('pagination', { currentPage, pageSize });
-      }
-    }
-  }, [currentPage, pageSize, initialPage, initialPageSize, onPreferencesChange]);
-
-  // Gestionnaires d'événements pour les actions
-  const handleRowClick = (item) => {
-    // Si on a des préférences, mettre à jour l'élément focalisé
-    if (onPreferencesChange) {
-      onPreferencesChange('selection', {
-        ...tablePreferences?.selection,
-        focusedItemId: item._id,
-      });
-    }
-
-    // Ne pas gérer la navigation ici, le composant TableRow s'en charge
-  };
+  // Handlers pour les actions
+  const handleRowClick = (item) => {};
 
   const handleBatchDelete = () => {
     if (
@@ -262,7 +178,6 @@ const EntityTable = ({
                   onDelete={onDelete}
                   onSync={onSync}
                   baseRoute={baseRoute}
-                  isFocused={item._id === tablePreferences?.selection?.focusedItemId}
                 />
               ))
             )}
