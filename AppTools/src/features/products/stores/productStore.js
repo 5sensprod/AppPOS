@@ -1,7 +1,9 @@
 // src/features/products/stores/productStore.js
-import { createEntityTableStore } from '../../../factories/createEntityTableStore';
-import apiService from '../../../services/api';
+import { createEntityStore } from '../../../factories/createEntityStore';
+import { createWebSocketStore } from '../../../factories/createWebSocketStore';
+import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
 import { ENTITY_CONFIG } from '../constants';
+import apiService from '../../../services/api';
 
 // Actions personnalisées spécifiques aux produits
 const customActions = {
@@ -67,29 +69,20 @@ const customReducers = {
   },
 };
 
-// Créer le store complet avec notre nouvelle factory
-const {
-  useProduct,
-  useEntityStore: useProductStore,
-  useProductDataStore, // Ce nom est maintenant exporté correctement par la factory
-  useProductHierarchyStore,
-  useProductExtras,
-  useProductTablePreferences,
-  useProductTablePreferencesStore,
-} = createEntityTableStore({
-  entityName: 'product',
-  apiEndpoint: '/api/products',
-  syncEnabled: true,
-  imagesEnabled: true,
-  cacheDuration: ENTITY_CONFIG.cacheDuration || 5 * 60 * 1000,
-  defaultTablePreferences: {
-    pageSize: ENTITY_CONFIG.defaultPageSize || 10,
-    sort: ENTITY_CONFIG.defaultSort || { field: 'name', direction: 'asc' },
-  },
+// Créer le store avec la factory
+const { useProduct: useProductBase, useEntityStore: useProductStore } = createEntityStore({
+  ...ENTITY_CONFIG,
   customActions,
   customReducers,
-  additionalWebSocketChannels: ['categories'],
-  additionalWebSocketEvents: [
+});
+
+// Créer le store WebSocket avec la nouvelle factory
+export const useProductDataStore = createWebSocketStore({
+  entityName: 'product',
+  apiEndpoint: '/api/products',
+  apiService,
+  additionalChannels: ['categories'],
+  additionalEvents: [
     {
       event: 'categories.tree.changed',
       handler: (get) => (data) => {
@@ -103,20 +96,22 @@ const {
   ],
 });
 
-// Exporter les hooks générés par la factory
-export {
-  useProduct,
-  useProductStore,
-  useProductDataStore, // Export explicite pour compatibilité
-  useProductHierarchyStore,
-  useProductTablePreferences,
-  useProductTablePreferencesStore,
-};
+// Étendre useProduct avec WebSocket (pour rétro-compatibilité)
+export function useProduct() {
+  const productStore = useProductBase();
+
+  return {
+    ...productStore,
+    initWebSocketListeners: createWebSocketRedirection('product', useProductDataStore),
+  };
+}
+
+// Réexporter useProductStore pour maintenir la compatibilité
+export { useProductStore };
 
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux produits
-export function useProductExtrasEnhanced() {
+export function useProductExtras() {
   const store = useProductStore();
-  const baseExtras = useProductExtras();
 
   // Définir l'image principale d'un produit
   const setMainImage = async (productId, imageIndex) => {
@@ -195,14 +190,11 @@ export function useProductExtrasEnhanced() {
     }
   };
 
-  // Retourne toutes les fonctionnalités standard du useProductExtras + les extras spécifiques
+  // Retourne toutes les fonctionnalités standard du useProduct + les extras
   return {
-    ...baseExtras,
+    ...useProduct(),
     setMainImage,
     uploadGalleryImage,
     deleteGalleryImage,
   };
 }
-
-// Exporter aussi les méthodes extras améliorées
-export { useProductExtras };

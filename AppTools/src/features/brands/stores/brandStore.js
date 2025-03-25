@@ -1,35 +1,50 @@
 // src/features/brands/stores/brandStore.js
-import { createEntityTableStore } from '../../../factories/createEntityTableStore';
-import { ENTITY_CONFIG } from '../constants';
+import { createEntityStore } from '../../../factories/createEntityStore';
+import { createWebSocketStore } from '../../../factories/createWebSocketStore';
+import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
+import apiService from '../../../services/api';
 
-// Créer le store complet avec notre nouvelle factory
-const {
-  useBrand,
-  useEntityStore: useBrandStore,
-  useBrandDataStore,
-  useBrandExtras,
-  useBrandTablePreferences,
-  useBrandTablePreferencesStore,
-} = createEntityTableStore({
+// Configuration de l'entité Brand
+const BRAND_CONFIG = {
   entityName: 'brand',
   apiEndpoint: '/api/brands',
   syncEnabled: true,
   imagesEnabled: true,
-  cacheDuration: ENTITY_CONFIG.cacheDuration || 5 * 60 * 1000,
-  defaultTablePreferences: {
-    pageSize: ENTITY_CONFIG.defaultPageSize || 5,
-    sort: ENTITY_CONFIG.defaultSort || { field: 'name', direction: 'asc' },
-  },
-});
-
-// Exporter les hooks générés par la factory
-export {
-  useBrand,
-  useBrandStore,
-  useBrandDataStore,
-  useBrandTablePreferences,
-  useBrandTablePreferencesStore,
+  cacheDuration: 5 * 60 * 1000, // 5 minutes
 };
 
-// Pour compatibilité avec le code existant
-export { useBrandExtras };
+// Créer le store avec la factory
+const { useBrand: useBrandBase, useEntityStore: useBrandStore } = createEntityStore(BRAND_CONFIG);
+
+// Store Zustand dédié pour la gestion des marques avec WebSocket
+export const useBrandDataStore = createWebSocketStore({
+  entityName: 'brand',
+  apiEndpoint: '/api/brands',
+  apiService,
+  additionalChannels: [],
+  additionalEvents: [],
+});
+
+// Étendre useBrand avec WebSocket (pour rétro-compatibilité)
+export function useBrand() {
+  const brandStore = useBrandBase();
+
+  return {
+    ...brandStore,
+    initWebSocketListeners: createWebSocketRedirection('brand', useBrandDataStore),
+  };
+}
+
+// Réexporter useBrandStore pour maintenir la compatibilité
+export { useBrandStore };
+
+// Fonction pour exposer des méthodes supplémentaires spécifiques aux marques
+export function useBrandExtras() {
+  const { syncBrand } = useBrandBase();
+
+  return {
+    ...useBrand(),
+    syncBrand,
+    // Vous pouvez ajouter ici d'autres fonctionnalités spécifiques aux marques si besoin
+  };
+}

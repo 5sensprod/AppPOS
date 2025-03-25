@@ -1,37 +1,47 @@
 // src/features/suppliers/stores/supplierStore.js
-import { createEntityTableStore } from '../../../factories/createEntityTableStore';
-import { ENTITY_CONFIG } from '../constants';
+import { createEntityStore } from '../../../factories/createEntityStore';
+import { createWebSocketStore } from '../../../factories/createWebSocketStore';
+import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
+import apiService from '../../../services/api';
 
-// Créer le store complet avec notre nouvelle factory
-const {
-  useSupplier,
-  useEntityStore: useSupplierStore,
-  useSupplierDataStore,
-  useSupplierHierarchyStore,
-  useSupplierExtras,
-  useSupplierTablePreferences,
-  useSupplierTablePreferencesStore,
-} = createEntityTableStore({
+// Configuration de l'entité Supplier
+const SUPPLIER_CONFIG = {
   entityName: 'supplier',
   apiEndpoint: '/api/suppliers',
-  syncEnabled: true,
-  imagesEnabled: false,
-  cacheDuration: ENTITY_CONFIG.cacheDuration || 5 * 60 * 1000,
-  defaultTablePreferences: {
-    pageSize: ENTITY_CONFIG.defaultPageSize || 10,
-    sort: ENTITY_CONFIG.defaultSort || { field: 'name', direction: 'asc' },
-  },
-});
-
-// Exporter les hooks générés par la factory
-export {
-  useSupplier,
-  useSupplierStore,
-  useSupplierDataStore,
-  useSupplierHierarchyStore,
-  useSupplierTablePreferences,
-  useSupplierTablePreferencesStore,
+  syncEnabled: false,
+  imagesEnabled: true,
 };
 
-// Pour compatibilité avec le code existant
-export { useSupplierExtras };
+// Créer le store avec la factory
+const { useSupplier: useSupplierBase, useEntityStore: useSupplierStore } =
+  createEntityStore(SUPPLIER_CONFIG);
+
+// Store Zustand dédié pour la gestion des fournisseurs avec WebSocket
+export const useSupplierDataStore = createWebSocketStore({
+  entityName: 'supplier',
+  apiEndpoint: '/api/suppliers',
+  apiService,
+  additionalChannels: [],
+  additionalEvents: [],
+});
+
+// Étendre useSupplier avec WebSocket (pour rétro-compatibilité)
+export function useSupplier() {
+  const supplierStore = useSupplierBase();
+
+  return {
+    ...supplierStore,
+    initWebSocketListeners: createWebSocketRedirection('supplier', useSupplierDataStore),
+  };
+}
+
+// Réexporter useSupplierStore pour maintenir la compatibilité
+export { useSupplierStore };
+
+// Fonction pour exposer des méthodes supplémentaires spécifiques aux fournisseurs
+export function useSupplierExtras() {
+  return {
+    ...useSupplier(),
+    // Vous pouvez ajouter ici des fonctionnalités spécifiques aux fournisseurs si besoin
+  };
+}

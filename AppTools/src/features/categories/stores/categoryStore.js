@@ -1,5 +1,4 @@
 // src/features/categories/stores/categoryStore.js
-import apiService from '../../../services/api';
 import { useCategoryHierarchyStore } from './categoryHierarchyStore';
 import { createEntityStore } from '../../../factories/createEntityStore';
 
