@@ -1,45 +1,36 @@
 // src/components/common/EntityTable/hooks/useTableFilter.js
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 
 export const useTableFilter = (
   data,
-  searchFields = ['name'],
-  filters = [],
+  searchFields,
+  filters,
   onSearch,
   onFilter,
-  searchProcessor,
-  initialSearchTerm = '',
-  initialActiveFilters = {}
+  searchProcessor
 ) => {
-  // Utiliser les valeurs initiales pour les états
-  const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
-  const [activeFilters, setActiveFilters] = useState(initialActiveFilters);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilters, setActiveFilters] = useState({});
 
   // Gestion de la recherche
-  const handleSearchChange = useCallback(
-    (e) => {
-      const value = typeof e === 'string' ? e : e.target.value;
-      setSearchTerm(value);
-      if (onSearch) {
-        onSearch(value, searchFields);
-      }
-    },
-    [onSearch, searchFields]
-  );
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    if (onSearch) {
+      onSearch(value, searchFields);
+    }
+  };
 
   // Gestion des filtres
-  const handleFilterChange = useCallback(
-    (filterId, value) => {
-      setActiveFilters((prev) => ({
-        ...prev,
-        [filterId]: value,
-      }));
-      if (onFilter) {
-        onFilter({ ...activeFilters, [filterId]: value });
-      }
-    },
-    [activeFilters, onFilter]
-  );
+  const handleFilterChange = (filterId, value) => {
+    setActiveFilters((prev) => ({
+      ...prev,
+      [filterId]: value,
+    }));
+    if (onFilter) {
+      onFilter({ ...activeFilters, [filterId]: value });
+    }
+  };
 
   // Appliquer les filtres et la recherche aux données
   const filteredData = useMemo(() => {
@@ -91,6 +82,5 @@ export const useTableFilter = (
     filteredData,
     handleSearchChange,
     handleFilterChange,
-    setActiveFilters, // Exposer cette méthode pour la réinitialisation
   };
 };

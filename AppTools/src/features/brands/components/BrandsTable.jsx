@@ -1,84 +1,75 @@
 // src/features/brands/components/BrandsTable.jsx
-import React from 'react';
-import {
-  useBrand,
-  useBrandExtras,
-  useBrandDataStore,
-  useBrandTablePreferences,
-} from '../stores/brandStore';
-import { useEntityTableWithPreferences } from '@/hooks/useEntityTableWithPreferences';
+import React, { useEffect } from 'react';
+import { useBrand, useBrandExtras } from '../stores/brandStore';
+import { useBrandHierarchyStore } from '../stores/brandStore';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
+import { useEntityTable } from '@/hooks/useEntityTable';
 
 function BrandsTable(props) {
   const { deleteBrand } = useBrand();
   const { syncBrand } = useBrandExtras();
 
+  // Utiliser le nouveau store hiérarchique
+  const { brands, loading: brandsLoading, fetchBrands, initWebSocket } = useBrandHierarchyStore();
+
+  // Initialiser les WebSockets et charger les données si nécessaire
+  useEffect(() => {
+    initWebSocket();
+    if (brands.length === 0) {
+      fetchBrands();
+    }
+  }, [initWebSocket, fetchBrands, brands.length]);
+
+  // Utilisation du hook useEntityTable sans les abonnements WebSocket
   const {
-    entities: brands,
-    tablePreferences,
-    isLoading,
+    loading: operationLoading,
     error,
     handleDeleteEntity,
     handleSyncEntity,
-    handlePreferencesChange,
-    handleResetFilters,
-  } = useEntityTableWithPreferences({
+  } = useEntityTable({
     entityType: 'brand',
-    entityStore: {
-      data: useBrandDataStore().brands,
-      loading: useBrandDataStore().loading,
-      fetchEntities: useBrandDataStore().fetchBrands,
-      initWebSocket: useBrandDataStore().initWebSocket,
+    fetchEntities: fetchBrands,
+    deleteEntity: async (id) => {
+      await deleteBrand(id);
     },
-    preferencesStore: useBrandTablePreferences(),
-    deleteEntityFn: async (id) => await deleteBrand(id),
-    syncEntityFn: async (id) => await syncBrand(id),
+    syncEntity: async (id) => {
+      await syncBrand(id);
+    },
+    // Ne pas spécifier de customEventHandlers pour éviter les abonnements doublons
   });
 
-  // Configuration des filtres
-  const filters = ENTITY_CONFIG.filters || [];
+  // Combinaison de l'état de chargement du store et des opérations
+  const isLoading = brandsLoading || operationLoading;
+
+  // Configuration des filtres si nécessaire
+  const filters = [];
 
   return (
-    <div className="space-y-4">
-      {Object.keys(tablePreferences.search.activeFilters).length > 0 && (
-        <div className="flex justify-end">
-          <button
-            onClick={handleResetFilters}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md"
-          >
-            Réinitialiser les filtres
-          </button>
-        </div>
-      )}
-
-      <EntityTable
-        data={brands || []}
-        isLoading={isLoading}
-        error={error}
-        columns={ENTITY_CONFIG.columns}
-        entityName="marque"
-        entityNamePlural="marques"
-        baseRoute="/products/brands"
-        filters={filters}
-        searchFields={['name', 'description']}
-        onDelete={handleDeleteEntity}
-        onSync={handleSyncEntity}
-        syncEnabled={ENTITY_CONFIG.syncEnabled}
-        actions={['view', 'edit', 'delete', 'sync']}
-        batchActions={['delete', 'sync']}
-        pagination={{
-          enabled: true,
-          pageSize: ENTITY_CONFIG.defaultPageSize || 5,
-          showPageSizeOptions: true,
-          pageSizeOptions: [5, 10, 25, 50],
-        }}
-        defaultSort={ENTITY_CONFIG.defaultSort}
-        tablePreferences={tablePreferences}
-        onPreferencesChange={handlePreferencesChange}
-        {...props}
-      />
-    </div>
+    <EntityTable
+      data={brands || []}
+      isLoading={isLoading}
+      error={error}
+      columns={ENTITY_CONFIG.columns}
+      entityName="marque"
+      entityNamePlural="marques"
+      baseRoute="/products/brands"
+      filters={filters}
+      searchFields={['name', 'description']}
+      onDelete={handleDeleteEntity}
+      onSync={handleSyncEntity}
+      syncEnabled={ENTITY_CONFIG.syncEnabled}
+      actions={['view', 'edit', 'delete', 'sync']}
+      batchActions={['delete', 'sync']}
+      pagination={{
+        enabled: true,
+        pageSize: 5,
+        showPageSizeOptions: true,
+        pageSizeOptions: [5, 10, 25, 50],
+      }}
+      defaultSort={ENTITY_CONFIG.defaultSort}
+      {...props}
+    />
   );
 }
 

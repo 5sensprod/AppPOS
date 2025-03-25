@@ -45,6 +45,7 @@ export function useEntityDetail({
 
     // Initialiser WebSocket si le store est fourni
     if (wsStore && wsStore.initWebSocket) {
+      console.log(`[DETAIL] Initialisation WebSocket pour ${entityType} #${id}`);
       cleanup = wsStore.initWebSocket();
     }
 

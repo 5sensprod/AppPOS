@@ -37,6 +37,7 @@ export async function initializeServices() {
     // Pré-charger les données essentielles
     await preloadEssentialData();
 
+    console.log('✅ Services initialisés avec succès');
     return true;
   } catch (error) {
     console.error("🚫 Échec de l'initialisation des services:", error.message);
@@ -49,7 +50,10 @@ export async function initializeServices() {
  */
 function setupGlobalWebSocketEventHandlers() {
   // Exemple de gestionnaire global pour les notifications système
-  websocketService.on('system.notification', (data) => {});
+  websocketService.on('system.notification', (data) => {
+    console.log('📢 Notification système reçue:', data);
+    // Vous pourriez appeler une fonction pour afficher une notification ici
+  });
 
   // Gestionnaire pour les déconnexions inattendues
   websocketService.on('disconnect', () => {
@@ -58,7 +62,10 @@ function setupGlobalWebSocketEventHandlers() {
   });
 
   // Gestionnaire pour les reconnexions réussies
-  websocketService.on('connect', () => {});
+  websocketService.on('connect', () => {
+    console.log('✅ WebSocket reconnecté');
+    // Vous pourriez rafraîchir certaines données ici
+  });
 }
 
 /**
@@ -76,7 +83,12 @@ async function preloadEssentialData() {
 
   // Vérifier les résultats
   preloadResults.forEach((result, index) => {
-    // Traitement silencieux des résultats de préchargement
+    const entities = ['products', 'categories', 'brands', 'suppliers'];
+    if (result.status === 'rejected') {
+      console.warn(`⚠️ Échec du préchargement des ${entities[index]}:`, result.reason);
+    } else {
+      console.log(`✅ ${entities[index]} préchargés avec succès`);
+    }
   });
 }
 
@@ -125,6 +137,8 @@ export function cleanupServices() {
 
   // Déconnecter le WebSocket proprement
   websocketService.disconnect();
+
+  console.log('🧹 Services nettoyés avec succès');
 }
 
 /**

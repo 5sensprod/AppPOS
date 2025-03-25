@@ -1,5 +1,5 @@
 // src/components/common/EntityDetail.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, AlertCircle, Edit, Trash } from 'lucide-react';
 import { TabNavigation, ActionButton, InfoCard } from '../ui';
@@ -19,9 +19,6 @@ const EntityDetail = ({
   tabs = [],
   renderTabContent,
   actions = ['edit', 'delete'],
-  // Préférences d'interface utilisateur
-  activeTab: externalActiveTab = null,
-  onTabChange: externalTabChange = null,
   // Fonctionnalités optionnelles
   syncEnabled = false,
   // Handlers
@@ -32,28 +29,7 @@ const EntityDetail = ({
   error = null,
 }) => {
   const navigate = useNavigate();
-
-  // État local pour l'onglet actif (utilisé uniquement si externalActiveTab n'est pas fourni)
-  const [localActiveTab, setLocalActiveTab] = useState(tabs.length > 0 ? tabs[0].id : 'general');
-
-  // Déterminer si nous utilisons l'état local ou externe pour l'onglet actif
-  const activeTab = externalActiveTab !== null ? externalActiveTab : localActiveTab;
-
-  // Fonction qui gère le changement d'onglet, en fonction de la disponibilité du handler externe
-  const handleTabChange = (tabId) => {
-    if (externalTabChange) {
-      externalTabChange(tabId);
-    } else {
-      setLocalActiveTab(tabId);
-    }
-  };
-
-  // S'assurer que l'onglet actif est valide par rapport aux onglets disponibles
-  useEffect(() => {
-    if (tabs.length > 0 && !tabs.some((tab) => tab.id === activeTab)) {
-      handleTabChange(tabs[0].id);
-    }
-  }, [tabs, activeTab]);
+  const [activeTab, setActiveTab] = useState(tabs.length > 0 ? tabs[0].id : 'general');
 
   // Gérer la suppression de l'entité
   const handleDelete = async () => {
@@ -185,7 +161,7 @@ const EntityDetail = ({
       {/* Contenu avec onglets */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
         {tabs.length > 1 && (
-          <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
+          <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
         )}
 
         {/* Contenu des onglets */}

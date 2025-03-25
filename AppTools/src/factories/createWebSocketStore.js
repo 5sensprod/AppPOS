@@ -42,6 +42,8 @@ export function createWebSocketStore(options) {
       // Éviter les abonnements multiples
       if (get().listenersInitialized) return;
 
+      console.log(`[${entityNameUpper}] Initialisation des écouteurs WebSocket`);
+
       // S'abonner au canal principal
       websocketService.subscribe(entityNamePlural);
 
@@ -52,16 +54,20 @@ export function createWebSocketStore(options) {
 
       // Gestionnaire pour l'événement de création
       const handleCreated = (data) => {
+        console.log(`[${entityNameUpper}] Événement ${entityNamePlural}.created reçu`, data);
         get()[methodName]();
       };
 
       // Gestionnaire pour l'événement de mise à jour
       const handleUpdated = (data) => {
+        console.log(`[${entityNameUpper}] Événement ${entityNamePlural}.updated reçu`, data);
         get()[methodName]();
       };
 
       // Gestionnaire amélioré pour l'événement de suppression
       const handleDeleted = (data) => {
+        console.log(`[${entityNameUpper}] Événement ${entityNamePlural}.deleted reçu ✨`, data);
+
         // Vérifier le format des données pour s'adapter
         let deletedId;
         if (data && data.entityId) {
@@ -72,12 +78,17 @@ export function createWebSocketStore(options) {
           deletedId = data;
         }
 
+        console.log(`[${entityNameUpper}] ${entityName} supprimé avec ID: ${deletedId}`);
         get()[methodName]();
       };
 
       // Gestionnaire global pour entity.deleted
       const handleEntityDeleted = (data) => {
         if (data && data.entityType === entityNamePlural) {
+          console.log(
+            `[${entityNameUpper}] Événement entity.deleted pour ${entityNamePlural} reçu ✨`,
+            data
+          );
           get()[methodName]();
         }
       };
@@ -113,6 +124,7 @@ export function createWebSocketStore(options) {
     const fetchMethod = async (params = {}) => {
       set({ loading: true, error: null });
       try {
+        console.log(`[${entityNameUpper}] Chargement des ${entityNamePlural}`);
         const response = await apiService.get(apiEndpoint, { params });
         const responseData = response.data.data;
 
@@ -124,6 +136,7 @@ export function createWebSocketStore(options) {
         };
 
         set(stateUpdate);
+        console.log(`[${entityNameUpper}] ${entityNamePlural} chargés:`, responseData.length);
         return responseData;
       } catch (error) {
         console.error(
@@ -157,6 +170,7 @@ export function createWebSocketStore(options) {
       cleanup: () => {
         if (!get().listenersInitialized) return;
 
+        console.log(`[${entityNameUpper}] Nettoyage des écouteurs WebSocket`);
         const { eventHandlers } = get();
 
         websocketService.off(`${entityNamePlural}.created`, eventHandlers.created);
@@ -190,6 +204,7 @@ export function createWebSocketStore(options) {
 
         events.forEach((event) => {
           const count = websocketService.eventHandlers[event]?.length || 0;
+          console.log(`[${entityNameUpper}-DEBUG] Écouteurs pour '${event}': ${count}`);
         });
       },
     };

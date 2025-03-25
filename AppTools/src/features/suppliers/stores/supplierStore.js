@@ -1,9 +1,8 @@
+// src/features/suppliers/stores/supplierStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
-import { createEntityPreferencesStore } from '../../../factories/createEntityPreferencesStore';
 import apiService from '../../../services/api';
-import { ENTITY_CONFIG } from '../constants';
 
 // Configuration de l'entité Supplier
 const SUPPLIER_CONFIG = {
@@ -26,65 +25,18 @@ export const useSupplierDataStore = createWebSocketStore({
   additionalEvents: [],
 });
 
-// Store de préférences unifié avec la nouvelle factory
-const {
-  useTablePreferences: useSupplierTablePreferences,
-  useDetailPreferences: useSupplierDetailPreferences,
-  useFormPreferences: useSupplierFormPreferences,
-  useGlobalPreferences: useSupplierGlobalPreferences,
-} = createEntityPreferencesStore({
-  entityType: 'supplier',
-  defaultPreferences: {
-    table: {
-      pagination: {
-        currentPage: 1,
-        pageSize: ENTITY_CONFIG.defaultPageSize || 5,
-      },
-      search: {
-        term: '',
-        activeFilters: {},
-      },
-      sort: {
-        ...ENTITY_CONFIG.defaultSort,
-      },
-      selection: {
-        focusedItemId: null,
-        selectedItems: [],
-      },
-    },
-    detail: {
-      activeTab: 'general',
-      scrollPosition: 0,
-      expandedSections: {},
-      lastViewedItems: [],
-    },
-    form: {
-      lastValues: {},
-      expandedSections: {},
-      activeStep: 0,
-    },
-    global: {
-      viewMode: 'list',
-    },
-  },
-});
-
-// Étendre useSupplier avec WebSocket
+// Étendre useSupplier avec WebSocket (pour rétro-compatibilité)
 export function useSupplier() {
   const supplierStore = useSupplierBase();
+
   return {
     ...supplierStore,
     initWebSocketListeners: createWebSocketRedirection('supplier', useSupplierDataStore),
   };
 }
 
-export {
-  useSupplierStore,
-  useSupplierTablePreferences,
-  useSupplierDetailPreferences,
-  useSupplierFormPreferences,
-  useSupplierGlobalPreferences,
-};
+// Réexporter useSupplierStore pour maintenir la compatibilité
+export { useSupplierStore };
 
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux fournisseurs
 export function useSupplierExtras() {

@@ -1,10 +1,15 @@
 // src/components/common/EntityTable/hooks/useTableSort.js
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 
 export const useTableSort = (data, defaultSort) => {
   const [sort, setSort] = useState(defaultSort);
-  const isInitialMount = useRef(true);
-  const prevSort = useRef(defaultSort);
+
+  const handleSort = (field) => {
+    setSort((prevSort) => ({
+      field,
+      direction: prevSort.field === field && prevSort.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
 
   // Appliquer le tri aux données
   const sortedData = useMemo(() => {
@@ -20,34 +25,6 @@ export const useTableSort = (data, defaultSort) => {
       return sort.direction === 'asc' ? result : -result;
     });
   }, [data, sort.field, sort.direction]);
-
-  // Mettre à jour le tri seulement si defaultSort change réellement
-  useEffect(() => {
-    // Ignorer le premier montage (useState l'a déjà initialisé)
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    // Vérifier si defaultSort a changé
-    if (
-      prevSort.current.field !== defaultSort.field ||
-      prevSort.current.direction !== defaultSort.direction
-    ) {
-      setSort(defaultSort);
-      prevSort.current = defaultSort;
-    }
-  }, [defaultSort]);
-
-  const handleSort = (field) => {
-    const newSort = {
-      field,
-      direction: sort.field === field && sort.direction === 'asc' ? 'desc' : 'asc',
-    };
-
-    setSort(newSort);
-    prevSort.current = newSort;
-  };
 
   return {
     sort,

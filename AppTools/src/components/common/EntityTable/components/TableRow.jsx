@@ -13,7 +13,6 @@ export const TableRow = ({
   onDelete,
   onSync,
   baseRoute,
-  isFocused = false,
 }) => {
   const navigate = useNavigate();
 
@@ -39,41 +38,23 @@ export const TableRow = ({
     onToggleSelection(item._id, !isSelected);
   };
 
-  // Gestionnaire pour le clic sur la ligne
+  // Nouvelle fonction pour gérer la navigation vers la vue détaillée
   const handleRowClick = () => {
-    // Sauvegarder la position de défilement actuelle
-    const scrollPosition = window.scrollY;
-
-    // Appeler d'abord le gestionnaire d'événements personnalisé
+    if (actions.includes('view')) {
+      navigate(`${baseRoute}/${item._id}`);
+    }
+    // Appeler aussi le onRowClick original si nécessaire
     if (onRowClick) {
       onRowClick(item);
     }
-
-    // Ensuite naviguer vers la page détail si l'action view est disponible
-    if (actions && actions.includes('view')) {
-      navigate(`${baseRoute}/${item._id}`);
-    }
-
-    // Après la navigation, restaurer la position de défilement
-    setTimeout(() => {
-      window.scrollTo({
-        top: scrollPosition,
-        behavior: 'instant',
-      });
-    }, 100);
   };
 
   return (
     <tr
-      id={`row-${item._id}`}
       onClick={handleRowClick}
       className={`${
-        actions && actions.includes('view')
-          ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700'
-          : ''
-      } ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''} 
-  transition-all duration-500 ease-in-out
-  ${isFocused ? 'bg-blue-100/30 dark:bg-blue-800/20' : ''}`}
+        actions.includes('view') ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : ''
+      }`}
     >
       <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
         <div onClick={handleCheckboxClick}>
@@ -85,16 +66,18 @@ export const TableRow = ({
           />
         </div>
       </td>
+
       {columns.map((column) => (
-        <td key={column.key || column.field} className="px-4 py-4 whitespace-nowrap">
+        <td key={column.key} className="px-4 py-4 whitespace-nowrap">
           <div className="text-sm text-gray-900 dark:text-gray-200">
-            {column.render ? column.render(item) : item[column.key || column.field]}
+            {column.render ? column.render(item) : item[column.key]}
           </div>
         </td>
       ))}
+
       <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
         <div className="flex justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
-          {actions && actions.includes('edit') && (
+          {actions.includes('edit') && (
             <button
               onClick={handleEdit}
               className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
@@ -102,7 +85,7 @@ export const TableRow = ({
               <Edit className="h-4 w-4" />
             </button>
           )}
-          {actions && actions.includes('delete') && (
+          {actions.includes('delete') && (
             <button
               onClick={handleDelete}
               className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
@@ -110,7 +93,7 @@ export const TableRow = ({
               <Trash className="h-4 w-4" />
             </button>
           )}
-          {syncEnabled && actions && actions.includes('sync') && (
+          {syncEnabled && actions.includes('sync') && (
             <button
               onClick={handleSync}
               className={`${

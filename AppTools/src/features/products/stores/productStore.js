@@ -2,7 +2,6 @@
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
-import { createEntityPreferencesStore } from '../../../factories/createEntityPreferencesStore';
 import { ENTITY_CONFIG } from '../constants';
 import apiService from '../../../services/api';
 
@@ -199,54 +198,3 @@ export function useProductExtras() {
     deleteGalleryImage,
   };
 }
-
-// Créer le store de préférences avec la nouvelle factory createEntityPreferencesStore
-const {
-  useTablePreferences: useProductTablePreferences,
-  useDetailPreferences: useProductDetailPreferences,
-  useFormPreferences: useProductFormPreferences,
-  useGlobalPreferences: useProductGlobalPreferences,
-} = createEntityPreferencesStore({
-  entityType: 'product',
-  defaultPreferences: {
-    table: {
-      pagination: {
-        currentPage: 1,
-        pageSize: ENTITY_CONFIG.defaultPageSize || 10,
-      },
-      search: {
-        term: '',
-        activeFilters: {},
-      },
-      sort: {
-        ...ENTITY_CONFIG.defaultSort,
-      },
-      selection: {
-        focusedItemId: null,
-        selectedItems: [],
-      },
-    },
-    detail: {
-      activeTab: 'general',
-      scrollPosition: 0,
-      expandedSections: {},
-      lastViewedItems: [],
-    },
-    form: {
-      lastValues: {},
-      expandedSections: {},
-      activeStep: 0,
-    },
-    global: {
-      viewMode: 'list',
-    },
-  },
-});
-
-// Export des hooks de préférences
-export {
-  useProductTablePreferences,
-  useProductDetailPreferences,
-  useProductFormPreferences,
-  useProductGlobalPreferences,
-};

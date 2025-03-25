@@ -1,8 +1,7 @@
 // src/features/categories/stores/categoryStore.js
+import apiService from '../../../services/api';
 import { useCategoryHierarchyStore } from './categoryHierarchyStore';
 import { createEntityStore } from '../../../factories/createEntityStore';
-import { createEntityPreferencesStore } from '../../../factories/createEntityPreferencesStore';
-import { ENTITY_CONFIG } from '../constants';
 
 // Configuration de l'entité Category avec options étendues
 const CATEGORY_CONFIG = {
@@ -22,65 +21,8 @@ const CATEGORY_CONFIG = {
 // Créer le store avec la factory améliorée
 const { useCategory, useEntityStore: useCategoryStore } = createEntityStore(CATEGORY_CONFIG);
 
-// Créer les stores de préférences avec la nouvelle factory
-const {
-  useTablePreferences: useCategoryTablePreferences,
-  useDetailPreferences: useCategoryDetailPreferences,
-  useFormPreferences: useCategoryFormPreferences,
-  useGlobalPreferences: useCategoryGlobalPreferences,
-} = createEntityPreferencesStore({
-  entityType: 'category',
-  defaultPreferences: {
-    table: {
-      pagination: {
-        currentPage: 1,
-        pageSize: ENTITY_CONFIG.defaultPageSize || 5,
-      },
-      search: {
-        term: '',
-        activeFilters: {},
-      },
-      sort: {
-        ...ENTITY_CONFIG.defaultSort,
-      },
-      selection: {
-        focusedItemId: null,
-        selectedItems: [],
-      },
-    },
-    detail: {
-      activeTab: 'info',
-      scrollPosition: 0,
-      expandedSections: {},
-      // Structure spécifique aux catégories pour mémoriser l'état développé/réduit de l'arborescence
-      expandedCategories: {},
-      lastViewedItems: [],
-    },
-    form: {
-      lastValues: {},
-      expandedSections: {},
-      activeStep: 0,
-      // Champs spécifiques aux formulaires de catégories
-      selectedParentId: null,
-      selectedImageTab: 'upload',
-    },
-    global: {
-      viewMode: 'list',
-      // Préférence spécifique pour l'affichage hiérarchique des catégories
-      hierarchicalView: true,
-    },
-  },
-});
-
-// Export des hooks avec la nouvelle structure
-export {
-  useCategory,
-  useCategoryStore,
-  useCategoryTablePreferences,
-  useCategoryDetailPreferences,
-  useCategoryFormPreferences,
-  useCategoryGlobalPreferences,
-};
+// Export du hook principal sans passer par une fonction intermédiaire
+export { useCategory, useCategoryStore };
 
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux catégories
 export function useCategoryExtras() {
