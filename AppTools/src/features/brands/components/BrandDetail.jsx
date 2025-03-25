@@ -2,7 +2,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useBrand, useBrandExtras } from '../stores/brandStore';
-import { useBrandHierarchyStore } from '../stores/brandStore';
+import { useBrandDataStore } from '../stores/brandStore';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
@@ -16,7 +16,7 @@ function BrandDetail() {
   const { uploadImage, deleteImage, syncBrand } = useBrandExtras();
 
   // Store WebSocket dédié
-  const brandWsStore = useBrandHierarchyStore();
+  const brandWsStore = useBrandDataStore();
 
   const {
     entity: brand,

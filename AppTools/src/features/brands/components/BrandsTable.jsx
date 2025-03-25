@@ -3,7 +3,7 @@ import React from 'react';
 import {
   useBrand,
   useBrandExtras,
-  useBrandHierarchyStore,
+  useBrandDataStore,
   useBrandTablePreferences,
 } from '../stores/brandStore';
 import { useEntityWithPreferences } from '@/hooks/useEntityWithPreferences';
@@ -26,10 +26,10 @@ function BrandsTable(props) {
   } = useEntityWithPreferences({
     entityType: 'brand',
     entityStore: {
-      data: useBrandHierarchyStore().brands,
-      loading: useBrandHierarchyStore().loading,
-      fetchEntities: useBrandHierarchyStore().fetchBrands,
-      initWebSocket: useBrandHierarchyStore().initWebSocket,
+      data: useBrandDataStore().brands,
+      loading: useBrandDataStore().loading,
+      fetchEntities: useBrandDataStore().fetchBrands,
+      initWebSocket: useBrandDataStore().initWebSocket,
     },
     preferencesStore: useBrandTablePreferences(),
     deleteEntityFn: async (id) => await deleteBrand(id),

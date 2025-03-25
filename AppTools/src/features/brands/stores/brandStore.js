@@ -7,7 +7,6 @@ const {
   useBrand,
   useEntityStore: useBrandStore,
   useBrandDataStore,
-  useBrandHierarchyStore,
   useBrandExtras,
   useBrandTablePreferences,
   useBrandTablePreferencesStore,
@@ -28,7 +27,6 @@ export {
   useBrand,
   useBrandStore,
   useBrandDataStore,
-  useBrandHierarchyStore,
   useBrandTablePreferences,
   useBrandTablePreferencesStore,
 };
