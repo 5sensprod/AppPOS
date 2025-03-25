@@ -20,7 +20,6 @@ export const useCategoryHierarchyData = ({
   const flattenHierarchy = useCallback(
     (categories, level = 0, parentExpanded = true) => {
       if (!categories) return [];
-      console.log('Ordre des catégories entrantes:', categories.map((c) => c.name).join(', '));
       let result = [];
 
       categories.forEach((category) => {
@@ -72,9 +71,7 @@ export const useCategoryHierarchyData = ({
           }
         }
       });
-      console.log('Ordre des catégories aplaties:', result.map((c) => c._originalName).join(', '));
       return [...result].sort((a, b) => a._originalName.localeCompare(b._originalName));
-      return result;
     },
     [expandedCategories, toggleCategory]
   );

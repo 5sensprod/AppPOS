@@ -48,11 +48,9 @@ export const useCategoryExpansion = ({
       if (isUpdating) return;
 
       setIsUpdating(true);
-      console.log(`[CategoriesTable] Basculement de la catégorie: ${categoryId}`);
 
       // Capturer la position de défilement actuelle
       const currentScrollPosition = window.scrollY;
-      console.log(`[CategoriesTable] Position de défilement actuelle: ${currentScrollPosition}`);
 
       // Mettre à jour l'état local
       const newExpandedState = {
@@ -98,37 +96,25 @@ export const useCategoryExpansion = ({
   const handleRowClick = useCallback(
     (rowData) => {
       if (rowData && rowData._id && !isUpdating) {
-        console.log('[CategoriesTable] Clic sur la ligne:', rowData._id);
-
         // Éviter de mettre à jour si c'est déjà l'élément focalisé
         if (tablePreferences.selection?.focusedItemId === rowData._id) {
-          console.log('[CategoriesTable] Élément déjà focalisé, pas de mise à jour nécessaire');
           return;
         }
-
         setIsUpdating(true);
-
         // Mettre à jour l'élément focalisé dans les préférences (section selection)
         // handlePreferencesChange gérera la sauvegarde de la position de défilement
         handlePreferencesChange('selection', {
           ...tablePreferences.selection,
           focusedItemId: rowData._id,
         });
-
         // Trouver le chemin vers l'élément cible
         const parentPath = findParentPath(hierarchicalCategories, rowData._id);
-
         if (parentPath && parentPath.length > 0) {
-          console.log(
-            '[CategoriesTable] Chemin parent trouvé, développement des catégories parents'
-          );
           const newExpandedState = {};
           parentPath.forEach((id) => {
             newExpandedState[id] = true;
           });
-
           setExpandedCategories(newExpandedState);
-
           // Mettre à jour uniquement selection avec le nouvel état d'expansion
           handlePreferencesChange('selection', {
             ...tablePreferences.selection,
@@ -136,7 +122,6 @@ export const useCategoryExpansion = ({
             focusedItemId: rowData._id,
           });
         }
-
         // Réinitialiser le flag après un court délai
         setTimeout(() => {
           setIsUpdating(false);
@@ -155,7 +140,6 @@ export const useCategoryExpansion = ({
   // Initialisation: déplier les parents si un élément est focalisé, sans gérer le défilement
   useEffect(() => {
     if (hierarchicalCategories.length > 0 && !initialized && !isUpdating) {
-      console.log('[CategoriesTable] Initialisation des chemins');
       setInitialized(true);
 
       // Récupérer toutes les préférences potentiellement utiles
@@ -170,15 +154,11 @@ export const useCategoryExpansion = ({
         tablePreferences.detail?.expandedCategories ||
         {};
 
-      console.log("[CategoriesTable] État d'expansion récupéré:", savedExpandedState);
-      console.log('[CategoriesTable] Élément focalisé récupéré:', focusedItemId);
-
       // Mettre d'abord à jour l'état local avec les catégories développées sauvegardées
       setExpandedCategories(savedExpandedState);
 
       // Si un élément est focalisé, s'assurer que ses parents sont développés
       if (focusedItemId) {
-        console.log('[CategoriesTable] Élément focalisé trouvé, recherche du chemin parent');
         const parentPath = findParentPath(hierarchicalCategories, focusedItemId);
 
         if (parentPath && parentPath.length > 0) {
@@ -189,7 +169,6 @@ export const useCategoryExpansion = ({
             newExpandedState[id] = true;
           });
 
-          console.log("[CategoriesTable] Nouvel état d'expansion calculé:", newExpandedState);
           setExpandedCategories(newExpandedState);
 
           // Synchroniser avec les préférences pour maintenir la cohérence

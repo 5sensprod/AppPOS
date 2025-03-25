@@ -358,9 +358,6 @@ export function createEntityStore(options) {
       // Utiliser l'intégration WebSocket si fournie, sinon utiliser l'implémentation standard
       initWebSocketListeners: webSocketIntegration
         ? () => {
-            console.log(
-              `[${entityName.toUpperCase()}] Utilisation de l'intégration WebSocket personnalisée`
-            );
             const wsStore = webSocketIntegration.storeHook.getState();
             wsStore.initWebSocket();
             return wsStore.cleanup;

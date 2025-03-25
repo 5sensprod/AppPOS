@@ -37,7 +37,6 @@ export function createEntityImageHandlers(entityName, apiEndpoint, dispatch, ACT
     try {
       const formData = new FormData();
       const fieldName = getImageFieldName();
-      console.log(`Utilisation du champ '${fieldName}' pour l'entité ${entityName}`);
 
       formData.append(fieldName, imageFile);
 

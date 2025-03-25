@@ -10,32 +10,26 @@ export const useCategoryHierarchyStore = create((set, get) => {
     // Éviter les abonnements multiples
     if (get().listenersInitialized) return;
 
-    console.log('[HIERARCHY] Initialisation des écouteurs WebSocket');
-
     // S'abonner au canal categories
     websocketService.subscribe('categories');
 
     // Gestionnaire pour l'événement de création
     const handleCreated = (data) => {
-      console.log('[HIERARCHY] Événement categories.created reçu', data);
       get().fetchHierarchicalCategories();
     };
 
     // Gestionnaire pour l'événement de mise à jour
     const handleUpdated = (data) => {
-      console.log('[HIERARCHY] Événement categories.updated reçu', data);
       get().fetchHierarchicalCategories();
     };
 
     // Gestionnaire pour l'événement de suppression
     const handleDeleted = (data) => {
-      console.log('[HIERARCHY] Événement categories.deleted reçu', data);
       get().fetchHierarchicalCategories();
     };
 
     // Gestionnaire pour l'événement de changement d'arborescence
     const handleTreeChanged = (data) => {
-      console.log('[HIERARCHY] Événement categories.tree.changed reçu', data);
       get().fetchHierarchicalCategories();
     };
 
@@ -70,14 +64,12 @@ export const useCategoryHierarchyStore = create((set, get) => {
     fetchHierarchicalCategories: async () => {
       set({ loading: true, error: null });
       try {
-        console.log('[HIERARCHY] Chargement des catégories hiérarchiques');
         const response = await apiService.get('/api/categories/hierarchical');
         set({
           hierarchicalCategories: response.data.data,
           loading: false,
           lastUpdate: Date.now(),
         });
-        console.log('[HIERARCHY] Catégories hiérarchiques chargées:', response.data.data.length);
         return response.data.data;
       } catch (error) {
         console.error('[HIERARCHY] Erreur lors du chargement des catégories:', error);
@@ -95,7 +87,6 @@ export const useCategoryHierarchyStore = create((set, get) => {
     cleanup: () => {
       if (!get().listenersInitialized) return;
 
-      console.log('[HIERARCHY] Nettoyage des écouteurs WebSocket');
       const { eventHandlers } = get();
 
       websocketService.off('categories.created', eventHandlers.created);
