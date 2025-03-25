@@ -1,38 +1,42 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useCategory, useCategoryExtras } from '../stores/categoryStore';
-import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function CategoriesTable(props) {
-  const { deleteCategory } = useCategory();
-  const { syncCategory } = useCategoryExtras();
-
-  // Utiliser le store hiérarchique pour les catégories
+  // Utiliser useCategoryExtras qui inclut maintenant les données hiérarchiques
   const {
+    deleteCategory,
+    syncCategory,
     hierarchicalCategories,
-    loading: hierarchyLoading,
-    fetchHierarchicalCategories,
-    initWebSocket,
-  } = useCategoryHierarchyStore();
+    hierarchicalLoading,
+    getHierarchicalCategories,
+    initWebSocketListeners,
+  } = useCategoryExtras();
 
   // États locaux pour le composant
   const [expandedCategories, setExpandedCategories] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [localSort, setLocalSort] = useState(ENTITY_CONFIG.defaultSort);
 
   // Initialiser les WebSockets une seule fois au montage du composant
   useEffect(() => {
     console.log('[TABLE] Initialisation du composant CategoriesTable');
-    // Initialiser les écouteurs WebSocket
-    initWebSocket();
+    // Initialiser les écouteurs WebSocket avec la nouvelle méthode
+    const cleanup = initWebSocketListeners();
+
     // Charger les catégories si elles ne sont pas déjà chargées
-    if (hierarchicalCategories.length === 0) {
-      fetchHierarchicalCategories();
+    if (!hierarchicalCategories || hierarchicalCategories.length === 0) {
+      getHierarchicalCategories();
     }
-  }, [initWebSocket, fetchHierarchicalCategories, hierarchicalCategories.length]);
+
+    return () => {
+      if (typeof cleanup === 'function') {
+        cleanup();
+      }
+    };
+  }, [initWebSocketListeners, getHierarchicalCategories, hierarchicalCategories]);
 
   // Utilisation du hook useEntityTable sans les abonnements WebSocket
   const {
@@ -42,7 +46,7 @@ function CategoriesTable(props) {
     handleSyncEntity,
   } = useEntityTable({
     entityType: 'category',
-    fetchEntities: fetchHierarchicalCategories,
+    fetchEntities: getHierarchicalCategories,
     deleteEntity: async (id) => {
       await deleteCategory(id);
       // Le refresh se fera automatiquement via les événements WebSocket
@@ -65,14 +69,6 @@ function CategoriesTable(props) {
   // Gestionnaire de recherche
   const handleSearch = useCallback((value) => {
     setSearchTerm(value);
-  }, []);
-
-  // Gestionnaire de tri
-  const customSort = useCallback((field) => {
-    setLocalSort((prev) => ({
-      field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
-    }));
   }, []);
 
   // Fonction pour aplatir les données hiérarchiques
@@ -125,7 +121,7 @@ function CategoriesTable(props) {
             _level: level,
             _childrenCount: hasChildren ? category.children.length : 0,
             product_count: category.productCount || 0,
-            _no_sort: true,
+            _sortIndex: result.length, // Ajouter un index de tri pour préserver l'ordre
           });
 
           // Ajouter récursivement les enfants si la catégorie est développée
@@ -167,7 +163,6 @@ function CategoriesTable(props) {
               _originalName: cat.name,
               _level: 0,
               product_count: cat.productCount || 0,
-              _no_sort: true,
             });
           }
 
@@ -194,26 +189,14 @@ function CategoriesTable(props) {
       return searchProcessor([], searchTerm);
     }
 
-    // Cloner avant de trier pour éviter de modifier les données d'origine
-    const sortedRootCategories = [...hierarchicalCategories].sort((a, b) => {
-      const aValue = a.name;
-      const bValue = b.name;
-
-      const result = aValue.localeCompare(bValue);
-      return localSort.direction === 'asc' ? result : -result;
-    });
-
     // Aplatir la hiérarchie pour l'affichage
-    return flattenHierarchy(sortedRootCategories);
-  }, [hierarchicalCategories, searchTerm, localSort, flattenHierarchy, searchProcessor]);
+    return flattenHierarchy(hierarchicalCategories);
+  }, [hierarchicalCategories, searchTerm, flattenHierarchy, searchProcessor]);
 
   const filters = [];
 
-  // Désactiver le tri standard
-  const sortProcessor = useCallback((data) => data, []);
-
   // Combinaison de l'état de chargement du store et des opérations
-  const isLoading = hierarchyLoading || operationLoading;
+  const isLoading = hierarchicalLoading || operationLoading;
 
   return (
     <>
@@ -228,9 +211,7 @@ function CategoriesTable(props) {
         filters={filters}
         searchFields={['_originalName', 'description']}
         searchProcessor={searchProcessor}
-        sortProcessor={sortProcessor}
         onSearch={handleSearch}
-        onSort={customSort}
         onDelete={handleDeleteEntity}
         onSync={handleSyncEntity}
         syncEnabled={ENTITY_CONFIG.syncEnabled}
@@ -243,7 +224,6 @@ function CategoriesTable(props) {
           pageSizeOptions: [5, 10, 25, 50],
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
-        sort={localSort}
         {...props}
       />
     </>

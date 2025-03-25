@@ -1,53 +1,53 @@
 // src/components/common/EntityTable/hooks/useTableSort.js
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 
 export const useTableSort = (data, defaultSort) => {
   const [sort, setSort] = useState(defaultSort);
-  const isInitialMount = useRef(true);
-  const prevSort = useRef(defaultSort);
+
+  const handleSort = (field) => {
+    setSort((prevSort) => ({
+      field,
+      direction: prevSort.field === field && prevSort.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
 
   // Appliquer le tri aux données
   const sortedData = useMemo(() => {
+    // Vérifier si nous avons des données hiérarchiques avec _sortIndex
+    const hasHierarchicalData = data.length > 0 && data[0]._sortIndex !== undefined;
+
+    // Si c'est le cas et qu'aucun tri n'est actif, maintenir l'ordre hiérarchique
+    if (hasHierarchicalData && sort.field === 'name' && sort.direction === 'asc') {
+      return [...data].sort((a, b) => a._sortIndex - b._sortIndex);
+    }
+
     return [...data].sort((a, b) => {
-      const aValue = a[sort.field];
-      const bValue = b[sort.field];
+      // Vérification supplémentaire pour les éléments React (pour le nom avec indentation)
+      const aOriginal = a._originalName !== undefined ? a._originalName : a[sort.field];
+      const bOriginal = b._originalName !== undefined ? b._originalName : b[sort.field];
+
+      // Si c'est le champ name mais qu'il y a des éléments React, utiliser _originalName
+      const aValue =
+        sort.field === 'name' && a._originalName !== undefined ? a._originalName : a[sort.field];
+
+      const bValue =
+        sort.field === 'name' && b._originalName !== undefined ? b._originalName : b[sort.field];
 
       if (aValue === bValue) return 0;
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
 
+      // Pour les chaînes de caractères
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        const result = aValue.localeCompare(bValue);
+        return sort.direction === 'asc' ? result : -result;
+      }
+
+      // Pour les valeurs numériques ou autres types
       const result = aValue < bValue ? -1 : 1;
       return sort.direction === 'asc' ? result : -result;
     });
   }, [data, sort.field, sort.direction]);
-
-  // Mettre à jour le tri seulement si defaultSort change réellement
-  useEffect(() => {
-    // Ignorer le premier montage (useState l'a déjà initialisé)
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    // Vérifier si defaultSort a changé
-    if (
-      prevSort.current.field !== defaultSort.field ||
-      prevSort.current.direction !== defaultSort.direction
-    ) {
-      setSort(defaultSort);
-      prevSort.current = defaultSort;
-    }
-  }, [defaultSort]);
-
-  const handleSort = (field) => {
-    const newSort = {
-      field,
-      direction: sort.field === field && sort.direction === 'asc' ? 'desc' : 'asc',
-    };
-
-    setSort(newSort);
-    prevSort.current = newSort;
-  };
 
   return {
     sort,
