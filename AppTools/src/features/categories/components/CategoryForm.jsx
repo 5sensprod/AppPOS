@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import * as yup from 'yup';
 import { EntityForm, EntityImageManager } from '../../../components/common';
-import { useCategory, useCategoryExtras } from '../contexts/categoryContext';
+import { useCategory, useCategoryExtras } from '../stores/categoryStore';
+import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
 import { ENTITY_CONFIG } from '../constants';
 
 function CategoryForm() {
@@ -11,11 +12,13 @@ function CategoryForm() {
   const navigate = useNavigate();
   const isNew = !id;
 
-  // Hooks de contexte
+  // Hooks Zustand (au lieu du contexte)
   const { getCategoryById, createCategory, updateCategory } = useCategory();
+  const { uploadImage, deleteImage } = useCategoryExtras();
 
-  // Hooks supplémentaires pour les catégories
-  const { uploadImage, deleteImage, getHierarchicalCategories } = useCategoryExtras();
+  // Store hiérarchique
+  const hierarchyStore = useCategoryHierarchyStore();
+  const { hierarchicalCategories, fetchHierarchicalCategories } = hierarchyStore;
 
   // États locaux
   const [category, setCategory] = useState(null);
@@ -39,6 +42,16 @@ function CategoryForm() {
     meta_keywords: yup.string(),
   });
 
+  // Initialiser les WebSockets
+  useEffect(() => {
+    const cleanup = hierarchyStore.initWebSocket();
+    return () => {
+      if (typeof cleanup === 'function') {
+        cleanup();
+      }
+    };
+  }, [hierarchyStore]);
+
   // Charger les données de la catégorie et les catégories parentes
   useEffect(() => {
     let isMounted = true;
@@ -51,7 +64,7 @@ function CategoryForm() {
 
       try {
         // Charger les catégories parentes pour le menu déroulant
-        const hierarchicalData = await getHierarchicalCategories();
+        const hierarchicalData = await fetchHierarchicalCategories();
         if (!isMounted) return;
 
         const options = transformToOptions(hierarchicalData);
@@ -80,7 +93,7 @@ function CategoryForm() {
     return () => {
       isMounted = false;
     };
-  }, [id, isNew]); // Suppression des dépendances qui pourraient causer une boucle
+  }, [id, isNew, fetchHierarchicalCategories, getCategoryById]);
 
   // Transformer les catégories hiérarchiques en options pour le menu déroulant
   const transformToOptions = (categories, prefix = '') => {
@@ -268,21 +281,59 @@ function CategoryForm() {
     navigate(isNew ? '/products/categories/' : `/products/categories/${id}`);
   };
 
-  // Rendu conditionnel de l'onglet images
-  const renderImageTab = () => {
-    if (activeTab !== 'images' || !category) return null;
+  // Gestionnaire pour l'upload d'image
+  const handleUploadImage = async (entityId, imageFile) => {
+    try {
+      setLoading(true);
+      await uploadImage(entityId, imageFile);
+      // Recharger les données de la catégorie après upload
+      const updatedCategory = await getCategoryById(id);
+      setCategory(updatedCategory);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de l'upload d'image:", error);
+      setError("Échec de l'upload d'image.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return (
-      <EntityImageManager
-        entity={category}
-        entityId={id}
-        entityType="category"
-        galleryMode={false}
-        onUploadImage={(id, file) => uploadImage(id, file)}
-        onDeleteImage={(id) => deleteImage(id)}
-        isLoading={loading}
-      />
-    );
+  // Gestionnaire pour supprimer une image
+  const handleDeleteImage = async (entityId) => {
+    try {
+      setLoading(true);
+      await deleteImage(entityId);
+      // Recharger les données de la catégorie après suppression
+      const updatedCategory = await getCategoryById(id);
+      setCategory(updatedCategory);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de la suppression d'image:", error);
+      setError("Échec de la suppression d'image.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Rendu du contenu des onglets
+  const renderTabContent = (tabId) => {
+    if (tabId === 'images' && category) {
+      return (
+        <EntityImageManager
+          entity={category}
+          entityId={id}
+          entityType="category"
+          galleryMode={false}
+          onUploadImage={handleUploadImage}
+          onDeleteImage={handleDeleteImage}
+          isLoading={loading}
+          error={error}
+        />
+      );
+    }
+    return null;
   };
 
   return (
@@ -302,15 +353,17 @@ function CategoryForm() {
           successMessage={success}
           buttonLabel={isNew ? 'Créer la catégorie' : 'Mettre à jour la catégorie'}
           formTitle={isNew ? 'Nouvelle catégorie' : `Modifier ${category?.name || 'la catégorie'}`}
-          layout={hasTabs ? 'tabs' : 'default'}
-          tabs={hasTabs ? ENTITY_CONFIG.tabs : []}
+          layout="tabs"
+          tabs={ENTITY_CONFIG.tabs}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          onTabChange={setActiveTab}
         />
       )}
 
-      {/* Gestionnaire d'images (affiché uniquement en mode édition) */}
-      {!isNew && category && renderImageTab()}
+      {/* Contenu des onglets spécifiques */}
+      {!isNew && category && activeTab !== 'general' && activeTab !== 'woocommerce' && (
+        <div className="mt-6">{renderTabContent(activeTab)}</div>
+      )}
     </div>
   );
 }

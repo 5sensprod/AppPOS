@@ -1,7 +1,6 @@
 // src/features/suppliers/stores/supplierStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
-import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
 import apiService from '../../../services/api';
 
 // Configuration de l'entité Supplier
@@ -25,13 +24,16 @@ export const useSupplierDataStore = createWebSocketStore({
   additionalEvents: [],
 });
 
-// Étendre useSupplier avec WebSocket (pour rétro-compatibilité)
+// Étendre useSupplier avec l'initialisation directe WebSocket (sans createWebSocketRedirection)
 export function useSupplier() {
   const supplierStore = useSupplierBase();
-
   return {
     ...supplierStore,
-    initWebSocketListeners: createWebSocketRedirection('supplier', useSupplierDataStore),
+    // Utiliser directement les méthodes du store WebSocket
+    initWebSocketListeners: () => {
+      const cleanup = useSupplierDataStore.getState().initWebSocket();
+      return cleanup;
+    },
   };
 }
 

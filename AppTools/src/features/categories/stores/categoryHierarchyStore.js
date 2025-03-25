@@ -3,12 +3,19 @@ import { create } from 'zustand';
 import websocketService from '../../../services/websocketService';
 import apiService from '../../../services/api';
 
+// Variable globale pour suivre l'état d'initialisation et éviter les doubles abonnements
+let listenersInitialized = false;
+let eventHandlers = {};
+
 // Store pour les catégories hiérarchiques avec gestion des WebSockets
 export const useCategoryHierarchyStore = create((set, get) => {
   // Fonction pour gérer les abonnements WebSocket
   const setupWebSocketListeners = () => {
     // Éviter les abonnements multiples
-    if (get().listenersInitialized) return;
+    if (listenersInitialized) {
+      console.log('[HIERARCHY] WebSocket déjà initialisé, réutilisation des écouteurs existants');
+      return () => {}; // Retourner une fonction de nettoyage vide si déjà initialisé
+    }
 
     console.log('[HIERARCHY] Initialisation des écouteurs WebSocket');
 
@@ -46,15 +53,34 @@ export const useCategoryHierarchyStore = create((set, get) => {
     websocketService.on('categories.tree.changed', handleTreeChanged);
 
     // Stocker les références aux gestionnaires pour le nettoyage
-    set({
-      listenersInitialized: true,
-      eventHandlers: {
-        created: handleCreated,
-        updated: handleUpdated,
-        deleted: handleDeleted,
-        treeChanged: handleTreeChanged,
-      },
-    });
+    eventHandlers = {
+      created: handleCreated,
+      updated: handleUpdated,
+      deleted: handleDeleted,
+      treeChanged: handleTreeChanged,
+    };
+
+    // Marquer comme initialisé
+    listenersInitialized = true;
+
+    // Debug
+    console.log('[HIERARCHY] Écouteurs WebSocket initialisés');
+
+    // Fonction de nettoyage
+    return () => {
+      if (!listenersInitialized) return;
+
+      console.log('[HIERARCHY] Nettoyage des écouteurs WebSocket');
+
+      websocketService.off('categories.created', eventHandlers.created);
+      websocketService.off('categories.updated', eventHandlers.updated);
+      websocketService.off('categories.deleted', eventHandlers.deleted);
+      websocketService.off('categories.tree.changed', eventHandlers.treeChanged);
+
+      // Réinitialiser
+      eventHandlers = {};
+      listenersInitialized = false;
+    };
   };
 
   return {
@@ -63,11 +89,18 @@ export const useCategoryHierarchyStore = create((set, get) => {
     loading: false,
     error: null,
     lastUpdate: null,
-    listenersInitialized: false,
-    eventHandlers: {},
 
     // Actions
-    fetchHierarchicalCategories: async () => {
+    fetchHierarchicalCategories: async (force = false) => {
+      // Éviter les appels inutiles si les données sont récentes et non forcées
+      const state = get();
+      const isDataStale = !state.lastUpdate || Date.now() - state.lastUpdate > 60000; // 1 minute
+
+      if (!force && !isDataStale && state.hierarchicalCategories.length > 0) {
+        console.log('[HIERARCHY] Utilisation des données en cache');
+        return state.hierarchicalCategories;
+      }
+
       set({ loading: true, error: null });
       try {
         console.log('[HIERARCHY] Chargement des catégories hiérarchiques');
@@ -88,25 +121,13 @@ export const useCategoryHierarchyStore = create((set, get) => {
 
     // Initialiser les écouteurs WebSocket
     initWebSocket: () => {
-      setupWebSocketListeners();
+      console.log('[HIERARCHY] Appel à initWebSocket()');
+      return setupWebSocketListeners();
     },
 
-    // Nettoyage (à appeler lors du démontage de l'application si nécessaire)
-    cleanup: () => {
-      if (!get().listenersInitialized) return;
-
-      console.log('[HIERARCHY] Nettoyage des écouteurs WebSocket');
-      const { eventHandlers } = get();
-
-      websocketService.off('categories.created', eventHandlers.created);
-      websocketService.off('categories.updated', eventHandlers.updated);
-      websocketService.off('categories.deleted', eventHandlers.deleted);
-      websocketService.off('categories.tree.changed', eventHandlers.treeChanged);
-
-      set({
-        listenersInitialized: false,
-        eventHandlers: {},
-      });
+    // Méthode pour vérifier si les WebSockets sont initialisés
+    isWebSocketInitialized: () => {
+      return listenersInitialized;
     },
   };
 });

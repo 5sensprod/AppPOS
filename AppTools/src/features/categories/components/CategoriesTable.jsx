@@ -1,44 +1,24 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useCategory, useCategoryExtras } from '../stores/categoryStore';
+import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function CategoriesTable(props) {
-  // Utiliser useCategoryExtras qui inclut maintenant les données hiérarchiques
-  const {
-    deleteCategory,
-    syncCategory,
-    hierarchicalCategories,
-    hierarchicalLoading,
-    getHierarchicalCategories,
-    initWebSocketListeners,
-  } = useCategoryExtras();
+  // Référence pour suivre le montage
+  const isMountedRef = useRef(false);
 
   // États locaux pour le composant
   const [expandedCategories, setExpandedCategories] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Initialiser les WebSockets une seule fois au montage du composant
-  useEffect(() => {
-    console.log('[TABLE] Initialisation du composant CategoriesTable');
-    // Initialiser les écouteurs WebSocket avec la nouvelle méthode
-    const cleanup = initWebSocketListeners();
+  // Accéder directement au store hiérarchique
+  const hierarchyStore = useCategoryHierarchyStore();
+  const { deleteCategory, syncCategory } = useCategory();
 
-    // Charger les catégories si elles ne sont pas déjà chargées
-    if (!hierarchicalCategories || hierarchicalCategories.length === 0) {
-      getHierarchicalCategories();
-    }
-
-    return () => {
-      if (typeof cleanup === 'function') {
-        cleanup();
-      }
-    };
-  }, [initWebSocketListeners, getHierarchicalCategories, hierarchicalCategories]);
-
-  // Utilisation du hook useEntityTable sans les abonnements WebSocket
+  // Utilisation du hook useEntityTable
   const {
     loading: operationLoading,
     error,
@@ -46,17 +26,34 @@ function CategoriesTable(props) {
     handleSyncEntity,
   } = useEntityTable({
     entityType: 'category',
-    fetchEntities: getHierarchicalCategories,
-    deleteEntity: async (id) => {
-      await deleteCategory(id);
-      // Le refresh se fera automatiquement via les événements WebSocket
-    },
-    syncEntity: async (id) => {
-      await syncCategory(id);
-      // Le refresh se fera automatiquement via les événements WebSocket
-    },
-    // Ne pas spécifier de customEventHandlers pour éviter les abonnements doublons
+    fetchEntities: hierarchyStore.fetchHierarchicalCategories,
+    deleteEntity: deleteCategory,
+    syncEntity: syncCategory,
   });
+
+  // Initialiser les WebSockets une seule fois au montage du composant
+  useEffect(() => {
+    console.log('[TABLE] Initialisation du composant CategoriesTable');
+
+    // Marquer le composant comme monté
+    isMountedRef.current = true;
+
+    // Initialiser les écouteurs WebSocket
+    const cleanup = hierarchyStore.initWebSocket();
+
+    // Charger les catégories si nécessaire
+    if (hierarchyStore.hierarchicalCategories.length === 0 && !hierarchyStore.loading) {
+      hierarchyStore.fetchHierarchicalCategories();
+    }
+
+    // Nettoyer au démontage
+    return () => {
+      isMountedRef.current = false;
+      if (typeof cleanup === 'function') {
+        cleanup();
+      }
+    };
+  }, []); // Exécuter une seule fois au montage
 
   // Fonction pour développer/replier une catégorie
   const toggleCategory = useCallback((categoryId) => {
@@ -141,11 +138,16 @@ function CategoriesTable(props) {
     (items, term) => {
       if (!term) return items;
 
+      const { hierarchicalCategories } = hierarchyStore;
       const lowerSearchTerm = term.toLowerCase();
 
       // Fonction récursive pour rechercher dans la hiérarchie
       const searchInHierarchy = (cats, results = []) => {
+        if (!cats) return results;
+
         cats.forEach((cat) => {
+          if (!cat || !cat.name) return;
+
           const nameMatch = cat.name.toLowerCase().includes(lowerSearchTerm);
           const descMatch =
             cat.description && cat.description.toLowerCase().includes(lowerSearchTerm);
@@ -177,11 +179,13 @@ function CategoriesTable(props) {
 
       return searchInHierarchy(hierarchicalCategories);
     },
-    [hierarchicalCategories]
+    [hierarchyStore]
   );
 
   // Traiter les données pour l'affichage
   const processedData = useMemo(() => {
+    const { hierarchicalCategories } = hierarchyStore;
+
     if (!hierarchicalCategories || hierarchicalCategories.length === 0) return [];
 
     // Si une recherche est active, utiliser le processeur de recherche
@@ -191,12 +195,12 @@ function CategoriesTable(props) {
 
     // Aplatir la hiérarchie pour l'affichage
     return flattenHierarchy(hierarchicalCategories);
-  }, [hierarchicalCategories, searchTerm, flattenHierarchy, searchProcessor]);
+  }, [hierarchyStore.hierarchicalCategories, searchTerm, flattenHierarchy, searchProcessor]);
 
   const filters = [];
 
   // Combinaison de l'état de chargement du store et des opérations
-  const isLoading = hierarchicalLoading || operationLoading;
+  const isLoading = hierarchyStore.loading || operationLoading;
 
   return (
     <>

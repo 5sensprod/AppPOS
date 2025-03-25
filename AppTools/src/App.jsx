@@ -10,12 +10,6 @@ import ApiTest from './components/ApiTest';
 import UpdateChecker from './components/UpdateChecker';
 import Login from './components/Login';
 
-// Providers
-import { ProductProvider } from './features/products/contexts/productContext';
-import { SupplierProvider } from './features/suppliers/contexts/supplierContext';
-import { CategoryProvider } from './features/categories/contexts/categoryContext';
-import { BrandProvider } from './features/brands/contexts/brandContext';
-
 // Pages
 import ProductsPage from './features/products/ProductsPage';
 import ProductDetail from './features/products/components/ProductDetail';
@@ -47,33 +41,29 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
-// **Routes dynamiques pour les produits et fournisseurs**
+// **Routes dynamiques pour les entités**
 const entityRoutes = [
   {
     path: 'products',
     component: ProductsPage,
-    provider: ProductProvider,
     details: ProductDetail,
     form: ProductForm,
   },
   {
     path: 'products/categories',
     component: CategoriesPage,
-    provider: CategoryProvider,
     details: CategorieDetail,
     form: CategoryForm,
   },
   {
     path: 'products/suppliers',
     component: SuppliersPage,
-    provider: SupplierProvider,
     details: SupplierDetail,
     form: SupplierForm,
   },
   {
     path: 'products/brands',
     component: BrandsPage,
-    provider: BrandProvider,
     details: BrandDetail,
     form: BrandForm,
   },
@@ -120,58 +110,50 @@ function AppRoutes() {
           }
         />
 
-        {entityRoutes.map(
-          ({ path, component: Component, provider: Provider, details: Details, form: Form }) => (
-            <React.Fragment key={path}>
-              <Route
-                path={`/${path}`}
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <Component />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path={`/${path}/new`}
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <Provider>
-                        <Form />
-                      </Provider>
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path={`/${path}/:id`}
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <Provider>
-                        <Details />
-                      </Provider>
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path={`/${path}/:id/edit`}
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <Provider>
-                        <Form />
-                      </Provider>
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-            </React.Fragment>
-          )
-        )}
+        {entityRoutes.map(({ path, component: Component, details: Details, form: Form }) => (
+          <React.Fragment key={path}>
+            <Route
+              path={`/${path}`}
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Component />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={`/${path}/new`}
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Form />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={`/${path}/:id`}
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Details />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={`/${path}/:id/edit`}
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Form />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
+          </React.Fragment>
+        ))}
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

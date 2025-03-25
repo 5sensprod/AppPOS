@@ -9,6 +9,32 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
   // Référence pour suivre si une opération est en cours
   const operationInProgress = useRef(false);
 
+  // Référence pour stocker les fonctions pour éviter les problèmes de dépendances
+  const functionsRef = useRef({
+    fetchEntities,
+    deleteEntity,
+    syncEntity,
+  });
+
+  // Mettre à jour les références si les fonctions changent
+  useEffect(() => {
+    functionsRef.current = {
+      fetchEntities,
+      deleteEntity,
+      syncEntity,
+    };
+  }, [fetchEntities, deleteEntity, syncEntity]);
+
+  // Référence pour suivre si le composant est monté
+  const isMountedRef = useRef(true);
+
+  // Nettoyer la référence au démontage
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Fonction pour exécuter une opération avec gestion des états
   const executeOperation = useCallback(async (operation) => {
     if (operationInProgress.current) return;
@@ -21,10 +47,16 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
       await operation();
     } catch (err) {
       console.error(`Erreur lors de l'opération:`, err);
-      setError(err.message || `Erreur lors de l'opération`);
+      // Vérifier si le composant est toujours monté avant de mettre à jour l'état
+      if (isMountedRef.current) {
+        setError(err.message || `Erreur lors de l'opération`);
+      }
       throw err;
     } finally {
-      setLoading(false);
+      // Vérifier si le composant est toujours monté avant de mettre à jour l'état
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
       operationInProgress.current = false;
     }
   }, []);
@@ -32,50 +64,64 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
   // Fonction pour charger les données avec gestion des erreurs
   const loadEntities = useCallback(() => {
     return executeOperation(async () => {
-      await fetchEntities();
+      await functionsRef.current.fetchEntities();
     });
-  }, [fetchEntities, executeOperation]);
+  }, [executeOperation]);
 
   // Chargement initial des données
   useEffect(() => {
-    loadEntities();
-  }, [loadEntities]);
+    // Utiliser une variable pour suivre si l'effet a été exécuté
+    let didInitialLoad = false;
+
+    if (!didInitialLoad) {
+      didInitialLoad = true;
+      loadEntities();
+    }
+
+    // Pas de dépendance à loadEntities pour éviter de déclencher à nouveau l'effet
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Gestion de la suppression
   const handleDeleteEntity = useCallback(
     async (id) => {
       return executeOperation(async () => {
-        await deleteEntity(id);
-        // Avec Zustand, le store est mis à jour automatiquement via les réducteurs
-        // mais on peut rafraîchir les données pour être sûr
-        await fetchEntities();
+        await functionsRef.current.deleteEntity(id);
+        // Avec WebSockets, ne pas appeler fetchEntities ici
+        // Les mises à jour seront déclenchées par les événements WebSocket
       });
     },
-    [deleteEntity, fetchEntities, executeOperation]
+    [executeOperation]
   );
 
   // Gestion de la synchronisation
   const handleSyncEntity = useCallback(
     async (id) => {
-      if (!syncEntity) return;
+      if (!functionsRef.current.syncEntity) return;
 
       return executeOperation(async () => {
-        await syncEntity(id);
-        // Avec Zustand, le store est mis à jour automatiquement via les réducteurs
-        // mais on peut rafraîchir les données pour être sûr
-        await fetchEntities();
+        await functionsRef.current.syncEntity(id);
+        // Avec WebSockets, ne pas appeler fetchEntities ici
+        // Les mises à jour seront déclenchées par les événements WebSocket
       });
     },
-    [syncEntity, fetchEntities, executeOperation]
+    [executeOperation]
   );
+
+  // Forcer un rechargement des données (utile pour les rafraîchissements manuels)
+  const refreshEntities = useCallback(() => {
+    return loadEntities();
+  }, [loadEntities]);
 
   return {
     loading,
     error,
     loadEntities,
+    refreshEntities,
     handleDeleteEntity,
     handleSyncEntity,
     executeOperation,
     operationInProgress: operationInProgress.current,
   };
 };
+
+export default useEntityTable;

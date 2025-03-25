@@ -11,17 +11,28 @@ const CATEGORY_CONFIG = {
   cacheDuration: 5 * 60 * 1000, // 5 minutes
   hierarchicalEnabled: true,
   hierarchicalEndpoint: '/api/categories/hierarchical',
-  // Intégration directe avec le WebSocket
-  webSocketIntegration: {
-    storeHook: useCategoryHierarchyStore,
-  },
 };
 
-// Créer le store avec la factory améliorée
-const { useCategory, useEntityStore: useCategoryStore } = createEntityStore(CATEGORY_CONFIG);
+// Créer le store avec la factory
+const { useCategory: useCategoryBase, useEntityStore: useCategoryStore } =
+  createEntityStore(CATEGORY_CONFIG);
 
-// Export du hook principal sans passer par une fonction intermédiaire
-export { useCategory, useCategoryStore };
+// Export du hook principal avec intégration directe de WebSocket
+export function useCategory() {
+  const categoryStore = useCategoryBase();
+
+  return {
+    ...categoryStore,
+    // Utiliser directement le store hiérarchique pour initWebSocket
+    initWebSocketListeners: () => {
+      const cleanup = useCategoryHierarchyStore.getState().initWebSocket();
+      return cleanup;
+    },
+  };
+}
+
+// Réexporter useCategoryStore pour maintenir la compatibilité
+export { useCategoryStore };
 
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux catégories
 export function useCategoryExtras() {
@@ -30,9 +41,9 @@ export function useCategoryExtras() {
 
   return {
     ...categoryStore,
-    // Utiliser directement la fonction du store hierarchique
+    // Utiliser directement la fonction du store hiérarchique
     getHierarchicalCategories: hierarchyStore.fetchHierarchicalCategories,
-    // État du store hierarchique
+    // État du store hiérarchique
     hierarchicalCategories: hierarchyStore.hierarchicalCategories,
     hierarchicalLoading: hierarchyStore.loading,
   };

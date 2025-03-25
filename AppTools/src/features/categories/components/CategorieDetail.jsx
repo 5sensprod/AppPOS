@@ -1,5 +1,5 @@
 // src/features/categories/components/CategoryDetail.jsx
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useCategory, useCategoryExtras } from '../stores/categoryStore';
 import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
@@ -12,12 +12,40 @@ import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
 function CategoryDetail() {
   const { id } = useParams();
-  const { getCategoryById, deleteCategory } = useCategory();
-  const { uploadImage, deleteImage, syncCategory } = useCategoryExtras();
+  const [wsInitialized, setWsInitialized] = useState(false);
+  const isMountedRef = useRef(true);
 
-  // Store WebSocket dédié
-  const categoryWsStore = useCategoryHierarchyStore();
+  // Récupération des fonctions du store
+  const { getCategoryById, deleteCategory, syncCategory } = useCategory();
+  const { uploadImage, deleteImage } = useCategoryExtras();
 
+  // Accès direct au store hiérarchique
+  const hierarchyStore = useCategoryHierarchyStore();
+
+  // Initialiser WebSocket séparément, une seule fois
+  useEffect(() => {
+    if (!wsInitialized) {
+      console.log(`[CATEGORY_DETAIL] Initialisation des WebSockets pour la catégorie #${id}`);
+      const cleanup = hierarchyStore.initWebSocket();
+      setWsInitialized(true);
+
+      return () => {
+        if (typeof cleanup === 'function') {
+          cleanup();
+        }
+      };
+    }
+  }, [id, hierarchyStore, wsInitialized]);
+
+  // Nettoyage à la déconnexion
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Utilisation du hook useEntityDetail sans passer le store WebSocket
+  // puisque nous l'initialisons directement ci-dessus
   const {
     entity: category,
     loading,
@@ -29,13 +57,14 @@ function CategoryDetail() {
     id,
     entityType: 'category',
     getEntityById: getCategoryById,
-    wsStore: categoryWsStore,
     syncEntity: syncCategory,
     uploadImage,
     deleteImage,
   });
 
   const renderTabContent = (category, activeTab) => {
+    if (!category) return null;
+
     switch (activeTab) {
       case 'general':
         return (
