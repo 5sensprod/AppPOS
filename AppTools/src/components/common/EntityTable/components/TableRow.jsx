@@ -72,8 +72,8 @@ export const TableRow = ({
           ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700'
           : ''
       } ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''} 
-        transition-all duration-500 ease-in-out
-        ${isFocused ? 'outline outline-2 outline-blue-500' : 'outline outline-0 outline-transparent'}`}
+  transition-all duration-500 ease-in-out
+  ${isFocused ? 'bg-blue-100/30 dark:bg-blue-800/20' : ''}`}
     >
       <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
         <div onClick={handleCheckboxClick}>
