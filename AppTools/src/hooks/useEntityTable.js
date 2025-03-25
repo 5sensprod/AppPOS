@@ -1,13 +1,7 @@
 // src/hooks/useEntityTable.js
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-export const useEntityTable = ({
-  entityType,
-  fetchEntities,
-  deleteEntity,
-  syncEntity,
-  customEventHandlers = {},
-}) => {
+export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
   // État
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
