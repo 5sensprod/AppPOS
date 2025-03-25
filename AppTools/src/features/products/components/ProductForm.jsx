@@ -1,8 +1,9 @@
+// src/features/products/components/ProductForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { EntityForm } from '../../../components/common';
+import { EntityForm, EntityImageManager } from '../../../components/common';
 import { ENTITY_CONFIG } from '../constants';
-import { useProduct } from '../contexts/productContext';
+import { useProduct, useProductExtras } from '../stores/productStore'; // Zustand hook
 import apiService from '../../../services/api';
 import getValidationSchema from './validationSchema/getValidationSchema';
 
@@ -10,7 +11,11 @@ function ProductForm() {
   const { id } = useParams();
   const isNew = !id;
   const navigate = useNavigate();
-  const { createProduct, updateProduct, getProductById } = useProduct();
+
+  // Utiliser les hooks Zustand au lieu du contexte
+  const { createProduct, updateProduct, getProductById, syncProduct } = useProduct();
+  const { uploadImage, deleteImage, setMainImage, uploadGalleryImage, deleteGalleryImage } =
+    useProductExtras();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -33,7 +38,7 @@ function ProductForm() {
       .then(setProduct)
       .catch(() => setError('Erreur lors de la récupération du produit.'))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, getProductById]);
 
   // Récupérer les listes déroulantes (catégories, marques, fournisseurs)
   useEffect(() => {
@@ -426,6 +431,222 @@ function ProductForm() {
     navigate(isNew ? '/products' : `/products/${id}`);
   };
 
+  // Gestionnaire de synchronisation
+  const handleSync = async () => {
+    if (!id) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await syncProduct(id);
+      setSuccess('Produit synchronisé avec succès');
+      // Recharger les données
+      const updatedProduct = await getProductById(id);
+      setProduct(updatedProduct);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation:', error);
+      setError('Erreur lors de la synchronisation du produit');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gestionnaire pour l'upload d'image
+  const handleUploadImage = async (entityId, imageFile) => {
+    try {
+      setLoading(true);
+      await uploadImage(entityId, imageFile);
+      // Recharger les données du produit après upload
+      const updatedProduct = await getProductById(id);
+      setProduct(updatedProduct);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de l'upload d'image:", error);
+      setError("Échec de l'upload d'image.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gestionnaire pour télécharger une image de galerie
+  const handleUploadGalleryImage = async (entityId, imageFile) => {
+    try {
+      setLoading(true);
+      await uploadGalleryImage(entityId, imageFile);
+      // Recharger les données du produit après upload
+      const updatedProduct = await getProductById(id);
+      setProduct(updatedProduct);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de l'upload d'image de galerie:", error);
+      setError("Échec de l'upload d'image de galerie.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gestionnaire pour supprimer une image
+  const handleDeleteImage = async (entityId) => {
+    try {
+      setLoading(true);
+      await deleteImage(entityId);
+      // Recharger les données du produit après suppression
+      const updatedProduct = await getProductById(id);
+      setProduct(updatedProduct);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de la suppression d'image:", error);
+      setError("Échec de la suppression d'image.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gestionnaire pour supprimer une image de galerie
+  const handleDeleteGalleryImage = async (entityId, imageIndex) => {
+    try {
+      setLoading(true);
+      await deleteGalleryImage(entityId, imageIndex);
+      // Recharger les données du produit après suppression
+      const updatedProduct = await getProductById(id);
+      setProduct(updatedProduct);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de la suppression d'image de galerie:", error);
+      setError("Échec de la suppression d'image de galerie.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gestionnaire pour définir l'image principale
+  const handleSetMainImage = async (entityId, imageIndex) => {
+    try {
+      setLoading(true);
+      await setMainImage(entityId, imageIndex);
+      // Recharger les données du produit
+      const updatedProduct = await getProductById(id);
+      setProduct(updatedProduct);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de la définition de l'image principale:", error);
+      setError("Échec de la définition de l'image principale.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Rendu du contenu des onglets
+  const renderTabContent = (tabId) => {
+    switch (tabId) {
+      case 'general':
+      case 'inventory':
+        return null; // Géré par EntityForm
+      case 'images':
+        if (!product) return null;
+        return (
+          <EntityImageManager
+            entity={product}
+            entityId={id}
+            entityType="product"
+            galleryMode={true}
+            onUploadImage={handleUploadImage}
+            onUploadGalleryImage={handleUploadGalleryImage}
+            onDeleteImage={handleDeleteImage}
+            onDeleteGalleryImage={handleDeleteGalleryImage}
+            onSetMainImage={handleSetMainImage}
+            isLoading={loading}
+            error={error}
+          />
+        );
+      case 'woocommerce':
+        if (!product) return null;
+        return (
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                Informations WooCommerce
+              </h2>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Statut de synchronisation:
+                  </span>
+                  <div>
+                    {product.woo_id ? (
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        Synchronisé
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                        Non synchronisé
+                      </span>
+                    )}
+
+                    {product.pending_sync && (
+                      <span className="ml-2 px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                        Modifié
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {product.woo_id && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">ID WooCommerce:</span>
+                    <span className="font-mono text-sm">{product.woo_id}</span>
+                  </div>
+                )}
+
+                {product.status && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Statut WooCommerce:</span>
+                    <span className="capitalize">
+                      {product.status === 'published'
+                        ? 'Publié'
+                        : product.status === 'draft'
+                          ? 'Brouillon'
+                          : product.status === 'archived'
+                            ? 'Archivé'
+                            : product.status}
+                    </span>
+                  </div>
+                )}
+
+                {product.last_sync && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Dernière synchronisation:
+                    </span>
+                    <span>{new Date(product.last_sync).toLocaleString()}</span>
+                  </div>
+                )}
+
+                <div className="pt-4">
+                  <button
+                    onClick={handleSync}
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                  >
+                    {product.woo_id ? 'Resynchroniser' : 'Synchroniser avec WooCommerce'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Formulaire principal */}
@@ -442,12 +663,17 @@ function ProductForm() {
           successMessage={success}
           buttonLabel={isNew ? 'Créer le produit' : 'Mettre à jour le produit'}
           formTitle={isNew ? 'Nouveau produit' : `Modifier ${product?.name || 'le produit'}`}
-          layout={hasTabs ? 'tabs' : 'default'}
-          tabs={hasTabs ? ENTITY_CONFIG.tabs : []}
+          layout="tabs"
+          tabs={ENTITY_CONFIG.tabs}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          onTabChange={setActiveTab}
           schema={getValidationSchema(isNew)} // Schéma de validation différent selon le mode
         />
+      )}
+
+      {/* Contenu des onglets spécifiques */}
+      {!isNew && product && (activeTab === 'images' || activeTab === 'woocommerce') && (
+        <div className="mt-6">{renderTabContent(activeTab)}</div>
       )}
     </div>
   );

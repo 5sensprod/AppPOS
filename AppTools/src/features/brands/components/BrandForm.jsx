@@ -111,77 +111,90 @@ function BrandForm() {
     }
   };
 
-  // Rendu conditionnel de l'onglet images
-  const renderImageTab = () => {
-    if (activeTab !== 'images' || !brand) return null;
+  // Préparer les champs du formulaire avec leur onglet
+  const formFields = ENTITY_CONFIG.formFields.map((field) => ({
+    ...field,
+    tab: 'general', // Tous les champs de formulaire sont dans l'onglet "general"
+  }));
 
-    return (
-      <EntityImageManager
-        entity={brand}
-        entityId={id}
-        entityType="brand"
-        galleryMode={false}
-        onUploadImage={(id, file) => uploadImage(id, file)}
-        onDeleteImage={(id) => deleteImage(id)}
-        isLoading={loading}
-      />
-    );
-  };
+  // Rendu du contenu des onglets
+  const renderTabContent = (tabId) => {
+    switch (tabId) {
+      case 'general':
+        return null; // Géré par EntityForm
+      case 'images':
+        if (!brand) return null;
+        return (
+          <EntityImageManager
+            entity={brand}
+            entityId={id}
+            entityType="brand"
+            galleryMode={false}
+            onUploadImage={(id, file) => uploadImage(id, file)}
+            onDeleteImage={(id) => deleteImage(id)}
+            isLoading={loading}
+            error={error}
+          />
+        );
+      case 'woocommerce':
+        if (!brand) return null;
+        return (
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                Informations WooCommerce
+              </h2>
 
-  // Rendu conditionnel de l'onglet WooCommerce
-  const renderWooCommerceTab = () => {
-    if (activeTab !== 'woocommerce' || !brand) return null;
-
-    return (
-      <div className="space-y-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-            Informations WooCommerce
-          </h2>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Statut de synchronisation:</span>
-              <div>
-                {brand.woo_id ? (
-                  <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                    Synchronisé
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Statut de synchronisation:
                   </span>
-                ) : (
-                  <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                    Non synchronisé
-                  </span>
+                  <div>
+                    {brand.woo_id ? (
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        Synchronisé
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                        Non synchronisé
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {brand.woo_id && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">ID WooCommerce:</span>
+                    <span className="font-mono text-sm">{brand.woo_id}</span>
+                  </div>
                 )}
-              </div>
-            </div>
 
-            {brand.woo_id && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 dark:text-gray-400">ID WooCommerce:</span>
-                <span className="font-mono text-sm">{brand.woo_id}</span>
-              </div>
-            )}
+                {brand.last_sync && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Dernière synchronisation:
+                    </span>
+                    <span>{new Date(brand.last_sync).toLocaleString()}</span>
+                  </div>
+                )}
 
-            {brand.last_sync && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Dernière synchronisation:</span>
-                <span>{new Date(brand.last_sync).toLocaleString()}</span>
+                <div className="pt-4">
+                  <button
+                    onClick={handleSync}
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                  >
+                    {brand.woo_id ? 'Resynchroniser' : 'Synchroniser avec WooCommerce'}
+                  </button>
+                </div>
               </div>
-            )}
-
-            <div className="pt-4">
-              <button
-                onClick={handleSync}
-                disabled={loading}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
-              >
-                {brand.woo_id ? 'Resynchroniser' : 'Synchroniser avec WooCommerce'}
-              </button>
             </div>
           </div>
-        </div>
-      </div>
-    );
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -189,7 +202,7 @@ function BrandForm() {
       {/* Formulaire principal */}
       {(!id || (id && brand)) && (
         <EntityForm
-          fields={ENTITY_CONFIG.formFields}
+          fields={formFields}
           entityName="marque"
           isNew={isNew}
           initialValues={getInitialValues()}
@@ -200,16 +213,17 @@ function BrandForm() {
           successMessage={success}
           buttonLabel={isNew ? 'Créer la marque' : 'Mettre à jour la marque'}
           formTitle={isNew ? 'Nouvelle marque' : `Modifier ${brand?.name || 'la marque'}`}
-          layout={hasTabs ? 'tabs' : 'default'}
-          tabs={hasTabs ? ENTITY_CONFIG.tabs : []}
+          layout="tabs"
+          tabs={ENTITY_CONFIG.tabs}
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
       )}
 
       {/* Contenu des onglets spécifiques */}
-      {!isNew && brand && activeTab === 'images' && renderImageTab()}
-      {!isNew && brand && activeTab === 'woocommerce' && renderWooCommerceTab()}
+      {!isNew && brand && activeTab !== 'general' && (
+        <div className="mt-6">{renderTabContent(activeTab)}</div>
+      )}
     </div>
   );
 }

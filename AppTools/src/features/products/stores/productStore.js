@@ -1,7 +1,6 @@
 // src/features/products/stores/productStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
-import { createWebSocketRedirection } from '../../../factories/createWebSocketRedirection';
 import { ENTITY_CONFIG } from '../constants';
 import apiService from '../../../services/api';
 
@@ -76,7 +75,7 @@ const { useProduct: useProductBase, useEntityStore: useProductStore } = createEn
   customReducers,
 });
 
-// Créer le store WebSocket avec la nouvelle factory
+// Créer le store WebSocket avec la factory
 export const useProductDataStore = createWebSocketStore({
   entityName: 'product',
   apiEndpoint: '/api/products',
@@ -96,13 +95,16 @@ export const useProductDataStore = createWebSocketStore({
   ],
 });
 
-// Étendre useProduct avec WebSocket (pour rétro-compatibilité)
+// Étendre useProduct avec l'initWebSocket direct plutôt que la redirection
 export function useProduct() {
   const productStore = useProductBase();
 
   return {
     ...productStore,
-    initWebSocketListeners: createWebSocketRedirection('product', useProductDataStore),
+    initWebSocketListeners: () => {
+      const cleanup = useProductDataStore.getState().initWebSocket();
+      return cleanup;
+    },
   };
 }
 
