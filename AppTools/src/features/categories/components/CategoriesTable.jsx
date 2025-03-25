@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useCategory, useCategoryExtras } from '../stores/categoryStore';
+import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function CategoriesTable(props) {
-  // Utiliser useCategoryExtras qui inclut maintenant les données hiérarchiques
+  const { deleteCategory } = useCategory();
+  const { syncCategory } = useCategoryExtras();
+
+  // Utiliser le store hiérarchique pour les catégories
   const {
-    deleteCategory,
-    syncCategory,
     hierarchicalCategories,
-    hierarchicalLoading,
-    getHierarchicalCategories,
-    initWebSocketListeners,
-  } = useCategoryExtras();
+    loading: hierarchyLoading,
+    fetchHierarchicalCategories,
+    initWebSocket,
+  } = useCategoryHierarchyStore();
 
   // États locaux pour le composant
   const [expandedCategories, setExpandedCategories] = useState({});
@@ -24,20 +26,13 @@ function CategoriesTable(props) {
   // Initialiser les WebSockets une seule fois au montage du composant
   useEffect(() => {
     console.log('[TABLE] Initialisation du composant CategoriesTable');
-    // Initialiser les écouteurs WebSocket avec la nouvelle méthode
-    const cleanup = initWebSocketListeners();
-
+    // Initialiser les écouteurs WebSocket
+    initWebSocket();
     // Charger les catégories si elles ne sont pas déjà chargées
-    if (!hierarchicalCategories || hierarchicalCategories.length === 0) {
-      getHierarchicalCategories();
+    if (hierarchicalCategories.length === 0) {
+      fetchHierarchicalCategories();
     }
-
-    return () => {
-      if (typeof cleanup === 'function') {
-        cleanup();
-      }
-    };
-  }, [initWebSocketListeners, getHierarchicalCategories, hierarchicalCategories]);
+  }, [initWebSocket, fetchHierarchicalCategories, hierarchicalCategories.length]);
 
   // Utilisation du hook useEntityTable sans les abonnements WebSocket
   const {
@@ -47,7 +42,7 @@ function CategoriesTable(props) {
     handleSyncEntity,
   } = useEntityTable({
     entityType: 'category',
-    fetchEntities: getHierarchicalCategories,
+    fetchEntities: fetchHierarchicalCategories,
     deleteEntity: async (id) => {
       await deleteCategory(id);
       // Le refresh se fera automatiquement via les événements WebSocket
@@ -218,7 +213,7 @@ function CategoriesTable(props) {
   const sortProcessor = useCallback((data) => data, []);
 
   // Combinaison de l'état de chargement du store et des opérations
-  const isLoading = hierarchicalLoading || operationLoading;
+  const isLoading = hierarchyLoading || operationLoading;
 
   return (
     <>

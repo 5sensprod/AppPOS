@@ -1,67 +1,42 @@
 // src/features/products/components/ProductTable.jsx
-import React, { useState, useEffect } from 'react';
-import { useProduct } from '../stores/productStore';
-import { useProductDataStore } from '../stores/productStore';
-import { EntityTable } from '../../../components/common/';
+import React from 'react';
+import {
+  useProduct,
+  useProductDataStore,
+  useProductTablePreferences,
+} from '../stores/productStore';
+import { useEntityWithPreferences } from '@/hooks/useEntityWithPreferences';
+import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
-import { useEntityTable } from '@/hooks/useEntityTable';
 
 function ProductTable(props) {
   const { deleteProduct } = useProduct();
 
-  // Utiliser le nouveau store dédié
   const {
-    products,
-    loading: productsLoading,
-    error: productsError,
-    fetchProducts,
-    initWebSocket,
-  } = useProductDataStore();
-
-  // États locaux pour les produits
-  const [localProducts, setLocalProducts] = useState([]);
-  const [error, setError] = useState(null);
-
-  // Initialiser les WebSockets et charger les données si nécessaire
-  useEffect(() => {
-    // Initialiser les écouteurs WebSocket
-    initWebSocket();
-
-    // Charger les produits seulement s'ils ne sont pas déjà chargés
-    if (products.length === 0) {
-      fetchProducts();
-    }
-  }, [initWebSocket, fetchProducts, products.length]);
-
-  // Mettre à jour l'état local lorsque les produits ou les erreurs changent
-  useEffect(() => {
-    setLocalProducts(products || []);
-    setError(productsError);
-  }, [products, productsError]);
-
-  // Utilisation du hook useEntityTable sans les abonnements WebSocket
-  const {
-    loading: operationLoading,
+    entities: products,
+    tablePreferences,
+    isLoading,
+    error,
     handleDeleteEntity,
     handleSyncEntity,
-  } = useEntityTable({
+    handlePreferencesChange,
+    handleResetFilters,
+  } = useEntityWithPreferences({
     entityType: 'product',
-    fetchEntities: fetchProducts,
-    deleteEntity: async (id) => {
-      await deleteProduct(id);
-      // Le refresh se fera automatiquement via les événements WebSocket
+    entityStore: {
+      data: useProductDataStore().products,
+      loading: useProductDataStore().loading,
+      fetchEntities: useProductDataStore().fetchProducts,
+      initWebSocket: useProductDataStore().initWebSocket,
     },
-    syncEntity: async (id) => {
-      // Fonction de synchronisation gérée par le composant useEntityTable
-      // Le refresh se fera automatiquement via les événements WebSocket
+    preferencesStore: useProductTablePreferences(),
+    deleteEntityFn: async (id) => await deleteProduct(id),
+    syncEntityFn: async (id) => {
+      // Synchronisation standard
     },
-    // Ne pas spécifier de customEventHandlers pour éviter les abonnements doublons
   });
 
-  // Combinaison de l'état de chargement
-  const isLoading = productsLoading || operationLoading;
-
-  // Configuration des filtres (spécifique à ce composant)
+  // Configuration des filtres
   const filters = [
     {
       id: 'status',
@@ -76,30 +51,45 @@ function ProductTable(props) {
   ];
 
   return (
-    <EntityTable
-      data={localProducts}
-      isLoading={isLoading}
-      error={error}
-      columns={ENTITY_CONFIG.columns}
-      entityName="produit"
-      entityNamePlural="produits"
-      baseRoute="/products"
-      filters={filters}
-      searchFields={['name', 'sku']}
-      onDelete={handleDeleteEntity}
-      onSync={handleSyncEntity}
-      syncEnabled={ENTITY_CONFIG.syncEnabled}
-      actions={['view', 'edit', 'delete', 'sync']}
-      batchActions={['delete', 'sync']}
-      pagination={{
-        enabled: true,
-        pageSize: 10,
-        showPageSizeOptions: true,
-        pageSizeOptions: [5, 10, 25, 50],
-      }}
-      defaultSort={ENTITY_CONFIG.defaultSort}
-      {...props}
-    />
+    <div className="space-y-4">
+      {Object.keys(tablePreferences.search.activeFilters).length > 0 && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleResetFilters}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md"
+          >
+            Réinitialiser les filtres
+          </button>
+        </div>
+      )}
+
+      <EntityTable
+        data={products || []}
+        isLoading={isLoading}
+        error={error}
+        columns={ENTITY_CONFIG.columns}
+        entityName="produit"
+        entityNamePlural="produits"
+        baseRoute="/products"
+        filters={filters}
+        searchFields={['name', 'sku']}
+        onDelete={handleDeleteEntity}
+        onSync={handleSyncEntity}
+        syncEnabled={ENTITY_CONFIG.syncEnabled}
+        actions={['view', 'edit', 'delete', 'sync']}
+        batchActions={['delete', 'sync']}
+        pagination={{
+          enabled: true,
+          pageSize: ENTITY_CONFIG.defaultPageSize || 10,
+          showPageSizeOptions: true,
+          pageSizeOptions: [5, 10, 25, 50],
+        }}
+        defaultSort={ENTITY_CONFIG.defaultSort}
+        tablePreferences={tablePreferences}
+        onPreferencesChange={handlePreferencesChange}
+        {...props}
+      />
+    </div>
   );
 }
 
