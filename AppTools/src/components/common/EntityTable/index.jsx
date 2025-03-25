@@ -40,10 +40,13 @@ const EntityTable = ({
   // Nouvelles props pour les préférences
   tablePreferences = null,
   onPreferencesChange = null,
+  disableSorting = false,
 }) => {
   // État initial pour le tri, utiliser les préférences si disponibles
   const initialSort = tablePreferences?.sort || defaultSort;
-  const { sort, sortedData, handleSort } = useTableSort(data, initialSort);
+  const { sort, sortedData, handleSort } = disableSorting
+    ? { sort: initialSort, sortedData: data, handleSort: () => {} }
+    : useTableSort(data, initialSort);
 
   // Mise à jour des préférences de tri seulement si nécessaire
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   useCategory,
   useCategoryExtras,
@@ -56,6 +57,10 @@ export const useCategoryTable = () => {
       toggleCategory,
       tablePreferences,
     });
+
+  useEffect(() => {
+    handlePreferencesChange('sort', { field: 'name', direction: 'asc' });
+  }, []);
 
   return {
     // Données et état

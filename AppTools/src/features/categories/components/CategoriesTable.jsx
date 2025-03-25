@@ -26,6 +26,17 @@ function CategoriesTable(props) {
   // Configuration des filtres
   const filters = ENTITY_CONFIG.filters || [];
 
+  // Désactiver le tri des colonnes dans cette table
+  const disableSorting = (columns) => {
+    return columns.map((column) => ({
+      ...column,
+      key: column.key,
+      sortable: false,
+    }));
+  };
+
+  const nonSortableColumns = disableSorting(ENTITY_CONFIG.columns);
+
   return (
     <div className="space-y-4">
       {Object.keys(tablePreferences.search.activeFilters).length > 0 && (
@@ -43,7 +54,7 @@ function CategoriesTable(props) {
         data={processedData}
         isLoading={isLoading}
         error={error}
-        columns={ENTITY_CONFIG.columns}
+        columns={nonSortableColumns}
         entityName="catégorie"
         entityNamePlural="catégories"
         baseRoute="/products/categories"
@@ -52,6 +63,7 @@ function CategoriesTable(props) {
         searchProcessor={searchProcessor}
         sortProcessor={sortProcessor}
         onDelete={handleDeleteEntity}
+        disableSorting={true}
         onSync={handleSyncEntity}
         syncEnabled={ENTITY_CONFIG.syncEnabled}
         actions={['view', 'edit', 'delete', 'sync']}

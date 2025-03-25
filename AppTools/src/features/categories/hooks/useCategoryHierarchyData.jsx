@@ -20,7 +20,7 @@ export const useCategoryHierarchyData = ({
   const flattenHierarchy = useCallback(
     (categories, level = 0, parentExpanded = true) => {
       if (!categories) return [];
-
+      console.log('Ordre des catégories entrantes:', categories.map((c) => c.name).join(', '));
       let result = [];
 
       categories.forEach((category) => {
@@ -72,7 +72,8 @@ export const useCategoryHierarchyData = ({
           }
         }
       });
-
+      console.log('Ordre des catégories aplaties:', result.map((c) => c._originalName).join(', '));
+      return [...result].sort((a, b) => a._originalName.localeCompare(b._originalName));
       return result;
     },
     [expandedCategories, toggleCategory]
@@ -127,34 +128,23 @@ export const useCategoryHierarchyData = ({
   const sortProcessor = useCallback((data) => data, []);
 
   // Traiter les données pour l'affichage
+  // Désactiver complètement le tri
   const processedData = useMemo(() => {
     if (!hierarchicalCategories || hierarchicalCategories.length === 0) return [];
 
-    // Si une recherche est active, utiliser le processeur de recherche
     if (tablePreferences.search.term && tablePreferences.search.term.length > 0) {
       return searchProcessor([], tablePreferences.search.term);
     }
 
-    // Cloner avant de trier pour éviter de modifier les données d'origine
-    const sortedRootCategories = [...hierarchicalCategories].sort((a, b) => {
-      const aValue = a.name;
-      const bValue = b.name;
-
-      const result = aValue.localeCompare(bValue);
-      return tablePreferences.sort.direction === 'desc' ? result : -result;
-    });
-
-    // Aplatir la hiérarchie pour l'affichage
-    return flattenHierarchy(sortedRootCategories);
+    // Utiliser les données sans tri
+    return flattenHierarchy(hierarchicalCategories);
   }, [
     hierarchicalCategories,
     tablePreferences.search.term,
-    tablePreferences.sort.direction,
     flattenHierarchy,
     searchProcessor,
     expandedCategories,
   ]);
-
   return {
     processedData,
     flattenHierarchy,
