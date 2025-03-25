@@ -1,18 +1,6 @@
 // src/hooks/useEntityTable.js
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-/**
- * Hook pour gérer les opérations communes des tables d'entités
- * Compatible avec Zustand
- *
- * @param {Object} options - Options de configuration
- * @param {string} options.entityType - Type d'entité (ex: 'product', 'supplier', 'category', 'brand')
- * @param {function} options.fetchEntities - Fonction pour récupérer les entités
- * @param {function} options.deleteEntity - Fonction pour supprimer une entité
- * @param {function} options.syncEntity - Fonction pour synchroniser une entité
- * @param {Object} options.customEventHandlers - Gestionnaires d'événements personnalisés
- * @returns {Object} - État et fonctions pour gérer la table d'entités
- */
 export const useEntityTable = ({
   entityType,
   fetchEntities,
