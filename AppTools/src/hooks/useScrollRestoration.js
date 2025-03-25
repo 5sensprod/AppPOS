@@ -22,7 +22,7 @@ export const useScrollRestoration = (tablePreferences, entityType) => {
           behavior: 'instant',
         });
         console.log(`[ScrollRestoration] Position restaurée à: ${scrollPosition}`);
-      }, 200); // Augmenter le délai pour donner plus de temps au rendu
+      }, 400); // Augmenter le délai pour donner plus de temps au rendu
     }
 
     // Optionnellement, mettre en surbrillance le dernier élément focalisé
@@ -46,7 +46,7 @@ export const useScrollRestoration = (tablePreferences, entityType) => {
         } else {
           console.log(`[ScrollRestoration] Élément non trouvé: row-${lastFocusedId}`);
         }
-      }, 300);
+      }, 400);
     }
 
     // Pas besoin de nettoyer les valeurs ici, car elles doivent persister
