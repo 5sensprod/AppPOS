@@ -469,6 +469,23 @@ function ProductForm() {
       setLoading(false);
     }
   };
+  // Gestionnaire pour supprimer une image
+  const handleDeleteImage = async (entityId) => {
+    try {
+      setLoading(true);
+      await deleteImage(entityId);
+      // Recharger les données du produit après suppression
+      const updatedProduct = await getProductById(id);
+      setProduct(updatedProduct);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de la suppression d'image:", error);
+      setError("Échec de la suppression d'image.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Gestionnaire pour télécharger une image de galerie
   const handleUploadGalleryImage = async (entityId, imageFile) => {
@@ -482,24 +499,6 @@ function ProductForm() {
     } catch (error) {
       console.error("Erreur lors de l'upload d'image de galerie:", error);
       setError("Échec de l'upload d'image de galerie.");
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Gestionnaire pour supprimer une image
-  const handleDeleteImage = async (entityId) => {
-    try {
-      setLoading(true);
-      await deleteImage(entityId);
-      // Recharger les données du produit après suppression
-      const updatedProduct = await getProductById(id);
-      setProduct(updatedProduct);
-      return true;
-    } catch (error) {
-      console.error("Erreur lors de la suppression d'image:", error);
-      setError("Échec de la suppression d'image.");
       return false;
     } finally {
       setLoading(false);
