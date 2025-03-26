@@ -1,10 +1,10 @@
 // src/features/categories/components/CategoryForm.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import * as yup from 'yup';
 import { EntityForm, EntityImageManager } from '../../../components/common';
 import { useCategory, useCategoryExtras } from '../stores/categoryStore';
-import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
+import { useHierarchicalCategories } from '../stores/categoryHierarchyStore';
 import { ENTITY_CONFIG } from '../constants';
 
 function CategoryForm() {
@@ -12,13 +12,17 @@ function CategoryForm() {
   const navigate = useNavigate();
   const isNew = !id;
 
-  // Hooks Zustand (au lieu du contexte)
+  // Hooks Zustand
   const { getCategoryById, createCategory, updateCategory } = useCategory();
   const { uploadImage, deleteImage } = useCategoryExtras();
 
-  // Store hiérarchique
-  const hierarchyStore = useCategoryHierarchyStore();
-  const { hierarchicalCategories, fetchHierarchicalCategories } = hierarchyStore;
+  // Utiliser useHierarchicalCategories au lieu de useCategoryHierarchyStore
+  const {
+    hierarchicalCategories,
+    fetchHierarchicalCategories,
+    initWebSocketListeners,
+    loading: hierarchyLoading,
+  } = useHierarchicalCategories();
 
   // États locaux
   const [category, setCategory] = useState(null);
@@ -26,13 +30,14 @@ function CategoryForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [wsInitialized, setWsInitialized] = useState(false);
+  const [dataFetched, setDataFetched] = useState(false);
   const hasTabs = ENTITY_CONFIG.tabs && ENTITY_CONFIG.tabs.length > 0;
   const [activeTab, setActiveTab] = useState(hasTabs ? 'general' : null);
 
   // Schéma de validation Yup pour les catégories
   const schema = yup.object().shape({
     name: yup.string().required('Le nom est requis'),
-    // slug: yup.string(),
     description: yup.string(),
     parent_id: yup.string().nullable(),
     status: yup.string().required('Le statut est requis'),
@@ -42,84 +47,101 @@ function CategoryForm() {
     meta_keywords: yup.string(),
   });
 
-  // Initialiser les WebSockets
+  // Initialiser les WebSockets une seule fois
   useEffect(() => {
-    const cleanup = hierarchyStore.initWebSocket();
-    return () => {
-      if (typeof cleanup === 'function') {
-        cleanup();
-      }
-    };
-  }, [hierarchyStore]);
+    if (!wsInitialized) {
+      console.log('[CATEGORY_FORM] Initialisation WebSocket');
+      const cleanup = initWebSocketListeners();
+      setWsInitialized(true);
 
-  // Charger les données de la catégorie et les catégories parentes
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchData = async () => {
-      if (!isMounted) return;
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        // Charger les catégories parentes pour le menu déroulant
-        const hierarchicalData = await fetchHierarchicalCategories();
-        if (!isMounted) return;
-
-        const options = transformToOptions(hierarchicalData);
-        setParentCategories(options);
-
-        // Si on est en mode édition et qu'on a un ID
-        if (!isNew && id) {
-          const categoryData = await getCategoryById(id);
-          if (!isMounted) return;
-          setCategory(categoryData);
+      return () => {
+        if (typeof cleanup === 'function') {
+          cleanup();
         }
-      } catch (err) {
-        if (!isMounted) return;
-        console.error('Erreur lors du chargement des données:', err);
-        setError('Erreur lors du chargement des données. Veuillez réessayer.');
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchData();
-
-    // Nettoyage
-    return () => {
-      isMounted = false;
-    };
-  }, [id, isNew, fetchHierarchicalCategories, getCategoryById]);
+      };
+    }
+  }, [initWebSocketListeners, wsInitialized]);
 
   // Transformer les catégories hiérarchiques en options pour le menu déroulant
-  const transformToOptions = (categories, prefix = '') => {
-    let options = [];
-
-    categories.forEach((category) => {
-      // Éviter d'inclure la catégorie en cours d'édition dans les options de parent
-      if (!isNew && category._id === id) {
-        return;
+  const transformToOptions = useCallback(
+    (categories, prefix = '') => {
+      if (!Array.isArray(categories)) {
+        console.warn("transformToOptions: categories n'est pas un tableau", categories);
+        return [];
       }
 
-      options.push({
-        value: category._id,
-        label: prefix + category.name,
+      let options = [];
+
+      categories.forEach((category) => {
+        // Vérifier que la catégorie est un objet valide
+        if (!category || typeof category !== 'object') {
+          return;
+        }
+
+        // Éviter d'inclure la catégorie en cours d'édition dans les options de parent
+        if (!isNew && category._id === id) {
+          return;
+        }
+
+        options.push({
+          value: category._id,
+          label: prefix + (category.name || 'Sans nom'),
+        });
+
+        if (category.children && Array.isArray(category.children) && category.children.length > 0) {
+          options = [...options, ...transformToOptions(category.children, prefix + '— ')];
+        }
       });
 
-      if (category.children && category.children.length > 0) {
-        options = [...options, ...transformToOptions(category.children, prefix + '— ')];
-      }
-    });
+      return options;
+    },
+    [id, isNew]
+  );
 
-    return options;
-  };
+  // Charger les données initiales une seule fois
+  useEffect(() => {
+    if (!dataFetched) {
+      const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+          // Charger les données hiérarchiques pour le menu déroulant
+          await fetchHierarchicalCategories();
+
+          // Si on est en mode édition et qu'on a un ID
+          if (!isNew && id) {
+            const categoryData = await getCategoryById(id);
+            setCategory(categoryData);
+          }
+
+          setDataFetched(true);
+        } catch (err) {
+          console.error('Erreur lors du chargement des données:', err);
+          setError('Erreur lors du chargement des données. Veuillez réessayer.');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchData();
+    }
+  }, [dataFetched, id, isNew, fetchHierarchicalCategories, getCategoryById]);
+
+  // Mettre à jour les options de catégories parentes lorsque les données hiérarchiques changent
+  useEffect(() => {
+    if (
+      hierarchicalCategories &&
+      Array.isArray(hierarchicalCategories) &&
+      hierarchicalCategories.length > 0
+    ) {
+      const options = transformToOptions(hierarchicalCategories);
+      setParentCategories(options);
+    }
+  }, [hierarchicalCategories, transformToOptions]);
 
   // Préparation des champs du formulaire avec les options de catégories parentes
-  const getFormFields = () => {
+  const getFormFields = useCallback(() => {
     // Clone des champs de configuration
     const fields = [...ENTITY_CONFIG.formFields];
 
@@ -181,14 +203,13 @@ function CategoryForm() {
     });
 
     return fields;
-  };
+  }, [parentCategories]);
 
   // Valeurs initiales pour le formulaire
-  const getInitialValues = () => {
+  const getInitialValues = useCallback(() => {
     if (isNew) {
       return {
         name: '',
-        // slug: '',
         description: '',
         parent_id: '',
         status: 'draft',
@@ -200,7 +221,7 @@ function CategoryForm() {
     }
 
     return category || {};
-  };
+  }, [category, isNew]);
 
   // Gestionnaire de soumission du formulaire
   const handleSubmit = async (data) => {
@@ -249,7 +270,6 @@ function CategoryForm() {
         }
       });
 
-      // Log pour débogage en développement uniquement
       if (process.env.NODE_ENV !== 'production') {
         console.log('Données catégorie formatées pour API:', formattedData);
       }
@@ -348,7 +368,7 @@ function CategoryForm() {
           initialValues={getInitialValues()}
           onSubmit={handleSubmit}
           onCancel={handleCancel}
-          isLoading={loading}
+          isLoading={loading || hierarchyLoading}
           error={error}
           successMessage={success}
           buttonLabel={isNew ? 'Créer la catégorie' : 'Mettre à jour la catégorie'}

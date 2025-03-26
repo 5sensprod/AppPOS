@@ -1,34 +1,27 @@
 // src/features/categories/stores/categoryStore.js
-import { useCategoryHierarchyStore } from './categoryHierarchyStore';
+import { useCategoryHierarchyStore, useHierarchicalCategories } from './categoryHierarchyStore';
 import { createEntityStore } from '../../../factories/createEntityStore';
 
-// Configuration de l'entité Category avec options étendues
+// Configuration de l'entité Category
 const CATEGORY_CONFIG = {
   entityName: 'category',
   apiEndpoint: '/api/categories',
   syncEnabled: true,
   imagesEnabled: true,
-  cacheDuration: 5 * 60 * 1000, // 5 minutes
-  hierarchicalEnabled: true,
-  hierarchicalEndpoint: '/api/categories/hierarchical',
+  // Pas besoin de hierarchicalEnabled puisque nous avons un store séparé
+  // Integration avec le store hiérarchique via webSocketIntegration
+  webSocketIntegration: {
+    storeHook: useCategoryHierarchyStore,
+  },
 };
 
 // Créer le store avec la factory
 const { useCategory: useCategoryBase, useEntityStore: useCategoryStore } =
   createEntityStore(CATEGORY_CONFIG);
 
-// Export du hook principal avec intégration directe de WebSocket
+// Export du hook principal
 export function useCategory() {
-  const categoryStore = useCategoryBase();
-
-  return {
-    ...categoryStore,
-    // Utiliser directement le store hiérarchique pour initWebSocket
-    initWebSocketListeners: () => {
-      const cleanup = useCategoryHierarchyStore.getState().initWebSocket();
-      return cleanup;
-    },
-  };
+  return useCategoryBase();
 }
 
 // Réexporter useCategoryStore pour maintenir la compatibilité
@@ -37,14 +30,17 @@ export { useCategoryStore };
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux catégories
 export function useCategoryExtras() {
   const categoryStore = useCategory();
-  const hierarchyStore = useCategoryHierarchyStore();
+  const {
+    hierarchicalCategories,
+    loading: hierarchicalLoading,
+    fetchHierarchicalCategories: getHierarchicalCategories,
+  } = useHierarchicalCategories();
 
   return {
     ...categoryStore,
-    // Utiliser directement la fonction du store hiérarchique
-    getHierarchicalCategories: hierarchyStore.fetchHierarchicalCategories,
-    // État du store hiérarchique
-    hierarchicalCategories: hierarchyStore.hierarchicalCategories,
-    hierarchicalLoading: hierarchyStore.loading,
+    // État et méthodes du store hiérarchique
+    hierarchicalCategories,
+    hierarchicalLoading,
+    getHierarchicalCategories,
   };
 }

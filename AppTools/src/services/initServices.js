@@ -6,6 +6,7 @@ import websocketService from './websocketService';
 // Importer les stores Zustand
 import { useProductStore } from '../features/products/stores/productStore';
 import { useCategoryStore } from '../features/categories/stores/categoryStore';
+import { useCategoryHierarchyStore } from '../features/categories/stores/categoryHierarchyStore';
 import { useBrandStore } from '../features/brands/stores/brandStore';
 import { useSupplierStore } from '../features/suppliers/stores/supplierStore';
 
@@ -79,17 +80,44 @@ async function preloadEssentialData() {
     preloadEntityData('category'),
     preloadEntityData('brand'),
     preloadEntityData('supplier'),
+    preloadCategoryHierarchy(), // Ajout du préchargement de la hiérarchie des catégories
   ]);
 
   // Vérifier les résultats
+  const entities = ['products', 'categories', 'brands', 'suppliers', 'category hierarchy'];
   preloadResults.forEach((result, index) => {
-    const entities = ['products', 'categories', 'brands', 'suppliers'];
     if (result.status === 'rejected') {
       console.warn(`⚠️ Échec du préchargement des ${entities[index]}:`, result.reason);
     } else {
       console.log(`✅ ${entities[index]} préchargés avec succès`);
     }
   });
+}
+
+/**
+ * Précharge la hiérarchie des catégories
+ * @returns {Promise<void>}
+ */
+async function preloadCategoryHierarchy() {
+  try {
+    // Initialiser les WebSockets pour le store hiérarchique
+    const hierarchyStore = useCategoryHierarchyStore.getState();
+
+    // Initialiser WebSocket une seule fois
+    if (hierarchyStore.initWebSocketListeners) {
+      hierarchyStore.initWebSocketListeners();
+    }
+
+    // Précharger les données hiérarchiques
+    if (hierarchyStore.fetchItems) {
+      await hierarchyStore.fetchItems();
+    }
+
+    console.log('🌳 Hiérarchie des catégories préchargée');
+  } catch (error) {
+    console.error('❌ Échec du préchargement de la hiérarchie des catégories:', error);
+    throw error;
+  }
 }
 
 /**
@@ -168,6 +196,10 @@ export function checkServicesStatus() {
       categories: {
         loaded: useCategoryStore.getState().items.length > 0,
         count: useCategoryStore.getState().items.length,
+      },
+      categoryHierarchy: {
+        loaded: useCategoryHierarchyStore.getState().items?.length > 0,
+        count: useCategoryHierarchyStore.getState().items?.length || 0,
       },
       brands: {
         loaded: useBrandStore.getState().items.length > 0,

@@ -1,8 +1,8 @@
-// src/features/categories/components/CategoryDetail.jsx
+// src/features/categories/components/CategorieDetail.jsx
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useCategory, useCategoryExtras } from '../stores/categoryStore';
-import { useCategoryHierarchyStore } from '../stores/categoryHierarchyStore';
+import { useHierarchicalCategories } from '../stores/categoryHierarchyStore';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
@@ -10,7 +10,7 @@ import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
-function CategoryDetail() {
+function CategorieDetail() {
   const { id } = useParams();
   const [wsInitialized, setWsInitialized] = useState(false);
   const isMountedRef = useRef(true);
@@ -19,23 +19,23 @@ function CategoryDetail() {
   const { getCategoryById, deleteCategory, syncCategory } = useCategory();
   const { uploadImage, deleteImage } = useCategoryExtras();
 
-  // Accès direct au store hiérarchique
-  const hierarchyStore = useCategoryHierarchyStore();
+  // Utiliser useHierarchicalCategories au lieu de useCategoryHierarchyStore
+  const { initWebSocketListeners } = useHierarchicalCategories();
 
   // Initialiser WebSocket séparément, une seule fois
   useEffect(() => {
     if (!wsInitialized) {
       console.log(`[CATEGORY_DETAIL] Initialisation des WebSockets pour la catégorie #${id}`);
-      const cleanup = hierarchyStore.initWebSocket();
+      // Utiliser initWebSocketListeners() au lieu de hierarchyStore.initWebSocket()
+      const cleanup = initWebSocketListeners();
       setWsInitialized(true);
-
       return () => {
         if (typeof cleanup === 'function') {
           cleanup();
         }
       };
     }
-  }, [id, hierarchyStore, wsInitialized]);
+  }, [id, initWebSocketListeners, wsInitialized]);
 
   // Nettoyage à la déconnexion
   useEffect(() => {
@@ -64,7 +64,6 @@ function CategoryDetail() {
 
   const renderTabContent = (category, activeTab) => {
     if (!category) return null;
-
     switch (activeTab) {
       case 'general':
         return (
@@ -114,4 +113,4 @@ function CategoryDetail() {
   );
 }
 
-export default CategoryDetail;
+export default CategorieDetail;
