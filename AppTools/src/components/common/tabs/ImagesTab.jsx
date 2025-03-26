@@ -12,8 +12,10 @@ const ImagesTab = ({
   onSetMainImage,
   isLoading,
   error,
+  // Ajout de la prop editable
+  editable = false,
 }) => {
-  // Passez simplement toutes les props à EntityImageManager
+  // Passez simplement toutes les props à EntityImageManager, y compris editable
   return (
     <EntityImageManager
       entity={entity}
@@ -25,6 +27,7 @@ const ImagesTab = ({
       onSetMainImage={onSetMainImage}
       isLoading={isLoading}
       error={error}
+      editable={editable}
     />
   );
 };

@@ -76,8 +76,8 @@ const updateBrandSchema = Joi.object({
 });
 
 const createSupplierSchema = Joi.object({
-  supplier_code: Joi.string(),
-  customer_code: Joi.string(),
+  supplier_code: Joi.string().allow(null, ''),
+  customer_code: Joi.string().allow(null, ''),
   name: Joi.string().required(),
   brands: Joi.array().items(Joi.string()).default([]),
   brandsRefs: Joi.array()
@@ -89,41 +89,29 @@ const createSupplierSchema = Joi.object({
     )
     .default([]),
   contact: Joi.object({
-    name: Joi.string(),
-    email: Joi.string().email(),
-    phone: Joi.string(),
-    address: Joi.string(),
-  }),
+    name: Joi.string().allow(null, ''),
+    email: Joi.string().email().allow(null, ''),
+    phone: Joi.string().allow(null, ''),
+    address: Joi.string().allow(null, ''),
+  }).optional(),
   banking: Joi.object({
-    iban: Joi.string(),
-    bic: Joi.string(),
-  }),
+    iban: Joi.string().allow(null, ''),
+    bic: Joi.string().allow(null, ''),
+  }).optional(),
   payment_terms: Joi.object({
-    type: Joi.string(),
-    discount: Joi.number(),
-  }),
+    type: Joi.string().allow(null, ''),
+    discount: Joi.number().allow(null),
+  }).optional(),
+}).options({
+  stripUnknown: true,
+  abortEarly: false,
 });
 
-const updateSupplierSchema = Joi.object({
-  supplier_code: Joi.string(),
-  customer_code: Joi.string(),
-  name: Joi.string(),
-  contact: Joi.object({
-    name: Joi.string(),
-    email: Joi.string().email(),
-    phone: Joi.string(),
-    address: Joi.string(),
-  }),
-  banking: Joi.object({
-    iban: Joi.string(),
-    bic: Joi.string(),
-  }),
-  image: imageSchema,
-  payment_terms: Joi.object({
-    type: Joi.string(),
-    discount: Joi.number(),
-  }),
-});
+// Pour la mise à jour, rendre tous les champs optionnels
+const updateSupplierSchema = createSupplierSchema.fork(
+  Object.keys(createSupplierSchema.describe().keys),
+  (schema) => schema.optional()
+);
 
 const categoryHierarchyItemSchema = Joi.object({
   id: Joi.string().allow(null, ''),

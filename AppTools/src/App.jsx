@@ -13,10 +13,8 @@ import Login from './components/Login';
 // Pages
 import ProductsPage from './features/products/ProductsPage';
 import ProductDetail from './features/products/components/ProductDetail';
-import ProductForm from './features/products/components/ProductForm';
 import SuppliersPage from './features/suppliers/SuppliersPage';
-import SupplierDetail from './features/suppliers/components/SupplierDetail';
-import SupplierForm from './features/suppliers/components/SupplierForm';
+import SupplierDetail from './features/suppliers/components/SupplierDetail'; // Composant unifié
 import CategoriesPage from './features/categories/CategoriesPage';
 import CategorieDetail from './features/categories/components/CategorieDetail';
 import CategoryForm from './features/categories/components/CategoryForm';
@@ -47,25 +45,29 @@ const entityRoutes = [
     path: 'products',
     component: ProductsPage,
     details: ProductDetail,
-    form: ProductForm,
+    form: ProductDetail, // Utiliser le même composant pour le formulaire
+    bidirectional: false, // Ce composant n'est pas encore bidirectionnel
   },
   {
     path: 'products/categories',
     component: CategoriesPage,
     details: CategorieDetail,
     form: CategoryForm,
+    bidirectional: false, // Ce composant n'est pas encore bidirectionnel
   },
   {
     path: 'products/suppliers',
     component: SuppliersPage,
     details: SupplierDetail,
-    form: SupplierForm,
+    form: SupplierDetail, // Utiliser le composant unifié
+    bidirectional: true, // Ce composant est bidirectionnel
   },
   {
     path: 'products/brands',
     component: BrandsPage,
     details: BrandDetail,
     form: BrandForm,
+    bidirectional: false, // Ce composant n'est pas encore bidirectionnel
   },
 ];
 
@@ -110,50 +112,93 @@ function AppRoutes() {
           }
         />
 
-        {entityRoutes.map(({ path, component: Component, details: Details, form: Form }) => (
-          <React.Fragment key={path}>
-            <Route
-              path={`/${path}`}
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Component />
-                  </MainLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path={`/${path}/new`}
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Form />
-                  </MainLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path={`/${path}/:id`}
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Details />
-                  </MainLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path={`/${path}/:id/edit`}
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Form />
-                  </MainLayout>
-                </ProtectedRoute>
-              }
-            />
-          </React.Fragment>
-        ))}
+        {entityRoutes.map(
+          ({ path, component: Component, details: Details, form: Form, bidirectional }) => (
+            <React.Fragment key={path}>
+              {/* Route principale */}
+              <Route
+                path={`/${path}`}
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <Component />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Si l'entité est bidirectionnelle, utiliser le même composant pour new, détail et édition */}
+              {bidirectional ? (
+                <>
+                  <Route
+                    path={`/${path}/new`}
+                    element={
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <Details /> {/* Même composant pour création */}
+                        </MainLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path={`/${path}/:id`}
+                    element={
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <Details /> {/* Même composant pour lecture */}
+                        </MainLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path={`/${path}/:id/edit`}
+                    element={
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <Details /> {/* Même composant pour édition */}
+                        </MainLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                </>
+              ) : (
+                // Sinon, utiliser des composants séparés comme avant
+                <>
+                  <Route
+                    path={`/${path}/new`}
+                    element={
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <Form />
+                        </MainLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path={`/${path}/:id`}
+                    element={
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <Details />
+                        </MainLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path={`/${path}/:id/edit`}
+                    element={
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <Form />
+                        </MainLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                </>
+              )}
+            </React.Fragment>
+          )
+        )}
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
