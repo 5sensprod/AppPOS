@@ -18,10 +18,8 @@ import SuppliersPage from './features/suppliers/SuppliersPage';
 import SupplierDetail from './features/suppliers/components/SupplierDetail';
 import CategoriesPage from './features/categories/CategoriesPage';
 import CategorieDetail from './features/categories/components/CategorieDetail';
-import CategoryForm from './features/categories/components/CategoryForm';
 import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
-import BrandForm from './features/brands/components/BrandForm';
 
 // Loader
 const Loader = ({ message }) => (
@@ -46,28 +44,24 @@ const entityRoutes = [
     path: 'products',
     component: ProductsPage,
     details: ProductDetail,
-    form: ProductDetail, // 👈 refactoré avec EntityDetail
     bidirectional: true,
   },
   {
     path: 'products/categories',
     component: CategoriesPage,
     details: CategorieDetail,
-    form: CategoryForm,
-    bidirectional: false,
+    bidirectional: true, // Changé à true pour utiliser le composant bidirectionnel
   },
   {
     path: 'products/suppliers',
     component: SuppliersPage,
     details: SupplierDetail,
-    form: SupplierDetail,
     bidirectional: true,
   },
   {
     path: 'products/brands',
     component: BrandsPage,
     details: BrandDetail,
-    form: BrandDetail,
     bidirectional: true,
   },
 ];
@@ -110,90 +104,55 @@ function AppRoutes() {
         }
       />
 
-      {entityRoutes.map(
-        ({ path, component: Component, details: Details, form: Form, bidirectional }) => (
-          <React.Fragment key={path}>
-            <Route
-              path={`/${path}`}
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Component />
-                  </MainLayout>
-                </ProtectedRoute>
-              }
-            />
+      {entityRoutes.map(({ path, component: Component, details: Details, bidirectional }) => (
+        <React.Fragment key={path}>
+          <Route
+            path={`/${path}`}
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Component />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
 
-            {bidirectional ? (
-              <>
-                <Route
-                  path={`/${path}/new`}
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <Details />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path={`/${path}/:id`}
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <Details />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path={`/${path}/:id/edit`}
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <Details />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-              </>
-            ) : (
-              <>
-                <Route
-                  path={`/${path}/new`}
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <Form />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path={`/${path}/:id`}
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <Details />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path={`/${path}/:id/edit`}
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <Form />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-              </>
-            )}
-          </React.Fragment>
-        )
-      )}
+          {bidirectional && (
+            <>
+              <Route
+                path={`/${path}/new`}
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <Details />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={`/${path}/:id`}
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <Details />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={`/${path}/:id/edit`}
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <Details />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+            </>
+          )}
+        </React.Fragment>
+      ))}
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
