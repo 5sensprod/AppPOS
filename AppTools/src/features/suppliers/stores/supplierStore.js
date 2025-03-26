@@ -24,7 +24,7 @@ export const useSupplierDataStore = createWebSocketStore({
   additionalEvents: [],
 });
 
-// Étendre useSupplier avec l'initialisation directe WebSocket (sans createWebSocketRedirection)
+// Étendre useSupplier avec l'initialisation directe WebSocket
 export function useSupplier() {
   const supplierStore = useSupplierBase();
   return {

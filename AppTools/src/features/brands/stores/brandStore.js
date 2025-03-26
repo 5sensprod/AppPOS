@@ -24,7 +24,7 @@ export const useBrandDataStore = createWebSocketStore({
   additionalEvents: [],
 });
 
-// Étendre useBrand sans utiliser createWebSocketRedirection
+// Étendre useBrand
 export function useBrand() {
   const brandStore = useBrandBase();
 

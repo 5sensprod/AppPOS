@@ -34,7 +34,7 @@ export const useCategoryDataStore = createWebSocketStore({
   ],
 });
 
-// Étendre useCategory sans utiliser createWebSocketRedirection
+// Étendre useCategory
 export function useCategory() {
   const categoryStore = useCategoryBase();
   return {
