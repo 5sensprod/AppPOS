@@ -40,8 +40,9 @@ const updateCategorySchema = createCategorySchema.fork(
 );
 const createBrandSchema = Joi.object({
   name: Joi.string().required(),
-  slug: Joi.string(),
-  description: Joi.string(),
+  slug: Joi.string().allow('', null),
+  description: Joi.string().allow('', null),
+  image: imageSchema,
   suppliers: Joi.array().items(Joi.string()).default([]),
   suppliersRefs: Joi.array()
     .items(
@@ -57,23 +58,12 @@ const createBrandSchema = Joi.object({
       value: Joi.string(),
     })
   ),
-  woo_id: Joi.number(),
-  last_sync: Joi.date(),
 });
 
-const updateBrandSchema = Joi.object({
-  name: Joi.string(),
-  slug: Joi.string(),
-  description: Joi.string(),
-  supplier_id: Joi.string(),
-  image: imageSchema,
-  meta_data: Joi.array().items(
-    Joi.object({
-      key: Joi.string(),
-      value: Joi.string(),
-    })
-  ),
-});
+const updateBrandSchema = createBrandSchema.fork(
+  Object.keys(createBrandSchema.describe().keys),
+  (schema) => schema.optional()
+);
 
 const createSupplierSchema = Joi.object({
   supplier_code: Joi.string().allow(null, ''),

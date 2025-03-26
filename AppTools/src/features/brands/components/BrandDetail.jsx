@@ -8,6 +8,7 @@ import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import { ENTITY_CONFIG } from '../constants';
+import getValidationSchema from './validationSchema/getValidationSchema';
 
 function BrandDetail() {
   const { id } = useParams();
@@ -62,7 +63,8 @@ function BrandDetail() {
     setError(null);
     try {
       if (isNew) {
-        const created = await createBrand(data);
+        const { gallery_images, ...cleanData } = data; // ⬅️ on enlève gallery_images
+        const created = await createBrand(cleanData);
         const newId = created?.id || created?._id || created?.data?.id || created?.data?._id;
         if (newId) {
           setSuccess('Marque créée avec succès');
@@ -71,7 +73,8 @@ function BrandDetail() {
           throw new Error("Impossible de récupérer l'ID de la nouvelle marque.");
         }
       } else {
-        await updateBrand(id, data);
+        const { gallery_images, slug, ...sanitizedData } = data;
+        await updateBrand(id, sanitizedData);
         const updated = await getBrandById(id);
         setBrand(updated);
         setSuccess('Marque mise à jour avec succès');
@@ -159,7 +162,7 @@ function BrandDetail() {
       error={error}
       success={success}
       editable={isEditMode}
-      validationSchema={null}
+      validationSchema={getValidationSchema(isNew)}
       defaultValues={{ name: '', description: '', slug: '' }}
       formTitle={isNew ? 'Nouvelle marque' : `Modifier ${brand?.name || 'la marque'}`}
     />
