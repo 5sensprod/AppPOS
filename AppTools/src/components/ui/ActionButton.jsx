@@ -13,6 +13,9 @@ const ActionButton = ({
   className = '',
   iconClassName = 'h-4 w-4 mr-2',
   isLoading = false,
+  type, // Ajout de la propriété type
+  form, // Ajout de la propriété form
+  ...props // Ajout du reste des propriétés
 }) => {
   // Configuration des variantes
   const variants = {
@@ -27,8 +30,11 @@ const ActionButton = ({
     <button
       onClick={onClick}
       disabled={disabled || isLoading}
-      className={`flex items-center px-4 py-2 rounded-lg transition-colors duration-200 ${variants[variant]} 
+      className={`flex items-center px-4 py-2 rounded-lg transition-colors duration-200 ${variants[variant]}
                   ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      type={type} // Transmission de type
+      form={form} // Transmission de form
+      {...props} // Transmission des autres propriétés
     >
       {Icon && <Icon className={`${iconClassName} ${isLoading ? 'animate-spin' : ''}`} />}
       {label}
