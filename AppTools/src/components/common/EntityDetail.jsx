@@ -29,6 +29,7 @@ const EntityDetail = ({
   syncEnabled = false,
   // Handlers
   onDelete,
+  title,
   onSync,
   onSubmit,
   onCancel,
@@ -154,7 +155,9 @@ const EntityDetail = ({
     return (
       <InfoCard
         variant="warning"
-        title={`${entityName ? `${entityName.charAt(0).toUpperCase() + entityName.slice(1)}` : 'Élément'} non trouvé`}
+        title={`${
+          entityName ? `${entityName.charAt(0).toUpperCase() + entityName.slice(1)}` : 'Élément'
+        } non trouvé`}
         icon={AlertCircle}
       >
         <p>
@@ -181,6 +184,13 @@ const EntityDetail = ({
     </div>
   );
 
+  const dynamicTitle =
+    title ||
+    (editable
+      ? `${entity && entity.name ? `Modifier « ${entity.name} »` : `Ajouter ${entityName}`}`
+      : entity?.name ||
+        `${entityName ? entityName.charAt(0).toUpperCase() + entityName.slice(1) : 'Détails'}`);
+
   return (
     <div className="container mx-auto px-4 py-6">
       {/* En-tête */}
@@ -192,12 +202,7 @@ const EntityDetail = ({
           >
             <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {editable
-              ? `${entity ? 'Modifier' : 'Créer'} ${entityName || 'élément'}`
-              : entity?.name ||
-                `${entityName ? entityName.charAt(0).toUpperCase() + entityName.slice(1) : 'Détails'}`}
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{dynamicTitle}</h1>
         </div>
 
         <div className="flex space-x-3">

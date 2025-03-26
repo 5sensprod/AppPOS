@@ -264,6 +264,7 @@ function ProductDetail() {
       onSubmit={handleSubmit}
       onCancel={handleCancel}
       isLoading={loading}
+      title={isNew ? 'Ajouter un produit' : `Modifier « ${product?.name || ''} »`}
       error={error}
       success={success}
       editable={isEditMode}
