@@ -67,8 +67,8 @@ const entityRoutes = [
     path: 'products/brands',
     component: BrandsPage,
     details: BrandDetail,
-    form: BrandForm,
-    bidirectional: false,
+    form: BrandDetail,
+    bidirectional: true,
   },
 ];
 
