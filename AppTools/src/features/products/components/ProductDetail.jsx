@@ -182,6 +182,25 @@ function ProductDetail() {
     }
   };
 
+  const handleSetMainImage = async (entityId, imageIndex) => {
+    try {
+      setLoading(true);
+      await setMainImage(entityId, imageIndex);
+
+      const effectiveId = currentId || paramId;
+      const updatedProduct = await getProductById(effectiveId);
+
+      setProduct(updatedProduct);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de la définition de l'image principale:", error);
+      setError("Échec de la définition de l'image principale.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderTabContent = (entity, activeTab, formProps = {}) => {
     const { editable, register, errors } = formProps;
     switch (activeTab) {
@@ -214,6 +233,7 @@ function ProductDetail() {
             galleryMode={true}
             onUploadImage={handleUploadImage}
             onDeleteImage={handleDeleteImage}
+            onSetMainImage={handleSetMainImage}
             isLoading={loading}
             error={error}
           />
@@ -225,6 +245,10 @@ function ProductDetail() {
     }
   };
 
+  const visibleTabs = isNew
+    ? ENTITY_CONFIG.tabs.filter((tab) => !['images', 'woocommerce'].includes(tab.id))
+    : ENTITY_CONFIG.tabs;
+
   return (
     <EntityDetail
       entity={product}
@@ -232,7 +256,7 @@ function ProductDetail() {
       entityName="produit"
       entityNamePlural="produits"
       baseRoute="/products"
-      tabs={ENTITY_CONFIG.tabs}
+      tabs={visibleTabs}
       renderTabContent={renderTabContent}
       actions={['edit', 'delete']}
       syncEnabled={true}
