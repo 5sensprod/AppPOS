@@ -32,13 +32,33 @@ export async function initializeServices() {
     const wsUrl = data.websocket ?? data.url.replace(/^http/, 'ws');
     websocketService.init(wsUrl);
 
-    // Configuration des gestionnaires d'événements WebSocket globaux
+    // Attendre que la connexion WebSocket soit établie
+    await new Promise((resolve) => {
+      if (websocketService.isConnected) {
+        resolve();
+      } else {
+        const checkConnection = () => {
+          if (websocketService.isConnected) {
+            websocketService.off('connect', checkConnection);
+            resolve();
+          }
+        };
+        websocketService.on('connect', checkConnection);
+        // Timeout après 5 secondes
+        setTimeout(() => resolve(), 5000);
+      }
+    });
+
+    // Configurer les gestionnaires d'événements WebSocket globaux
     setupGlobalWebSocketEventHandlers();
 
     // Pré-charger les données essentielles
     await preloadEssentialData();
 
     console.log('✅ Services initialisés avec succès');
+    // Afficher l'état des écouteurs WebSocket pour débogage
+    websocketService.listAllListeners();
+
     return true;
   } catch (error) {
     console.error("🚫 Échec de l'initialisation des services:", error.message);
@@ -65,8 +85,32 @@ function setupGlobalWebSocketEventHandlers() {
   // Gestionnaire pour les reconnexions réussies
   websocketService.on('connect', () => {
     console.log('✅ WebSocket reconnecté');
-    // Vous pourriez rafraîchir certaines données ici
+    // Force le rafraîchissement des données critiques après reconnexion
+    preloadCriticalData();
   });
+
+  // Gestionnaire global pour les changements dans l'arborescence des catégories
+  websocketService.on('categories.tree.changed', (data) => {
+    console.log('🌳 Arborescence des catégories modifiée, notification globale reçue');
+    // Le store spécifique devrait gérer le rafraîchissement
+  });
+}
+
+/**
+ * Précharge uniquement les données critiques après une reconnexion
+ * @returns {Promise<void>}
+ */
+async function preloadCriticalData() {
+  try {
+    // Priorité à la hiérarchie des catégories qui est souvent utilisée dans l'interface
+    const hierarchyStore = useCategoryHierarchyStore.getState();
+    if (hierarchyStore.initWebSocketListeners) {
+      hierarchyStore.initWebSocketListeners();
+    }
+    console.log('🔄 Données critiques rechargées après reconnexion');
+  } catch (error) {
+    console.error('❌ Erreur lors du rechargement des données critiques:', error);
+  }
 }
 
 /**
@@ -74,17 +118,26 @@ function setupGlobalWebSocketEventHandlers() {
  * @returns {Promise<void>}
  */
 async function preloadEssentialData() {
-  // On utilise Promise.allSettled pour éviter que les erreurs ne se propagent
+  console.log('🚀 Démarrage du préchargement des données essentielles');
+
+  // Priorité à la hiérarchie des catégories (chargée en premier)
+  try {
+    await preloadCategoryHierarchy();
+    console.log('✅ Hiérarchie des catégories préchargée avec succès');
+  } catch (error) {
+    console.warn('⚠️ Échec du préchargement de la hiérarchie des catégories:', error);
+  }
+
+  // Puis charger le reste des données en parallèle
   const preloadResults = await Promise.allSettled([
     preloadEntityData('product'),
     preloadEntityData('category'),
     preloadEntityData('brand'),
     preloadEntityData('supplier'),
-    preloadCategoryHierarchy(), // Ajout du préchargement de la hiérarchie des catégories
   ]);
 
   // Vérifier les résultats
-  const entities = ['products', 'categories', 'brands', 'suppliers', 'category hierarchy'];
+  const entities = ['products', 'categories', 'brands', 'suppliers'];
   preloadResults.forEach((result, index) => {
     if (result.status === 'rejected') {
       console.warn(`⚠️ Échec du préchargement des ${entities[index]}:`, result.reason);
@@ -100,20 +153,30 @@ async function preloadEssentialData() {
  */
 async function preloadCategoryHierarchy() {
   try {
-    // Initialiser les WebSockets pour le store hiérarchique
+    // Accéder au store hiérarchique
     const hierarchyStore = useCategoryHierarchyStore.getState();
+    console.log('🌳 Initialisation du store de hiérarchie des catégories');
 
-    // Initialiser WebSocket une seule fois
+    // Initialiser les écouteurs WebSocket
     if (hierarchyStore.initWebSocketListeners) {
       hierarchyStore.initWebSocketListeners();
+      console.log('🌳 Écouteurs WebSocket initialisés pour la hiérarchie des catégories');
+    } else {
+      console.warn('⚠️ Méthode initWebSocketListeners non trouvée dans le store');
     }
+
+    // S'assurer d'être abonné explicitement au canal
+    websocketService.subscribe('categories');
 
     // Précharger les données hiérarchiques
     if (hierarchyStore.fetchItems) {
       await hierarchyStore.fetchItems();
+      console.log('🌳 Données hiérarchiques chargées avec succès');
+    } else {
+      console.warn('⚠️ Méthode fetchItems non trouvée dans le store');
     }
 
-    console.log('🌳 Hiérarchie des catégories préchargée');
+    return true;
   } catch (error) {
     console.error('❌ Échec du préchargement de la hiérarchie des catégories:', error);
     throw error;
@@ -127,26 +190,42 @@ async function preloadCategoryHierarchy() {
  */
 async function preloadEntityData(entityType) {
   try {
-    let fetchFunction;
+    let store;
     switch (entityType) {
       case 'product':
-        fetchFunction = useProductStore.getState().fetchItems;
+        store = useProductStore.getState();
         break;
       case 'category':
-        fetchFunction = useCategoryStore.getState().fetchItems;
+        store = useCategoryStore.getState();
         break;
       case 'brand':
-        fetchFunction = useBrandStore.getState().fetchItems;
+        store = useBrandStore.getState();
         break;
       case 'supplier':
-        fetchFunction = useSupplierStore.getState().fetchItems;
+        store = useSupplierStore.getState();
         break;
       default:
         console.warn(`Type d'entité inconnu pour le préchargement: ${entityType}`);
         return;
     }
 
-    await fetchFunction();
+    // Initialiser les écouteurs WebSocket si la méthode existe
+    if (store.initWebSocketListeners) {
+      store.initWebSocketListeners();
+      console.log(`✓ Écouteurs WebSocket initialisés pour ${entityType}`);
+    }
+
+    // S'assurer d'être abonné au canal
+    websocketService.subscribe(entityType);
+
+    // Charger les données
+    if (store.fetchItems) {
+      await store.fetchItems();
+      console.log(`✓ Données ${entityType} chargées`);
+      return true;
+    } else {
+      console.warn(`⚠️ Méthode fetchItems non trouvée pour ${entityType}`);
+    }
   } catch (error) {
     console.error(`❌ Échec du préchargement des données ${entityType}:`, error);
     throw error;
@@ -158,10 +237,38 @@ async function preloadEntityData(entityType) {
  * À appeler lors de la déconnexion de l'application
  */
 export function cleanupServices() {
+  // Nettoyer les stores spécifiques
+  try {
+    // Nettoyage du store de hiérarchie des catégories
+    const hierarchyStore = useCategoryHierarchyStore.getState();
+    if (hierarchyStore.cleanup) {
+      hierarchyStore.cleanup();
+      console.log('✓ Store de hiérarchie des catégories nettoyé');
+    }
+
+    // Nettoyage des autres stores si nécessaire
+    const stores = [
+      { name: 'category', store: useCategoryStore.getState() },
+      { name: 'product', store: useProductStore.getState() },
+      { name: 'brand', store: useBrandStore.getState() },
+      { name: 'supplier', store: useSupplierStore.getState() },
+    ];
+
+    stores.forEach(({ name, store }) => {
+      if (store.cleanup) {
+        store.cleanup();
+        console.log(`✓ Store ${name} nettoyé`);
+      }
+    });
+  } catch (error) {
+    console.warn('⚠️ Erreur lors du nettoyage des stores:', error);
+  }
+
   // Nettoyer les gestionnaires d'événements globaux
   websocketService.off('system.notification');
   websocketService.off('disconnect');
   websocketService.off('connect');
+  websocketService.off('categories.tree.changed');
 
   // Déconnecter le WebSocket proprement
   websocketService.disconnect();
@@ -175,6 +282,24 @@ export function cleanupServices() {
  * @returns {Object} - État des différents services
  */
 export function checkServicesStatus() {
+  // Obtenir des informations sur les écouteurs WebSocket
+  let websocketListeners = {};
+  try {
+    const events = [
+      'categories.tree.changed',
+      'categories.created',
+      'categories.updated',
+      'categories.deleted',
+      'connect',
+      'disconnect',
+    ];
+    events.forEach((event) => {
+      websocketListeners[event] = websocketService.eventHandlers[event]?.length || 0;
+    });
+  } catch (e) {
+    websocketListeners = { error: e.message };
+  }
+
   return {
     api: {
       available: !!apiService.getBaseUrl(),
@@ -184,6 +309,8 @@ export function checkServicesStatus() {
       connected: websocketService.isConnected,
       reconnecting: websocketService.isReconnecting,
       reconnectAttempts: websocketService.reconnectAttempts,
+      subscriptions: [...websocketService.subscriptions],
+      listeners: websocketListeners,
     },
     imageProxy: {
       initialized: imageProxyService.isInitialized ?? false,
@@ -200,6 +327,7 @@ export function checkServicesStatus() {
       categoryHierarchy: {
         loaded: useCategoryHierarchyStore.getState().items?.length > 0,
         count: useCategoryHierarchyStore.getState().items?.length || 0,
+        listenersInitialized: useCategoryHierarchyStore.getState().listenersInitialized || false,
       },
       brands: {
         loaded: useBrandStore.getState().items.length > 0,
@@ -212,3 +340,9 @@ export function checkServicesStatus() {
     },
   };
 }
+
+export default {
+  initializeServices,
+  cleanupServices,
+  checkServicesStatus,
+};

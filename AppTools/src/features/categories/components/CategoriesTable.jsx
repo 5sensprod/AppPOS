@@ -1,6 +1,6 @@
 // src/features/categories/components/CategoriesTable.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useCategory, useCategoryExtras } from '../stores/categoryStore';
+import { useCategory } from '../stores/categoryStore';
 import { useHierarchicalCategories } from '../stores/categoryHierarchyStore';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
@@ -11,12 +11,13 @@ function CategoriesTable(props) {
   // Récupérer les fonctions du store
   const { deleteCategory, syncCategory } = useCategory();
 
-  // Accéder directement au store hiérarchique
+  // Accéder au store hiérarchique
   const {
     hierarchicalCategories,
     loading: hierarchicalLoading,
     fetchHierarchicalCategories,
     initWebSocketListeners,
+    debugListeners,
   } = useHierarchicalCategories();
 
   // États locaux pour le composant
@@ -24,38 +25,42 @@ function CategoriesTable(props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [initialized, setInitialized] = useState(false);
 
-  // Initialiser les WebSockets et charger les données une seule fois
+  // Initialiser les WebSockets et charger les données au montage du composant
   useEffect(() => {
-    if (!initialized) {
-      console.log('[CATEGORIES_TABLE] Initialisation WebSocket et chargement des données');
+    console.log('[CATEGORIES_TABLE] Montage du composant');
 
-      // Utiliser directement initWebSocketListeners
-      const cleanup = initWebSocketListeners();
+    // Initialiser les écouteurs WebSocket une seule fois
+    const cleanupListeners = initWebSocketListeners();
 
-      // Charger les données
-      fetchHierarchicalCategories();
+    // Charger les données initiales
+    fetchHierarchicalCategories();
 
-      setInitialized(true);
+    // Afficher l'état des écouteurs pour débogage
+    setTimeout(() => {
+      debugListeners();
+    }, 1000);
 
-      return () => {
-        if (typeof cleanup === 'function') {
-          cleanup();
-        }
-      };
-    }
-  }, [initialized, fetchHierarchicalCategories, initWebSocketListeners]);
+    // Nettoyer les écouteurs lors du démontage
+    return () => {
+      console.log('[CATEGORIES_TABLE] Démontage du composant');
+      if (typeof cleanupListeners === 'function') {
+        cleanupListeners();
+      }
+    };
+  }, []);
+
   // Fonction pour rafraîchir les données
   const refreshCategories = useCallback(() => {
+    console.log('[CATEGORIES_TABLE] Rafraîchissement manuel des catégories');
     return fetchHierarchicalCategories();
   }, [fetchHierarchicalCategories]);
 
-  // Utilisation du hook useEntityTable avec des fonctions explicites
+  // Utilisation du hook useEntityTable
   const {
     loading: operationLoading,
     error,
     executeOperation,
   } = useEntityTable({
-    // Ne pas passer fetchEntities pour éviter l'erreur
     deleteEntity: deleteCategory,
     syncEntity: syncCategory,
   });
@@ -69,7 +74,8 @@ function CategoriesTable(props) {
 
       return executeOperation(async () => {
         await deleteCategory(id);
-        // Rafraîchir manuellement après l'opération
+        // Le rafraîchissement devrait se faire automatiquement via WebSocket,
+        // mais on le force au cas où
         await refreshCategories();
       });
     },
@@ -80,7 +86,8 @@ function CategoriesTable(props) {
     async (id) => {
       return executeOperation(async () => {
         await syncCategory(id);
-        // Rafraîchir manuellement après l'opération
+        // Le rafraîchissement devrait se faire automatiquement via WebSocket,
+        // mais on le force au cas où
         await refreshCategories();
       });
     },

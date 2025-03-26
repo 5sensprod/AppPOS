@@ -1,8 +1,6 @@
-// src/features/categories/components/CategorieDetail.jsx
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { useCategory, useCategoryExtras } from '../stores/categoryStore';
-import { useHierarchicalCategories } from '../stores/categoryHierarchyStore';
+import { useCategory, useCategoryExtras, useCategoryDataStore } from '../stores/categoryStore';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
@@ -12,30 +10,14 @@ import { useEntityDetail } from '../../../hooks/useEntityDetail';
 
 function CategorieDetail() {
   const { id } = useParams();
-  const [wsInitialized, setWsInitialized] = useState(false);
   const isMountedRef = useRef(true);
 
   // Récupération des fonctions du store
-  const { getCategoryById, deleteCategory, syncCategory } = useCategory();
-  const { uploadImage, deleteImage } = useCategoryExtras();
+  const { getCategoryById, deleteCategory } = useCategory();
+  const { uploadImage, deleteImage, syncCategory } = useCategoryExtras();
 
-  // Utiliser useHierarchicalCategories au lieu de useCategoryHierarchyStore
-  const { initWebSocketListeners } = useHierarchicalCategories();
-
-  // Initialiser WebSocket séparément, une seule fois
-  useEffect(() => {
-    if (!wsInitialized) {
-      console.log(`[CATEGORY_DETAIL] Initialisation des WebSockets pour la catégorie #${id}`);
-      // Utiliser initWebSocketListeners() au lieu de hierarchyStore.initWebSocket()
-      const cleanup = initWebSocketListeners();
-      setWsInitialized(true);
-      return () => {
-        if (typeof cleanup === 'function') {
-          cleanup();
-        }
-      };
-    }
-  }, [id, initWebSocketListeners, wsInitialized]);
+  // Store WebSocket dédié - comme dans BrandDetail
+  const categoryWsStore = useCategoryDataStore();
 
   // Nettoyage à la déconnexion
   useEffect(() => {
@@ -44,8 +26,7 @@ function CategorieDetail() {
     };
   }, []);
 
-  // Utilisation du hook useEntityDetail sans passer le store WebSocket
-  // puisque nous l'initialisons directement ci-dessus
+  // Utilisation du hook useEntityDetail avec le wsStore
   const {
     entity: category,
     loading,
@@ -57,11 +38,13 @@ function CategorieDetail() {
     id,
     entityType: 'category',
     getEntityById: getCategoryById,
+    wsStore: categoryWsStore,
     syncEntity: syncCategory,
     uploadImage,
     deleteImage,
   });
 
+  // Reste du code inchangé...
   const renderTabContent = (category, activeTab) => {
     if (!category) return null;
     switch (activeTab) {
