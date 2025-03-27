@@ -73,10 +73,6 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
         return;
       }
 
-      if (!window.confirm(`Êtes-vous sûr de vouloir supprimer cet élément ?`)) {
-        return;
-      }
-
       return executeOperation(async () => {
         await functionsRef.current.deleteEntity(id);
         // Rafraîchir seulement si fetchEntities est une fonction
