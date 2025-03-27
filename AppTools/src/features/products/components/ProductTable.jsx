@@ -7,7 +7,8 @@ import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function ProductTable(props) {
-  const { deleteProduct } = useProduct();
+  // Récupérer les fonctions du store avec syncProduct explicitement
+  const { deleteProduct, syncProduct } = useProduct();
 
   // Utiliser le nouveau store dédié
   const {
@@ -48,11 +49,20 @@ function ProductTable(props) {
     entityType: 'product',
     fetchEntities: fetchProducts,
     deleteEntity: async (id) => {
+      console.log(`🗑️ Suppression du produit #${id}`);
       await deleteProduct(id);
       // Le refresh se fera automatiquement via les événements WebSocket
     },
     syncEntity: async (id) => {
-      // Fonction de synchronisation gérée par le composant useEntityTable
+      // Utiliser la fonction syncProduct explicitement
+      console.log(`🔄 Début de synchronisation du produit #${id}`);
+      try {
+        await syncProduct(id);
+        console.log(`✅ Fin de synchronisation du produit #${id}`);
+      } catch (error) {
+        console.error(`❌ Erreur lors de la synchronisation:`, error);
+        throw error;
+      }
       // Le refresh se fera automatiquement via les événements WebSocket
     },
     // Ne pas spécifier de customEventHandlers pour éviter les abonnements doublons

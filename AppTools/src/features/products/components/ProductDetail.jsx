@@ -1,7 +1,8 @@
 // src/features/products/components/ProductDetail.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useProduct, useProductExtras } from '../stores/productStore';
+import { useHierarchicalCategories } from '../../categories/stores/categoryHierarchyStore';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ProductPriceSection from './ProductPriceSection';
@@ -10,6 +11,7 @@ import ImagesTab from '../../../components/common/tabs/ImagesTab';
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import getValidationSchema from './validationSchema/getValidationSchema';
 import { ENTITY_CONFIG } from '../constants';
+import apiService from '../../../services/api';
 
 function ProductDetail() {
   const { id: paramId } = useParams();
@@ -25,8 +27,29 @@ function ProductDetail() {
   const [success, setSuccess] = useState(null);
   const [currentId, setCurrentId] = useState(paramId);
 
+  // État pour stocker les données liées (marques, fournisseurs)
+  const [relatedData, setRelatedData] = useState({
+    brands: [],
+    suppliers: [],
+  });
+
+  // État pour éviter les appels API multiples
+  const [dataFetched, setDataFetched] = useState(false);
+
+  // Utiliser les hooks Zustand pour les produits
   const { getProductById, createProduct, updateProduct, deleteProduct, syncProduct } = useProduct();
   const { uploadImage, deleteImage, setMainImage } = useProductExtras();
+
+  // Utiliser le hook pour les catégories hiérarchiques
+  const {
+    hierarchicalCategories,
+    fetchHierarchicalCategories,
+    initWebSocketListeners: initCategoryWebSocketListeners,
+    loading: hierarchyLoading,
+  } = useHierarchicalCategories();
+
+  // État pour le WebSocket
+  const [wsInitialized, setWsInitialized] = useState(false);
 
   const validationSchema = getValidationSchema(isNew);
 
@@ -52,6 +75,55 @@ function ProductDetail() {
     supplier_ref: null,
   };
 
+  // Initialiser les WebSockets une seule fois
+  useEffect(() => {
+    if (!wsInitialized) {
+      console.log('[PRODUCT_DETAIL] Initialisation WebSocket pour les catégories');
+      const cleanup = initCategoryWebSocketListeners();
+      setWsInitialized(true);
+
+      return () => {
+        if (typeof cleanup === 'function') {
+          cleanup();
+        }
+      };
+    }
+  }, [initCategoryWebSocketListeners, wsInitialized]);
+
+  // Récupérer les données uniquement lors du premier rendu
+  useEffect(() => {
+    if (dataFetched) return;
+
+    const fetchAllData = async () => {
+      try {
+        setLoading(true);
+
+        // Récupérer les catégories hiérarchiques
+        await fetchHierarchicalCategories();
+
+        // Récupérer les marques et fournisseurs
+        const [brandsResponse, suppliersResponse] = await Promise.all([
+          apiService.get('/api/brands'),
+          apiService.get('/api/suppliers'),
+        ]);
+
+        setRelatedData({
+          brands: brandsResponse.data.data || [],
+          suppliers: suppliersResponse.data.data || [],
+        });
+
+        setDataFetched(true);
+      } catch (error) {
+        console.error('Erreur lors de la récupération des données:', error);
+        setError('Erreur lors de la récupération des données pour le formulaire.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllData();
+  }, [fetchHierarchicalCategories, dataFetched]);
+
   // Chargement du produit lors du premier rendu ou du changement d'ID
   useEffect(() => {
     const effectiveId = currentId || paramId;
@@ -76,15 +148,138 @@ function ProductDetail() {
       .finally(() => setLoading(false));
   }, [currentId, paramId, isNew, getProductById]);
 
+  // Transformer les catégories hiérarchiques en options pour le select
+  const transformCategoryOptions = useCallback((categories, prefix = '') => {
+    if (!Array.isArray(categories)) return [];
+
+    let options = [];
+
+    categories.forEach((category) => {
+      if (!category || typeof category !== 'object') return;
+
+      options.push({
+        value: category._id,
+        label: prefix + (category.name || 'Sans nom'),
+      });
+
+      if (category.children && Array.isArray(category.children) && category.children.length > 0) {
+        options = [...options, ...transformCategoryOptions(category.children, prefix + '— ')];
+      }
+    });
+
+    return options;
+  }, []);
+
+  // Calculer les options de catégories une seule fois quand les données changent
+  const categoryOptions = useMemo(() => {
+    return transformCategoryOptions(hierarchicalCategories);
+  }, [hierarchicalCategories, transformCategoryOptions]);
+
+  // Calculer les options de marques et fournisseurs une seule fois quand les données changent
+  const brandOptions = useMemo(() => {
+    return relatedData.brands.map((brand) => ({
+      value: brand._id,
+      label: brand.name,
+    }));
+  }, [relatedData.brands]);
+
+  const supplierOptions = useMemo(() => {
+    return relatedData.suppliers.map((supplier) => ({
+      value: supplier._id,
+      label: supplier.name,
+    }));
+  }, [relatedData.suppliers]);
+
+  // Pré-traiter les données avant soumission
+  const preprocessData = useCallback(
+    (data) => {
+      const processedData = { ...data };
+
+      // Traiter les chaînes vides comme null pour les ID de relation
+      if (processedData.category_id === '') processedData.category_id = null;
+      if (processedData.brand_id === '') processedData.brand_id = null;
+      if (processedData.supplier_id === '') processedData.supplier_id = null;
+
+      // S'assurer que description et sku ne sont jamais null
+      if (processedData.description === null || processedData.description === undefined) {
+        processedData.description = '';
+      }
+      if (processedData.sku === null || processedData.sku === undefined) {
+        processedData.sku = '';
+      }
+
+      // S'assurer que stock est au moins 0
+      if (processedData.stock === null || processedData.stock === undefined) {
+        processedData.stock = 0;
+      }
+
+      // Ajouter les références aux catégories
+      if (processedData.category_id) {
+        const catOption = categoryOptions.find((opt) => opt.value === processedData.category_id);
+        if (catOption) {
+          processedData.category_ref = {
+            id: catOption.value,
+            name: catOption.label.replace(/^—\s*/g, ''), // Retirer les tirets de préfixe
+          };
+        }
+      }
+
+      // Ajouter les références aux catégories multiples
+      if (Array.isArray(processedData.categories) && processedData.categories.length > 0) {
+        processedData.categories_refs = processedData.categories
+          .map((catId) => {
+            const catOption = categoryOptions.find((opt) => opt.value === catId);
+            if (catOption) {
+              return {
+                id: catOption.value,
+                name: catOption.label.replace(/^—\s*/g, ''), // Retirer les tirets de préfixe
+              };
+            }
+            return null;
+          })
+          .filter(Boolean);
+      }
+
+      // Ajouter les références aux marques
+      if (processedData.brand_id) {
+        const brand = relatedData.brands.find((b) => b._id === processedData.brand_id);
+        if (brand) {
+          processedData.brand_ref = {
+            id: brand._id,
+            name: brand.name,
+          };
+        }
+      }
+
+      // Ajouter les références aux fournisseurs
+      if (processedData.supplier_id) {
+        const supplier = relatedData.suppliers.find((s) => s._id === processedData.supplier_id);
+        if (supplier) {
+          processedData.supplier_ref = {
+            id: supplier._id,
+            name: supplier.name,
+          };
+        }
+      }
+
+      return processedData;
+    },
+    [categoryOptions, relatedData.brands, relatedData.suppliers]
+  );
+
   const handleSubmit = async (data) => {
     setLoading(true);
     setError(null);
 
     try {
-      if (isNew) {
-        const created = await createProduct(data);
+      // Prétraitement des données pour gérer les relations
+      const processedData = preprocessData(data);
 
-        // Extraire l'ID de la réponse API (vérifiez la structure exacte)
+      console.log('Données produit traitées:', processedData);
+
+      if (isNew) {
+        const created = await createProduct(processedData);
+
         // Pour debugging, log la réponse complète
         console.log('Réponse API createProduct:', created);
 
@@ -123,7 +318,7 @@ function ProductDetail() {
         navigate(`/products/${newId}`, { replace: true });
       } else {
         const effectiveId = currentId || paramId;
-        await updateProduct(effectiveId, data);
+        await updateProduct(effectiveId, processedData);
         setSuccess('Produit mis à jour avec succès');
 
         // Recharger le produit mis à jour
@@ -201,53 +396,123 @@ function ProductDetail() {
     }
   };
 
-  const renderTabContent = (entity, activeTab, formProps = {}) => {
-    const { editable, register, errors } = formProps;
-    switch (activeTab) {
-      case 'general':
-        return (
-          <GeneralInfoTab
-            entity={entity}
-            fields={['name', 'sku', 'description', 'status']}
-            editable={editable}
-            additionalSection={
-              <ProductPriceSection
-                product={entity}
-                editable={editable}
-                register={register}
-                errors={errors}
-              />
-            }
-          />
-        );
-      case 'inventory':
-        return (
-          <InventoryTab product={entity} editable={editable} register={register} errors={errors} />
-        );
-      case 'images':
-        return (
-          <ImagesTab
-            entity={entity}
-            entityId={currentId || paramId}
-            entityType="product"
-            galleryMode={true}
-            onUploadImage={handleUploadImage}
-            onDeleteImage={handleDeleteImage}
-            onSetMainImage={handleSetMainImage}
-            isLoading={loading}
-            error={error}
-          />
-        );
-      case 'woocommerce':
-        return <WooCommerceTab entity={entity} entityType="product" onSync={syncProduct} />;
-      default:
-        return null;
+  // Fonction pour synchroniser le produit avec WooCommerce
+  const handleSync = async () => {
+    try {
+      setLoading(true);
+      const effectiveId = currentId || paramId;
+      await syncProduct(effectiveId);
+
+      // Recharger le produit pour obtenir les informations à jour
+      const updatedProduct = await getProductById(effectiveId);
+      setProduct(updatedProduct);
+
+      setSuccess('Produit synchronisé avec succès');
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation:', error);
+      setError('Erreur lors de la synchronisation du produit');
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const visibleTabs = isNew
-    ? ENTITY_CONFIG.tabs.filter((tab) => !['images', 'woocommerce'].includes(tab.id))
-    : ENTITY_CONFIG.tabs;
+  // Mémoriser les champs améliorés pour éviter de les recréer à chaque rendu
+  const enhancedInventoryFields = useMemo(() => {
+    return {
+      category_id: {
+        type: 'select',
+        options: [{ value: '', label: 'Aucune catégorie' }, ...categoryOptions],
+      },
+      categories: {
+        type: 'multiselect',
+        options: categoryOptions,
+      },
+      brand_id: {
+        type: 'select',
+        options: [{ value: '', label: 'Aucune marque' }, ...brandOptions],
+      },
+      supplier_id: {
+        type: 'select',
+        options: [{ value: '', label: 'Aucun fournisseur' }, ...supplierOptions],
+      },
+    };
+  }, [categoryOptions, brandOptions, supplierOptions]);
+
+  // Mémoriser la fonction renderTabContent pour éviter de la recréer à chaque rendu
+  const renderTabContent = useCallback(
+    (entity, activeTab, formProps = {}) => {
+      const { editable, register, errors } = formProps;
+
+      switch (activeTab) {
+        case 'general':
+          return (
+            <GeneralInfoTab
+              entity={entity}
+              fields={['name', 'sku', 'description', 'status']}
+              editable={editable}
+              additionalSection={
+                <ProductPriceSection
+                  product={entity}
+                  editable={editable}
+                  register={register}
+                  errors={errors}
+                />
+              }
+            />
+          );
+        case 'inventory':
+          return (
+            <InventoryTab
+              product={entity}
+              editable={editable}
+              register={register}
+              errors={errors}
+              specialFields={editable ? enhancedInventoryFields : {}} // Passer les champs avec les options
+            />
+          );
+        case 'images':
+          return (
+            <ImagesTab
+              entity={entity}
+              entityId={currentId || paramId}
+              entityType="product"
+              galleryMode={true}
+              onUploadImage={handleUploadImage}
+              onDeleteImage={handleDeleteImage}
+              onSetMainImage={handleSetMainImage}
+              isLoading={loading}
+              error={error}
+            />
+          );
+        case 'woocommerce':
+          return <WooCommerceTab entity={entity} entityType="product" onSync={handleSync} />;
+        default:
+          return null;
+      }
+    },
+    [
+      currentId,
+      paramId,
+      loading,
+      error,
+      enhancedInventoryFields,
+      handleUploadImage,
+      handleDeleteImage,
+      handleSetMainImage,
+      syncProduct,
+    ]
+  );
+
+  // Mémoriser les onglets visibles
+  const visibleTabs = useMemo(() => {
+    return isNew
+      ? ENTITY_CONFIG.tabs.filter((tab) => !['images', 'woocommerce'].includes(tab.id))
+      : ENTITY_CONFIG.tabs;
+  }, [isNew]);
+
+  const isLoadingData = loading || hierarchyLoading;
 
   return (
     <EntityDetail
@@ -263,7 +528,8 @@ function ProductDetail() {
       onDelete={handleDelete}
       onSubmit={handleSubmit}
       onCancel={handleCancel}
-      isLoading={loading}
+      onSync={handleSync}
+      isLoading={isLoadingData}
       title={isNew ? 'Ajouter un produit' : `Modifier « ${product?.name || ''} »`}
       error={error}
       success={success}

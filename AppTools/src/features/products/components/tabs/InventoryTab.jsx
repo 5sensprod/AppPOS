@@ -1,7 +1,9 @@
 // src/features/products/components/tabs/InventoryTab.jsx
 import React from 'react';
 
-const InventoryTab = ({ product, editable = false, register, errors }) => {
+const InventoryTab = ({ product, editable = false, register, errors, specialFields = {} }) => {
+  console.log('🧰 InventoryTab - specialFields reçus:', specialFields);
+
   // Si en mode lecture
   if (!editable) {
     return (
@@ -150,7 +152,8 @@ const InventoryTab = ({ product, editable = false, register, errors }) => {
           Catégories et relations
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* Catégorie principale */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Catégorie principale
@@ -160,11 +163,49 @@ const InventoryTab = ({ product, editable = false, register, errors }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Sélectionner une catégorie</option>
-              {/* Ici vous devriez ajouter les options de catégories dynamiquement */}
-              {/* Exemple : {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)} */}
+              {specialFields.category_id?.options &&
+                specialFields.category_id.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
             </select>
+            {errors?.category_id && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-500">
+                {errors.category_id.message}
+              </p>
+            )}
           </div>
 
+          {/* Catégories additionnelles */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Catégories additionnelles
+            </label>
+            <select
+              multiple
+              {...register('categories')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              size="4"
+            >
+              {specialFields.categories?.options &&
+                specialFields.categories.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs catégories
+            </p>
+            {errors?.categories && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-500">
+                {errors.categories.message}
+              </p>
+            )}
+          </div>
+
+          {/* Marque */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Marque
@@ -174,10 +215,21 @@ const InventoryTab = ({ product, editable = false, register, errors }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Sélectionner une marque</option>
-              {/* Ici vous devriez ajouter les options de marques dynamiquement */}
+              {specialFields.brand_id?.options &&
+                specialFields.brand_id.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
             </select>
+            {errors?.brand_id && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-500">
+                {errors.brand_id.message}
+              </p>
+            )}
           </div>
 
+          {/* Fournisseur */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Fournisseur
@@ -187,8 +239,18 @@ const InventoryTab = ({ product, editable = false, register, errors }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Sélectionner un fournisseur</option>
-              {/* Ici vous devriez ajouter les options de fournisseurs dynamiquement */}
+              {specialFields.supplier_id?.options &&
+                specialFields.supplier_id.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
             </select>
+            {errors?.supplier_id && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-500">
+                {errors.supplier_id.message}
+              </p>
+            )}
           </div>
         </div>
       </div>

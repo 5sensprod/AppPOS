@@ -10,6 +10,7 @@ const customActions = {
   SET_MAIN_IMAGE: 'SET_MAIN_IMAGE',
   UPLOAD_GALLERY_IMAGE: 'UPLOAD_GALLERY_IMAGE',
   DELETE_GALLERY_IMAGE: 'DELETE_GALLERY_IMAGE',
+  SYNC_PRODUCT: 'SYNC_PRODUCT', // Nouvelle action pour la synchronisation
 };
 
 // Reducers personnalisés spécifiques aux produits
@@ -66,6 +67,15 @@ const customReducers = {
       loading: false,
     };
   },
+  SYNC_PRODUCT: (state, action) => {
+    return {
+      ...state,
+      items: state.items.map((item) =>
+        item._id === action.payload.id ? { ...item, ...action.payload.data } : item
+      ),
+      loading: false,
+    };
+  },
 };
 
 // Créer le store avec la factory
@@ -98,9 +108,35 @@ export const useProductDataStore = createWebSocketStore({
 // Étendre useProduct avec l'initWebSocket direct plutôt que la redirection
 export function useProduct() {
   const productStore = useProductBase();
+  const store = useProductStore();
+
+  // Fonction explicite de synchronisation
+  const syncProduct = async (productId) => {
+    console.log(`🔄 Synchronisation du produit #${productId}`);
+    store.dispatch({ type: 'FETCH_START' });
+
+    try {
+      // Appel API explicite pour synchroniser
+      const response = await apiService.post(`/api/products/${productId}/sync`);
+      console.log(`✅ Produit synchronisé avec succès:`, response.data);
+
+      // Mettre à jour le store avec les données reçues
+      store.dispatch({
+        type: customActions.SYNC_PRODUCT,
+        payload: { id: productId, data: response.data.data || {} },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Erreur lors de la synchronisation du produit #${productId}:`, error);
+      store.dispatch({ type: 'FETCH_ERROR', payload: error.message });
+      throw error;
+    }
+  };
 
   return {
     ...productStore,
+    syncProduct, // Ajouter explicitement la fonction de synchronisation
     initWebSocketListeners: () => {
       const cleanup = useProductDataStore.getState().initWebSocket();
       return cleanup;
@@ -114,6 +150,7 @@ export { useProductStore };
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux produits
 export function useProductExtras() {
   const store = useProductStore();
+  const { syncProduct } = useProduct(); // Récupérer la fonction syncProduct
 
   // Définir l'image principale d'un produit
   const setMainImage = async (productId, imageIndex) => {
@@ -195,6 +232,7 @@ export function useProductExtras() {
   // Retourne toutes les fonctionnalités standard du useProduct + les extras
   return {
     ...useProduct(),
+    syncProduct, // Ajouter explicitement la fonction de synchronisation
     setMainImage,
     uploadGalleryImage,
     deleteGalleryImage,
