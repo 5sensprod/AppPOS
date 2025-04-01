@@ -2,6 +2,8 @@
 const BaseController = require('./base/BaseController');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
+const Brand = require('../models/Brand');
+const Supplier = require('../models/Supplier');
 const productWooCommerceService = require('../services/ProductWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
 const { getEntityEventService } = require('../services/events/entityEvents');
@@ -114,6 +116,15 @@ class ProductController extends BaseController {
       // Utiliser super.create mais ne pas envoyer la réponse tout de suite
       const newItem = await this.model.create(req.body);
 
+      // Mise à jour des compteurs si une marque ou un fournisseur est spécifié
+      if (req.body.brand_id) {
+        await Brand.updateProductCount(req.body.brand_id);
+      }
+
+      if (req.body.supplier_id) {
+        await Supplier.updateProductCount(req.body.supplier_id);
+      }
+
       // Mise à jour des références de catégories
       if (categories.length > 0) {
         await updateCategoryRefs(newItem._id, categories);
@@ -134,6 +145,7 @@ class ProductController extends BaseController {
 
       // Émettre l'événement de création
       this.eventService.created(updatedItem);
+      this.eventService.created(newItem);
 
       // Maintenant envoyer la réponse
       return ResponseHandler.created(res, updatedItem);
@@ -144,6 +156,14 @@ class ProductController extends BaseController {
 
   async update(req, res) {
     try {
+      const existingProduct = await this.model.findById(req.params.id);
+      if (!existingProduct) return ResponseHandler.notFound(res);
+
+      // Sauvegarder les anciennes valeurs pour vérifier les changements
+      const oldBrandId = existingProduct.brand_id;
+      const oldSupplierId = existingProduct.supplier_id;
+      const oldCategories = existingProduct.categories || [];
+
       let categoryChanged = false;
       let categoriesForRefs = null;
 
@@ -156,31 +176,28 @@ class ProductController extends BaseController {
         }
 
         // Vérifier si la catégorie a changé
-        const existingProduct = await this.model.findById(req.params.id);
-        if (existingProduct) {
-          const oldCategories = existingProduct.categories || [];
-          if (JSON.stringify(oldCategories.sort()) !== JSON.stringify(categories.sort())) {
-            categoryChanged = true;
-            categoriesForRefs = categories;
-          }
+        if (JSON.stringify(oldCategories.sort()) !== JSON.stringify(categories.sort())) {
+          categoryChanged = true;
+          categoriesForRefs = categories;
         }
 
         req.body.categories = categories;
         req.body.category_id = categories.length > 0 ? categories[0] : null;
       }
 
-      // Mise à jour directe sans appeler super.update pour éviter l'envoi de réponse
+      // Mise à jour directe
       const id = req.params.id;
       const updateData = req.body;
 
-      const existing = await this.model.findById(id);
-      if (!existing) return ResponseHandler.notFound(res);
-
-      if (existing.woo_id) {
+      if (existingProduct.woo_id) {
         updateData.pending_sync = true;
       }
 
       await this.model.update(id, updateData);
+
+      // Importer les modèles à l'intérieur de la fonction pour éviter les erreurs
+      const Brand = require('../models/Brand');
+      const Supplier = require('../models/Supplier');
 
       // Mise à jour des références de catégories si nécessaire
       if (categoryChanged && categoriesForRefs !== null) {
@@ -194,6 +211,40 @@ class ProductController extends BaseController {
         // Obtenir le service d'événements pour les catégories
         const categoryEventService = getEntityEventService('categories');
         categoryEventService.categoryTreeChanged();
+      }
+
+      // Vérifier si la marque a changé et mettre à jour les compteurs
+      if ('brand_id' in updateData && updateData.brand_id !== oldBrandId) {
+        console.log(
+          `Marque changée de ${oldBrandId} à ${updateData.brand_id}, mise à jour des compteurs`
+        );
+
+        // Mettre à jour le compteur pour l'ancienne marque
+        if (oldBrandId) {
+          await Brand.updateProductCount(oldBrandId);
+        }
+
+        // Mettre à jour le compteur pour la nouvelle marque
+        if (updateData.brand_id) {
+          await Brand.updateProductCount(updateData.brand_id);
+        }
+      }
+
+      // Vérifier si le fournisseur a changé et mettre à jour les compteurs
+      if ('supplier_id' in updateData && updateData.supplier_id !== oldSupplierId) {
+        console.log(
+          `Fournisseur changé de ${oldSupplierId} à ${updateData.supplier_id}, mise à jour des compteurs`
+        );
+
+        // Mettre à jour le compteur pour l'ancien fournisseur
+        if (oldSupplierId) {
+          await Supplier.updateProductCount(oldSupplierId);
+        }
+
+        // Mettre à jour le compteur pour le nouveau fournisseur
+        if (updateData.supplier_id) {
+          await Supplier.updateProductCount(updateData.supplier_id);
+        }
       }
 
       // Récupérer le produit mis à jour
@@ -212,8 +263,55 @@ class ProductController extends BaseController {
         }
       }
 
-      // Envoyer la réponse une seule fois à la fin
+      // Envoyer la réponse
       return ResponseHandler.success(res, updatedItem);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du produit:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  async delete(req, res) {
+    try {
+      const existingProduct = await this.model.findById(req.params.id);
+      if (!existingProduct) return ResponseHandler.notFound(res);
+
+      // Sauvegarder les IDs pour la mise à jour des compteurs après suppression
+      const brandId = existingProduct.brand_id;
+      const supplierId = existingProduct.supplier_id;
+
+      // Supprimer le produit
+      await this.model.delete(req.params.id);
+
+      // Mettre à jour les compteurs après suppression
+      if (brandId) {
+        await Brand.updateProductCount(brandId);
+      }
+
+      if (supplierId) {
+        await Supplier.updateProductCount(supplierId);
+      }
+
+      // Émettre l'événement de suppression
+      this.eventService.deleted(req.params.id);
+
+      return ResponseHandler.success(res, {
+        message: 'Produit supprimé avec succès',
+      });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  // Nouvelle méthode pour recalculer tous les compteurs
+  async recalculateAllCounts(req, res) {
+    try {
+      await Brand.recalculateAllProductCounts();
+      await Supplier.recalculateAllProductCounts();
+
+      return ResponseHandler.success(res, {
+        message: 'Tous les compteurs de produits ont été recalculés',
+      });
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
@@ -232,5 +330,6 @@ module.exports = {
   updateImageMetadata: productController.updateImageMetadata,
   deleteImage: productController.deleteImage,
   setMainImage: productController.setMainImage,
-  updateCategoryRefs: updateCategoryRefs, // Exposer la fonction pour l'utiliser ailleurs si nécessaire
+  updateCategoryRefs: updateCategoryRefs,
+  recalculateAllCounts: productController.recalculateAllCounts.bind(productController),
 };

@@ -148,6 +148,19 @@ class SupplierController extends BaseController {
       this.eventService.updated(req.params.id, updated);
 
       const finalSupplier = await this.model.findById(req.params.id);
+
+      await this.model.updateProductCount(req.params.id);
+
+      // Recalculer les compteurs pour les marques modifiées
+      if (addedBrands.length > 0 || removedBrands.length > 0) {
+        const Brand = require('../models/Brand');
+        const affectedBrands = [...new Set([...addedBrands, ...removedBrands])];
+
+        for (const brandId of affectedBrands) {
+          await Brand.updateProductCount(brandId);
+        }
+      }
+
       return ResponseHandler.success(res, finalSupplier);
     } catch (error) {
       return ResponseHandler.error(res, error);
@@ -180,6 +193,13 @@ class SupplierController extends BaseController {
 
       // Utiliser le service d'événements
       this.eventService.deleted(req.params.id);
+
+      if (supplier.brands && Array.isArray(supplier.brands)) {
+        const Brand = require('../models/Brand');
+        for (const brandId of supplier.brands) {
+          await Brand.updateProductCount(brandId);
+        }
+      }
 
       return ResponseHandler.success(res, {
         message: 'Fournisseur supprimé avec succès',

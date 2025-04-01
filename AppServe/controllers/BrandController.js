@@ -93,6 +93,11 @@ class BrandController extends BaseController {
         }
       }
 
+      const finalBrand = await this.model.findById(req.params.id);
+
+      // Recalculer les compteurs de produits
+      await this.model.updateProductCount(req.params.id);
+
       return ResponseHandler.created(res, newItem);
     } catch (error) {
       return ResponseHandler.error(res, error);
@@ -223,6 +228,13 @@ class BrandController extends BaseController {
 
       // Émettre l'événement de suppression via le service d'événements
       this.eventService.deleted(req.params.id);
+
+      if (brand.suppliers && Array.isArray(brand.suppliers)) {
+        const Supplier = require('../models/Supplier');
+        for (const supplierId of brand.suppliers) {
+          await Supplier.updateProductCount(supplierId);
+        }
+      }
 
       return ResponseHandler.success(res, {
         message: 'Marque supprimée avec succès',

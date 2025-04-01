@@ -38,6 +38,9 @@ router.post(
   wooSyncMiddleware({ forceSync: true, manualSync: true })
 );
 
+// Nouvelle route pour recalculer tous les compteurs de produits
+router.post('/recalculate-counts', productController.recalculateAllCounts);
+
 router.use('/', productImageRoutes);
 
 module.exports = router;
