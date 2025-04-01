@@ -1,6 +1,6 @@
 // src/features/suppliers/constants.js
 import React from 'react';
-import { Truck, Mail, Phone, Building, User, Image } from 'lucide-react';
+import { Truck, Mail, Phone, Building, User, Image, Package } from 'lucide-react';
 import imageProxyService from '../../services/imageProxyService';
 
 export const ENTITY_CONFIG = {
@@ -30,6 +30,17 @@ export const ENTITY_CONFIG = {
     { key: 'name', label: 'Nom', sortable: true },
     { key: 'supplier_code', label: 'Code fournisseur', sortable: true },
     { key: 'customer_code', label: 'Code client', sortable: true },
+    {
+      key: 'products_count',
+      label: 'Produits',
+      sortable: true,
+      render: (supplier) => (
+        <div className="flex items-center text-sm">
+          <Package className="h-4 w-4 mr-1" />
+          <span>{supplier.products_count || 0}</span>
+        </div>
+      ),
+    },
     {
       key: 'contact',
       label: 'Contact',

@@ -8,11 +8,10 @@ import { useProductStore } from '../features/products/stores/productStore';
 import { useCategoryStore } from '../features/categories/stores/categoryStore';
 import { useCategoryHierarchyStore } from '../features/categories/stores/categoryHierarchyStore';
 import { useBrandStore } from '../features/brands/stores/brandStore';
-import { useSupplierStore } from '../features/suppliers/stores/supplierStore';
+import { useSupplierStore, useSupplierDataStore } from '../features/suppliers/stores/supplierStore';
 
 /**
  * Initialise tous les services nécessaires au démarrage de l'application
- * @returns {Promise<boolean>} - true si l'initialisation a réussi, false sinon
  */
 export async function initializeServices() {
   try {
@@ -73,13 +72,11 @@ function setupGlobalWebSocketEventHandlers() {
   // Exemple de gestionnaire global pour les notifications système
   websocketService.on('system.notification', (data) => {
     console.log('📢 Notification système reçue:', data);
-    // Vous pourriez appeler une fonction pour afficher une notification ici
   });
 
   // Gestionnaire pour les déconnexions inattendues
   websocketService.on('disconnect', () => {
     console.warn('⚠️ WebSocket déconnecté');
-    // Vous pourriez afficher un indicateur de connexion perdue
   });
 
   // Gestionnaire pour les reconnexions réussies
@@ -92,13 +89,39 @@ function setupGlobalWebSocketEventHandlers() {
   // Gestionnaire global pour les changements dans l'arborescence des catégories
   websocketService.on('categories.tree.changed', (data) => {
     console.log('🌳 Arborescence des catégories modifiée, notification globale reçue');
-    // Le store spécifique devrait gérer le rafraîchissement
+  });
+
+  // Abonnement aux événements produits pour les compteurs
+  websocketService.on('products.updated', (data) => {
+    console.log('📦 Produit mis à jour, vérification des compteurs');
+    // On peut forcer un rafraîchissement des données fournisseurs ici
+    const supplierStore = useSupplierDataStore.getState();
+    if (supplierStore.fetchSuppliers) {
+      supplierStore.fetchSuppliers();
+    }
+  });
+
+  // Abonnement aux événements de création de produits
+  websocketService.on('products.created', (data) => {
+    console.log('📦 Nouveau produit créé, mise à jour des compteurs');
+    const supplierStore = useSupplierDataStore.getState();
+    if (supplierStore.fetchSuppliers) {
+      supplierStore.fetchSuppliers();
+    }
+  });
+
+  // Abonnement aux événements de suppression de produits
+  websocketService.on('products.deleted', (data) => {
+    console.log('📦 Produit supprimé, mise à jour des compteurs');
+    const supplierStore = useSupplierDataStore.getState();
+    if (supplierStore.fetchSuppliers) {
+      supplierStore.fetchSuppliers();
+    }
   });
 }
 
 /**
  * Précharge uniquement les données critiques après une reconnexion
- * @returns {Promise<void>}
  */
 async function preloadCriticalData() {
   try {
@@ -115,7 +138,6 @@ async function preloadCriticalData() {
 
 /**
  * Précharge les données essentielles pour l'application
- * @returns {Promise<void>}
  */
 async function preloadEssentialData() {
   console.log('🚀 Démarrage du préchargement des données essentielles');
@@ -149,7 +171,6 @@ async function preloadEssentialData() {
 
 /**
  * Précharge la hiérarchie des catégories
- * @returns {Promise<void>}
  */
 async function preloadCategoryHierarchy() {
   try {
@@ -186,7 +207,6 @@ async function preloadCategoryHierarchy() {
 /**
  * Précharge les données d'une entité spécifique
  * @param {string} entityType - Type d'entité (product, category, brand, supplier)
- * @returns {Promise<void>}
  */
 async function preloadEntityData(entityType) {
   try {
@@ -202,7 +222,8 @@ async function preloadEntityData(entityType) {
         store = useBrandStore.getState();
         break;
       case 'supplier':
-        store = useSupplierStore.getState();
+        // Utiliser le dataStore avec WebSocket pour les fournisseurs
+        store = useSupplierDataStore.getState();
         break;
       default:
         console.warn(`Type d'entité inconnu pour le préchargement: ${entityType}`);
@@ -210,7 +231,10 @@ async function preloadEntityData(entityType) {
     }
 
     // Initialiser les écouteurs WebSocket si la méthode existe
-    if (store.initWebSocketListeners) {
+    if (store.initWebSocket) {
+      store.initWebSocket();
+      console.log(`✓ Écouteurs WebSocket initialisés pour ${entityType}`);
+    } else if (store.initWebSocketListeners) {
       store.initWebSocketListeners();
       console.log(`✓ Écouteurs WebSocket initialisés pour ${entityType}`);
     }
@@ -218,13 +242,22 @@ async function preloadEntityData(entityType) {
     // S'assurer d'être abonné au canal
     websocketService.subscribe(entityType);
 
+    // Pour les fournisseurs, s'abonner aussi aux événements produits
+    if (entityType === 'supplier') {
+      websocketService.subscribe('products');
+    }
+
     // Charger les données
     if (store.fetchItems) {
       await store.fetchItems();
       console.log(`✓ Données ${entityType} chargées`);
       return true;
+    } else if (store.fetchSuppliers) {
+      await store.fetchSuppliers();
+      console.log(`✓ Données ${entityType} chargées`);
+      return true;
     } else {
-      console.warn(`⚠️ Méthode fetchItems non trouvée pour ${entityType}`);
+      console.warn(`⚠️ Méthode de chargement non trouvée pour ${entityType}`);
     }
   } catch (error) {
     console.error(`❌ Échec du préchargement des données ${entityType}:`, error);
@@ -234,7 +267,6 @@ async function preloadEntityData(entityType) {
 
 /**
  * Nettoie tous les gestionnaires d'événements WebSocket
- * À appeler lors de la déconnexion de l'application
  */
 export function cleanupServices() {
   // Nettoyer les stores spécifiques
@@ -251,7 +283,7 @@ export function cleanupServices() {
       { name: 'category', store: useCategoryStore.getState() },
       { name: 'product', store: useProductStore.getState() },
       { name: 'brand', store: useBrandStore.getState() },
-      { name: 'supplier', store: useSupplierStore.getState() },
+      { name: 'supplier', store: useSupplierDataStore.getState() },
     ];
 
     stores.forEach(({ name, store }) => {
@@ -269,6 +301,9 @@ export function cleanupServices() {
   websocketService.off('disconnect');
   websocketService.off('connect');
   websocketService.off('categories.tree.changed');
+  websocketService.off('products.updated');
+  websocketService.off('products.created');
+  websocketService.off('products.deleted');
 
   // Déconnecter le WebSocket proprement
   websocketService.disconnect();
@@ -278,8 +313,6 @@ export function cleanupServices() {
 
 /**
  * Vérifie si les services sont connectés et fonctionnels
- * Utile pour les diagnostics
- * @returns {Object} - État des différents services
  */
 export function checkServicesStatus() {
   // Obtenir des informations sur les écouteurs WebSocket
@@ -290,6 +323,9 @@ export function checkServicesStatus() {
       'categories.created',
       'categories.updated',
       'categories.deleted',
+      'products.updated',
+      'products.created',
+      'products.deleted',
       'connect',
       'disconnect',
     ];
@@ -334,8 +370,8 @@ export function checkServicesStatus() {
         count: useBrandStore.getState().items.length,
       },
       suppliers: {
-        loaded: useSupplierStore.getState().items.length > 0,
-        count: useSupplierStore.getState().items.length,
+        loaded: useSupplierDataStore.getState().suppliers?.length > 0,
+        count: useSupplierDataStore.getState().suppliers?.length || 0,
       },
     },
   };
