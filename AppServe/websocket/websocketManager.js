@@ -89,6 +89,12 @@ class WebSocketManager {
     console.log("[WS-DEBUG] Notification de changement dans l'arborescence des catégories envoyée");
   }
 
+  // Ajout dans websocketManager.js
+  notifyEntityCountUpdated(entityType, entityId, count) {
+    const entityPlural = entityType.endsWith('s') ? entityType : `${entityType}s`;
+    this.broadcast(`${entityPlural}.count.updated`, { entityId, count }, [entityPlural]);
+  }
+
   // Envoyer à un client spécifique
   sendToClient(client, type, payload) {
     if (client.readyState === WebSocket.OPEN) {

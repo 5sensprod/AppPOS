@@ -90,6 +90,14 @@ class EntityEventService {
 
     return data;
   }
+
+  countUpdated(id, count) {
+    console.log(
+      `[EVENT] Émission d'événement de mise à jour de compteur pour ${this.entityType}: ${id}, count: ${count}`
+    );
+    apiEventEmitter.countUpdated(this.entityType, id, count);
+    return count;
+  }
 }
 
 // Fonction factory pour obtenir un service d'événements pour une entité

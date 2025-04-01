@@ -37,6 +37,12 @@ class ApiEventEmitter extends EventEmitter {
     this.emit('categories.tree.changed', { timestamp: Date.now() });
   }
 
+  countUpdated(entityType, id, count) {
+    const standardEntityType = this.standardizeEntityType(entityType);
+    console.log(`[EVENT] Émission de ${standardEntityType}.count.updated`);
+    this.emit(`${standardEntityType}.count.updated`, { id, count });
+  }
+
   standardizeEntityType(entityType) {
     const singular = entityType.endsWith('s') ? entityType.slice(0, -1) : entityType;
     const entityMap = {
