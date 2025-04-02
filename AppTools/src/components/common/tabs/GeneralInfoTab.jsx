@@ -1,6 +1,8 @@
 // src/features/common/tabs/GeneralInfoTab.jsx
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
+import { Controller } from 'react-hook-form';
+import HierarchicalParentSelector from '../../common/HierarchicalParentSelector';
 
 const GeneralInfoTab = ({
   entity,
@@ -76,6 +78,25 @@ const GeneralInfoTab = ({
     const baseInputClass = `w-full px-3 py-2 border ${
       error ? 'border-red-500' : 'border-gray-300'
     } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white`;
+
+    // Champs avec rendu personnalisé
+    if (field === 'parent_id') {
+      return (
+        <Controller
+          name={field}
+          control={formContext.control}
+          render={({ field: controllerField }) => (
+            <HierarchicalParentSelector
+              hierarchicalData={formContext.getValues('_hierarchicalCategories') || []}
+              value={controllerField.value}
+              onChange={controllerField.onChange}
+              disabled={false}
+              currentCategoryId={formContext.getValues('_id')}
+            />
+          )}
+        />
+      );
+    }
 
     switch (field) {
       case 'description':

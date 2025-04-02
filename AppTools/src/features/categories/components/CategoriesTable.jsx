@@ -107,17 +107,22 @@ function CategoriesTable(props) {
     setSearchTerm(value);
   }, []);
 
-  // Fonction pour aplatir les données hiérarchiques
+  // Fonction flattenHierarchy améliorée pour CategoriesTable.jsx
   const flattenHierarchy = useCallback(
-    (categories, level = 0, parentExpanded = true) => {
+    (categories, level = 0, parentExpanded = true, parentIndex = '', parentId = null) => {
       if (!categories) return [];
 
       let result = [];
 
-      categories.forEach((category) => {
+      categories.forEach((category, index) => {
         const isExpanded = expandedCategories[category._id] || false;
         const hasChildren = category.children && category.children.length > 0;
         const isVisible = level === 0 || parentExpanded;
+
+        // Créer un index hiérarchique sous forme de chaîne pour garantir l'ordre parent-enfant
+        const hierarchyIndex = parentIndex
+          ? `${parentIndex}.${String(index).padStart(3, '0')}`
+          : `${String(index).padStart(3, '0')}`;
 
         if (isVisible) {
           // Créer l'élément nom avec indentation et icône d'expansion
@@ -150,6 +155,7 @@ function CategoriesTable(props) {
             </div>
           );
 
+          // Ajouter la catégorie avec des métadonnées pour le tri
           result.push({
             ...category,
             name: indentedName,
@@ -157,12 +163,21 @@ function CategoriesTable(props) {
             _level: level,
             _childrenCount: hasChildren ? category.children.length : 0,
             product_count: category.productCount || 0,
-            _sortIndex: result.length, // Ajouter un index de tri pour préserver l'ordre
+            _sortIndex: index,
+            _hierarchyIndex: hierarchyIndex, // Index hiérarchique pour le tri
+            _parentId: parentId, // ID du parent pour référence
           });
 
           // Ajouter récursivement les enfants si la catégorie est développée
           if (hasChildren && isExpanded) {
-            result = result.concat(flattenHierarchy(category.children, level + 1, true));
+            const childrenResult = flattenHierarchy(
+              category.children,
+              level + 1,
+              true,
+              hierarchyIndex,
+              category._id
+            );
+            result = result.concat(childrenResult);
           }
         }
       });
@@ -171,7 +186,6 @@ function CategoriesTable(props) {
     },
     [expandedCategories, toggleCategory]
   );
-
   // Processeur de recherche personnalisé
   const searchProcessor = useCallback(
     (items, term) => {

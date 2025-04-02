@@ -1,5 +1,5 @@
 // src/features/categories/components/CategorieDetail.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
@@ -8,6 +8,8 @@ import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import { useCategory, useCategoryExtras } from '../stores/categoryStore';
 import { useHierarchicalCategories } from '../stores/categoryHierarchyStore';
 import { ENTITY_CONFIG } from '../constants';
+import HierarchicalParentSelector from '../../../components/common/HierarchicalParentSelector';
+import { Controller } from 'react-hook-form';
 
 import {
   getValidationSchema,
@@ -22,6 +24,7 @@ function CategorieDetail() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Important: Vérifier d'abord si on est en mode création
   const isNew = location.pathname.endsWith('/new');
   const isEditMode = isNew || location.pathname.endsWith('/edit');
 
@@ -107,10 +110,12 @@ function CategorieDetail() {
       Array.isArray(hierarchicalCategories) &&
       hierarchicalCategories.length > 0
     ) {
-      const options = transformToOptions(hierarchicalCategories);
+      const effectiveId = currentId || paramId;
+      // Utiliser isNew pour transformer correctement les options
+      const options = transformToOptions(hierarchicalCategories, effectiveId, isNew);
       setParentCategories(options);
     }
-  }, [hierarchicalCategories, transformToOptions]);
+  }, [hierarchicalCategories, currentId, paramId, isNew]);
 
   // Gestionnaire de soumission du formulaire
   const handleSubmit = async (data) => {
@@ -125,7 +130,7 @@ function CategorieDetail() {
         console.log('Données formatées pour création:', formattedData);
         const created = await createCategory(formattedData);
 
-        // 🆔 Extraire proprement l’ID
+        // 🆔 Extraire proprement l'ID
         const newId = extractCategoryId(created);
 
         if (!newId) {
@@ -228,46 +233,126 @@ function CategorieDetail() {
 
   // Rendu du contenu des onglets
   const renderTabContent = (entity, activeTab, formProps = {}) => {
-    const { editable, register, errors } = formProps;
+    const { editable, register, control, errors, setValue } = formProps;
     const effectiveId = currentId || paramId;
 
     switch (activeTab) {
       case 'general':
-        // Construire les champs à afficher
-        const fields = ['name', 'description', 'parent_id'];
+        // Mode édition et création utilisent maintenant la même approche
+        if (editable) {
+          // Extraction sécurisée des props
+          const register = formProps?.register || (() => {});
+          const control = formProps?.control || {};
+          const errors = formProps?.errors || {};
 
-        // Ajouter les champs spéciaux si en mode édition
-        const specialFields = editable
-          ? {
-              parent_id: {
-                type: 'select',
-                options: [{ value: '', label: 'Aucune (catégorie racine)' }, ...parentCategories],
-              },
-              is_featured: {
-                type: 'checkbox',
-                label: 'Catégorie mise en avant',
-              },
-              status: {
-                type: 'select',
-                label: 'Statut',
-                options: [
-                  { value: 'published', label: 'Publié' },
-                  { value: 'draft', label: 'Brouillon' },
-                ],
-              },
-            }
-          : {};
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  Informations générales
+                </h2>
 
-        return (
-          <GeneralInfoTab
-            entity={entity}
-            fields={fields}
-            specialFields={specialFields}
-            editable={editable}
-            register={register}
-            errors={errors}
-          />
-        );
+                <div className="space-y-4">
+                  {/* Nom */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Nom
+                    </h3>
+                    <input
+                      type="text"
+                      {...register('name')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      placeholder="Entrez le nom..."
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Description
+                    </h3>
+                    <textarea
+                      {...register('description')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white min-h-[100px]"
+                      placeholder="Entrez une description..."
+                    />
+                  </div>
+
+                  {/* Statut */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Statut
+                    </h3>
+                    <select
+                      {...register('status')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                      <option value="published">Publié</option>
+                      <option value="draft">Brouillon</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                {/* Catégorie parent */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Catégorie parent
+                  </h3>
+                  {control && (
+                    <Controller
+                      name="parent_id"
+                      control={control}
+                      render={({ field }) => (
+                        <HierarchicalParentSelector
+                          hierarchicalData={hierarchicalCategories}
+                          value={field.value}
+                          onChange={field.onChange}
+                          currentCategoryId={isNew ? null : effectiveId}
+                          placeholder="Sélectionner une catégorie parent"
+                        />
+                      )}
+                    />
+                  )}
+                </div>
+
+                {/* Options */}
+                <div className="mt-6">
+                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Options
+                  </h3>
+                  <div className="mt-2">
+                    <div className="flex items-center">
+                      <input
+                        id="is_featured"
+                        type="checkbox"
+                        {...register('is_featured')}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label
+                        htmlFor="is_featured"
+                        className="ml-2 text-gray-700 dark:text-gray-300"
+                      >
+                        Catégorie mise en avant
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        } else {
+          // Mode lecture
+          return (
+            <GeneralInfoTab
+              entity={entity}
+              fields={['name', 'description', 'parent_id', 'status']}
+              productCount={entity?.productCount || 0}
+              editable={false}
+            />
+          );
+        }
 
       case 'images':
         return (

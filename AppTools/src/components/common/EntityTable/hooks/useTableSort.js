@@ -13,27 +13,54 @@ export const useTableSort = (data, defaultSort) => {
 
   // Appliquer le tri aux données
   const sortedData = useMemo(() => {
-    // Vérifier si nous avons des données hiérarchiques avec _sortIndex
-    const hasHierarchicalData = data.length > 0 && data[0]._sortIndex !== undefined;
+    // Si aucune donnée, retourner un tableau vide
+    if (!data || data.length === 0) return [];
 
-    // Si c'est le cas et qu'aucun tri n'est actif, maintenir l'ordre hiérarchique
+    // Vérifier si nous avons des données hiérarchiques
+    const hasHierarchicalData =
+      data.length > 0 && (data[0]._hierarchyIndex !== undefined || data[0]._level !== undefined);
+
+    // Si nous avons des données hiérarchiques et que le tri par défaut est actif
     if (hasHierarchicalData && sort.field === 'name' && sort.direction === 'asc') {
+      // Si nous avons un index hiérarchique, l'utiliser pour le tri
+      if (data[0]._hierarchyIndex !== undefined) {
+        return [...data].sort((a, b) => a._hierarchyIndex.localeCompare(b._hierarchyIndex));
+      }
+
+      // Sinon, trier par l'index de tri standard
       return [...data].sort((a, b) => a._sortIndex - b._sortIndex);
     }
 
+    // Pour les autres types de tri, respecter la hiérarchie au sein de chaque niveau
     return [...data].sort((a, b) => {
-      // Vérification supplémentaire pour les éléments React (pour le nom avec indentation)
-      const aOriginal = a._originalName !== undefined ? a._originalName : a[sort.field];
-      const bOriginal = b._originalName !== undefined ? b._originalName : b[sort.field];
-
-      // Si c'est le champ name mais qu'il y a des éléments React, utiliser _originalName
+      // Obtenir les valeurs à comparer
       const aValue =
         sort.field === 'name' && a._originalName !== undefined ? a._originalName : a[sort.field];
 
       const bValue =
         sort.field === 'name' && b._originalName !== undefined ? b._originalName : b[sort.field];
 
-      if (aValue === bValue) return 0;
+      // Si les valeurs sont égales, maintenir l'ordre hiérarchique
+      if (aValue === bValue) {
+        // Si nous avons un index hiérarchique, utiliser cela en premier
+        if (a._hierarchyIndex !== undefined && b._hierarchyIndex !== undefined) {
+          return a._hierarchyIndex.localeCompare(b._hierarchyIndex);
+        }
+
+        // Sinon, utiliser le niveau et l'index de tri
+        if (a._level !== undefined && b._level !== undefined) {
+          // Si les niveaux sont différents, trier par niveau d'abord
+          if (a._level !== b._level) {
+            return a._level - b._level;
+          }
+          // Sinon utiliser l'index de tri
+          return a._sortIndex - b._sortIndex;
+        }
+
+        return 0;
+      }
+
+      // Gérer les valeurs nulles ou non définies
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
 

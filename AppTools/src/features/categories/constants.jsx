@@ -27,7 +27,7 @@ export const ENTITY_CONFIG = {
         </div>
       ),
     },
-    { key: 'name', label: 'Nom', sortable: true },
+    { key: 'name', label: 'Nom', sortable: false },
     {
       key: 'description',
       label: 'Description',
