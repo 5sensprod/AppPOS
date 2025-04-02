@@ -91,8 +91,6 @@ export const getValidationSchema = (isNew = true) => {
         .transform((value) => (value === '' ? null : value)),
 
       // Nouveaux champs de référence
-      category_ref: yup.object().nullable(),
-      categories_refs: yup.array().default([]),
       brand_ref: yup.object().nullable(),
       supplier_ref: yup.object().nullable(),
     });
@@ -182,9 +180,6 @@ export const getValidationSchema = (isNew = true) => {
       .transform((value) => (value === '' ? null : value))
       .optional(),
 
-    // Nouveaux champs de référence
-    category_ref: yup.object().nullable().optional(),
-    categories_refs: yup.array().optional(),
     brand_ref: yup.object().nullable().optional(),
     supplier_ref: yup.object().nullable().optional(),
   });

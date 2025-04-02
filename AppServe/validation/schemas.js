@@ -144,26 +144,6 @@ const createProductSchema = Joi.object({
     name: Joi.string().allow(null, ''),
   }).allow(null),
 
-  // Références de catégories avec hiérarchie
-  categories_refs: Joi.array()
-    .items(
-      Joi.object({
-        id: Joi.string().allow(null, ''),
-        name: Joi.string().allow(null, ''),
-        level: Joi.number().default(0),
-        hierarchy: Joi.array().items(categoryHierarchyItemSchema).default([]),
-      })
-    )
-    .default([]),
-
-  // Référence de catégorie principale avec hiérarchie
-  category_ref: Joi.object({
-    id: Joi.string().allow(null, ''),
-    name: Joi.string().allow(null, ''),
-    level: Joi.number().default(0),
-    hierarchy: Joi.array().items(categoryHierarchyItemSchema).default([]),
-  }).allow(null),
-
   // Images
   image: Joi.object().allow(null),
   gallery_images: Joi.array().items(Joi.object()).default([]),

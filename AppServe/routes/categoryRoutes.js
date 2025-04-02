@@ -7,6 +7,8 @@ const { createCategorySchema, updateCategorySchema } = require('../validation/sc
 const categoryImageRoutes = require('./image/categoryImageRoutes');
 const wooSyncMiddleware = require('../middleware/wooSyncMiddleware');
 const Category = require('../models/Category');
+// Ajouter cette ligne pour importer ResponseHandler
+const ResponseHandler = require('../handlers/ResponseHandler');
 
 // Routes principales des catégories
 router.get('/', categoryController.getAll);
@@ -23,6 +25,14 @@ router.post(
   },
   wooSyncMiddleware({ forceSync: true, manualSync: true })
 );
+router.get('/:id/path', async (req, res) => {
+  try {
+    const pathInfo = await Category.getCategoryPath(req.params.id);
+    return ResponseHandler.success(res, pathInfo);
+  } catch (error) {
+    return ResponseHandler.error(res, error);
+  }
+});
 
 // Intégration des routes de gestion d'images
 router.use('/', categoryImageRoutes);

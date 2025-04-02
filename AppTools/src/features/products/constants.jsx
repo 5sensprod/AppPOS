@@ -64,34 +64,24 @@ export const ENTITY_CONFIG = {
       key: 'category',
       label: 'Catégorie',
       render: (product) => {
-        // Utiliser categories_refs si disponible, sinon utiliser category_ref
-        if (product.categories_refs && product.categories_refs.length > 0) {
-          // Afficher la première catégorie (principale)
+        if (product.category_info && product.category_info.primary) {
           return (
             <div className="flex flex-col">
-              <span>{product.categories_refs[0].name}</span>
-              {product.categories_refs.length > 1 && (
+              <span>{product.category_info.primary.name}</span>
+              {product.category_info.primary.path.length > 1 && (
                 <span className="text-xs text-gray-500">
-                  (+{product.categories_refs.length - 1} autres)
+                  {product.category_info.primary.path_string}
+                </span>
+              )}
+              {product.category_info.refs.length > 1 && (
+                <span className="text-xs text-gray-500">
+                  (+{product.category_info.refs.length - 1} autres)
                 </span>
               )}
             </div>
           );
-        } else if (product.category_ref) {
-          // Utiliser category_ref si pas de categories_refs
-          return (
-            <>
-              {product.category_ref.name}
-              {product.category_ref.hierarchy && product.category_ref.hierarchy.length > 1 && (
-                <span className="text-xs text-gray-500 ml-2">
-                  ({product.category_ref.hierarchy.map((cat) => cat.name).join(' > ')})
-                </span>
-              )}
-            </>
-          );
-        } else {
-          return '-';
         }
+        return '-';
       },
       sortable: false,
     },

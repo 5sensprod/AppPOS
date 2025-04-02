@@ -342,7 +342,7 @@ function CategorieDetail() {
     switch (activeTab) {
       case 'general':
         // Construire les champs à afficher
-        const fields = ['name', 'description'];
+        const fields = ['name', 'description', 'parent_id'];
 
         // Ajouter les champs spéciaux si en mode édition
         const specialFields = editable

@@ -10,6 +10,26 @@ const Product = require('../models/Product');
 
 router.get('/', productController.getAll);
 router.get('/:id', productController.getById);
+router.get('/:id/category-path', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return ResponseHandler.notFound(res, 'Produit non trouvé');
+
+    if (!product.categories || product.categories.length === 0) {
+      return ResponseHandler.success(res, {
+        path: [],
+        path_ids: [],
+        path_string: '',
+      });
+    }
+
+    const Category = require('../models/Category');
+    const pathInfo = await Category.getCategoryPath(product.categories[0]);
+    return ResponseHandler.success(res, pathInfo);
+  } catch (error) {
+    return ResponseHandler.error(res, error);
+  }
+});
 router.post('/', validateSchema(createProductSchema), productController.create);
 
 // Middleware de synchronisation pour les routes de mise à jour

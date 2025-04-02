@@ -6,83 +6,6 @@ const ResponseHandler = require('../handlers/ResponseHandler');
 const { calculateLevel } = require('../utils/categoryHelpers');
 const { getEntityEventService } = require('../services/events/entityEvents');
 
-// Ajoutez cette fonction au début du fichier categoryController.js, après les imports
-async function updateProductCategoryRefs(categoryId) {
-  try {
-    const Product = require('../models/Product');
-    const Category = require('../models/Category');
-    const eventService = getEntityEventService('categories');
-
-    // Obtenir les détails de la catégorie
-    const category = await Category.findById(categoryId);
-    if (!category) {
-      console.error(
-        `[WS-DEBUG] Catégorie ${categoryId} non trouvée pour la mise à jour des références`
-      );
-      return;
-    }
-
-    // Trouver tous les produits liés à cette catégorie
-    const allProducts = await Product.findAll();
-    const linkedProducts = allProducts.filter(
-      (product) =>
-        (product.categories?.length > 0 && product.categories.includes(categoryId)) ||
-        (product.category_id && product.category_id === categoryId)
-    );
-
-    if (linkedProducts.length === 0) {
-      console.log(`[WS-DEBUG] Aucun produit lié à la catégorie ${categoryId} à mettre à jour`);
-      return;
-    }
-
-    // Obtenir toutes les catégories pour les références
-    const allCategories = await Category.findAll();
-
-    // Mettre à jour les références pour chaque produit
-    for (const product of linkedProducts) {
-      if (!product.categories || product.categories.length === 0) continue;
-
-      const categoryRefs = product.categories
-        .map((catId) => {
-          const cat = allCategories.find((c) => c._id === catId);
-          if (cat) {
-            return {
-              id: cat._id,
-              name: cat.name,
-              woo_id: cat.woo_id || null,
-            };
-          }
-          return null;
-        })
-        .filter((ref) => ref !== null);
-
-      // Créer category_ref (première catégorie)
-      const primaryCategoryRef =
-        categoryRefs.length > 0
-          ? {
-              id: categoryRefs[0].id,
-              name: categoryRefs[0].name,
-            }
-          : null;
-
-      await Product.update(product._id, {
-        categories_refs: categoryRefs,
-        category_ref: primaryCategoryRef,
-      });
-
-      console.log(
-        `[WS-DEBUG] Mise à jour des références de catégories pour le produit ${product._id}`
-      );
-    }
-
-    console.log(
-      `[WS-DEBUG] Mise à jour terminée pour ${linkedProducts.length} produits liés à la catégorie ${categoryId}`
-    );
-  } catch (error) {
-    console.error('[WS-DEBUG] Erreur lors de la mise à jour des references de catégories:', error);
-  }
-}
-
 // Fonction pour mettre à jour les produits après la suppression d'une catégorie
 async function updateProductsAfterCategoryDeletion(categoryId) {
   try {
@@ -109,38 +32,9 @@ async function updateProductsAfterCategoryDeletion(categoryId) {
             : null
           : product.category_id;
 
-      // Mise à jour de toutes les références de catégories
-      const Category = require('../models/Category');
-      const allCategories = await Category.findAll();
-
-      const categoryRefs = updatedCategories
-        .map((catId) => {
-          const cat = allCategories.find((c) => c._id === catId);
-          if (cat) {
-            return {
-              id: cat._id,
-              name: cat.name,
-              woo_id: cat.woo_id || null,
-            };
-          }
-          return null;
-        })
-        .filter((ref) => ref !== null);
-
-      // Créer category_ref (première catégorie)
-      const primaryCategoryRef =
-        categoryRefs.length > 0
-          ? {
-              id: categoryRefs[0].id,
-              name: categoryRefs[0].name,
-            }
-          : null;
-
       await Product.update(product._id, {
         categories: updatedCategories,
         category_id: updatedCategoryId,
-        categories_refs: categoryRefs,
-        category_ref: primaryCategoryRef,
       });
 
       console.log(
@@ -242,13 +136,6 @@ class CategoryController extends BaseController {
       this.eventService.updated(id, updatedItem);
       // La méthode updated gère également l'émission de categoryTreeChanged si nécessaire
 
-      // Vérifier si le nom ou la hiérarchie a changé
-      if (updateData.name || updateData.parent_id) {
-        console.log('[WS-DEBUG] Mise à jour de la catégorie, émission de categories.tree.changed');
-        // Mettre à jour les références dans les produits
-        await updateProductCategoryRefs(id);
-      }
-
       // Gestion de la synchronisation WooCommerce si nécessaire
       if (this.shouldSync() && this.wooCommerceService) {
         try {
@@ -331,68 +218,61 @@ class CategoryController extends BaseController {
   }
 }
 
-// Nouvelle fonction pour les catégories hiérarchiques
 async function getHierarchicalCategories(req, res) {
   try {
-    // Récupération de toutes les catégories
     const allCategories = await Category.findAll();
-
-    // Récupération de tous les produits pour compter
     const Product = require('../models/Product');
     const allProducts = await Product.findAll();
 
-    // Organiser les catégories par niveau
     const rootCategories = [];
     const categoriesMap = new Map();
 
-    // Première passe : créer la map des catégories avec compteur de produits
+    // Créer la map des catégories avec compteurs et listes de produits
     allCategories.forEach((category) => {
-      // Filtrer les produits pour cette catégorie
       const categoryProducts = allProducts.filter(
-        (product) =>
-          (product.categories && product.categories.includes(category._id)) ||
-          product.category_id === category._id
+        (product) => product.categories && product.categories.includes(category._id)
       );
 
-      // Collecter les IDs et noms des produits pour référence rapide
       const productsList = categoryProducts.map((product) => ({
         _id: product._id,
         name: product.name,
         sku: product.sku || null,
       }));
 
-      // Pour chaque catégorie, ajouter un tableau children vide, le compteur et les produits
       categoriesMap.set(category._id, {
         ...category,
         children: [],
         productCount: categoryProducts.length,
         products: productsList,
+        path: [category.name],
+        path_ids: [category._id],
+        path_string: category.name,
       });
     });
 
-    // Deuxième passe : organiser la hiérarchie
+    // Organiser la hiérarchie et construire les chemins
     allCategories.forEach((category) => {
       const categoryWithChildren = categoriesMap.get(category._id);
 
       if (!category.parent_id) {
-        // C'est une catégorie racine (niveau 0)
         rootCategories.push(categoryWithChildren);
       } else {
-        // C'est une sous-catégorie, l'ajouter aux enfants du parent
         const parentCategory = categoriesMap.get(category.parent_id);
         if (parentCategory) {
           parentCategory.children.push(categoryWithChildren);
+
+          // Mettre à jour le chemin
+          categoryWithChildren.path = [...parentCategory.path, category.name];
+          categoryWithChildren.path_ids = [...parentCategory.path_ids, category._id];
+          categoryWithChildren.path_string = categoryWithChildren.path.join(' > ');
         } else {
-          // Si le parent n'existe pas, traiter comme une catégorie racine
-          console.warn(
-            `Parent introuvable pour la catégorie ${category._id} (parent_id: ${category.parent_id})`
-          );
+          console.warn(`Parent introuvable pour catégorie ${category._id}`);
           rootCategories.push(categoryWithChildren);
         }
       }
     });
 
-    // Trier les catégories par nom
+    // Trier par nom
     rootCategories.sort((a, b) => a.name.localeCompare(b.name));
 
     // Trier récursivement les enfants

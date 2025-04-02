@@ -58,13 +58,13 @@ const InventoryTab = ({ product, editable = false, register, errors, specialFiel
                 Catégorie principale
               </h3>
               <p className="mt-1 text-gray-900 dark:text-gray-100">
-                {product.category_ref ? (
+                {product.category_info?.primary ? (
                   <>
-                    {product.category_ref.name}
-                    {product.category_ref.hierarchy &&
-                      product.category_ref.hierarchy.length > 1 && (
+                    {product.category_info.primary.name}
+                    {product.category_info.primary.path_string &&
+                      product.category_info.primary.path.length > 1 && (
                         <span className="text-xs text-gray-500 ml-2">
-                          ({product.category_ref.hierarchy.map((cat) => cat.name).join(' > ')})
+                          ({product.category_info.primary.path_string})
                         </span>
                       )}
                   </>

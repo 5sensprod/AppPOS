@@ -69,8 +69,6 @@ function ProductDetail() {
     categories: [],
     brand_id: null,
     supplier_id: null,
-    category_ref: null,
-    categories_refs: [],
     brand_ref: null,
     supplier_ref: null,
   };
@@ -213,31 +211,53 @@ function ProductDetail() {
         processedData.stock = 0;
       }
 
-      // Ajouter les références aux catégories
-      if (processedData.category_id) {
-        const catOption = categoryOptions.find((opt) => opt.value === processedData.category_id);
-        if (catOption) {
-          processedData.category_ref = {
-            id: catOption.value,
-            name: catOption.label.replace(/^—\s*/g, ''), // Retirer les tirets de préfixe
-          };
-        }
+      // Construire les informations de catégorie au nouveau format
+      const categoryRefs = [];
+
+      // Traiter les catégories multiples
+      if (Array.isArray(processedData.categories) && processedData.categories.length > 0) {
+        processedData.categories.forEach((catId) => {
+          const catOption = categoryOptions.find((opt) => opt.value === catId);
+          if (catOption) {
+            const catName = catOption.label.replace(/^—\s*/g, ''); // Retirer les tirets de préfixe
+
+            // Trouver l'objet catégorie dans la hiérarchie
+            const findCategoryInHierarchy = (categories, id) => {
+              for (const cat of categories) {
+                if (cat._id === id) return cat;
+                if (cat.children && cat.children.length > 0) {
+                  const found = findCategoryInHierarchy(cat.children, id);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+
+            const category = findCategoryInHierarchy(hierarchicalCategories, catId);
+
+            categoryRefs.push({
+              id: catId,
+              name: catName,
+              woo_id: category?.woo_id || null,
+              path: category?.path || [catName],
+              path_ids: category?.path_ids || [catId],
+              path_string: category?.path_string || catName,
+            });
+          }
+        });
       }
 
-      // Ajouter les références aux catégories multiples
-      if (Array.isArray(processedData.categories) && processedData.categories.length > 0) {
-        processedData.categories_refs = processedData.categories
-          .map((catId) => {
-            const catOption = categoryOptions.find((opt) => opt.value === catId);
-            if (catOption) {
-              return {
-                id: catOption.value,
-                name: catOption.label.replace(/^—\s*/g, ''), // Retirer les tirets de préfixe
-              };
-            }
-            return null;
-          })
-          .filter(Boolean);
+      // Ajouter category_info au lieu des anciens champs
+      if (categoryRefs.length > 0) {
+        processedData.category_info = {
+          refs: categoryRefs,
+          primary: categoryRefs[0],
+        };
+      } else {
+        processedData.category_info = {
+          refs: [],
+          primary: null,
+        };
       }
 
       // Ajouter les références aux marques
@@ -264,7 +284,7 @@ function ProductDetail() {
 
       return processedData;
     },
-    [categoryOptions, relatedData.brands, relatedData.suppliers]
+    [categoryOptions, relatedData.brands, relatedData.suppliers, hierarchicalCategories]
   );
 
   const handleSubmit = async (data) => {
