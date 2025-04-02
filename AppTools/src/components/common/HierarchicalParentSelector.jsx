@@ -16,37 +16,52 @@ const HierarchicalParentSelector = ({
 
   // Filtrer les catégories qu'on ne peut pas sélectionner comme parent
   const filteredData = useMemo(() => {
-    // En mode édition, on doit filtrer la catégorie actuelle et ses enfants
+    // En mode édition, on doit filtrer uniquement la catégorie actuelle et ses descendants
     if (currentCategoryId) {
-      // Fonction pour trouver tous les IDs à exclure
-      const findExcludedIds = (items, excludedIds = new Set()) => {
-        items.forEach((item) => {
-          if (item._id === currentCategoryId) {
-            excludedIds.add(item._id);
+      // Fonction pour trouver les IDs des descendants à exclure
+      const findDescendantIds = (items, targetId, descendantIds = new Set()) => {
+        for (const item of items) {
+          if (item._id === targetId) {
+            // Trouvé la catégorie actuelle, ajouter ses descendants
             if (item.children && item.children.length > 0) {
-              findExcludedIds(item.children, excludedIds);
+              // Ajouter tous les descendants récursivement
+              const addAllDescendants = (children) => {
+                for (const child of children) {
+                  descendantIds.add(child._id);
+                  if (child.children && child.children.length > 0) {
+                    addAllDescendants(child.children);
+                  }
+                }
+              };
+              addAllDescendants(item.children);
             }
-          } else if (item.children && item.children.length > 0) {
-            const childExcludedIds = findExcludedIds(item.children, new Set());
-            if (childExcludedIds.has(currentCategoryId)) {
-              excludedIds.add(item._id);
-              childExcludedIds.forEach((id) => excludedIds.add(id));
-            }
+            // Également ajouter la catégorie elle-même
+            descendantIds.add(targetId);
+            return descendantIds;
           }
-        });
-        return excludedIds;
+
+          // Chercher dans les enfants
+          if (item.children && item.children.length > 0) {
+            findDescendantIds(item.children, targetId, descendantIds);
+          }
+        }
+        return descendantIds;
       };
 
-      const excludedIds = findExcludedIds(hierarchicalData);
+      // Obtenir les IDs à exclure
+      const excludedIds = findDescendantIds(hierarchicalData, currentCategoryId);
 
-      // Filtrer la hiérarchie
+      console.log('Catégories exclues:', [...excludedIds]);
+
+      // Fonction de filtrage qui préserve la structure hiérarchique
       const filterHierarchy = (items) => {
         return items
-          .filter((item) => !excludedIds.has(item._id))
           .map((item) => ({
             ...item,
+            // Garder l'item s'il n'est pas exclu
             children: item.children ? filterHierarchy(item.children) : [],
-          }));
+          }))
+          .filter((item) => !excludedIds.has(item._id));
       };
 
       return filterHierarchy(hierarchicalData);
@@ -55,36 +70,56 @@ const HierarchicalParentSelector = ({
     // En mode création, on affiche toutes les catégories
     return hierarchicalData;
   }, [hierarchicalData, currentCategoryId]);
-
   // Recherche dans les catégories
   const filteredBySearch = useMemo(() => {
     if (!searchTerm) return filteredData;
 
     const lowerSearchTerm = searchTerm.toLowerCase();
 
-    // Recherche récursive
     const searchInHierarchy = (items) => {
-      return items.filter((item) => {
-        const nameMatch = item.name?.toLowerCase().includes(lowerSearchTerm);
-        let childrenMatch = false;
+      return items
+        .map((item) => {
+          let filteredChildren = [];
 
-        let filteredChildren = [];
-        if (item.children && item.children.length > 0) {
-          filteredChildren = searchInHierarchy(item.children);
-          childrenMatch = filteredChildren.length > 0;
-        }
+          if (item.children && item.children.length > 0) {
+            filteredChildren = searchInHierarchy(item.children);
+          }
 
-        if (childrenMatch) {
-          item = { ...item, children: filteredChildren };
-          setExpandedItems((prev) => ({ ...prev, [item._id]: true }));
-        }
+          const nameMatch = item.name?.toLowerCase().includes(lowerSearchTerm);
+          const childrenMatch = filteredChildren.length > 0;
 
-        return nameMatch || childrenMatch;
-      });
+          if (nameMatch || childrenMatch) {
+            return {
+              ...item,
+              children: filteredChildren,
+            };
+          }
+
+          return null;
+        })
+        .filter(Boolean);
     };
 
     return searchInHierarchy(filteredData);
   }, [filteredData, searchTerm]);
+
+  useEffect(() => {
+    if (!searchTerm) return;
+
+    const expanded = {};
+
+    const markExpanded = (items) => {
+      for (const item of items) {
+        if (item.children && item.children.length > 0) {
+          expanded[item._id] = true;
+          markExpanded(item.children);
+        }
+      }
+    };
+
+    markExpanded(filteredBySearch);
+    setExpandedItems((prev) => ({ ...prev, ...expanded }));
+  }, [filteredBySearch, searchTerm]);
 
   // Trouver et afficher le nom de la catégorie sélectionnée
   const selectedLabel = useMemo(() => {
@@ -186,6 +221,31 @@ const HierarchicalParentSelector = ({
       });
     }
   }, [hierarchicalData, filteredData, currentCategoryId, value]);
+
+  useEffect(() => {
+    if (!value) return;
+
+    // Fonction pour trouver et développer le chemin vers la valeur
+    const expandPathToValue = (items) => {
+      for (const item of items) {
+        if (item._id === value) {
+          return true; // Trouvé!
+        }
+
+        if (item.children && item.children.length > 0) {
+          const foundInChildren = expandPathToValue(item.children);
+          if (foundInChildren) {
+            // Développer ce nœud parent car la valeur est dans ses enfants
+            setExpandedItems((prev) => ({ ...prev, [item._id]: true }));
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    expandPathToValue(hierarchicalData);
+  }, [value, hierarchicalData]);
 
   return (
     <div className="hierarchical-selector relative">

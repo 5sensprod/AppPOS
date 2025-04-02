@@ -463,7 +463,7 @@ function ProductDetail() {
   // Mémoriser la fonction renderTabContent pour éviter de la recréer à chaque rendu
   const renderTabContent = useCallback(
     (entity, activeTab, formProps = {}) => {
-      const { editable, register, errors } = formProps;
+      const { editable, register, control, errors } = formProps;
 
       switch (activeTab) {
         case 'general':
@@ -488,8 +488,10 @@ function ProductDetail() {
               product={entity}
               editable={editable}
               register={register}
+              control={control}
               errors={errors}
-              specialFields={editable ? enhancedInventoryFields : {}} // Passer les champs avec les options
+              specialFields={editable ? enhancedInventoryFields : {}}
+              hierarchicalCategories={hierarchicalCategories}
             />
           );
         case 'images':
@@ -521,7 +523,8 @@ function ProductDetail() {
       handleUploadImage,
       handleDeleteImage,
       handleSetMainImage,
-      syncProduct,
+      handleSync,
+      hierarchicalCategories,
     ]
   );
 

@@ -1,7 +1,17 @@
 // src/features/products/components/tabs/InventoryTab.jsx
 import React from 'react';
+import { Controller } from 'react-hook-form';
+import MultiHierarchicalSelector from '../../../../components/common/MultiHierarchicalSelector';
 
-const InventoryTab = ({ product, editable = false, register, errors, specialFields = {} }) => {
+const InventoryTab = ({
+  product,
+  editable = false,
+  register,
+  control,
+  errors,
+  specialFields = {},
+  hierarchicalCategories = [],
+}) => {
   console.log('🧰 InventoryTab - specialFields reçus:', specialFields);
 
   // Si en mode lecture
@@ -153,50 +163,28 @@ const InventoryTab = ({ product, editable = false, register, errors, specialFiel
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {/* Catégorie principale */}
+          {/* Catégorie principale avec HierarchicalParentSelector */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Catégorie principale
             </label>
-            <select
-              {...register('category_id')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-              <option value="">Sélectionner une catégorie</option>
-              {specialFields.category_id?.options &&
-                specialFields.category_id.options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-            </select>
-            {errors?.category_id && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-500">
-                {errors.category_id.message}
-              </p>
+            {control && (
+              <Controller
+                name="categories"
+                control={control}
+                render={({ field }) => (
+                  <MultiHierarchicalSelector
+                    hierarchicalData={hierarchicalCategories}
+                    values={field.value || []}
+                    onChange={field.onChange}
+                    currentSelected={product ? [product.category_id].filter(Boolean) : []}
+                    placeholder="Sélectionner des catégories additionnelles"
+                  />
+                )}
+              />
             )}
-          </div>
-
-          {/* Catégories additionnelles */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Catégories additionnelles
-            </label>
-            <select
-              multiple
-              {...register('categories')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              size="4"
-            >
-              {specialFields.categories?.options &&
-                specialFields.categories.options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-            </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs catégories
+              Cliquez sur une catégorie pour la sélectionner/désélectionner
             </p>
             {errors?.categories && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-500">
