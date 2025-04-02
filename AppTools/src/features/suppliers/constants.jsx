@@ -31,13 +31,14 @@ export const ENTITY_CONFIG = {
     { key: 'supplier_code', label: 'Code fournisseur', sortable: true },
     { key: 'customer_code', label: 'Code client', sortable: true },
     {
-      key: 'products_count',
-      label: 'Produits',
+      key: 'product_count',
+      label: 'Articles',
       sortable: true,
       render: (supplier) => (
-        <div className="flex items-center text-sm">
-          <Package className="h-4 w-4 mr-1" />
-          <span>{supplier.products_count || 0}</span>
+        <div className="text-center">
+          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+            {supplier.products_count || 0}
+          </span>
         </div>
       ),
     },
