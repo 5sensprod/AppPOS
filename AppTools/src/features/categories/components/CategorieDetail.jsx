@@ -8,7 +8,14 @@ import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import { useCategory, useCategoryExtras } from '../stores/categoryStore';
 import { useHierarchicalCategories } from '../stores/categoryHierarchyStore';
 import { ENTITY_CONFIG } from '../constants';
-import * as yup from 'yup';
+
+import {
+  getValidationSchema,
+  defaultValues,
+  transformToOptions,
+  formatCategoryData,
+  extractCategoryId,
+} from '../services/categoryService';
 
 function CategorieDetail() {
   const { id: paramId } = useParams();
@@ -54,69 +61,6 @@ function CategorieDetail() {
       };
     }
   }, [initWebSocketListeners, wsInitialized]);
-
-  // Schéma de validation Yup pour les catégories
-  const getValidationSchema = () => {
-    return yup.object().shape({
-      name: yup.string().required('Le nom est requis'),
-      description: yup.string(),
-      parent_id: yup.string().nullable(),
-      status: yup.string().required('Le statut est requis'),
-      is_featured: yup.boolean(),
-      meta_title: yup.string(),
-      meta_description: yup.string(),
-      meta_keywords: yup.string(),
-    });
-  };
-
-  // Valeurs par défaut
-  const defaultValues = {
-    name: '',
-    description: '',
-    parent_id: '',
-    status: 'draft',
-    is_featured: false,
-    meta_title: '',
-    meta_description: '',
-    meta_keywords: '',
-  };
-
-  // Transformer les catégories hiérarchiques en options pour le select
-  const transformToOptions = useCallback(
-    (categories, prefix = '') => {
-      if (!Array.isArray(categories)) {
-        console.warn("transformToOptions: categories n'est pas un tableau", categories);
-        return [];
-      }
-
-      let options = [];
-
-      categories.forEach((category) => {
-        // Vérifier que la catégorie est un objet valide
-        if (!category || typeof category !== 'object') {
-          return;
-        }
-
-        // Éviter d'inclure la catégorie en cours d'édition dans les options de parent
-        const effectiveId = currentId || paramId;
-        if (!isNew && category._id === effectiveId) {
-          return;
-        }
-
-        options.push({
-          value: category._id,
-          label: prefix + (category.name || 'Sans nom'),
-        });
-
-        if (category.children && Array.isArray(category.children) && category.children.length > 0) {
-          options = [...options, ...transformToOptions(category.children, prefix + '— ')];
-        }
-      });
-
-      return options;
-    },
-    [currentId, paramId, isNew]
-  );
 
   // Charger les catégories hiérarchiques et la catégorie courante
   useEffect(() => {
@@ -174,64 +118,15 @@ function CategorieDetail() {
     setError(null);
 
     try {
-      // Création d'une copie des données
-      const formattedData = { ...data };
-
-      // Traitement des champs selon leur type
-      Object.keys(formattedData).forEach((field) => {
-        const value = formattedData[field];
-
-        // Déterminer le type de traitement pour chaque champ
-        switch (field) {
-          // Champs qui doivent être null quand vides
-          case 'parent_id':
-            if (value === '') formattedData[field] = null;
-            break;
-
-          // Champs à exclure systématiquement
-          case 'woo_id':
-          case 'last_sync':
-          case 'createdAt':
-          case 'updatedAt':
-          case 'pending_sync':
-          case '_id':
-          case '__v':
-          case 'created_at':
-          case 'updated_at':
-          case 'level':
-          case 'product_count':
-          case 'gallery_images':
-            delete formattedData[field];
-            break;
-
-          // Traitement par défaut pour les autres champs
-          default:
-            // Supprimer les champs vides
-            if (value === '') {
-              delete formattedData[field];
-            }
-            break;
-        }
-      });
+      // 🧹 Nettoyer les données avant envoi
+      const formattedData = formatCategoryData(data);
 
       if (isNew) {
-        // Création d'une nouvelle catégorie
-        console.log('Données catégorie formatées pour création:', formattedData);
+        console.log('Données formatées pour création:', formattedData);
         const created = await createCategory(formattedData);
 
-        // Extraire l'ID
-        let newId = null;
-        if (created?.id) {
-          newId = created.id;
-        } else if (created?._id) {
-          newId = created._id;
-        } else if (created?.data?.id) {
-          newId = created.data.id;
-        } else if (created?.data?._id) {
-          newId = created.data._id;
-        } else if (typeof created === 'string') {
-          newId = created;
-        }
+        // 🆔 Extraire proprement l’ID
+        const newId = extractCategoryId(created);
 
         if (!newId) {
           console.error('Réponse API complète:', created);
@@ -240,24 +135,21 @@ function CategorieDetail() {
           );
         }
 
-        // Mettre à jour l'état local avec le nouvel ID
         setCurrentId(newId);
         setSuccess('Catégorie créée avec succès');
 
-        // Charger les données de la nouvelle catégorie
         const newCategory = await getCategoryById(newId);
         setCategory(newCategory);
 
         // Rediriger vers la page de détail
         navigate(`/products/categories/${newId}`, { replace: true });
       } else {
-        // Mise à jour d'une catégorie existante
         const effectiveId = currentId || paramId;
         console.log(`Mise à jour de la catégorie ${effectiveId}:`, formattedData);
+
         await updateCategory(effectiveId, formattedData);
         setSuccess('Catégorie mise à jour avec succès');
 
-        // Recharger la catégorie mise à jour
         const updated = await getCategoryById(effectiveId);
         setCategory(updated);
       }
