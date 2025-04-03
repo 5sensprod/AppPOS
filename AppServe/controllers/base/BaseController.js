@@ -14,20 +14,27 @@ class BaseController {
     this.entityName = this.buildEntityName(model);
     this.eventService = getEntityEventService(this.entityName);
 
+    // Gestion améliorée des options d'image
     if (options.image) {
       this.imageController = new BaseImageController(this.entityName, options.image);
       this.setupImageHandlers();
+    }
+
+    // Option : fonction personnalisée de suppression WooCommerce
+    if (options.deleteFromWoo) {
+      this.deleteFromWoo = options.deleteFromWoo;
     }
   }
 
   buildEntityName(model) {
     const name = model.constructor.name.toLowerCase().replace('model', '');
-    const entityMap = {
+    const map = {
       category: 'categories',
-      supplier: 'suppliers',
       brand: 'brands',
+      supplier: 'suppliers',
+      product: 'products',
     };
-    return entityMap[name] || (name.endsWith('s') ? name : `${name}s`);
+    return map[name] || (name.endsWith('s') ? name : `${name}s`);
   }
 
   setupImageHandlers() {
@@ -90,7 +97,6 @@ class BaseController {
 
       await this.model.update(id, updateData);
       const updatedItem = await this.model.findById(id);
-
       this.eventService.updated(id, updatedItem);
 
       const syncResponse = await this.syncIfNeeded([updatedItem], res);
@@ -108,7 +114,6 @@ class BaseController {
       if (!item) return;
 
       const wooId = item.woo_id;
-
       await this.handleImageDeletion(item);
 
       if (wooId) {
@@ -143,27 +148,12 @@ class BaseController {
   async handleWooCommerceDelete(item) {
     if (!item.woo_id) return;
 
-    const deleteMap = {
-      products: 'deleteProduct',
-      categories: 'deleteCategory',
-      brands: 'deleteBrand',
-    };
-
-    const method = deleteMap[this.entityName];
-    if (!method) {
-      console.warn(`Aucune méthode de suppression WooCommerce définie pour ${this.entityName}`);
+    if (typeof this.deleteFromWoo === 'function') {
+      await this.deleteFromWoo(item._id);
       return;
     }
 
-    try {
-      const service = require(`../../services/${this.entityName.slice(0, -1)}WooCommerceService`);
-      if (typeof service[method] === 'function') {
-        await service[method](item._id);
-      }
-    } catch (error) {
-      console.error(`Erreur WooCommerce (${this.entityName}):`, error);
-      throw error;
-    }
+    console.warn(`Aucune méthode WooCommerce de suppression définie pour ${this.entityName}`);
   }
 
   async syncIfNeeded(entities, res = null) {

@@ -1,9 +1,8 @@
 // controllers/categoryController.js
 const BaseController = require('./base/BaseController');
 const Category = require('../models/Category');
-const ResponseHandler = require('../handlers/ResponseHandler');
 const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
-const { getEntityEventService } = require('../services/events/entityEvents');
+const ResponseHandler = require('../handlers/ResponseHandler');
 const {
   calculateLevel,
   hasChildren,
@@ -11,12 +10,13 @@ const {
   removeCategoryFromProducts,
   buildCategoryTree,
 } = require('../services/categoryService');
+const { getEntityEventService } = require('../services/events/entityEvents');
 
 class CategoryController extends BaseController {
   constructor() {
     super(Category, categoryWooCommerceService, {
-      entity: 'categories',
-      type: 'single',
+      image: { type: 'single' },
+      deleteFromWoo: (id) => categoryWooCommerceService.deleteCategory(id),
     });
     this.eventService = getEntityEventService(this.entityName);
   }
@@ -110,7 +110,8 @@ class CategoryController extends BaseController {
 async function getHierarchicalCategories(req, res) {
   try {
     const allCategories = await Category.findAll();
-    const allProducts = await require('../models/Product').findAll();
+    const Product = require('../models/Product');
+    const allProducts = await Product.findAll();
 
     const tree = buildCategoryTree(allCategories, allProducts);
     return ResponseHandler.success(res, tree);

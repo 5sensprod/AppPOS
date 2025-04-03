@@ -12,7 +12,9 @@ const {
 
 class SupplierController extends BaseController {
   constructor() {
-    super(Supplier, null, { entity: 'suppliers', type: 'single' });
+    super(Supplier, null, {
+      image: { type: 'single' },
+    });
     this.eventService = getEntityEventService(this.entityName);
   }
 

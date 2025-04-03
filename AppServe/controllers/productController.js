@@ -16,8 +16,8 @@ const {
 class ProductController extends BaseController {
   constructor() {
     super(Product, productWooCommerceService, {
-      entity: 'products',
-      type: 'gallery',
+      image: { type: 'gallery' },
+      deleteFromWoo: (id) => productWooCommerceService.deleteProduct(id),
     });
     this.eventService = getEntityEventService(this.entityName);
   }
@@ -118,28 +118,8 @@ class ProductController extends BaseController {
       const brandId = existingProduct.brand_id;
       const supplierId = existingProduct.supplier_id;
 
-      if (existingProduct.woo_id) {
-        try {
-          if (existingProduct.image?.wp_id) {
-            await this.wooCommerceService.client.deleteMedia(existingProduct.image.wp_id);
-          }
-          if (existingProduct.gallery_images?.length) {
-            for (const image of existingProduct.gallery_images) {
-              if (image.wp_id) {
-                await this.wooCommerceService.client.deleteMedia(image.wp_id);
-              }
-            }
-          }
-
-          await this.wooCommerceService.client.delete(`products/${existingProduct.woo_id}`, {
-            force: true,
-          });
-        } catch (error) {
-          console.error(`Erreur lors de la suppression sur WooCommerce:`, error);
-        }
-      }
-
       await this.handleImageDeletion(existingProduct);
+      await this.handleWooCommerceDelete(existingProduct);
       await this.model.delete(req.params.id);
 
       if (brandId) await Brand.updateProductCount(brandId);

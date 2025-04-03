@@ -13,7 +13,10 @@ const {
 
 class BrandController extends BaseController {
   constructor() {
-    super(Brand, brandWooCommerceService, { entity: 'brands', type: 'single' });
+    super(Brand, brandWooCommerceService, {
+      image: { type: 'single' },
+      deleteFromWoo: (id) => brandWooCommerceService.deleteBrand(id),
+    });
     this.eventService = getEntityEventService(this.entityName);
   }
 
