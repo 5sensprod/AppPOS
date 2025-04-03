@@ -2,6 +2,9 @@
 const SyncStrategy = require('../base/SyncStrategy');
 const Product = require('../../models/Product');
 const Category = require('../../models/Category');
+const Brand = require('../../models/Brand');
+const categoryWooCommerceService = require('../CategoryWooCommerceService');
+const brandWooCommerceService = require('../BrandWooCommerceService');
 const { v4: uuidv4 } = require('uuid');
 
 class ProductSyncStrategy extends SyncStrategy {
@@ -26,27 +29,24 @@ class ProductSyncStrategy extends SyncStrategy {
     // Gestion des catégories
     wcData.categories = await this._prepareCategoryData(product);
 
+    // Gestion de la marque
+    if (product.brand_id) {
+      wcData.brands = await this._prepareBrandData(product.brand_id);
+    }
+
     // Gestion des images
     wcData.images = this._prepareImageData(product);
 
-    // Ajouter la marque si elle existe
-    if (product.brand_id) {
-      const Brand = require('../../models/Brand');
-      const brand = await Brand.findById(product.brand_id);
-      if (brand?.woo_id) {
-        wcData.brands = [{ id: parseInt(brand.woo_id) }];
-      }
-    }
-
     return wcData;
   }
+
   async _prepareCategoryData(product) {
     // Si categories est vide ET category_id est null, utiliser "non classée"
     if (
       (!product.categories || product.categories.length === 0) &&
       (!product.category_id || product.category_id === null)
     ) {
-      console.log('Aucune catégorie définie, utilisation de "non classée"');
+      console.log('[WS-DEBUG] Aucune catégorie définie, utilisation de "non classée"');
       return [{ id: 1 }]; // Catégorie "non classée" de WooCommerce
     }
 
@@ -58,18 +58,153 @@ class ProductSyncStrategy extends SyncStrategy {
           ? [product.category_id]
           : [];
 
+    // Récupérer les catégories et vérifier si elles sont synchronisées
     const categories = await Category.findAll();
-    const mappedCategories = categories
+    const productCategories = categories.filter((cat) => categoryIds.includes(cat._id));
+    const unsyncedCategories = productCategories.filter((cat) => !cat.woo_id);
+
+    // Si des catégories ne sont pas synchronisées, les synchroniser
+    if (unsyncedCategories.length > 0) {
+      console.log(
+        `[WS-DEBUG] Catégories non synchronisées pour produit ${product._id}: ${unsyncedCategories.map((c) => c._id).join(', ')}`
+      );
+      await this._syncCategories(unsyncedCategories);
+    }
+
+    // Récupérer à nouveau les catégories après la synchronisation
+    const updatedCategories = await Category.findAll();
+    const mappedCategories = updatedCategories
       .filter((cat) => categoryIds.includes(cat._id) && cat.woo_id)
       .map((cat) => ({ id: parseInt(cat.woo_id) }));
 
     // Si aucune catégorie valide trouvée, utiliser "non classée"
     if (mappedCategories.length === 0) {
-      console.log('Aucune catégorie valide trouvée, utilisation de "non classée"');
+      console.log('[WS-DEBUG] Aucune catégorie valide trouvée, utilisation de "non classée"');
       return [{ id: 1 }];
     }
 
     return mappedCategories;
+  }
+
+  /**
+   * Prépare les données de la marque pour WooCommerce et assure sa synchronisation
+   * @param {string} brandId - ID de la marque
+   * @returns {Promise<Array>} - Tableau contenant la référence à la marque WooCommerce
+   */
+  async _prepareBrandData(brandId) {
+    if (!brandId) return null;
+
+    // Récupérer la marque
+    const brand = await Brand.findById(brandId);
+    if (!brand) {
+      console.log(`[WS-DEBUG] Marque avec ID ${brandId} non trouvée`);
+      return null;
+    }
+
+    // Vérifier si la marque est déjà synchronisée
+    if (brand.woo_id) {
+      return [{ id: parseInt(brand.woo_id) }];
+    }
+
+    // Si la marque n'est pas synchronisée, la synchroniser
+    console.log(
+      `[WS-DEBUG] Marque non synchronisée: ${brand.name} (${brand._id}), synchronisation...`
+    );
+
+    try {
+      // Synchroniser la marque
+      const syncResult = await this._syncBrand(brand);
+
+      if (syncResult.success) {
+        // Récupérer la marque mise à jour
+        const updatedBrand = await Brand.findById(brandId);
+        if (updatedBrand.woo_id) {
+          console.log(
+            `[WS-DEBUG] Marque synchronisée avec succès: ${updatedBrand.name} (woo_id: ${updatedBrand.woo_id})`
+          );
+          return [{ id: parseInt(updatedBrand.woo_id) }];
+        }
+      } else {
+        console.error(
+          `[WS-DEBUG] Erreur lors de la synchronisation de la marque:`,
+          syncResult.error
+        );
+      }
+    } catch (error) {
+      console.error(`[WS-DEBUG] Exception lors de la synchronisation de la marque:`, error);
+    }
+
+    // En cas d'échec, retourner null
+    return null;
+  }
+
+  /**
+   * Synchronise une marque avec WooCommerce
+   * @param {Object} brand - La marque à synchroniser
+   * @returns {Promise<Object>} - Résultat de la synchronisation
+   */
+  async _syncBrand(brand) {
+    try {
+      const syncResult = await brandWooCommerceService.syncToWooCommerce([brand]);
+
+      if (syncResult.errors && syncResult.errors.length > 0) {
+        console.error(
+          `[WS-DEBUG] Erreurs lors de la synchronisation de la marque:`,
+          syncResult.errors
+        );
+        return { success: false, error: syncResult.errors[0] };
+      }
+
+      return { success: true, brand: syncResult.data[0] };
+    } catch (error) {
+      console.error(`[WS-DEBUG] Erreur lors de la synchronisation de la marque:`, error);
+      return { success: false, error };
+    }
+  }
+
+  /**
+   * Synchronise les catégories spécifiées avec WooCommerce
+   * @param {Array} categories - Liste des catégories à synchroniser
+   */
+  async _syncCategories(categories) {
+    if (!categories || categories.length === 0) return;
+
+    try {
+      console.log(`[WS-DEBUG] Synchronisation de ${categories.length} catégories avant produit`);
+
+      // Trier les catégories par niveau pour synchroniser les parents d'abord
+      const sortedCategories = this._sortCategoriesByLevel(categories);
+
+      // Utiliser le service de catégorie pour la synchronisation
+      const syncResult = await categoryWooCommerceService.syncToWooCommerce(sortedCategories);
+
+      if (syncResult.errors && syncResult.errors.length > 0) {
+        console.error(
+          `[WS-DEBUG] Erreurs lors de la synchronisation des catégories:`,
+          syncResult.errors
+        );
+      } else {
+        console.log(
+          `[WS-DEBUG] ${syncResult.created + syncResult.updated} catégories synchronisées avec succès`
+        );
+      }
+    } catch (error) {
+      console.error(`[WS-DEBUG] Erreur lors de la synchronisation des catégories:`, error);
+      // Ne pas propager l'erreur pour permettre au produit d'être synchronisé quand même
+    }
+  }
+
+  /**
+   * Trie les catégories par niveau (parents d'abord)
+   * @param {Array} categories - Liste des catégories à trier
+   * @returns {Array} - Liste des catégories triées
+   */
+  _sortCategoriesByLevel(categories) {
+    return categories.sort((a, b) => {
+      const levelA = a.level || (a.parent_id ? 1 : 0);
+      const levelB = b.level || (b.parent_id ? 1 : 0);
+      return levelA - levelB;
+    });
   }
 
   _prepareImageData(product) {

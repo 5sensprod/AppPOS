@@ -10,7 +10,6 @@ const { getEntityEventService } = require('../services/events/entityEvents');
 async function updateProductsAfterCategoryDeletion(categoryId) {
   try {
     const Product = require('../models/Product');
-    const eventService = getEntityEventService('categories');
     const allProducts = await Product.findAll();
 
     // Trouver tous les produits qui utilisent cette catégorie
