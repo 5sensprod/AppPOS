@@ -1,52 +1,16 @@
 // controllers/categoryController.js
 const BaseController = require('./base/BaseController');
 const Category = require('../models/Category');
-const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
-const { calculateLevel } = require('../utils/categoryHelpers');
+const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
 const { getEntityEventService } = require('../services/events/entityEvents');
-
-// Fonction pour mettre à jour les produits après la suppression d'une catégorie
-async function updateProductsAfterCategoryDeletion(categoryId) {
-  try {
-    const Product = require('../models/Product');
-    const allProducts = await Product.findAll();
-
-    // Trouver tous les produits qui utilisent cette catégorie
-    const linkedProducts = allProducts.filter(
-      (product) =>
-        (product.categories?.length > 0 && product.categories.includes(categoryId)) ||
-        (product.category_id && product.category_id === categoryId)
-    );
-
-    if (linkedProducts.length === 0) return;
-
-    // Mise à jour de chaque produit
-    for (const product of linkedProducts) {
-      const updatedCategories = product.categories?.filter((id) => id !== categoryId) || [];
-      const updatedCategoryId =
-        product.category_id === categoryId
-          ? updatedCategories.length > 0
-            ? updatedCategories[0]
-            : null
-          : product.category_id;
-
-      await Product.update(product._id, {
-        categories: updatedCategories,
-        category_id: updatedCategoryId,
-      });
-
-      console.log(
-        `[WS-DEBUG] Produit ${product._id} mis à jour après suppression de la catégorie ${categoryId}`
-      );
-    }
-  } catch (error) {
-    console.error(
-      '[WS-DEBUG] Erreur lors de la mise à jour des produits après suppression de catégorie:',
-      error
-    );
-  }
-}
+const {
+  calculateLevel,
+  hasChildren,
+  getLinkedProducts,
+  removeCategoryFromProducts,
+  buildCategoryTree,
+} = require('../services/categoryService');
 
 class CategoryController extends BaseController {
   constructor() {
@@ -54,45 +18,22 @@ class CategoryController extends BaseController {
       entity: 'categories',
       type: 'single',
     });
-    // S'assurer que le service d'événements est initialisé
     this.eventService = getEntityEventService(this.entityName);
   }
 
   async create(req, res) {
     try {
-      // Vérifier les conditions préalables (ex. niveau si parent_id est présent)
       if (req.body.parent_id) {
-        try {
-          req.body.level = await calculateLevel(req.body.parent_id);
-        } catch (levelError) {
-          console.error('[WS-DEBUG] Erreur lors du calcul du niveau:', levelError);
-          return ResponseHandler.error(res, 'Erreur lors du calcul du niveau');
-        }
+        req.body.level = await calculateLevel(req.body.parent_id);
       } else {
-        // Pour les catégories racines, le niveau est 0
         req.body.level = 0;
       }
 
-      // Création de la catégorie
       const newCategory = await this.model.create(req.body);
-
-      // Émettre l'événement de création via le service d'événements
-      console.log(`[EVENT] Émission d'événement de création de catégorie: ${newCategory._id}`);
       this.eventService.created(newCategory);
-      // Le service eventService.created s'occupe déjà d'émettre categoryTreeChanged si nécessaire
 
-      if (this.shouldSync() && this.wooCommerceService) {
-        try {
-          const syncResult = await this.wooCommerceService.syncToWooCommerce([newCategory]);
-          if (syncResult.errors.length > 0) {
-            return ResponseHandler.partialSuccess(res, newCategory, {
-              message: syncResult.errors.join(', '),
-            });
-          }
-        } catch (syncError) {
-          return ResponseHandler.partialSuccess(res, newCategory, syncError);
-        }
-      }
+      const syncResult = await this.syncIfNeeded([newCategory], res);
+      if (syncResult) return syncResult;
 
       return ResponseHandler.created(res, newCategory);
     } catch (error) {
@@ -103,47 +44,23 @@ class CategoryController extends BaseController {
 
   async update(req, res) {
     try {
-      // Vérifier si la catégorie existe
-      const category = await this.model.findById(req.params.id);
-      if (!category) {
-        console.error('[WS-DEBUG] Catégorie introuvable pour mise à jour:', req.params.id);
-        return ResponseHandler.notFound(res, 'Catégorie non trouvée');
-      }
+      const category = await this.getByIdOr404(req.params.id, res);
+      if (!category) return;
 
-      // Vérifier et recalculer le niveau de la catégorie si le parent_id a changé
       if (req.body.parent_id && req.body.parent_id !== category.parent_id) {
-        try {
-          req.body.level = await calculateLevel(req.body.parent_id);
-        } catch (levelError) {
-          console.error('[WS-DEBUG] Erreur lors du calcul du niveau:', levelError);
-          return ResponseHandler.error(res, 'Erreur lors du calcul du niveau');
-        }
+        req.body.level = await calculateLevel(req.body.parent_id);
       }
 
-      // Mise à jour directe au lieu d'appeler super.update qui renvoie une réponse
-      const id = req.params.id;
-      const updateData = req.body;
+      const updateData = { ...req.body };
+      if (category.woo_id) updateData.pending_sync = true;
 
-      if (category.woo_id) {
-        updateData.pending_sync = true;
-      }
+      await this.model.update(req.params.id, updateData);
+      const updatedItem = await this.model.findById(req.params.id);
 
-      await this.model.update(id, updateData);
-      const updatedItem = await this.model.findById(id);
+      this.eventService.updated(req.params.id, updatedItem);
 
-      // Émettre l'événement de mise à jour via le service d'événements
-      this.eventService.updated(id, updatedItem);
-      // La méthode updated gère également l'émission de categoryTreeChanged si nécessaire
-
-      // Gestion de la synchronisation WooCommerce si nécessaire
-      if (this.shouldSync() && this.wooCommerceService) {
-        try {
-          await this.wooCommerceService.syncToWooCommerce([updatedItem]);
-          await this.model.update(id, { pending_sync: false });
-        } catch (syncError) {
-          return ResponseHandler.partialSuccess(res, updatedItem, syncError);
-        }
-      }
+      const syncResult = await this.syncIfNeeded([updatedItem], res);
+      if (syncResult) return syncResult;
 
       return ResponseHandler.success(res, updatedItem);
     } catch (error) {
@@ -154,30 +71,18 @@ class CategoryController extends BaseController {
 
   async delete(req, res) {
     try {
-      const item = await this.model.findById(req.params.id);
-      if (!item) return ResponseHandler.notFound(res);
+      const category = await this.getByIdOr404(req.params.id, res);
+      if (!category) return;
 
-      // Vérification des sous-catégories
-      if (item.level === 0) {
-        const allCategories = await this.model.findAll();
-        const children = allCategories.filter((cat) => cat.parent_id === req.params.id);
-        if (children.length > 0) {
-          return ResponseHandler.error(res, {
-            status: 400,
-            message: `Impossible de supprimer la catégorie : ${children.length} sous-catégorie(s) existante(s)`,
-          });
-        }
+      const hasChildrenCat = await hasChildren(category._id);
+      if (hasChildrenCat) {
+        return ResponseHandler.error(res, {
+          status: 400,
+          message: `Impossible de supprimer la catégorie : des sous-catégories existent`,
+        });
       }
 
-      // Vérification des produits liés
-      const Product = require('../models/Product');
-      const allProducts = await Product.findAll();
-      const linkedProducts = allProducts.filter(
-        (product) =>
-          (product.categories?.length > 0 && product.categories.includes(item._id)) ||
-          (product.category_id && product.category_id === item._id)
-      );
-
+      const linkedProducts = await getLinkedProducts(category._id);
       if (linkedProducts.length > 0) {
         return ResponseHandler.error(res, {
           status: 400,
@@ -185,31 +90,16 @@ class CategoryController extends BaseController {
         });
       }
 
-      // Si l'entité est synchronisée avec WooCommerce, la supprimer d'abord de WC
-      if (item.woo_id) {
-        try {
-          console.log(
-            `[WS-DEBUG] Suppression de la catégorie ${item._id} de WooCommerce (woo_id: ${item.woo_id})`
-          );
-          const categoryWooService = require('../services/CategoryWooCommerceService');
-          await categoryWooService.deleteCategory(item._id);
-          console.log(`[WS-DEBUG] Catégorie supprimée de WooCommerce avec succès`);
-        } catch (wcError) {
-          console.error(`[WS-DEBUG] Erreur lors de la suppression WooCommerce:`, wcError);
-          // On continue malgré l'erreur pour supprimer en local
-        }
-      }
-
-      await this.handleImageDeletion(item);
-      await updateProductsAfterCategoryDeletion(req.params.id);
+      await this.handleImageDeletion(category);
+      await removeCategoryFromProducts(category._id);
+      await this.handleWooCommerceDelete(category);
       await this.model.delete(req.params.id);
 
-      // Notification via le service d'événements
       this.eventService.deleted(req.params.id);
 
       return ResponseHandler.success(res, {
         message: 'Catégorie supprimée avec succès',
-        woo_status: item.woo_id ? 'synchronized' : 'not_applicable',
+        woo_status: category.woo_id ? 'synchronized' : 'not_applicable',
       });
     } catch (error) {
       return ResponseHandler.error(res, error);
@@ -220,73 +110,10 @@ class CategoryController extends BaseController {
 async function getHierarchicalCategories(req, res) {
   try {
     const allCategories = await Category.findAll();
-    const Product = require('../models/Product');
-    const allProducts = await Product.findAll();
+    const allProducts = await require('../models/Product').findAll();
 
-    const rootCategories = [];
-    const categoriesMap = new Map();
-
-    // Créer la map des catégories avec compteurs et listes de produits
-    allCategories.forEach((category) => {
-      const categoryProducts = allProducts.filter(
-        (product) => product.categories && product.categories.includes(category._id)
-      );
-
-      const productsList = categoryProducts.map((product) => ({
-        _id: product._id,
-        name: product.name,
-        sku: product.sku || null,
-      }));
-
-      categoriesMap.set(category._id, {
-        ...category,
-        children: [],
-        productCount: categoryProducts.length,
-        products: productsList,
-        path: [category.name],
-        path_ids: [category._id],
-        path_string: category.name,
-      });
-    });
-
-    // Organiser la hiérarchie et construire les chemins
-    allCategories.forEach((category) => {
-      const categoryWithChildren = categoriesMap.get(category._id);
-
-      if (!category.parent_id) {
-        rootCategories.push(categoryWithChildren);
-      } else {
-        const parentCategory = categoriesMap.get(category.parent_id);
-        if (parentCategory) {
-          parentCategory.children.push(categoryWithChildren);
-
-          // Mettre à jour le chemin
-          categoryWithChildren.path = [...parentCategory.path, category.name];
-          categoryWithChildren.path_ids = [...parentCategory.path_ids, category._id];
-          categoryWithChildren.path_string = categoryWithChildren.path.join(' > ');
-        } else {
-          console.warn(`Parent introuvable pour catégorie ${category._id}`);
-          rootCategories.push(categoryWithChildren);
-        }
-      }
-    });
-
-    // Trier par nom
-    rootCategories.sort((a, b) => a.name.localeCompare(b.name));
-
-    // Trier récursivement les enfants
-    const sortChildren = (categories) => {
-      categories.forEach((category) => {
-        if (category.children && category.children.length > 0) {
-          category.children.sort((a, b) => a.name.localeCompare(b.name));
-          sortChildren(category.children);
-        }
-      });
-    };
-
-    sortChildren(rootCategories);
-
-    return ResponseHandler.success(res, rootCategories);
+    const tree = buildCategoryTree(allCategories, allProducts);
+    return ResponseHandler.success(res, tree);
   } catch (error) {
     console.error('Erreur dans getHierarchicalCategories:', error);
     return ResponseHandler.error(res, error);
@@ -294,6 +121,7 @@ async function getHierarchicalCategories(req, res) {
 }
 
 const categoryController = new CategoryController();
+
 module.exports = {
   getAll: categoryController.getAll.bind(categoryController),
   getById: categoryController.getById.bind(categoryController),
@@ -303,5 +131,5 @@ module.exports = {
   uploadImage: categoryController.uploadImage,
   updateImageMetadata: categoryController.updateImageMetadata,
   deleteImage: categoryController.deleteImage,
-  getHierarchicalCategories: getHierarchicalCategories,
+  getHierarchicalCategories,
 };

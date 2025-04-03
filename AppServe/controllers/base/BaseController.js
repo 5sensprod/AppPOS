@@ -1,3 +1,4 @@
+// base/BaseController.js
 const ResponseHandler = require('../../handlers/ResponseHandler');
 const BaseImageController = require('../image/BaseImageController');
 const fs = require('fs').promises;
@@ -5,31 +6,28 @@ const path = require('path');
 const { getEntityEventService } = require('../../services/events/entityEvents');
 
 class BaseController {
-  constructor(model, wooCommerceService, imageOptions = null) {
-    if (!model) {
-      throw new Error('Un modèle est requis pour le contrôleur de base');
-    }
+  constructor(model, wooCommerceService, options = {}) {
+    if (!model) throw new Error('Un modèle est requis pour le contrôleur de base');
 
     this.model = model;
     this.wooCommerceService = wooCommerceService;
+    this.entityName = this.buildEntityName(model);
+    this.eventService = getEntityEventService(this.entityName);
 
-    // Standardisation : toujours en pluriel
-    const singularName = model.constructor.name.toLowerCase().replace('model', '');
+    if (options.image) {
+      this.imageController = new BaseImageController(this.entityName, options.image);
+      this.setupImageHandlers();
+    }
+  }
+
+  buildEntityName(model) {
+    const name = model.constructor.name.toLowerCase().replace('model', '');
     const entityMap = {
       category: 'categories',
       supplier: 'suppliers',
+      brand: 'brands',
     };
-    this.entityName =
-      entityMap[singularName] || (singularName.endsWith('s') ? singularName : `${singularName}s`);
-
-    this.eventService = getEntityEventService(this.entityName);
-
-    if (imageOptions?.entity) {
-      this.imageController = new BaseImageController(this.entityName, {
-        type: imageOptions.type || 'single',
-      });
-      this.setupImageHandlers();
-    }
+    return entityMap[name] || (name.endsWith('s') ? name : `${name}s`);
   }
 
   setupImageHandlers() {
@@ -58,25 +56,22 @@ class BaseController {
     }
   }
 
+  async getByIdOr404(id, res) {
+    const item = await this.model.findById(id);
+    if (!item) {
+      ResponseHandler.notFound(res);
+      return null;
+    }
+    return item;
+  }
+
   async create(req, res) {
     try {
       const newItem = await this.model.create(req.body);
-
-      // Utiliser le service d'événements
       this.eventService.created(newItem);
 
-      if (this.shouldSync() && this.wooCommerceService) {
-        try {
-          const syncResult = await this.wooCommerceService.syncToWooCommerce([newItem]);
-          if (syncResult.errors.length > 0) {
-            return ResponseHandler.partialSuccess(res, newItem, {
-              message: syncResult.errors.join(', '),
-            });
-          }
-        } catch (syncError) {
-          return ResponseHandler.partialSuccess(res, newItem, syncError);
-        }
-      }
+      const syncResponse = await this.syncIfNeeded([newItem], res);
+      if (syncResponse) return syncResponse;
 
       return ResponseHandler.created(res, newItem);
     } catch (error) {
@@ -87,29 +82,19 @@ class BaseController {
   async update(req, res) {
     try {
       const id = req.params.id;
-      const updateData = req.body;
+      const updateData = { ...req.body };
+      const existing = await this.getByIdOr404(id, res);
+      if (!existing) return;
 
-      const existing = await this.model.findById(id);
-      if (!existing) return ResponseHandler.notFound(res);
-
-      if (existing.woo_id) {
-        updateData.pending_sync = true;
-      }
+      if (existing.woo_id) updateData.pending_sync = true;
 
       await this.model.update(id, updateData);
       const updatedItem = await this.model.findById(id);
 
-      // Utiliser le service d'événements
       this.eventService.updated(id, updatedItem);
 
-      if (this.shouldSync() && this.wooCommerceService) {
-        try {
-          await this.wooCommerceService.syncToWooCommerce([updatedItem]);
-          await this.model.update(id, { pending_sync: false });
-        } catch (syncError) {
-          return ResponseHandler.partialSuccess(res, updatedItem, syncError);
-        }
-      }
+      const syncResponse = await this.syncIfNeeded([updatedItem], res);
+      if (syncResponse) return syncResponse;
 
       return ResponseHandler.success(res, updatedItem);
     } catch (error) {
@@ -119,32 +104,22 @@ class BaseController {
 
   async delete(req, res) {
     try {
-      const item = await this.model.findById(req.params.id);
-      if (!item) return ResponseHandler.notFound(res);
+      const item = await this.getByIdOr404(req.params.id, res);
+      if (!item) return;
 
-      // Sauvegarder l'ID WooCommerce avant suppression
       const wooId = item.woo_id;
 
-      // Supprimer les images associées
       await this.handleImageDeletion(item);
 
-      // Supprimer l'entité sur WooCommerce si elle y existe
       if (wooId) {
         try {
           await this.handleWooCommerceDelete(item);
-          console.log(
-            `Entité ${this.entityName} (ID: ${req.params.id}) supprimée sur WooCommerce (woo_id: ${wooId})`
-          );
         } catch (wcError) {
           console.error(`Erreur lors de la suppression sur WooCommerce:`, wcError);
-          // On continue malgré l'erreur pour supprimer en local
         }
       }
 
-      // Supprimer l'entité dans la base de données
       await this.model.delete(req.params.id);
-
-      // Utiliser le service d'événements
       this.eventService.deleted(req.params.id);
 
       return ResponseHandler.success(res, {
@@ -168,39 +143,40 @@ class BaseController {
   async handleWooCommerceDelete(item) {
     if (!item.woo_id) return;
 
+    const deleteMap = {
+      products: 'deleteProduct',
+      categories: 'deleteCategory',
+      brands: 'deleteBrand',
+    };
+
+    const method = deleteMap[this.entityName];
+    if (!method) {
+      console.warn(`Aucune méthode de suppression WooCommerce définie pour ${this.entityName}`);
+      return;
+    }
+
     try {
-      const entityType = this.entityName;
-
-      // Service WooCommerce approprié selon le type d'entité
-      let wooService;
-      let deleteMethod;
-
-      switch (entityType) {
-        case 'products':
-          wooService = require('../../services/ProductWooCommerceService');
-          deleteMethod = 'deleteProduct';
-          break;
-        case 'categories':
-          wooService = require('../../services/CategoryWooCommerceService');
-          deleteMethod = 'deleteCategory';
-          break;
-        case 'brands':
-          wooService = require('../../services/BrandWooCommerceService');
-          deleteMethod = 'deleteBrand';
-          break;
-        default:
-          console.error(`Type d'entité non géré pour la suppression: ${entityType}`);
-          return;
-      }
-
-      // Appel de la méthode de suppression
-      if (wooService && typeof wooService[deleteMethod] === 'function') {
-        await wooService[deleteMethod](item._id);
-        console.log(`${entityType} ${item._id} supprimé de WooCommerce`);
+      const service = require(`../../services/${this.entityName.slice(0, -1)}WooCommerceService`);
+      if (typeof service[method] === 'function') {
+        await service[method](item._id);
       }
     } catch (error) {
-      console.error(`Erreur lors de la suppression WooCommerce (${this.entityName}):`, error);
+      console.error(`Erreur WooCommerce (${this.entityName}):`, error);
       throw error;
+    }
+  }
+
+  async syncIfNeeded(entities, res = null) {
+    if (!this.shouldSync() || !this.wooCommerceService) return;
+    try {
+      const result = await this.wooCommerceService.syncToWooCommerce(entities);
+      if (result.errors?.length > 0 && res) {
+        return ResponseHandler.partialSuccess(res, entities[0], {
+          message: result.errors.join(', '),
+        });
+      }
+    } catch (err) {
+      if (res) return ResponseHandler.partialSuccess(res, entities[0], err);
     }
   }
 
