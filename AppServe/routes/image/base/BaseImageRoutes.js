@@ -1,6 +1,6 @@
 // routes/image/base/BaseImageRoutes.js
 const express = require('express');
-const createImageUploadMiddleware = require('../../../middleware/upload/handlers');
+const createImageUploadMiddleware = require('../../../middleware/upload/uploadHandlerFactory');
 const BaseImageController = require('../../../controllers/image/BaseImageController');
 
 class BaseImageRoutes {

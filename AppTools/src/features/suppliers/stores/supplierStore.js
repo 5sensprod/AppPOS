@@ -47,7 +47,7 @@ export function useSupplierExtras() {
   const uploadImage = async (supplierId, file) => {
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('image', file);
 
       const response = await apiService.post(
         `${SUPPLIER_CONFIG.apiEndpoint}/${supplierId}/image`,

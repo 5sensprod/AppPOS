@@ -1,8 +1,6 @@
-// src/models/images/SingleImage.js
-// SingleImage.js
-const BaseImageHandler = require('../base/BaseImageHandler');
+const ImageEntityHandler = require('../base/ImageEntityHandler');
 
-class SingleImage extends BaseImageHandler {
+class SingleImage extends ImageEntityHandler {
   constructor(entity) {
     super(entity);
     this.maxFiles = 1;

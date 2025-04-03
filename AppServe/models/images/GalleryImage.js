@@ -1,15 +1,14 @@
-// src/models/images/GalleryImage.js
-const BaseImageHandler = require('../base/BaseImageHandler');
+const ImageEntityHandler = require('../base/ImageEntityHandler');
 
-class GalleryImage extends BaseImageHandler {
+class GalleryImage extends ImageEntityHandler {
   constructor(entity) {
     super(entity);
     this.maxFiles = 10;
     this.isGallery = true;
   }
 
-  async reorderGallery(productId, imageIds) {
-    const existingImages = await this.getImages(productId);
+  async reorderGallery(entityId, imageIds) {
+    const existingImages = await this.getImages(entityId);
     if (!existingImages.length) throw new Error('Aucune image trouvée');
 
     const validIds = existingImages.map((img) => img.id);
@@ -22,12 +21,12 @@ class GalleryImage extends BaseImageHandler {
       gallery_order: index,
     }));
 
-    await this.updateEntity(productId, reorderedImages);
+    await this.updateEntity(entityId, reorderedImages);
     return reorderedImages;
   }
 
-  async setPrimaryImage(productId, imageId) {
-    const existingImages = await this.getImages(productId);
+  async setPrimaryImage(entityId, imageId) {
+    const existingImages = await this.getImages(entityId);
     if (!existingImages.length) throw new Error('Aucune image trouvée');
 
     const updatedImages = existingImages.map((img) => ({
@@ -35,7 +34,7 @@ class GalleryImage extends BaseImageHandler {
       is_primary: img.id === imageId,
     }));
 
-    await this.updateEntity(productId, updatedImages);
+    await this.updateEntity(entityId, updatedImages);
     return updatedImages;
   }
 }
