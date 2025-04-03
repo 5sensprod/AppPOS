@@ -1,4 +1,3 @@
-// services/ProductWooCommerceService.js
 const WooCommerceClient = require('./base/WooCommerceClient');
 const ProductSyncStrategy = require('./sync/ProductSync');
 const SyncErrorHandler = require('./base/SyncErrorHandler');
@@ -24,23 +23,14 @@ class ProductWooCommerceService {
 
       const products = Array.isArray(input) ? input : [input];
 
-      for (const product of products) {
-        const result = await this.strategy.syncToWooCommerce(product, this.client, results);
-        if (!result.success) {
-          this.errorHandler.handleSyncError(result.error, results, product._id);
-        } else if (result.product) {
-          // Ajouter cette condition pour émettre un événement après synchronisation réussie
-          this.eventService.syncCompleted(product._id, result.product);
-        }
-      }
-
-      return {
-        success: true,
-        data: Array.isArray(input)
-          ? await Promise.all(products.map((p) => Product.findById(p._id)))
-          : [await Product.findById(input._id)],
-        ...results,
-      };
+      return await this.strategy.syncEntityList(
+        products,
+        Product,
+        this.client,
+        this.eventService,
+        results,
+        'product'
+      );
     } catch (error) {
       console.error('Sync error:', error);
       return {
@@ -55,29 +45,23 @@ class ProductWooCommerceService {
   async deleteProduct(productId) {
     try {
       const product = await Product.findById(productId);
-      if (!product) {
-        throw new Error('Product not found');
-      }
+      if (!product) throw new Error('Product not found');
 
       if (product.woo_id) {
         try {
-          // Suppression des images
-          if (product.image?.wp_id) {
-            await this.client.deleteMedia(product.image.wp_id);
-          }
+          // Supprimer l’image principale
+          if (product.image?.wp_id) await this.client.deleteMedia(product.image.wp_id);
+
+          // Supprimer la galerie
           if (product.gallery_images?.length) {
-            for (const image of product.gallery_images) {
-              if (image.wp_id) {
-                await this.client.deleteMedia(image.wp_id);
-              }
+            for (const img of product.gallery_images) {
+              if (img.wp_id) await this.client.deleteMedia(img.wp_id);
             }
           }
-          // Suppression du produit
+
           await this.client.delete(`${this.endpoint}/${product.woo_id}`, { force: true });
         } catch (error) {
-          if (error.response?.status !== 404) {
-            throw error;
-          }
+          if (error.response?.status !== 404) throw error;
         }
       }
 
@@ -92,48 +76,34 @@ class ProductWooCommerceService {
   async getProductUrl(productId) {
     try {
       const product = await Product.findById(productId);
+      if (!product) throw new Error('Produit non trouvé');
 
-      if (!product) {
-        throw new Error('Produit non trouvé');
+      const isRecent =
+        product.last_sync && Date.now() - new Date(product.last_sync).getTime() < 86400000;
+
+      if (product.website_url && isRecent) {
+        return { success: true, url: product.website_url };
       }
 
-      // Si l'URL du produit est déjà enregistrée et récente (sync récent)
-      if (product.website_url && product.last_sync) {
-        const syncAge = Date.now() - new Date(product.last_sync).getTime();
-        // Si la sync date de moins de 24h, utiliser l'URL stockée
-        if (syncAge < 24 * 60 * 60 * 1000) {
-          return { success: true, url: product.website_url };
-        }
-      }
-
-      // Si pas d'URL ou sync trop ancienne, récupérer depuis WooCommerce
       if (product.woo_id) {
-        const response = await this.client.get(`${this.endpoint}/${product.woo_id}`);
-
-        if (response.data && response.data.permalink) {
-          // Mettre à jour l'URL dans la base de données
+        const res = await this.client.get(`${this.endpoint}/${product.woo_id}`);
+        if (res.data?.permalink) {
           await Product.update(productId, {
-            website_url: response.data.permalink,
+            website_url: res.data.permalink,
             last_sync: new Date(),
           });
-
-          return { success: true, url: response.data.permalink };
+          return { success: true, url: res.data.permalink };
         }
       }
 
-      // Si pas de woo_id ou pas d'URL trouvée
       return {
         success: false,
         error: 'URL du produit non disponible',
-        message:
-          "Le produit n'a pas encore été synchronisé avec WooCommerce ou l'URL n'est pas disponible",
+        message: 'Produit non synchronisé ou lien indisponible.',
       };
     } catch (error) {
       this.errorHandler.handleError(error, 'product', productId);
-      return {
-        success: false,
-        error: error.message,
-      };
+      return { success: false, error: error.message };
     }
   }
 

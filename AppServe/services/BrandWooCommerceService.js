@@ -24,22 +24,14 @@ class BrandWooCommerceService {
 
       const brands = Array.isArray(input) ? input : [input];
 
-      for (const brand of brands) {
-        try {
-          const result = await this.strategy.syncToWooCommerce(brand, this.client, results);
-          if (!result.success) {
-            this.errorHandler.handleSyncError(result.error, results, brand._id);
-          } else if (result.brand) {
-            // Émettre un événement après synchronisation réussie
-            console.log(
-              `[EVENT] Émission d'événement après synchronisation de la marque ${brand._id}`
-            );
-            this.eventService.syncCompleted(brand._id, result.brand);
-          }
-        } catch (error) {
-          this.errorHandler.handleSyncError(error, results, brand._id);
-        }
-      }
+      return await this.strategy.syncEntityList(
+        input,
+        Brand,
+        this.client,
+        this.eventService,
+        results,
+        'brand'
+      );
 
       return {
         success: true,

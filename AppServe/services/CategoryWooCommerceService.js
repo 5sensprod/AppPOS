@@ -27,40 +27,14 @@ class CategoryWooCommerceService {
       // Trier les catégories par niveau pour synchroniser les parents d'abord
       const sortedCategories = this.strategy._sortCategoriesByLevel(categories);
 
-      for (const category of sortedCategories) {
-        try {
-          const result = await this.strategy.syncToWooCommerce(category, this.client, results);
-          if (!result.success) {
-            if (result.error.message.includes('catégorie parente')) {
-              results.pending.push(category._id);
-            } else {
-              this.errorHandler.handleSyncError(result.error, results, category._id);
-            }
-          } else if (result.category) {
-            // ⚠️ UTILISER LE SERVICE D'ÉVÉNEMENTS : Émettre un événement après la synchronisation
-            console.log(
-              `[EVENT] Émission d'événement après synchronisation de la catégorie ${category._id}`
-            );
-            this.eventService.syncCompleted(category._id, result.category);
-          }
-        } catch (error) {
-          this.errorHandler.handleSyncError(error, results, category._id);
-        }
-      }
-
-      // Si c'est une seule catégorie et qu'elle a été synchronisée avec succès,
-      // émettre un événement de mise à jour de l'arborescence
-      if (!Array.isArray(input) && results.errors.length === 0) {
-        this.eventService.categoryTreeChanged();
-      }
-
-      return {
-        success: true,
-        data: Array.isArray(input)
-          ? await Promise.all(categories.map((c) => Category.findById(c._id)))
-          : [await Category.findById(input._id)],
-        ...results,
-      };
+      return await this.strategy.syncEntityList(
+        sortedCategories,
+        Category,
+        this.client,
+        this.eventService,
+        results,
+        'category'
+      );
     } catch (error) {
       console.error('Sync error:', error);
       return {

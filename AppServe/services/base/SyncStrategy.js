@@ -46,6 +46,42 @@ class SyncStrategy {
     }
     return { success: true };
   }
+
+  async syncEntityList(
+    input,
+    model,
+    client,
+    eventService,
+    results = { created: 0, updated: 0, deleted: 0, errors: [] },
+    entityKey = 'entity'
+  ) {
+    const entities = Array.isArray(input) ? input : [input];
+
+    for (const entity of entities) {
+      try {
+        const result = await this.syncToWooCommerce(entity, client, results);
+        if (!result.success) {
+          results.errors.push({
+            entity_id: entity._id,
+            error: result.error?.message || 'Erreur inconnue',
+          });
+        } else if (result[entityKey]) {
+          eventService?.syncCompleted?.(entity._id, result[entityKey]);
+        }
+      } catch (error) {
+        results.errors.push({
+          entity_id: entity._id,
+          error: error.message,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      data: await Promise.all(entities.map((e) => model.findById(e._id))),
+      ...results,
+    };
+  }
 }
 
 module.exports = SyncStrategy;
