@@ -3,14 +3,7 @@ import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import apiService from '../../../services/api';
 import { useHierarchicalCategories } from './categoryHierarchyStore';
-
-// Configuration de l'entité Category
-const CATEGORY_CONFIG = {
-  entityName: 'category',
-  apiEndpoint: '/api/categories',
-  syncEnabled: true,
-  imagesEnabled: true,
-};
+import { ENTITY_CONFIG as CATEGORY_CONFIG } from '../constants';
 
 // Créer le store avec la factory
 const { useCategory: useCategoryBase, useEntityStore: useCategoryStore } =
@@ -18,10 +11,10 @@ const { useCategory: useCategoryBase, useEntityStore: useCategoryStore } =
 
 // Store Zustand dédié pour la gestion des catégories avec WebSocket
 export const useCategoryDataStore = createWebSocketStore({
-  entityName: 'category',
-  apiEndpoint: '/api/categories',
+  entityName: CATEGORY_CONFIG.entityName,
+  apiEndpoint: CATEGORY_CONFIG.apiEndpoint,
   apiService,
-  fetchMethodName: 'fetchCategories', // Spécifier explicitement le nom
+  fetchMethodName: 'fetchCategories',
   additionalChannels: [],
   additionalEvents: [
     {
@@ -53,17 +46,10 @@ export { useCategoryStore };
 // Fonction pour exposer des méthodes supplémentaires spécifiques aux catégories
 export function useCategoryExtras() {
   const categoryStore = useCategory();
-  const {
-    hierarchicalCategories,
-    loading: hierarchicalLoading,
-    fetchHierarchicalCategories,
-  } = useHierarchicalCategories();
-
   return {
     ...categoryStore,
-    // État et méthodes du store hiérarchique
-    hierarchicalCategories,
-    hierarchicalLoading,
-    getHierarchicalCategories: fetchHierarchicalCategories,
+    hierarchicalCategories: categoryStore.hierarchicalItems,
+    hierarchicalLoading: categoryStore.hierarchicalLoading,
+    getHierarchicalCategories: categoryStore.fetchHierarchicalItems,
   };
 }

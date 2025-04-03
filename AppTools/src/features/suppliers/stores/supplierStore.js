@@ -1,15 +1,7 @@
-// src/features/suppliers/stores/supplierStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import apiService from '../../../services/api';
-
-// Configuration de l'entité Supplier
-const SUPPLIER_CONFIG = {
-  entityName: 'supplier',
-  apiEndpoint: '/api/suppliers',
-  syncEnabled: false,
-  imagesEnabled: true,
-};
+import { ENTITY_CONFIG as SUPPLIER_CONFIG } from '../constants';
 
 // Créer le store avec la factory
 const { useSupplier: useSupplierBase, useEntityStore: useSupplierStore } =
@@ -17,8 +9,8 @@ const { useSupplier: useSupplierBase, useEntityStore: useSupplierStore } =
 
 // Store Zustand dédié pour la gestion des fournisseurs avec WebSocket
 export const useSupplierDataStore = createWebSocketStore({
-  entityName: 'supplier',
-  apiEndpoint: '/api/suppliers',
+  entityName: SUPPLIER_CONFIG.entityName,
+  apiEndpoint: SUPPLIER_CONFIG.apiEndpoint,
   apiService,
   additionalChannels: [],
   additionalEvents: [],
@@ -29,7 +21,6 @@ export function useSupplier() {
   const supplierStore = useSupplierBase();
   return {
     ...supplierStore,
-    // Utiliser directement les méthodes du store WebSocket
     initWebSocketListeners: () => {
       const cleanup = useSupplierDataStore.getState().initWebSocket();
       return cleanup;

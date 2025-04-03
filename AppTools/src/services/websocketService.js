@@ -9,16 +9,12 @@ class WebSocketService {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000;
-    this.subscriptions = []; // Garder une trace des abonnements actifs
-
-    // Ajouter une méthode de débogage
-    this.debug = true; // Activer le débogage
+    this.subscriptions = [];
+    this.debug = true;
   }
 
   log(...args) {
-    if (this.debug) {
-      console.log('[WS-CLIENT]', ...args);
-    }
+    if (this.debug) console.log('[WS-CLIENT]', ...args);
   }
 
   init(baseUrl) {
@@ -30,55 +26,58 @@ class WebSocketService {
       ? baseUrl.replace(/^http(s)?:/, wsProtocol)
       : `${wsProtocol}//${window.location.host}`;
 
-    this.log(`Nouvelle connexion WebSocket à ${wsUrl}/ws`);
-
+    this.log(`Connexion WebSocket à ${wsUrl}/ws`);
     this.socket = new WebSocket(`${wsUrl}/ws`);
-    this.setupEventListeners();
+    this._setupListeners();
   }
 
-  setupEventListeners() {
-    this.socket.addEventListener('open', () => {
-      this.log('WebSocket connecté');
-      this.isConnected = true;
-      this.reconnectAttempts = 0;
-      this.isReconnecting = false;
-
-      // Réabonner aux entités précédemment suivies
-      this.log(`Réabonnement aux ${this.subscriptions.length} souscriptions précédentes`);
-      this.subscriptions.forEach((entityType) => {
-        this.subscribe(entityType);
-      });
-
-      this.triggerEvent('connect');
-    });
-
-    this.socket.addEventListener('message', ({ data }) => {
-      try {
-        const { type, payload } = JSON.parse(data);
-        this.log(`Message reçu: ${type}`, payload);
-
-        // Déclenchement direct de l'événement
-        this.triggerEvent(type, payload);
-      } catch (error) {
-        console.error('[WS-CLIENT] Erreur de traitement WebSocket:', error);
-      }
-    });
-
-    this.socket.addEventListener('close', ({ code, reason }) => {
-      this.log(`WebSocket fermé: ${code} ${reason}`);
-      this.isConnected = false;
-      this.attemptReconnect();
-      this.triggerEvent('disconnect');
-    });
-
-    this.socket.addEventListener('error', (error) => {
-      console.error('[WS-CLIENT] Erreur WebSocket:', error);
-      this.triggerEvent('error', error);
-    });
+  _setupListeners() {
+    this._onSocket('open', this._handleOpen.bind(this));
+    this._onSocket('message', this._handleMessage.bind(this));
+    this._onSocket('close', this._handleClose.bind(this));
+    this._onSocket('error', this._handleError.bind(this));
   }
 
-  attemptReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts || this.isReconnecting) {
+  _onSocket(event, handler) {
+    this.socket.addEventListener(event, handler);
+  }
+
+  _handleOpen() {
+    this.log('WebSocket connecté');
+    this.isConnected = true;
+    this.isReconnecting = false;
+    this.reconnectAttempts = 0;
+
+    this.log(`Réabonnement à ${this.subscriptions.length} entité(s)`);
+    this.subscriptions.forEach((type) => this._subscribeType(type));
+
+    this._trigger('connect');
+  }
+
+  _handleMessage({ data }) {
+    try {
+      const { type, payload } = JSON.parse(data);
+      this.log(`Message reçu: ${type}`, payload);
+      this._trigger(type, payload);
+    } catch (err) {
+      console.error('[WS-CLIENT] Erreur de parsing message:', err);
+    }
+  }
+
+  _handleClose({ code, reason }) {
+    this.log(`WebSocket fermé: ${code} ${reason}`);
+    this.isConnected = false;
+    this._trigger('disconnect');
+    this._attemptReconnect();
+  }
+
+  _handleError(error) {
+    console.error('[WS-CLIENT] Erreur WebSocket:', error);
+    this._trigger('error', error);
+  }
+
+  _attemptReconnect() {
+    if (this.isReconnecting || this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error(
         `[WS-CLIENT] Reconnexion annulée après ${this.maxReconnectAttempts} tentatives`
       );
@@ -87,107 +86,98 @@ class WebSocketService {
 
     this.reconnectAttempts++;
     this.isReconnecting = true;
+
     this.log(`Reconnexion dans ${this.reconnectDelay}ms (Tentative ${this.reconnectAttempts})`);
 
     setTimeout(() => {
-      if (!this.isConnected) {
-        this.init();
-      }
+      if (!this.isConnected) this.init();
     }, this.reconnectDelay);
   }
 
   send(type, payload) {
     if (!this.isConnected) {
-      console.warn('[WS-CLIENT] Envoi WebSocket impossible: connexion fermée');
+      console.warn("[WS-CLIENT] Impossible d'envoyer: WebSocket non connecté");
       return false;
     }
-    this.log(`Envoi du message: ${type}`, payload);
+    this.log(`Envoi: ${type}`, payload);
     this.socket.send(JSON.stringify({ type, payload }));
     return true;
   }
 
   subscribe(entityType) {
-    // Normaliser le nom d'entité (toujours au pluriel)
-    const normalizedEntityType = entityType.endsWith('s') ? entityType : `${entityType}s`;
+    const normalized = this._normalizeType(entityType);
 
-    this.log(`Abonnement à: ${normalizedEntityType}`);
-
-    // Stocker l'abonnement pour réabonnement lors des reconnexions
-    if (!this.subscriptions.includes(normalizedEntityType)) {
-      this.subscriptions.push(normalizedEntityType);
-      this.log(`Liste des abonnements: ${this.subscriptions.join(', ')}`);
-    }
-
-    return this.send('subscribe', { entityType: normalizedEntityType });
-  }
-
-  on(eventName, callback) {
-    if (!this.eventHandlers[eventName]) {
-      this.eventHandlers[eventName] = [];
-    }
-
-    // Vérifier que la fonction de callback n'est pas déjà enregistrée
-    const callbackExists = this.eventHandlers[eventName].some(
-      (handler) => handler.toString() === callback.toString()
-    );
-
-    if (!callbackExists) {
-      this.eventHandlers[eventName].push(callback);
-      this.log(
-        `Nouvel écouteur pour '${eventName}'. Total: ${this.eventHandlers[eventName].length}`
-      );
+    if (!this.subscriptions.includes(normalized)) {
+      this.subscriptions.push(normalized);
+      this.log(`Ajout de l'abonnement: ${normalized}`);
     } else {
-      this.log(`Écouteur déjà enregistré pour '${eventName}'`);
+      this.log(`Déjà abonné à: ${normalized}`);
+    }
+
+    return this._subscribeType(normalized);
+  }
+
+  _normalizeType(type) {
+    return type.endsWith('s') ? type : `${type}s`;
+  }
+
+  _subscribeType(normalizedType) {
+    return this.send('subscribe', { entityType: normalizedType });
+  }
+
+  on(event, callback) {
+    if (!this.eventHandlers[event]) this.eventHandlers[event] = [];
+
+    const exists = this.eventHandlers[event].some((fn) => fn.toString() === callback.toString());
+
+    if (!exists) {
+      this.eventHandlers[event].push(callback);
+      this.log(`Ajout écouteur '${event}' (${this.eventHandlers[event].length})`);
+    } else {
+      this.log(`Écouteur déjà existant pour '${event}'`);
     }
   }
 
-  off(eventName, callback) {
-    if (!this.eventHandlers[eventName]) {
-      this.log(`Tentative de suppression d'un écouteur pour '${eventName}', mais aucun n'existe`);
+  off(event, callback) {
+    const handlers = this.eventHandlers[event];
+    if (!handlers) {
+      this.log(`Aucun écouteur à retirer pour '${event}'`);
       return;
     }
-
-    const initialCount = this.eventHandlers[eventName].length;
 
     if (callback) {
-      this.eventHandlers[eventName] = this.eventHandlers[eventName].filter(
-        (handler) => handler !== callback
-      );
+      const initialLength = handlers.length;
+      this.eventHandlers[event] = handlers.filter((fn) => fn !== callback);
       this.log(
-        `Écouteur supprimé pour '${eventName}'. Avant: ${initialCount}, Après: ${this.eventHandlers[eventName].length}`
+        `Suppression écouteur '${event}': ${initialLength} → ${this.eventHandlers[event].length}`
       );
     } else {
-      this.eventHandlers[eventName] = [];
-      this.log(`Tous les écouteurs (${initialCount}) supprimés pour '${eventName}'`);
+      this.eventHandlers[event] = [];
+      this.log(`Tous les écouteurs supprimés pour '${event}'`);
     }
   }
 
-  triggerEvent(eventName, data) {
-    if (!this.eventHandlers[eventName] || this.eventHandlers[eventName].length === 0) {
-      // Log plus discret pour les événements sans écouteurs
-      this.log(`Aucun écouteur pour l'événement '${eventName}'`);
+  _trigger(event, data) {
+    const handlers = this.eventHandlers[event];
+    if (!handlers || handlers.length === 0) {
+      this.log(`Aucun écouteur pour '${event}'`);
       return;
     }
 
-    this.log(
-      `Déclenchement de '${eventName}' pour ${this.eventHandlers[eventName].length} écouteur(s)`
-    );
+    this.log(`Déclenche '${event}' (${handlers.length} écouteur(s))`);
 
-    this.eventHandlers[eventName].forEach((callback, index) => {
+    handlers.forEach((fn, i) => {
       try {
-        callback(data);
-      } catch (error) {
-        console.error(
-          `[WS-CLIENT] Erreur dans l'écouteur #${index + 1} pour '${eventName}':`,
-          error
-        );
+        fn(data);
+      } catch (err) {
+        console.error(`[WS-CLIENT] Erreur dans l'écouteur #${i + 1} de '${event}':`, err);
       }
     });
   }
 
   disconnect() {
     if (this.socket) {
-      this.log('Déconnexion manuelle du WebSocket');
+      this.log('Déconnexion WebSocket');
       this.socket.close();
       this.socket = null;
       this.isConnected = false;
@@ -195,17 +185,17 @@ class WebSocketService {
     }
   }
 
-  // Méthode pour lister tous les écouteurs actifs (débogage)
   listAllListeners() {
-    console.log('[WS-CLIENT] Liste de tous les écouteurs enregistrés:');
+    console.log('[WS-CLIENT] Écouteurs enregistrés:');
 
-    if (Object.keys(this.eventHandlers).length === 0) {
-      console.log('- Aucun écouteur enregistré');
+    const entries = Object.entries(this.eventHandlers);
+    if (entries.length === 0) {
+      console.log('- Aucun écouteur');
       return;
     }
 
-    Object.entries(this.eventHandlers).forEach(([event, handlers]) => {
-      console.log(`- ${event}: ${handlers.length} écouteur(s)`);
+    entries.forEach(([event, fns]) => {
+      console.log(`- ${event}: ${fns.length} écouteur(s)`);
     });
 
     console.log(`Abonnements actifs: ${this.subscriptions.join(', ')}`);

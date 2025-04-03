@@ -6,7 +6,11 @@ import imageProxyService from '../../services/imageProxyService';
 export const ENTITY_CONFIG = {
   entityName: 'brand',
   apiEndpoint: '/api/brands',
-  syncEnabled: true,
+  features: {
+    sync: true,
+    images: true,
+    hierarchy: false,
+  },
   columns: [
     {
       key: 'image',
