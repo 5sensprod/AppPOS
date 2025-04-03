@@ -12,8 +12,6 @@ const InventoryTab = ({
   specialFields = {},
   hierarchicalCategories = [],
 }) => {
-  console.log('🧰 InventoryTab - specialFields reçus:', specialFields);
-
   // Si en mode lecture
   if (!editable) {
     return (
