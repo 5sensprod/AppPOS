@@ -221,10 +221,10 @@ function CategoriesTable(props) {
       searchProcessor={searchProcessor}
       onSearch={handleSearch}
       onDelete={handleDeleteEntity}
-      onSync={sync ? handleSyncEntity : undefined}
       syncEnabled={sync}
-      actions={['view', 'edit', 'delete', ...(sync ? ['sync'] : [])]}
-      batchActions={['delete', ...(sync ? ['sync'] : [])]}
+      actions={['view', 'edit', 'delete', 'sync']}
+      batchActions={['delete', 'sync']}
+      onSync={handleSyncEntity}
       pagination={{
         enabled: true,
         pageSize: 5,

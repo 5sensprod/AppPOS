@@ -12,6 +12,8 @@ import { useTableSort } from './hooks/useTableSort';
 import { useTableFilter } from './hooks/useTableFilter';
 import { useTablePagination } from './hooks/useTablePagination';
 
+// ... imports inchangés ...
+
 const EntityTable = ({
   data = [],
   isLoading = false,
@@ -21,8 +23,8 @@ const EntityTable = ({
   entityNamePlural = '',
   baseRoute = '',
   defaultSort = { field: 'name', direction: 'asc' },
-  actions = ['view', 'edit', 'delete'],
-  batchActions = ['delete'],
+  actions = ['view', 'edit', 'delete', 'sync'],
+  batchActions = ['delete', 'sync'],
   syncEnabled = false,
   pagination = {
     enabled: true,
@@ -38,20 +40,13 @@ const EntityTable = ({
   filters = [],
   searchProcessor,
 }) => {
-  // D'abord le tri
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
-
-  // Ensuite le filtrage
   const { searchTerm, activeFilters, filteredData, handleSearchChange, handleFilterChange } =
     useTableFilter(sortedData, searchFields, filters, onSearch, onFilter, searchProcessor);
-
-  // Puis la sélection
   const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(
     data,
     filteredData
   );
-
-  // Enfin la pagination
   const {
     currentPage,
     pageSize,
@@ -62,8 +57,7 @@ const EntityTable = ({
     paginationInfo,
   } = useTablePagination(filteredData, pagination);
 
-  // Handlers pour les actions
-  const handleRowClick = (item) => {};
+  const hasSync = typeof onSync === 'function';
 
   const handleBatchDelete = () => {
     if (
@@ -76,16 +70,13 @@ const EntityTable = ({
   };
 
   const handleBatchSync = () => {
-    if (syncEnabled) {
-      Promise.all(selectedItems.map((id) => onSync(id)))
-        .then(() => {
-          // Message de succès possible ici
-        })
-        .catch((err) => console.error('Erreur lors de la synchronisation par lot:', err));
+    if (hasSync) {
+      Promise.all(selectedItems.map((id) => onSync(id))).catch((err) =>
+        console.error('Erreur lors de la synchronisation par lot:', err)
+      );
     }
   };
 
-  // Affichage du chargement ou de l'erreur
   if (isLoading && data.length === 0) {
     return <LoadingState />;
   }
@@ -103,7 +94,6 @@ const EntityTable = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-      {/* Barre de recherche et filtres */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-4">
         <div className="flex flex-col sm:flex-row justify-between gap-4">
           <SearchBar
@@ -111,7 +101,6 @@ const EntityTable = ({
             onSearchChange={handleSearchChange}
             entityNamePlural={entityNamePlural}
           />
-
           {filters.length > 0 && (
             <FilterBar
               filters={filters}
@@ -122,20 +111,17 @@ const EntityTable = ({
         </div>
       </div>
 
-      {/* Actions par lot */}
       {selectedItems.length > 0 && (
         <BatchActions
           selectedItems={selectedItems}
           entityName={entityName}
           entityNamePlural={entityNamePlural}
-          batchActions={batchActions}
-          syncEnabled={syncEnabled}
+          batchActions={batchActions.filter((a) => a !== 'sync' || hasSync)}
           onBatchDelete={handleBatchDelete}
-          onBatchSync={handleBatchSync}
+          onBatchSync={hasSync ? handleBatchSync : undefined}
         />
       )}
 
-      {/* Tableau */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <TableHeader
@@ -170,13 +156,12 @@ const EntityTable = ({
                   key={item._id}
                   item={item}
                   columns={columns}
-                  actions={actions}
-                  syncEnabled={syncEnabled}
+                  actions={actions.filter((a) => a !== 'sync' || hasSync)}
                   isSelected={selectedItems.includes(item._id)}
                   onToggleSelection={toggleSelection}
-                  onRowClick={handleRowClick}
+                  onRowClick={() => {}}
                   onDelete={onDelete}
-                  onSync={onSync}
+                  onSync={hasSync ? onSync : undefined}
                   baseRoute={baseRoute}
                 />
               ))
@@ -185,7 +170,6 @@ const EntityTable = ({
         </table>
       </div>
 
-      {/* Pagination */}
       {pagination.enabled && (totalPages > 1 || filteredData.length >= 5) && (
         <Pagination
           currentPage={currentPage}

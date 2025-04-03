@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { useSupplier } from '../stores/supplierStore';
-import { useSupplierDataStore } from '../stores/supplierStore';
+import { useSupplier, useSupplierDataStore } from '../stores/supplierStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '../../../hooks/useEntityTable';
@@ -60,10 +59,10 @@ function SupplierTable(props) {
       filters={filters}
       searchFields={['name']}
       onDelete={handleDeleteEntity}
-      onSync={syncEnabled ? handleSyncEntity : undefined}
       syncEnabled={syncEnabled}
-      actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-      batchActions={['delete', ...(syncEnabled ? ['sync'] : [])]}
+      actions={['view', 'edit', 'delete', 'sync']}
+      batchActions={['delete', 'sync']}
+      onSync={handleSyncEntity}
       pagination={{
         enabled: true,
         pageSize: 5,

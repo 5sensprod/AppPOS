@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { useBrand } from '../stores/brandStore';
-import { useBrandDataStore } from '../stores/brandStore';
+import { useBrand, useBrandDataStore } from '../stores/brandStore';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
@@ -57,10 +56,10 @@ function BrandsTable(props) {
       filters={[]}
       searchFields={['name', 'description']}
       onDelete={handleDeleteEntity}
-      onSync={syncEnabled ? handleSyncEntity : undefined}
+      onSync={handleSyncEntity}
       syncEnabled={syncEnabled}
-      actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-      batchActions={['delete', ...(syncEnabled ? ['sync'] : [])]}
+      actions={['view', 'edit', 'delete', 'sync']}
+      batchActions={['delete', 'sync']}
       pagination={{
         enabled: true,
         pageSize: 5,

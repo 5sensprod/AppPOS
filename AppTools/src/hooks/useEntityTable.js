@@ -2,30 +2,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
-  // État
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // Référence pour suivre si une opération est en cours
   const operationInProgress = useRef(false);
 
-  // Référence pour stocker les fonctions pour éviter les problèmes de dépendances
   const functionsRef = useRef({
     fetchEntities,
     deleteEntity,
     syncEntity,
   });
 
-  // Mettre à jour les références si les fonctions changent
   useEffect(() => {
-    functionsRef.current = {
-      fetchEntities,
-      deleteEntity,
-      syncEntity,
-    };
+    functionsRef.current = { fetchEntities, deleteEntity, syncEntity };
   }, [fetchEntities, deleteEntity, syncEntity]);
 
-  // Fonction pour exécuter une opération avec gestion des états
   const executeOperation = useCallback(async (operation) => {
     if (operationInProgress.current) return;
     operationInProgress.current = true;
@@ -43,39 +33,24 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
     }
   }, []);
 
-  // Fonction pour charger les données avec gestion des erreurs
   const loadEntities = useCallback(() => {
     return executeOperation(async () => {
       if (typeof functionsRef.current.fetchEntities === 'function') {
         await functionsRef.current.fetchEntities();
-      } else {
-        console.warn("fetchEntities n'est pas une fonction");
       }
     });
   }, [executeOperation]);
 
-  // Chargement initial des données
   useEffect(() => {
-    let shouldLoad = true;
-    if (shouldLoad && typeof functionsRef.current.fetchEntities === 'function') {
-      loadEntities();
-    }
-    return () => {
-      shouldLoad = false;
-    };
+    loadEntities();
   }, [loadEntities]);
 
-  // Gestion de la suppression
   const handleDeleteEntity = useCallback(
     async (id) => {
-      if (!functionsRef.current.deleteEntity) {
-        console.warn("deleteEntity n'est pas défini");
-        return;
-      }
+      if (!functionsRef.current.deleteEntity) return;
 
       return executeOperation(async () => {
         await functionsRef.current.deleteEntity(id);
-        // Rafraîchir seulement si fetchEntities est une fonction
         if (typeof functionsRef.current.fetchEntities === 'function') {
           await functionsRef.current.fetchEntities();
         }
@@ -84,17 +59,12 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
     [executeOperation]
   );
 
-  // Gestion de la synchronisation
   const handleSyncEntity = useCallback(
     async (id) => {
-      if (!functionsRef.current.syncEntity) {
-        console.warn("syncEntity n'est pas défini");
-        return;
-      }
+      if (!functionsRef.current.syncEntity) return;
 
       return executeOperation(async () => {
         await functionsRef.current.syncEntity(id);
-        // Rafraîchir seulement si fetchEntities est une fonction
         if (typeof functionsRef.current.fetchEntities === 'function') {
           await functionsRef.current.fetchEntities();
         }
@@ -108,7 +78,7 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
     error,
     loadEntities,
     handleDeleteEntity,
-    handleSyncEntity,
+    ...(syncEntity && { handleSyncEntity }), // clé conditionnelle
     executeOperation,
     operationInProgress: operationInProgress.current,
   };

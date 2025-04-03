@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useProduct } from '../stores/productStore';
-import { useProductDataStore } from '../stores/productStore';
+import { useProduct, useProductDataStore } from '../stores/productStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
@@ -87,10 +86,10 @@ function ProductTable(props) {
       filters={filters}
       searchFields={['name', 'sku']}
       onDelete={handleDeleteEntity}
-      onSync={syncEnabled ? handleSyncEntity : undefined}
       syncEnabled={syncEnabled}
-      actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-      batchActions={['delete', ...(syncEnabled ? ['sync'] : [])]}
+      actions={['view', 'edit', 'delete', 'sync']}
+      batchActions={['delete', 'sync']}
+      onSync={handleSyncEntity}
       pagination={{
         enabled: true,
         pageSize: 10,
