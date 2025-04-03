@@ -1,6 +1,4 @@
-//AppServe\models\base\BaseModel.js
 const path = require('path');
-const fs = require('fs/promises');
 
 class BaseModel {
   constructor(collection, imageFolder) {
@@ -11,60 +9,48 @@ class BaseModel {
     this.imageFolder = imageFolder;
   }
 
-  create(data) {
+  // 🔁 Méthode utilitaire DRY pour éviter la répétition des callbacks
+  promisifyCall(method, ...args) {
     return new Promise((resolve, reject) => {
-      this.collection.insert(data, (err, newDoc) => {
+      method.call(this.collection, ...args, (err, result) => {
         if (err) reject(err);
-        resolve(newDoc);
+        else resolve(result);
       });
     });
+  }
+
+  // 🧱 Méthode extensible par les classes enfants
+  getDefaultValues() {
+    return {};
+  }
+
+  // 🔨 CRUD standard avec support de valeurs par défaut
+  async create(data) {
+    const toInsert = { ...this.getDefaultValues(), ...data };
+    return this.promisifyCall(this.collection.insert, toInsert);
   }
 
   findAll() {
-    return new Promise((resolve, reject) => {
-      this.collection.find({}, (err, docs) => {
-        if (err) reject(err);
-        resolve(docs);
-      });
-    });
+    return this.promisifyCall(this.collection.find, {});
+  }
+
+  find(query = {}) {
+    return this.promisifyCall(this.collection.find, query);
   }
 
   findById(id) {
-    return new Promise((resolve, reject) => {
-      this.collection.findOne({ _id: id }, (err, doc) => {
-        if (err) reject(err);
-        resolve(doc);
-      });
-    });
+    return this.promisifyCall(this.collection.findOne, { _id: id });
   }
 
   update(id, updateData) {
-    return new Promise((resolve, reject) => {
-      this.collection.update({ _id: id }, { $set: updateData }, {}, (err, numReplaced) => {
-        if (err) reject(err);
-        resolve(numReplaced);
-      });
-    });
+    return this.promisifyCall(this.collection.update, { _id: id }, { $set: updateData }, {});
   }
 
   async delete(id) {
-    try {
-      const entity = await this.findById(id);
-      if (!entity) return 0;
+    const entity = await this.findById(id);
+    if (!entity) return 0;
 
-      // Plus besoin de la gestion d'image ici car déplacée dans BaseController
-      return new Promise((resolve, reject) => {
-        this.collection.remove({ _id: id }, {}, (err, numRemoved) => {
-          if (err) {
-            console.error('Erreur suppression:', err);
-            reject(err);
-          }
-          resolve(numRemoved);
-        });
-      });
-    } catch (error) {
-      throw error;
-    }
+    return this.promisifyCall(this.collection.remove, { _id: id }, {});
   }
 }
 

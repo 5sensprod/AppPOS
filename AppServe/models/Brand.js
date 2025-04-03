@@ -1,4 +1,3 @@
-// Modification de Brand.js
 const BaseModel = require('./base/BaseModel');
 const db = require('../config/database');
 
@@ -7,53 +6,31 @@ class Brand extends BaseModel {
     super(db.brands, 'brands');
   }
 
-  // Méthodes spécifiques aux marques
+  // 🎁 Valeurs par défaut injectées dans BaseModel.create()
+  getDefaultValues() {
+    return {
+      woo_id: null,
+      last_sync: null,
+      products_count: 0,
+    };
+  }
+
   async findBySupplier(supplierId) {
-    return new Promise((resolve, reject) => {
-      this.collection.find({ supplier_id: supplierId }, (err, docs) => {
-        if (err) reject(err);
-        resolve(docs);
-      });
-    });
+    return this.promisifyCall(this.collection.find, { supplier_id: supplierId });
   }
 
-  async create(data) {
-    return new Promise((resolve, reject) => {
-      this.collection.insert(
-        {
-          ...data,
-          woo_id: null,
-          last_sync: null,
-          products_count: 0, // Initialiser le compteur à 0
-        },
-        (err, newDoc) => {
-          if (err) reject(err);
-          resolve(newDoc);
-        }
-      );
-    });
-  }
-
-  // Nouvelle méthode pour mettre à jour le compteur
+  // 🧮 Met à jour le compteur de produits pour une marque
   async updateProductCount(brandId) {
     return new Promise((resolve, reject) => {
-      // 1. Compter les produits associés à cette marque
       db.products.count({ brand_id: brandId }, (err, count) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+        if (err) return reject(err);
 
-        // 2. Mettre à jour le document de la marque
         this.collection.update(
           { _id: brandId },
           { $set: { products_count: count } },
           {},
           (updateErr) => {
-            if (updateErr) {
-              reject(updateErr);
-              return;
-            }
+            if (updateErr) return reject(updateErr);
             resolve(count);
           }
         );
@@ -61,24 +38,15 @@ class Brand extends BaseModel {
     });
   }
 
-  // Méthode pour calculer les compteurs pour toutes les marques
   async recalculateAllProductCounts() {
-    return new Promise(async (resolve, reject) => {
-      try {
-        // Récupérer toutes les marques
-        const brands = await this.findAll();
-
-        // Pour chaque marque, calculer et mettre à jour le compteur
-        const updatePromises = brands.map((brand) => this.updateProductCount(brand._id));
-
-        // Attendre que toutes les mises à jour soient terminées
-        await Promise.all(updatePromises);
-
-        resolve(true);
-      } catch (error) {
-        reject(error);
-      }
-    });
+    try {
+      const brands = await this.findAll();
+      const updatePromises = brands.map((brand) => this.updateProductCount(brand._id));
+      await Promise.all(updatePromises);
+      return true;
+    } catch (error) {
+      throw error;
+    }
   }
 }
 
