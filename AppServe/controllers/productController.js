@@ -226,6 +226,34 @@ class ProductController extends BaseController {
       const brandId = existingProduct.brand_id;
       const supplierId = existingProduct.supplier_id;
 
+      // Supprimer sur WooCommerce si le produit est synchronisé
+      if (existingProduct.woo_id) {
+        try {
+          // Suppression des images
+          if (existingProduct.image?.wp_id) {
+            await this.wooCommerceService.client.deleteMedia(existingProduct.image.wp_id);
+          }
+          if (existingProduct.gallery_images?.length) {
+            for (const image of existingProduct.gallery_images) {
+              if (image.wp_id) {
+                await this.wooCommerceService.client.deleteMedia(image.wp_id);
+              }
+            }
+          }
+          // Suppression du produit
+          await this.wooCommerceService.client.delete(`products/${existingProduct.woo_id}`, {
+            force: true,
+          });
+          console.log(`Produit ${existingProduct._id} supprimé de WooCommerce`);
+        } catch (error) {
+          console.error(`Erreur lors de la suppression sur WooCommerce:`, error);
+          // On continue malgré l'erreur pour supprimer en local
+        }
+      }
+
+      // Supprimer les images associées
+      await this.handleImageDeletion(existingProduct);
+
       // Supprimer le produit
       await this.model.delete(req.params.id);
 
