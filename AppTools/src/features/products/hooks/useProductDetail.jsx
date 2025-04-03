@@ -151,7 +151,36 @@ export function useProductDetail() {
   );
 
   const handleSubmit = async (data) => {
-    /* logique de soumission ici, identique à avant */
+    setLoading(true);
+    setError(null);
+    try {
+      const processed = preprocessProductData(data, {
+        brands: relatedData.brands,
+        suppliers: relatedData.suppliers,
+        categories: hierarchicalCategories,
+      });
+
+      if (isNew) {
+        const created = await createProduct(processed);
+        const newId = extractProductId(created);
+        if (!newId) throw new Error("Impossible de récupérer l'ID du produit créé");
+        setCurrentId(newId);
+        setSuccess('Produit créé avec succès');
+        const newProduct = await getProductById(newId);
+        setProduct(newProduct);
+        navigate(`/products/${newId}`, { replace: true });
+      } else {
+        const id = currentId || paramId;
+        await updateProduct(id, processed);
+        setSuccess('Produit mis à jour avec succès');
+        const updated = await getProductById(id);
+        setProduct(updated);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderTabContent = (entity, activeTab, formProps = {}) => {
