@@ -1,27 +1,28 @@
-// src/features/brands/components/BrandsTable.jsx
 import React, { useEffect } from 'react';
-import { useBrand, useBrandExtras } from '../stores/brandStore';
+import { useBrand } from '../stores/brandStore';
 import { useBrandDataStore } from '../stores/brandStore';
 import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function BrandsTable(props) {
-  const { deleteBrand } = useBrand();
-  const { syncBrand } = useBrandExtras();
+  const { deleteBrand, syncBrand } = useBrand();
 
-  // Utiliser le store de données standard (non-hiérarchique)
   const { brands, loading: brandsLoading, fetchBrands, initWebSocket } = useBrandDataStore();
 
-  // Initialiser les WebSockets et charger les données si nécessaire
+  const { sync: syncEnabled } = ENTITY_CONFIG.features;
+
+  // Initialiser les WebSockets uniquement si le sync est activé
   useEffect(() => {
-    initWebSocket();
+    if (syncEnabled) {
+      initWebSocket();
+    }
+
     if (brands.length === 0) {
       fetchBrands();
     }
-  }, [initWebSocket, fetchBrands, brands.length]);
+  }, [initWebSocket, fetchBrands, brands.length, syncEnabled]);
 
-  // Utilisation du hook useEntityTable sans les abonnements WebSocket
   const {
     loading: operationLoading,
     error,
@@ -32,19 +33,17 @@ function BrandsTable(props) {
     fetchEntities: fetchBrands,
     deleteEntity: async (id) => {
       await deleteBrand(id);
-      // Le refresh se fera automatiquement via les événements WebSocket
+      // Pas besoin de refetch si WebSocket actif
     },
-    syncEntity: async (id) => {
-      await syncBrand(id);
-      // Le refresh se fera automatiquement via les événements WebSocket
-    },
+    syncEntity: syncEnabled
+      ? async (id) => {
+          await syncBrand(id);
+          // Pas besoin de refetch si WebSocket actif
+        }
+      : undefined,
   });
 
-  // Combinaison de l'état de chargement du store et des opérations
   const isLoading = brandsLoading || operationLoading;
-
-  // Configuration des filtres si nécessaire
-  const filters = [];
 
   return (
     <EntityTable
@@ -55,13 +54,13 @@ function BrandsTable(props) {
       entityName="marque"
       entityNamePlural="marques"
       baseRoute="/products/brands"
-      filters={filters}
+      filters={[]}
       searchFields={['name', 'description']}
       onDelete={handleDeleteEntity}
-      onSync={handleSyncEntity}
-      syncEnabled={ENTITY_CONFIG.syncEnabled}
-      actions={['view', 'edit', 'delete', 'sync']}
-      batchActions={['delete', 'sync']}
+      onSync={syncEnabled ? handleSyncEntity : undefined}
+      syncEnabled={syncEnabled}
+      actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
+      batchActions={['delete', ...(syncEnabled ? ['sync'] : [])]}
       pagination={{
         enabled: true,
         pageSize: 5,

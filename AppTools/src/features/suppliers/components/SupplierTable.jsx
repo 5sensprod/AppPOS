@@ -1,4 +1,3 @@
-// src/features/suppliers/components/SupplierTable.jsx
 import React, { useEffect } from 'react';
 import { useSupplier } from '../stores/supplierStore';
 import { useSupplierDataStore } from '../stores/supplierStore';
@@ -8,8 +7,6 @@ import { useEntityTable } from '../../../hooks/useEntityTable';
 
 function SupplierTable(props) {
   const { deleteSupplier } = useSupplier();
-
-  // Utiliser le store dédié (non-hiérarchique)
   const {
     suppliers,
     loading: suppliersLoading,
@@ -17,36 +14,38 @@ function SupplierTable(props) {
     initWebSocket,
   } = useSupplierDataStore();
 
-  // Initialiser les WebSockets et charger les données si nécessaire
-  useEffect(() => {
-    // Initialiser les écouteurs WebSocket
-    initWebSocket();
+  const { sync: syncEnabled } = ENTITY_CONFIG.features;
 
-    // Charger les fournisseurs seulement s'ils ne sont pas déjà chargés
+  useEffect(() => {
+    if (syncEnabled) {
+      initWebSocket();
+    }
+
     if (suppliers.length === 0) {
       fetchSuppliers();
     }
-  }, [initWebSocket, fetchSuppliers, suppliers.length]);
+  }, [initWebSocket, fetchSuppliers, suppliers.length, syncEnabled]);
 
-  // Utilisation du hook useEntityTable sans les abonnements WebSocket
   const {
     loading: operationLoading,
     error,
     handleDeleteEntity,
+    handleSyncEntity,
   } = useEntityTable({
     entityType: 'supplier',
     fetchEntities: fetchSuppliers,
     deleteEntity: async (id) => {
       await deleteSupplier(id);
-      // Le refresh se fera automatiquement via les événements WebSocket
     },
-    syncEntity: null, // Les fournisseurs n'ont pas de synchronisation (syncEnabled: false)
+    syncEntity: syncEnabled
+      ? async (id) => {
+          /* À implémenter si un jour le sync est dispo */
+        }
+      : undefined,
   });
 
-  // Combinaison de l'état de chargement du store et des opérations
   const isLoading = suppliersLoading || operationLoading;
 
-  // Configuration des filtres
   const filters = [];
 
   return (
@@ -61,10 +60,10 @@ function SupplierTable(props) {
       filters={filters}
       searchFields={['name']}
       onDelete={handleDeleteEntity}
-      onSync={null} // Pas de synchronisation pour les fournisseurs
-      syncEnabled={ENTITY_CONFIG.syncEnabled}
-      actions={['view', 'edit', 'delete']} // Retrait de 'sync' car non applicable
-      batchActions={['delete']} // Retrait de 'sync' car non applicable
+      onSync={syncEnabled ? handleSyncEntity : undefined}
+      syncEnabled={syncEnabled}
+      actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
+      batchActions={['delete', ...(syncEnabled ? ['sync'] : [])]}
       pagination={{
         enabled: true,
         pageSize: 5,

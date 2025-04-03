@@ -1,4 +1,3 @@
-// src/features/categories/components/CategoriesTable.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useCategory } from '../stores/categoryStore';
 import { useHierarchicalCategories } from '../stores/categoryHierarchyStore';
@@ -8,10 +7,10 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function CategoriesTable(props) {
-  // Récupérer les fonctions du store
   const { deleteCategory, syncCategory } = useCategory();
+  const { sync, hierarchy } = ENTITY_CONFIG.features;
 
-  // Accéder au store hiérarchique
+  // Hiérarchie activée
   const {
     hierarchicalCategories,
     loading: hierarchicalLoading,
@@ -20,63 +19,48 @@ function CategoriesTable(props) {
     debugListeners,
   } = useHierarchicalCategories();
 
-  // États locaux pour le composant
   const [expandedCategories, setExpandedCategories] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [initialized, setInitialized] = useState(false);
 
-  // Initialiser les WebSockets et charger les données au montage du composant
+  // Initialisation conditionnelle
   useEffect(() => {
-    console.log('[CATEGORIES_TABLE] Montage du composant');
+    if (hierarchy) {
+      const cleanup = sync ? initWebSocketListeners() : undefined;
+      fetchHierarchicalCategories();
 
-    // Initialiser les écouteurs WebSocket une seule fois
-    const cleanupListeners = initWebSocketListeners();
-
-    // Charger les données initiales
-    fetchHierarchicalCategories();
-
-    // Afficher l'état des écouteurs pour débogage
-    setTimeout(() => {
-      debugListeners();
-    }, 1000);
-
-    // Nettoyer les écouteurs lors du démontage
-    return () => {
-      console.log('[CATEGORIES_TABLE] Démontage du composant');
-      if (typeof cleanupListeners === 'function') {
-        cleanupListeners();
+      if (sync) {
+        setTimeout(() => debugListeners?.(), 1000);
       }
-    };
-  }, []);
 
-  // Fonction pour rafraîchir les données
+      return () => {
+        if (typeof cleanup === 'function') {
+          cleanup();
+        }
+      };
+    }
+  }, [hierarchy, sync, initWebSocketListeners, fetchHierarchicalCategories, debugListeners]);
+
   const refreshCategories = useCallback(() => {
-    console.log('[CATEGORIES_TABLE] Rafraîchissement manuel des catégories');
-    return fetchHierarchicalCategories();
-  }, [fetchHierarchicalCategories]);
+    if (hierarchy) {
+      return fetchHierarchicalCategories();
+    }
+  }, [fetchHierarchicalCategories, hierarchy]);
 
-  // Utilisation du hook useEntityTable
   const {
     loading: operationLoading,
     error,
     executeOperation,
   } = useEntityTable({
     deleteEntity: deleteCategory,
-    syncEntity: syncCategory,
+    syncEntity: sync ? syncCategory : undefined,
   });
 
-  // Gestionnaires d'actions personnalisés
   const handleDeleteEntity = useCallback(
     async (id) => {
-      if (!window.confirm(`Êtes-vous sûr de vouloir supprimer cette catégorie ?`)) {
-        return;
-      }
-
+      if (!window.confirm(`Êtes-vous sûr de vouloir supprimer cette catégorie ?`)) return;
       return executeOperation(async () => {
         await deleteCategory(id);
-        // Le rafraîchissement devrait se faire automatiquement via WebSocket,
-        // mais on le force au cas où
-        await refreshCategories();
+        await refreshCategories?.();
       });
     },
     [executeOperation, deleteCategory, refreshCategories]
@@ -86,15 +70,12 @@ function CategoriesTable(props) {
     async (id) => {
       return executeOperation(async () => {
         await syncCategory(id);
-        // Le rafraîchissement devrait se faire automatiquement via WebSocket,
-        // mais on le force au cas où
-        await refreshCategories();
+        await refreshCategories?.();
       });
     },
     [executeOperation, syncCategory, refreshCategories]
   );
 
-  // Fonction pour développer/replier une catégorie
   const toggleCategory = useCallback((categoryId) => {
     setExpandedCategories((prev) => ({
       ...prev,
@@ -102,12 +83,10 @@ function CategoriesTable(props) {
     }));
   }, []);
 
-  // Gestionnaire de recherche
   const handleSearch = useCallback((value) => {
     setSearchTerm(value);
   }, []);
 
-  // Fonction flattenHierarchy améliorée pour CategoriesTable.jsx
   const flattenHierarchy = useCallback(
     (categories, level = 0, parentExpanded = true, parentIndex = '', parentId = null) => {
       if (!categories) return [];
@@ -116,16 +95,14 @@ function CategoriesTable(props) {
 
       categories.forEach((category, index) => {
         const isExpanded = expandedCategories[category._id] || false;
-        const hasChildren = category.children && category.children.length > 0;
+        const hasChildren = category.children?.length > 0;
         const isVisible = level === 0 || parentExpanded;
 
-        // Créer un index hiérarchique sous forme de chaîne pour garantir l'ordre parent-enfant
         const hierarchyIndex = parentIndex
           ? `${parentIndex}.${String(index).padStart(3, '0')}`
           : `${String(index).padStart(3, '0')}`;
 
         if (isVisible) {
-          // Créer l'élément nom avec indentation et icône d'expansion
           const indentedName = (
             <div className="flex items-center">
               <div style={{ width: `${level * 16}px` }} className="flex-shrink-0"></div>
@@ -155,29 +132,22 @@ function CategoriesTable(props) {
             </div>
           );
 
-          // Ajouter la catégorie avec des métadonnées pour le tri
           result.push({
             ...category,
             name: indentedName,
             _originalName: category.name,
             _level: level,
-            _childrenCount: hasChildren ? category.children.length : 0,
+            _childrenCount: category.children?.length || 0,
             product_count: category.productCount || 0,
             _sortIndex: index,
-            _hierarchyIndex: hierarchyIndex, // Index hiérarchique pour le tri
-            _parentId: parentId, // ID du parent pour référence
+            _hierarchyIndex: hierarchyIndex,
+            _parentId: parentId,
           });
 
-          // Ajouter récursivement les enfants si la catégorie est développée
           if (hasChildren && isExpanded) {
-            const childrenResult = flattenHierarchy(
-              category.children,
-              level + 1,
-              true,
-              hierarchyIndex,
-              category._id
+            result = result.concat(
+              flattenHierarchy(category.children, level + 1, true, hierarchyIndex, category._id)
             );
-            result = result.concat(childrenResult);
           }
         }
       });
@@ -186,31 +156,23 @@ function CategoriesTable(props) {
     },
     [expandedCategories, toggleCategory]
   );
-  // Processeur de recherche personnalisé
+
   const searchProcessor = useCallback(
     (items, term) => {
       if (!term) return items;
 
-      const lowerSearchTerm = term.toLowerCase();
+      const lowerTerm = term.toLowerCase();
 
-      // Fonction récursive pour rechercher dans la hiérarchie
       const searchInHierarchy = (cats, results = []) => {
-        if (!cats) return results;
-
-        cats.forEach((cat) => {
-          if (!cat || !cat.name) return;
-
-          const nameMatch = cat.name.toLowerCase().includes(lowerSearchTerm);
-          const descMatch =
-            cat.description && cat.description.toLowerCase().includes(lowerSearchTerm);
-
-          if (nameMatch || descMatch) {
-            // Formater l'entrée pour l'affichage
+        cats?.forEach((cat) => {
+          if (
+            cat.name?.toLowerCase().includes(lowerTerm) ||
+            cat.description?.toLowerCase().includes(lowerTerm)
+          ) {
             results.push({
               ...cat,
               name: (
                 <div className="flex items-center">
-                  <div style={{ width: `${0}px` }} className="flex-shrink-0"></div>
                   <span className="truncate text-gray-900 dark:text-gray-100">{cat.name}</span>
                 </div>
               ),
@@ -220,8 +182,7 @@ function CategoriesTable(props) {
             });
           }
 
-          // Rechercher dans les enfants
-          if (cat.children && cat.children.length > 0) {
+          if (cat.children?.length) {
             searchInHierarchy(cat.children, results);
           }
         });
@@ -234,53 +195,45 @@ function CategoriesTable(props) {
     [hierarchicalCategories]
   );
 
-  // Traiter les données pour l'affichage
   const processedData = useMemo(() => {
-    if (!hierarchicalCategories || hierarchicalCategories.length === 0) return [];
+    if (!hierarchicalCategories?.length) return [];
 
-    // Si une recherche est active, utiliser le processeur de recherche
-    if (searchTerm && searchTerm.length > 0) {
+    if (searchTerm) {
       return searchProcessor([], searchTerm);
     }
 
-    // Aplatir la hiérarchie pour l'affichage
     return flattenHierarchy(hierarchicalCategories);
   }, [hierarchicalCategories, searchTerm, flattenHierarchy, searchProcessor]);
 
-  const filters = [];
-
-  // Combinaison de l'état de chargement du store et des opérations
   const isLoading = hierarchicalLoading || operationLoading;
 
   return (
-    <>
-      <EntityTable
-        data={processedData}
-        isLoading={isLoading}
-        error={error}
-        columns={ENTITY_CONFIG.columns}
-        entityName="catégorie"
-        entityNamePlural="catégories"
-        baseRoute="/products/categories"
-        filters={filters}
-        searchFields={['_originalName', 'description']}
-        searchProcessor={searchProcessor}
-        onSearch={handleSearch}
-        onDelete={handleDeleteEntity}
-        onSync={handleSyncEntity}
-        syncEnabled={ENTITY_CONFIG.syncEnabled}
-        actions={['view', 'edit', 'delete', 'sync']}
-        batchActions={['delete', 'sync']}
-        pagination={{
-          enabled: true,
-          pageSize: 5,
-          showPageSizeOptions: true,
-          pageSizeOptions: [5, 10, 25, 50],
-        }}
-        defaultSort={ENTITY_CONFIG.defaultSort}
-        {...props}
-      />
-    </>
+    <EntityTable
+      data={processedData}
+      isLoading={isLoading}
+      error={error}
+      columns={ENTITY_CONFIG.columns}
+      entityName="catégorie"
+      entityNamePlural="catégories"
+      baseRoute="/products/categories"
+      filters={[]}
+      searchFields={['_originalName', 'description']}
+      searchProcessor={searchProcessor}
+      onSearch={handleSearch}
+      onDelete={handleDeleteEntity}
+      onSync={sync ? handleSyncEntity : undefined}
+      syncEnabled={sync}
+      actions={['view', 'edit', 'delete', ...(sync ? ['sync'] : [])]}
+      batchActions={['delete', ...(sync ? ['sync'] : [])]}
+      pagination={{
+        enabled: true,
+        pageSize: 5,
+        showPageSizeOptions: true,
+        pageSizeOptions: [5, 10, 25, 50],
+      }}
+      defaultSort={ENTITY_CONFIG.defaultSort}
+      {...props}
+    />
   );
 }
 

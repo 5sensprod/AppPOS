@@ -1,4 +1,3 @@
-// src/features/products/components/ProductTable.jsx
 import React, { useState, useEffect } from 'react';
 import { useProduct } from '../stores/productStore';
 import { useProductDataStore } from '../stores/productStore';
@@ -7,10 +6,7 @@ import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 
 function ProductTable(props) {
-  // Récupérer les fonctions du store avec syncProduct explicitement
   const { deleteProduct, syncProduct } = useProduct();
-
-  // Utiliser le nouveau store dédié
   const {
     products,
     loading: productsLoading,
@@ -19,28 +15,26 @@ function ProductTable(props) {
     initWebSocket,
   } = useProductDataStore();
 
-  // États locaux pour les produits
+  const { sync: syncEnabled } = ENTITY_CONFIG.features;
+
   const [localProducts, setLocalProducts] = useState([]);
   const [error, setError] = useState(null);
 
-  // Initialiser les WebSockets et charger les données si nécessaire
   useEffect(() => {
-    // Initialiser les écouteurs WebSocket
-    initWebSocket();
+    if (syncEnabled) {
+      initWebSocket();
+    }
 
-    // Charger les produits seulement s'ils ne sont pas déjà chargés
     if (products.length === 0) {
       fetchProducts();
     }
-  }, [initWebSocket, fetchProducts, products.length]);
+  }, [initWebSocket, fetchProducts, products.length, syncEnabled]);
 
-  // Mettre à jour l'état local lorsque les produits ou les erreurs changent
   useEffect(() => {
     setLocalProducts(products || []);
     setError(productsError);
   }, [products, productsError]);
 
-  // Utilisation du hook useEntityTable sans les abonnements WebSocket
   const {
     loading: operationLoading,
     handleDeleteEntity,
@@ -51,27 +45,23 @@ function ProductTable(props) {
     deleteEntity: async (id) => {
       console.log(`🗑️ Suppression du produit #${id}`);
       await deleteProduct(id);
-      // Le refresh se fera automatiquement via les événements WebSocket
     },
-    syncEntity: async (id) => {
-      // Utiliser la fonction syncProduct explicitement
-      console.log(`🔄 Début de synchronisation du produit #${id}`);
-      try {
-        await syncProduct(id);
-        console.log(`✅ Fin de synchronisation du produit #${id}`);
-      } catch (error) {
-        console.error(`❌ Erreur lors de la synchronisation:`, error);
-        throw error;
-      }
-      // Le refresh se fera automatiquement via les événements WebSocket
-    },
-    // Ne pas spécifier de customEventHandlers pour éviter les abonnements doublons
+    syncEntity: syncEnabled
+      ? async (id) => {
+          console.log(`🔄 Début de synchronisation du produit #${id}`);
+          try {
+            await syncProduct(id);
+            console.log(`✅ Fin de synchronisation du produit #${id}`);
+          } catch (error) {
+            console.error(`❌ Erreur lors de la synchronisation:`, error);
+            throw error;
+          }
+        }
+      : undefined,
   });
 
-  // Combinaison de l'état de chargement
   const isLoading = productsLoading || operationLoading;
 
-  // Configuration des filtres (spécifique à ce composant)
   const filters = [
     {
       id: 'status',
@@ -97,10 +87,10 @@ function ProductTable(props) {
       filters={filters}
       searchFields={['name', 'sku']}
       onDelete={handleDeleteEntity}
-      onSync={handleSyncEntity}
-      syncEnabled={ENTITY_CONFIG.syncEnabled}
-      actions={['view', 'edit', 'delete', 'sync']}
-      batchActions={['delete', 'sync']}
+      onSync={syncEnabled ? handleSyncEntity : undefined}
+      syncEnabled={syncEnabled}
+      actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
+      batchActions={['delete', ...(syncEnabled ? ['sync'] : [])]}
       pagination={{
         enabled: true,
         pageSize: 10,
