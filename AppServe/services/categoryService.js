@@ -1,8 +1,9 @@
-// services/categoryService.js
 const Category = require('../models/Category');
 const Product = require('../models/Product');
+const { getEntityEventService } = require('../services/events/entityEvents');
 const { calculateLevel } = require('../utils/categoryHelpers');
 
+// ------- EXISTANT -------
 async function hasChildren(categoryId) {
   const allCategories = await Category.findAll();
   return allCategories.some((cat) => cat.parent_id === categoryId);
@@ -91,10 +92,69 @@ function buildCategoryTree(allCategories, allProducts) {
   return rootCategories;
 }
 
+// ------- MÉTIER : create/update/delete --------
+async function createCategory(data) {
+  if (data.parent_id) {
+    data.level = await calculateLevel(data.parent_id);
+  } else {
+    data.level = 0;
+  }
+
+  const newCategory = await Category.create(data);
+  const categoryEvents = getEntityEventService('categories');
+  categoryEvents.created(newCategory);
+  return newCategory;
+}
+
+async function updateCategory(id, data) {
+  const category = await Category.findById(id);
+  if (!category) throw new Error('Catégorie introuvable');
+
+  if (data.parent_id && data.parent_id !== category.parent_id) {
+    data.level = await calculateLevel(data.parent_id);
+  }
+
+  if (category.woo_id) data.pending_sync = true;
+
+  await Category.update(id, data);
+  const updated = await Category.findById(id);
+
+  getEntityEventService('categories').updated(id, updated);
+  return updated;
+}
+
+async function deleteCategory(category) {
+  const { _id, woo_id } = category;
+  const categoryEvents = getEntityEventService('categories');
+
+  const hasChildrenCat = await hasChildren(_id);
+  if (hasChildrenCat) {
+    throw new Error(`Impossible de supprimer la catégorie : des sous-catégories existent`);
+  }
+
+  const linkedProducts = await getLinkedProducts(_id);
+  if (linkedProducts.length > 0) {
+    throw new Error(`Impossible de supprimer : ${linkedProducts.length} produit(s) lié(s)`);
+  }
+
+  await removeCategoryFromProducts(_id);
+  await Category.delete(_id);
+
+  categoryEvents.deleted(_id);
+  return {
+    message: 'Catégorie supprimée avec succès',
+    woo_status: woo_id ? 'synchronized' : 'not_applicable',
+  };
+}
+
+// ------- EXPORT -------
 module.exports = {
   calculateLevel,
   hasChildren,
   getLinkedProducts,
   removeCategoryFromProducts,
   buildCategoryTree,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 };

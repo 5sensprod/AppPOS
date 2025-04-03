@@ -22,8 +22,6 @@ class BrandWooCommerceService {
         return await this.strategy.handleFullSync(this.client, results);
       }
 
-      const brands = Array.isArray(input) ? input : [input];
-
       return await this.strategy.syncEntityList(
         input,
         Brand,
@@ -32,14 +30,6 @@ class BrandWooCommerceService {
         results,
         'brand'
       );
-
-      return {
-        success: true,
-        data: Array.isArray(input)
-          ? await Promise.all(brands.map((b) => Brand.findById(b._id)))
-          : [await Brand.findById(input._id)],
-        ...results,
-      };
     } catch (error) {
       console.error('Sync error:', error);
       return {

@@ -1,14 +1,12 @@
-// controllers/categoryController.js
 const BaseController = require('./base/BaseController');
 const Category = require('../models/Category');
 const categoryWooCommerceService = require('../services/CategoryWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
 const {
-  calculateLevel,
-  hasChildren,
-  getLinkedProducts,
-  removeCategoryFromProducts,
   buildCategoryTree,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 } = require('../services/categoryService');
 const { getEntityEventService } = require('../services/events/entityEvents');
 
@@ -23,48 +21,29 @@ class CategoryController extends BaseController {
 
   async create(req, res) {
     try {
-      if (req.body.parent_id) {
-        req.body.level = await calculateLevel(req.body.parent_id);
-      } else {
-        req.body.level = 0;
-      }
-
-      const newCategory = await this.model.create(req.body);
-      this.eventService.created(newCategory);
-
-      const syncResult = await this.syncIfNeeded([newCategory], res);
+      const category = await createCategory(req.body);
+      const syncResult = await this.syncIfNeeded([category], res);
       if (syncResult) return syncResult;
 
-      return ResponseHandler.created(res, newCategory);
+      return ResponseHandler.created(res, category);
     } catch (error) {
-      console.error('[WS-DEBUG] Erreur dans create() de categoryController:', error);
+      console.error('[CategoryController] Erreur create:', error);
       return ResponseHandler.error(res, error);
     }
   }
 
   async update(req, res) {
     try {
-      const category = await this.getByIdOr404(req.params.id, res);
-      if (!category) return;
+      const existing = await this.getByIdOr404(req.params.id, res);
+      if (!existing) return;
 
-      if (req.body.parent_id && req.body.parent_id !== category.parent_id) {
-        req.body.level = await calculateLevel(req.body.parent_id);
-      }
-
-      const updateData = { ...req.body };
-      if (category.woo_id) updateData.pending_sync = true;
-
-      await this.model.update(req.params.id, updateData);
-      const updatedItem = await this.model.findById(req.params.id);
-
-      this.eventService.updated(req.params.id, updatedItem);
-
-      const syncResult = await this.syncIfNeeded([updatedItem], res);
+      const updated = await updateCategory(req.params.id, req.body);
+      const syncResult = await this.syncIfNeeded([updated], res);
       if (syncResult) return syncResult;
 
-      return ResponseHandler.success(res, updatedItem);
+      return ResponseHandler.success(res, updated);
     } catch (error) {
-      console.error('[WS-DEBUG] Erreur dans update() de categoryController:', error);
+      console.error('[CategoryController] Erreur update:', error);
       return ResponseHandler.error(res, error);
     }
   }
@@ -74,39 +53,18 @@ class CategoryController extends BaseController {
       const category = await this.getByIdOr404(req.params.id, res);
       if (!category) return;
 
-      const hasChildrenCat = await hasChildren(category._id);
-      if (hasChildrenCat) {
-        return ResponseHandler.error(res, {
-          status: 400,
-          message: `Impossible de supprimer la catégorie : des sous-catégories existent`,
-        });
-      }
-
-      const linkedProducts = await getLinkedProducts(category._id);
-      if (linkedProducts.length > 0) {
-        return ResponseHandler.error(res, {
-          status: 400,
-          message: `Impossible de supprimer la catégorie : ${linkedProducts.length} produit(s) lié(s)`,
-        });
-      }
-
       await this.handleImageDeletion(category);
-      await removeCategoryFromProducts(category._id);
       await this.handleWooCommerceDelete(category);
-      await this.model.delete(req.params.id);
 
-      this.eventService.deleted(req.params.id);
-
-      return ResponseHandler.success(res, {
-        message: 'Catégorie supprimée avec succès',
-        woo_status: category.woo_id ? 'synchronized' : 'not_applicable',
-      });
+      const result = await deleteCategory(category);
+      return ResponseHandler.success(res, result);
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
   }
 }
 
+// 🔁 Route personnalisée : arborescence hiérarchique
 async function getHierarchicalCategories(req, res) {
   try {
     const allCategories = await Category.findAll();
@@ -123,14 +81,18 @@ async function getHierarchicalCategories(req, res) {
 
 const categoryController = new CategoryController();
 
+const exportController = require('../utils/exportController');
+
 module.exports = {
-  getAll: categoryController.getAll.bind(categoryController),
-  getById: categoryController.getById.bind(categoryController),
-  create: categoryController.create.bind(categoryController),
-  update: categoryController.update.bind(categoryController),
-  delete: categoryController.delete.bind(categoryController),
-  uploadImage: categoryController.uploadImage,
-  updateImageMetadata: categoryController.updateImageMetadata,
-  deleteImage: categoryController.deleteImage,
+  ...exportController(categoryController, [
+    'getAll',
+    'getById',
+    'create',
+    'update',
+    'delete',
+    'uploadImage',
+    'updateImageMetadata',
+    'deleteImage',
+  ]),
   getHierarchicalCategories,
 };

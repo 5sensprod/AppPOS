@@ -1,4 +1,3 @@
-// controllers/productController.js
 const BaseController = require('./base/BaseController');
 const Product = require('../models/Product');
 const Brand = require('../models/Brand');
@@ -6,12 +5,7 @@ const Supplier = require('../models/Supplier');
 const productWooCommerceService = require('../services/ProductWooCommerceService');
 const ResponseHandler = require('../handlers/ResponseHandler');
 const { getEntityEventService } = require('../services/events/entityEvents');
-const {
-  validateCategories,
-  updateBrandAndSupplierCount,
-  categoriesChanged,
-  notifyCategoryTreeChangedIfNeeded,
-} = require('../services/productService');
+const { createProduct, updateProduct, deleteProduct } = require('../services/productService');
 
 class ProductController extends BaseController {
   constructor() {
@@ -25,10 +19,10 @@ class ProductController extends BaseController {
   async getAll(req, res) {
     try {
       const products = await this.model.findAll();
-      const productsWithCategoryInfo = await Promise.all(
+      const withCategoryInfo = await Promise.all(
         products.map((product) => this.model.findByIdWithCategoryInfo(product._id))
       );
-      return ResponseHandler.success(res, productsWithCategoryInfo);
+      return ResponseHandler.success(res, withCategoryInfo);
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
@@ -46,22 +40,10 @@ class ProductController extends BaseController {
 
   async create(req, res) {
     try {
-      const categories = req.body.categories || [];
-      if (categories.length > 0) await validateCategories(categories);
-
-      const newItem = await this.model.create({ ...req.body, categories });
-
-      if (req.body.brand_id) await Brand.updateProductCount(req.body.brand_id);
-      if (req.body.supplier_id) await Supplier.updateProductCount(req.body.supplier_id);
-
-      notifyCategoryTreeChangedIfNeeded(categories.length > 0);
-      this.eventService.created(newItem);
-
-      const productWithCategoryInfo = await this.model.findByIdWithCategoryInfo(newItem._id);
-      const syncResult = await this.syncIfNeeded([productWithCategoryInfo], res);
+      const product = await createProduct(req.body);
+      const syncResult = await this.syncIfNeeded([product], res);
       if (syncResult) return syncResult;
-
-      return ResponseHandler.created(res, productWithCategoryInfo);
+      return ResponseHandler.created(res, product);
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
@@ -69,41 +51,14 @@ class ProductController extends BaseController {
 
   async update(req, res) {
     try {
-      const existingProduct = await this.getByIdOr404(req.params.id, res);
-      if (!existingProduct) return;
+      const existing = await this.getByIdOr404(req.params.id, res);
+      if (!existing) return;
 
-      const oldBrandId = existingProduct.brand_id;
-      const oldSupplierId = existingProduct.supplier_id;
-      const oldCategories = existingProduct.categories || [];
-
-      let categories = oldCategories;
-      let categoryChanged = false;
-
-      if ('categories' in req.body) {
-        categories = req.body.categories || [];
-        if (categories.length > 0) await validateCategories(categories);
-        categoryChanged = categoriesChanged(oldCategories, categories);
-      }
-
-      const updateData = { ...req.body, categories };
-      if (existingProduct.woo_id) updateData.pending_sync = true;
-
-      const updatedProduct = await this.model.updateWithCategoryInfo(req.params.id, updateData);
-
-      await updateBrandAndSupplierCount(
-        oldBrandId,
-        updateData.brand_id,
-        oldSupplierId,
-        updateData.supplier_id
-      );
-
-      notifyCategoryTreeChangedIfNeeded(categoryChanged);
-      this.eventService.updated(req.params.id, updatedProduct);
-
-      const syncResult = await this.syncIfNeeded([updatedProduct], res);
+      const updated = await updateProduct(req.params.id, req.body);
+      const syncResult = await this.syncIfNeeded([updated], res);
       if (syncResult) return syncResult;
 
-      return ResponseHandler.success(res, updatedProduct);
+      return ResponseHandler.success(res, updated);
     } catch (error) {
       console.error('Erreur mise à jour produit:', error);
       return ResponseHandler.error(res, error);
@@ -112,24 +67,14 @@ class ProductController extends BaseController {
 
   async delete(req, res) {
     try {
-      const existingProduct = await this.getByIdOr404(req.params.id, res);
-      if (!existingProduct) return;
+      const existing = await this.getByIdOr404(req.params.id, res);
+      if (!existing) return;
 
-      const brandId = existingProduct.brand_id;
-      const supplierId = existingProduct.supplier_id;
+      await this.handleImageDeletion(existing);
+      await this.handleWooCommerceDelete(existing);
+      const result = await deleteProduct(existing);
 
-      await this.handleImageDeletion(existingProduct);
-      await this.handleWooCommerceDelete(existingProduct);
-      await this.model.delete(req.params.id);
-
-      if (brandId) await Brand.updateProductCount(brandId);
-      if (supplierId) await Supplier.updateProductCount(supplierId);
-
-      this.eventService.deleted(req.params.id);
-
-      return ResponseHandler.success(res, {
-        message: 'Produit supprimé avec succès',
-      });
+      return ResponseHandler.success(res, result);
     } catch (error) {
       return ResponseHandler.error(res, error);
     }
@@ -151,15 +96,17 @@ class ProductController extends BaseController {
 
 const productController = new ProductController();
 
-module.exports = {
-  getAll: productController.getAll.bind(productController),
-  getById: productController.getById.bind(productController),
-  create: productController.create.bind(productController),
-  update: productController.update.bind(productController),
-  delete: productController.delete.bind(productController),
-  uploadImage: productController.uploadImage,
-  updateImageMetadata: productController.updateImageMetadata,
-  deleteImage: productController.deleteImage,
-  setMainImage: productController.setMainImage,
-  recalculateAllCounts: productController.recalculateAllCounts.bind(productController),
-};
+const exportController = require('../utils/exportController');
+
+module.exports = exportController(productController, [
+  'getAll',
+  'getById',
+  'create',
+  'update',
+  'delete',
+  'uploadImage',
+  'updateImageMetadata',
+  'deleteImage',
+  'setMainImage',
+  'recalculateAllCounts',
+]);
