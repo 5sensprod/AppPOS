@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const GalleryImage = require('../../models/images/GalleryImage');
 const SingleImage = require('../../models/images/SingleImage');
 const WordPressImageSync = require('./WordPressImageSync');
+const FileManager = require('../../utils/FileManager');
 const { v4: uuidv4 } = require('uuid');
 
 class ImageService {
@@ -11,6 +12,7 @@ class ImageService {
     this.entity = entity;
     this.imageHandler = type === 'gallery' ? new GalleryImage(entity) : new SingleImage(entity);
     this.wpSync = new WordPressImageSync();
+    this.logPrefix = '[WS-DEBUG]';
   }
 
   async processUpload(files, entityId, options = {}) {
@@ -22,20 +24,19 @@ class ImageService {
       const uploadedImages = [];
       const filesToProcess = Array.isArray(files) ? files : [files];
 
-      // Limiter le nombre de fichiers selon le type (single ou gallery)
+      // Limiter le nombre de fichiers selon le type
       if (this.imageHandler.isGallery === false && filesToProcess.length > 1) {
         console.log(
-          `[WS-DEBUG] Type 'single' - Limitation à un seul fichier (${filesToProcess.length} fournis)`
+          `${this.logPrefix} Type 'single' - Limitation à un seul fichier (${filesToProcess.length} fournis)`
         );
         filesToProcess.length = 1;
       }
 
-      // Pour le type 'single', sauvegarder l'ancienne image pour suppression ultérieure
+      // Pour le type 'single', sauvegarder l'ancienne image
       let oldImage = null;
-
       if (!this.imageHandler.isGallery && item.image) {
         oldImage = { ...item.image };
-        console.log(`[WS-DEBUG] Ancienne image trouvée pour ${entityId}:`, oldImage);
+        console.log(`${this.logPrefix} Ancienne image trouvée pour ${entityId}:`, oldImage);
       }
 
       // Traitement des nouvelles images
@@ -43,15 +44,11 @@ class ImageService {
         const imageData = await this.imageHandler.upload(file, entityId);
         imageData._id = uuidv4();
 
-        if (this.entity !== 'suppliers' && options.syncToWordPress) {
-          const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
+        // Synchronisation WordPress si nécessaire
+        if (this.shouldSyncToWordPress(options)) {
+          const wpData = await this.syncImageToWordPress(imageData.local_path);
           uploadedImages.push({
-            _id: imageData._id,
-            src: imageData.src,
-            local_path: imageData.local_path,
-            status: 'active',
-            type: imageData.type,
-            metadata: imageData.metadata,
+            ...imageData,
             wp_id: wpData.id,
             url: wpData.url,
           });
@@ -62,227 +59,172 @@ class ImageService {
 
       // Mise à jour de l'entité
       if (uploadedImages.length > 0) {
-        const updateData = {};
+        await this.updateEntityWithImages(item, uploadedImages, Model);
 
-        if (!this.imageHandler.isGallery) {
-          updateData.image = { ...uploadedImages[0], status: 'active' };
-          updateData.gallery_images = [];
-        } else {
-          if (!item.image && uploadedImages.length > 0) {
-            updateData.image = { ...uploadedImages[0], status: 'active' };
-          }
-
-          const allImages = [...(item.gallery_images || []), ...uploadedImages];
-          const uniqueImages = [];
-          const pathsAdded = new Set();
-
-          for (const img of allImages) {
-            if (!pathsAdded.has(img.local_path)) {
-              if (!img._id) {
-                img._id = uuidv4();
-              }
-              uniqueImages.push({ ...img, status: 'active' });
-              pathsAdded.add(img.local_path);
-            }
-          }
-
-          updateData.gallery_images = uniqueImages;
-        }
-
-        // Mettre à jour l'entité avec la nouvelle image
-        await Model.update(entityId, updateData);
-
-        // SECTION CORRIGÉE: Suppression de l'ancienne image
+        // Suppression de l'ancienne image si type 'single'
         if (!this.imageHandler.isGallery && oldImage) {
-          try {
-            console.log(`[WS-DEBUG] Début suppression de l'ancienne image:`, oldImage);
-
-            // Supprimer l'ancienne image de WordPress si elle existe
-            if (oldImage.wp_id && this.entity !== 'suppliers') {
-              try {
-                console.log(`[WS-DEBUG] Suppression de l'image WordPress wp_id: ${oldImage.wp_id}`);
-                await this.wpSync.deleteFromWordPress(oldImage.wp_id);
-                console.log(`[WS-DEBUG] Image WordPress supprimée avec succès`);
-              } catch (wpError) {
-                console.error(
-                  `[WS-DEBUG] Erreur lors de la suppression WordPress:`,
-                  wpError.message
-                );
-              }
-            }
-
-            // Supprimer le fichier local
-            if (oldImage.local_path) {
-              try {
-                console.log(`[WS-DEBUG] Suppression du fichier local: ${oldImage.local_path}`);
-                await fs.access(oldImage.local_path); // Vérifier si le fichier existe
-                await fs.unlink(oldImage.local_path);
-                console.log(`[WS-DEBUG] Fichier local supprimé avec succès`);
-              } catch (fsError) {
-                console.error(
-                  `[WS-DEBUG] Erreur lors de la suppression du fichier local:`,
-                  fsError.message
-                );
-
-                // Si le chemin direct ne fonctionne pas, essayer de reconstruire le chemin
-                if (oldImage.src) {
-                  try {
-                    const fileName = oldImage.src.split('/').pop();
-                    const alternativePath = path.join(
-                      process.cwd(),
-                      'public',
-                      this.entity,
-                      entityId,
-                      fileName
-                    );
-                    console.log(`[WS-DEBUG] Tentative avec chemin alternatif: ${alternativePath}`);
-
-                    await fs.access(alternativePath);
-                    await fs.unlink(alternativePath);
-                    console.log(`[WS-DEBUG] Fichier supprimé avec chemin alternatif`);
-                  } catch (altError) {
-                    console.error(`[WS-DEBUG] Échec avec chemin alternatif:`, altError.message);
-                  }
-                }
-              }
-            } else if (oldImage.src) {
-              // Si nous n'avons pas local_path mais avons src, essayer de reconstruire le chemin
-              try {
-                const fileName = oldImage.src.split('/').pop();
-                const reconstructedPath = path.join(
-                  process.cwd(),
-                  'public',
-                  this.entity,
-                  entityId,
-                  fileName
-                );
-                console.log(`[WS-DEBUG] Tentative avec chemin reconstruit: ${reconstructedPath}`);
-
-                await fs.access(reconstructedPath);
-                await fs.unlink(reconstructedPath);
-                console.log(`[WS-DEBUG] Fichier supprimé avec chemin reconstruit`);
-              } catch (reconError) {
-                console.error(`[WS-DEBUG] Échec avec chemin reconstruit:`, reconError.message);
-              }
-            }
-
-            // Nettoyer les fichiers orphelins
-            await this.cleanupDirectoryForEntity(entityId);
-          } catch (error) {
-            console.error(
-              `[WS-DEBUG] Erreur générale lors de la suppression de l'ancienne image:`,
-              error
-            );
-          }
+          await this.cleanupOldImage(oldImage, entityId);
         }
       }
 
       return { message: 'Images téléversées avec succès', data: uploadedImages };
     } catch (error) {
       if (files) {
-        const toClean = Array.isArray(files) ? files : [files];
-        for (const file of toClean) {
-          if (file.path) await this._cleanup(file.path).catch(console.error);
-        }
+        await this.cleanupTempFiles(files);
       }
       throw error;
     }
   }
 
+  shouldSyncToWordPress(options) {
+    return this.entity !== 'suppliers' && options.syncToWordPress;
+  }
+
+  async syncImageToWordPress(localPath) {
+    return await this.wpSync.uploadToWordPress(localPath);
+  }
+
+  async cleanupTempFiles(files) {
+    const toClean = Array.isArray(files) ? files : [files];
+    for (const file of toClean) {
+      if (file.path) await this._cleanup(file.path).catch(console.error);
+    }
+  }
+
+  async updateEntityWithImages(item, newImages, Model) {
+    const updateData = {};
+
+    if (!this.imageHandler.isGallery) {
+      // Mode 'single' - remplacer l'image existante
+      updateData.image = { ...newImages[0], status: 'active' };
+      updateData.gallery_images = [];
+    } else {
+      // Mode 'gallery' - ajouter à la galerie
+      if (!item.image && newImages.length > 0) {
+        updateData.image = { ...newImages[0], status: 'active' };
+      }
+
+      // Fusionner avec les images existantes en évitant les doublons
+      const allImages = [...(item.gallery_images || []), ...newImages];
+      updateData.gallery_images = this.deduplicateImages(allImages);
+    }
+
+    await Model.update(item._id, updateData);
+  }
+
+  deduplicateImages(images) {
+    const uniqueImages = [];
+    const pathsAdded = new Set();
+
+    for (const img of images) {
+      if (!pathsAdded.has(img.local_path)) {
+        if (!img._id) {
+          img._id = uuidv4();
+        }
+        uniqueImages.push({ ...img, status: 'active' });
+        pathsAdded.add(img.local_path);
+      }
+    }
+
+    return uniqueImages;
+  }
+
+  async cleanupOldImage(oldImage, entityId) {
+    console.log(`${this.logPrefix} Début suppression de l'ancienne image:`, oldImage);
+
+    // 1. Suppression WordPress si nécessaire
+    if (oldImage.wp_id && this.entity !== 'suppliers') {
+      await this.deleteFromWordPress(oldImage.wp_id);
+    }
+
+    // 2. Suppression fichier local
+    await this.deleteImageFile(oldImage, entityId);
+
+    // 3. Nettoyage du répertoire
+    await this.cleanupDirectoryForEntity(entityId);
+  }
+
+  async deleteFromWordPress(wpId) {
+    if (!wpId) return;
+
+    try {
+      console.log(`${this.logPrefix} Suppression de l'image WordPress wp_id: ${wpId}`);
+      await this.wpSync.deleteFromWordPress(wpId);
+      console.log(`${this.logPrefix} Image WordPress supprimée avec succès`);
+    } catch (wpError) {
+      console.error(`${this.logPrefix} Erreur lors de la suppression WordPress:`, wpError.message);
+    }
+  }
+
+  async deleteImageFile(imageData, entityId) {
+    if (!imageData) return;
+
+    // Essayer avec le chemin direct
+    if (imageData.local_path) {
+      const deleted = await FileManager.deleteFile(imageData.local_path, this.logPrefix);
+      if (deleted) return true;
+    }
+
+    // Si échec ou pas de local_path, essayer avec chemin alternatif
+    if (imageData.src) {
+      const altPath = FileManager.getAlternativePath(
+        this.entity,
+        entityId,
+        imageData.local_path,
+        imageData.src
+      );
+      if (altPath) {
+        return await FileManager.deleteFile(altPath, this.logPrefix);
+      }
+    }
+
+    return false;
+  }
+
   async cleanupDirectoryForEntity(entityId) {
     try {
-      console.log(`[WS-DEBUG] Nettoyage du répertoire pour ${this.entity} ID: ${entityId}`);
+      console.log(`${this.logPrefix} Nettoyage du répertoire pour ${this.entity} ID: ${entityId}`);
 
-      // 1. Récupérer l'entité actuelle pour connaître les fichiers à conserver
+      // 1. Récupérer l'entité pour connaître les fichiers à conserver
       const Model = this._getModelByEntity();
       const item = await Model.findById(entityId);
 
       if (!item) {
-        console.log(`[WS-DEBUG] Entité ${entityId} non trouvée, nettoyage du répertoire entier`);
-        // Si l'entité n'existe plus, on peut supprimer tout le répertoire
-        const entityDir = path.join(process.cwd(), 'public', this.entity, entityId);
-        try {
-          await fs.rm(entityDir, { recursive: true, force: true });
-          console.log(`[WS-DEBUG] Répertoire supprimé: ${entityDir}`);
-          return {
-            success: true,
-            message: 'Répertoire supprimé (entité inexistante)',
-            deleted: true,
-          };
-        } catch (rmError) {
-          if (rmError.code !== 'ENOENT') {
-            console.error(`[WS-DEBUG] Erreur suppression répertoire:`, rmError);
-          }
-          return { success: false, error: rmError.message };
-        }
+        // Si l'entité n'existe plus, supprimer tout le répertoire
+        const entityDir = FileManager.getEntityDir(this.entity, entityId);
+        await FileManager.deleteDirectory(entityDir, this.logPrefix);
+        return {
+          success: true,
+          message: 'Répertoire supprimé (entité inexistante)',
+          deleted: true,
+        };
       }
 
-      // 2. Identifier les fichiers actuellement utilisés
-      const filesToKeep = new Set();
+      // 2. Identifier les fichiers à conserver
+      const filesToKeep = this.collectFilesToKeep(item);
+      console.log(`${this.logPrefix} Fichiers à conserver: ${Array.from(filesToKeep).join(', ')}`);
 
-      // Extraire le nom de fichier à partir d'un chemin ou d'une URL
-      const extractFilename = (path) => {
-        if (!path) return null;
-        const parts = path.split('/');
-        return parts[parts.length - 1];
-      };
-
-      // Vérifier l'image principale
-      if (item.image) {
-        if (item.image.local_path) {
-          filesToKeep.add(path.basename(item.image.local_path));
-        } else if (item.image.src) {
-          const filename = extractFilename(item.image.src);
-          if (filename) filesToKeep.add(filename);
-        }
-      }
-
-      // Vérifier les images de galerie
-      if (item.gallery_images && item.gallery_images.length > 0) {
-        for (const img of item.gallery_images) {
-          if (img.local_path) {
-            filesToKeep.add(path.basename(img.local_path));
-          } else if (img.src) {
-            const filename = extractFilename(img.src);
-            if (filename) filesToKeep.add(filename);
-          }
-        }
-      }
-
-      console.log(`[WS-DEBUG] Fichiers à conserver: ${Array.from(filesToKeep).join(', ')}`);
-
-      // 3. Lire le répertoire et supprimer les fichiers non utilisés
-      const entityDir = path.join(process.cwd(), 'public', this.entity, entityId);
+      // 3. Supprimer les fichiers non utilisés
+      const entityDir = FileManager.getEntityDir(this.entity, entityId);
       let deleted = 0;
 
       try {
         const files = await fs.readdir(entityDir);
-        console.log(`[WS-DEBUG] Fichiers trouvés dans le répertoire: ${files.join(', ')}`);
+        console.log(`${this.logPrefix} Fichiers trouvés dans le répertoire: ${files.join(', ')}`);
 
         for (const file of files) {
-          // Si ce n'est pas un fichier à conserver, le supprimer
           if (!filesToKeep.has(file)) {
-            try {
-              const filePath = path.join(entityDir, file);
-              console.log(`[WS-DEBUG] Suppression du fichier inutilisé: ${filePath}`);
-              await fs.unlink(filePath);
-              deleted++;
-            } catch (unlinkError) {
-              console.error(`[WS-DEBUG] Erreur lors de la suppression de ${file}:`, unlinkError);
-            }
+            const filePath = path.join(entityDir, file);
+            const success = await FileManager.deleteFile(filePath, this.logPrefix);
+            if (success) deleted++;
           }
         }
 
-        console.log(`[WS-DEBUG] ${deleted} fichiers supprimés sur ${files.length} trouvés`);
+        console.log(`${this.logPrefix} ${deleted} fichiers supprimés sur ${files.length} trouvés`);
 
-        // Si tous les fichiers ont été supprimés, on peut supprimer le répertoire
+        // Si tous les fichiers ont été supprimés, supprimer le répertoire
         if (deleted === files.length && files.length > 0) {
-          try {
-            await fs.rmdir(entityDir);
-            console.log(`[WS-DEBUG] Répertoire vide supprimé: ${entityDir}`);
-          } catch (rmdirError) {
-            console.error(`[WS-DEBUG] Erreur lors de la suppression du répertoire:`, rmdirError);
-          }
+          await FileManager.deleteDirectory(entityDir, this.logPrefix);
         }
 
         return {
@@ -293,113 +235,45 @@ class ImageService {
         };
       } catch (readError) {
         if (readError.code === 'ENOENT') {
-          console.log(`[WS-DEBUG] Le répertoire n'existe pas: ${entityDir}`);
+          console.log(`${this.logPrefix} Le répertoire n'existe pas: ${entityDir}`);
           return { success: true, message: 'Aucun répertoire à nettoyer', deleted: 0 };
         }
         throw readError;
       }
     } catch (error) {
-      console.error(`[WS-DEBUG] Erreur lors du nettoyage du répertoire:`, error);
+      console.error(`${this.logPrefix} Erreur lors du nettoyage du répertoire:`, error);
       return { success: false, error: error.message };
     }
   }
 
-  async _handleExistingImage(existingImage, entityId) {
-    // Supprimer l'image de WordPress si elle existe
-    if (existingImage.wp_id && this.entity !== 'suppliers') {
-      try {
-        await this.wpSync.deleteFromWordPress(existingImage.wp_id);
-      } catch (error) {
-        // Ignorer l'erreur 404, logger les autres
-        if (!error.message.includes('404')) {
-          console.error('Erreur suppression WordPress:', error);
-        }
+  collectFilesToKeep(item) {
+    const filesToKeep = new Set();
+
+    // Fonction pour extraire et ajouter un nom de fichier à l'ensemble
+    const addFileToKeep = (imageData) => {
+      if (!imageData) return;
+
+      if (imageData.local_path) {
+        filesToKeep.add(path.basename(imageData.local_path));
+      } else if (imageData.src) {
+        const filename = FileManager.extractFilename(imageData.src);
+        if (filename) filesToKeep.add(filename);
+      }
+    };
+
+    // Vérifier l'image principale
+    if (item.image) {
+      addFileToKeep(item.image);
+    }
+
+    // Vérifier les images de galerie
+    if (item.gallery_images && item.gallery_images.length > 0) {
+      for (const img of item.gallery_images) {
+        addFileToKeep(img);
       }
     }
 
-    // Supprimer le fichier local s'il existe
-    if (existingImage.local_path) {
-      try {
-        await fs.access(existingImage.local_path);
-        await fs.unlink(existingImage.local_path);
-      } catch (error) {
-        // Ignorer l'erreur si le fichier n'existe pas
-        if (error.code !== 'ENOENT') {
-          console.error('Erreur suppression fichier local:', error);
-        }
-      }
-    }
-
-    // Nettoyer le dossier si nécessaire
-    try {
-      const imageDir = path.join(process.cwd(), 'public', this.entity, entityId);
-      const exists = await fs
-        .access(imageDir)
-        .then(() => true)
-        .catch(() => false);
-
-      if (exists) {
-        const files = await fs.readdir(imageDir);
-        if (files.length === 0) {
-          await fs.rmdir(imageDir);
-        }
-      }
-    } catch (error) {
-      console.warn('Avertissement nettoyage dossier:', error.message);
-    }
-  }
-
-  async _updateEntityWithNewImage(item, updatedImageData, Model) {
-    // S'assurer que l'image a un _id
-    if (!updatedImageData._id) {
-      updatedImageData._id = uuidv4();
-    }
-
-    const updateData = this.imageHandler.isGallery
-      ? { gallery_images: [...(item.gallery_images || []), updatedImageData] }
-      : { image: updatedImageData };
-
-    try {
-      // Mettre à jour l'entité locale
-      await Model.update(item._id, updateData);
-
-      // Synchroniser avec WooCommerce si nécessaire
-      if (false) {
-        const service = this._getWooCommerceService();
-        if (service) {
-          const updatedDoc = await Model.findById(item._id);
-          await service.syncToWooCommerce(updatedDoc);
-        }
-      }
-    } catch (error) {
-      console.error('Erreur mise à jour entité:', error);
-      throw error;
-    }
-  }
-
-  _getModelByEntity() {
-    return this.entity === 'products'
-      ? require('../../models/Product')
-      : this.entity === 'categories'
-        ? require('../../models/Category')
-        : this.entity === 'brands'
-          ? require('../../models/Brand')
-          : require('../../models/Supplier');
-  }
-
-  _getWooCommerceService() {
-    try {
-      return this.entity === 'products'
-        ? require('../ProductWooCommerceService')
-        : this.entity === 'categories'
-          ? require('../CategoryWooCommerceService')
-          : this.entity === 'brands'
-            ? require('../BrandWooCommerceService')
-            : null;
-    } catch (error) {
-      console.error('Service WooCommerce non trouvé:', error);
-      return null;
-    }
+    return filesToKeep;
   }
 
   async updateMetadata(entityId, metadata) {
@@ -432,93 +306,49 @@ class ImageService {
 
       const imageData = item.image;
 
-      // 1. Suppression WordPress si applicable
+      // 1. Suppression WordPress
       if (imageData?.wp_id && this.entity !== 'suppliers') {
-        try {
-          console.log(`[WS-DEBUG] Suppression de l'image WordPress wp_id: ${imageData.wp_id}`);
-          await this.wpSync.deleteFromWordPress(imageData.wp_id);
-          console.log(`[WS-DEBUG] Image WordPress supprimée avec succès`);
-        } catch (error) {
-          console.error('[WS-DEBUG] Erreur suppression WordPress:', error);
-        }
+        await this.deleteFromWordPress(imageData.wp_id);
       }
 
-      // 2. Suppression du fichier local
-      if (imageData?.local_path) {
-        try {
-          console.log(`[WS-DEBUG] Suppression du fichier local: ${imageData.local_path}`);
-          await fs.access(imageData.local_path);
-          await fs.unlink(imageData.local_path);
-          console.log(`[WS-DEBUG] Fichier local supprimé avec succès`);
-        } catch (fsError) {
-          // Si le chemin direct ne fonctionne pas, essayer avec un chemin reconstruit
-          if (imageData.src) {
-            try {
-              const fileName = imageData.src.split('/').pop();
-              const alternativePath = path.join(
-                process.cwd(),
-                'public',
-                this.entity,
-                entityId,
-                fileName
-              );
-              console.log(`[WS-DEBUG] Tentative avec chemin alternatif: ${alternativePath}`);
+      // 2. Suppression fichier local
+      await this.deleteImageFile(imageData, entityId);
 
-              await fs.access(alternativePath);
-              await fs.unlink(alternativePath);
-              console.log(`[WS-DEBUG] Fichier supprimé avec chemin alternatif`);
-            } catch (altError) {
-              console.error(`[WS-DEBUG] Échec suppression fichier:`, altError.message);
-            }
-          }
-        }
-      }
+      // 3. Nettoyage complet du répertoire
+      await this.cleanupAllFiles(entityId);
 
-      // 3. Nettoyer le répertoire d'images de l'entité
-      try {
-        const entityDir = path.join(process.cwd(), 'public', this.entity, entityId);
-        console.log(`[WS-DEBUG] Nettoyage du répertoire: ${entityDir}`);
-
-        // Vérifier si le répertoire existe
-        try {
-          await fs.access(entityDir);
-
-          // Lister tous les fichiers et les supprimer
-          const files = await fs.readdir(entityDir);
-          console.log(`[WS-DEBUG] ${files.length} fichiers trouvés dans le répertoire`);
-
-          for (const file of files) {
-            const filePath = path.join(entityDir, file);
-            try {
-              await fs.unlink(filePath);
-              console.log(`[WS-DEBUG] Fichier supprimé: ${filePath}`);
-            } catch (unlinkError) {
-              console.error(
-                `[WS-DEBUG] Erreur suppression fichier: ${filePath}`,
-                unlinkError.message
-              );
-            }
-          }
-
-          // Supprimer le répertoire vide
-          await fs.rmdir(entityDir);
-          console.log(`[WS-DEBUG] Répertoire supprimé: ${entityDir}`);
-        } catch (accessError) {
-          if (accessError.code === 'ENOENT') {
-            console.log(`[WS-DEBUG] Le répertoire n'existe pas: ${entityDir}`);
-          } else {
-            console.error(`[WS-DEBUG] Erreur accès répertoire:`, accessError.message);
-          }
-        }
-      } catch (dirError) {
-        console.error(`[WS-DEBUG] Erreur nettoyage répertoire:`, dirError);
-      }
-
-      // 4. Mettre à jour l'entité en base de données
+      // 4. Mise à jour de l'entité en base de données
       await this.imageHandler.delete(entityId);
       return true;
     } catch (error) {
       throw new Error(`Erreur suppression image: ${error.message}`);
+    }
+  }
+
+  async cleanupAllFiles(entityId) {
+    const entityDir = FileManager.getEntityDir(this.entity, entityId);
+
+    try {
+      console.log(`${this.logPrefix} Nettoyage complet du répertoire: ${entityDir}`);
+
+      // Vérifier si le répertoire existe
+      const exists = await FileManager.fileExists(entityDir);
+      if (!exists) {
+        console.log(`${this.logPrefix} Le répertoire n'existe pas: ${entityDir}`);
+        return false;
+      }
+
+      // Supprimer tous les fichiers puis le répertoire
+      const files = await fs.readdir(entityDir);
+      for (const file of files) {
+        await FileManager.deleteFile(path.join(entityDir, file), this.logPrefix);
+      }
+
+      // Supprimer le répertoire
+      return await FileManager.deleteDirectory(entityDir, this.logPrefix);
+    } catch (error) {
+      console.error(`${this.logPrefix} Erreur nettoyage complet:`, error);
+      return false;
     }
   }
 
@@ -534,74 +364,60 @@ class ImageService {
 
       if (!imageToDelete) throw new Error(`Image non trouvée`);
 
-      // En mode localOnly, on ne supprime PAS l'image sur WordPress
-      // Mais on conserve l'information de cette image dans un champ temporaire
-      if (options.localOnly) {
-        console.log(`[WS-DEBUG] Mode localOnly activé - Suppression WordPress ignorée`);
-      }
-      // Uniquement si NOT localOnly, on supprime sur WordPress
-      else if (imageToDelete.wp_id && this.entity !== 'suppliers') {
-        try {
-          await this.wpSync.deleteFromWordPress(imageToDelete.wp_id);
-          console.log(`[WS-DEBUG] Image supprimée sur WordPress (wp_id: ${imageToDelete.wp_id})`);
-        } catch (error) {
-          console.error(`[WS-DEBUG] ERREUR lors de la suppression WordPress:`, error.message);
-        }
+      // Suppression WordPress sauf si mode localOnly
+      if (!options.localOnly && imageToDelete.wp_id && this.entity !== 'suppliers') {
+        await this.deleteFromWordPress(imageToDelete.wp_id);
+      } else if (options.localOnly) {
+        console.log(`${this.logPrefix} Mode localOnly activé - Suppression WordPress ignorée`);
       }
 
-      // Suppression du fichier local uniquement (pas WordPress)
-      if (imageToDelete.local_path) {
-        try {
-          await fs.access(imageToDelete.local_path);
-          await fs.unlink(imageToDelete.local_path);
-          console.log(`[WS-DEBUG] Fichier local supprimé: ${imageToDelete.local_path}`);
-        } catch (error) {
-          if (error.code !== 'ENOENT') {
-            console.error('Erreur suppression fichier local:', error);
-          }
-        }
-      }
+      // Suppression du fichier local
+      await this.deleteImageFile(imageToDelete, entityId);
 
-      // Mise à jour des données locales
-      const updateData = {
-        gallery_images: item.gallery_images.filter((img) => img._id !== imageId),
-      };
-
-      // Si c'est aussi l'image principale, la supprimer ou la remplacer
-      if (
-        item.image &&
-        (item.image._id === imageId ||
-          (item.image.local_path && item.image.local_path === imageToDelete.local_path))
-      ) {
-        // Si d'autres images existent dans la galerie, utiliser la première comme principale
-        if (updateData.gallery_images.length > 0) {
-          updateData.image = { ...updateData.gallery_images[0] };
-        } else {
-          updateData.image = null;
-        }
-      }
-
-      // Marquer comme nécessitant une synchronisation si localOnly est activé
-      if (options.localOnly && item.woo_id) {
-        updateData.pending_sync = true;
-      }
-
-      await Model.update(entityId, updateData);
-
-      // Synchronisation WooCommerce après la mise à jour locale SEULEMENT si localOnly n'est pas actif
-      if (false) {
-        const service = this._getWooCommerceService();
-        if (service) {
-          const updatedDoc = await Model.findById(entityId);
-          await service.syncToWooCommerce(updatedDoc);
-          console.log(`[WS-DEBUG] Synchronisation WooCommerce effectuée automatiquement`);
-        }
-      }
+      // Mise à jour des données en base
+      await this.updateAfterGalleryImageDeletion(
+        entityId,
+        imageId,
+        imageToDelete,
+        item,
+        Model,
+        options
+      );
 
       return true;
     } catch (error) {
       throw new Error(`Erreur suppression: ${error.message}`);
     }
+  }
+
+  async updateAfterGalleryImageDeletion(entityId, imageId, imageToDelete, item, Model, options) {
+    // Filtrer la galerie pour enlever l'image supprimée
+    const updatedGallery = item.gallery_images.filter((img) => img._id !== imageId);
+
+    const updateData = {
+      gallery_images: updatedGallery,
+    };
+
+    // Si c'est aussi l'image principale, la supprimer ou la remplacer
+    if (
+      item.image &&
+      (item.image._id === imageId ||
+        (item.image.local_path && item.image.local_path === imageToDelete.local_path))
+    ) {
+      // Si d'autres images existent dans la galerie, utiliser la première
+      if (updatedGallery.length > 0) {
+        updateData.image = { ...updatedGallery[0] };
+      } else {
+        updateData.image = null;
+      }
+    }
+
+    // Marquer pour synchronisation si localOnly est activé
+    if (options.localOnly && item.woo_id) {
+      updateData.pending_sync = true;
+    }
+
+    await Model.update(entityId, updateData);
   }
 
   async resyncImage(imageData) {
@@ -614,7 +430,7 @@ class ImageService {
     }
 
     try {
-      const wpData = await this.wpSync.uploadToWordPress(imageData.local_path);
+      const wpData = await this.syncImageToWordPress(imageData.local_path);
       return {
         ...imageData,
         wp_id: wpData.id,
@@ -627,17 +443,31 @@ class ImageService {
   }
 
   async _cleanup(filePath) {
-    if (!filePath) return;
+    await FileManager.deleteFile(filePath);
+  }
+
+  _getModelByEntity() {
+    return this.entity === 'products'
+      ? require('../../models/Product')
+      : this.entity === 'categories'
+        ? require('../../models/Category')
+        : this.entity === 'brands'
+          ? require('../../models/Brand')
+          : require('../../models/Supplier');
+  }
+
+  _getWooCommerceService() {
     try {
-      const exists = await fs
-        .access(filePath)
-        .then(() => true)
-        .catch(() => false);
-      if (exists) {
-        await fs.unlink(filePath);
-      }
+      return this.entity === 'products'
+        ? require('../ProductWooCommerceService')
+        : this.entity === 'categories'
+          ? require('../CategoryWooCommerceService')
+          : this.entity === 'brands'
+            ? require('../BrandWooCommerceService')
+            : null;
     } catch (error) {
-      console.error('Erreur nettoyage fichier temporaire:', error);
+      console.error('Service WooCommerce non trouvé:', error);
+      return null;
     }
   }
 }
