@@ -1,5 +1,5 @@
-// server/services/apiEventEmitter.js
 const EventEmitter = require('events');
+const { standardizeEntityType } = require('../utils/entityTypeUtils');
 
 class ApiEventEmitter extends EventEmitter {
   constructor() {
@@ -12,24 +12,24 @@ class ApiEventEmitter extends EventEmitter {
   }
 
   entityCreated(entityType, data) {
-    const standardEntityType = this.standardizeEntityType(entityType);
-    console.log(`[EVENT] Émission de ${standardEntityType}.created`);
-    this.emit(`${standardEntityType}.created`, data);
-    this.emit('entity.created', { entityType: standardEntityType, data });
+    const normalized = standardizeEntityType(entityType);
+    console.log(`[EVENT] Émission de ${normalized}.created`);
+    this.emit(`${normalized}.created`, data);
+    this.emit('entity.created', { entityType: normalized, data });
   }
 
   entityUpdated(entityType, id, data) {
-    const standardEntityType = this.standardizeEntityType(entityType);
-    console.log(`[EVENT] Émission de ${standardEntityType}.updated`);
-    this.emit(`${standardEntityType}.updated`, { id, data });
-    this.emit('entity.updated', { entityType: standardEntityType, id, data });
+    const normalized = standardizeEntityType(entityType);
+    console.log(`[EVENT] Émission de ${normalized}.updated`);
+    this.emit(`${normalized}.updated`, { id, data });
+    this.emit('entity.updated', { entityType: normalized, id, data });
   }
 
   entityDeleted(entityType, id) {
-    const standardEntityType = this.standardizeEntityType(entityType);
-    console.log(`[EVENT] Émission de ${standardEntityType}.deleted`);
-    this.emit(`${standardEntityType}.deleted`, { id });
-    this.emit('entity.deleted', { entityType: standardEntityType, id });
+    const normalized = standardizeEntityType(entityType);
+    console.log(`[EVENT] Émission de ${normalized}.deleted`);
+    this.emit(`${normalized}.deleted`, { id });
+    this.emit('entity.deleted', { entityType: normalized, id });
   }
 
   categoryTreeChanged() {
@@ -38,21 +38,9 @@ class ApiEventEmitter extends EventEmitter {
   }
 
   countUpdated(entityType, id, count) {
-    const standardEntityType = this.standardizeEntityType(entityType);
-    console.log(`[EVENT] Émission de ${standardEntityType}.count.updated`);
-    this.emit(`${standardEntityType}.count.updated`, { id, count });
-  }
-
-  standardizeEntityType(entityType) {
-    const singular = entityType.endsWith('s') ? entityType.slice(0, -1) : entityType;
-    const entityMap = {
-      category: 'categories',
-      product: 'products',
-      supplier: 'suppliers',
-      brand: 'brands',
-    };
-
-    return entityMap[singular] || `${singular}s`;
+    const normalized = standardizeEntityType(entityType);
+    console.log(`[EVENT] Émission de ${normalized}.count.updated`);
+    this.emit(`${normalized}.count.updated`, { id, count });
   }
 }
 

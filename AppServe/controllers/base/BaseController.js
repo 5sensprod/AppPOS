@@ -4,6 +4,7 @@ const BaseImageController = require('../image/BaseImageController');
 const fs = require('fs').promises;
 const path = require('path');
 const { getEntityEventService } = require('../../services/events/entityEvents');
+const { standardizeEntityType } = require('../../utils/entityTypeUtils');
 
 class BaseController {
   constructor(model, wooCommerceService, options = {}) {
@@ -11,7 +12,7 @@ class BaseController {
 
     this.model = model;
     this.wooCommerceService = wooCommerceService;
-    this.entityName = this.buildEntityName(model);
+    this.entityName = standardizeEntityType(model);
     this.eventService = getEntityEventService(this.entityName);
 
     // Gestion améliorée des options d'image
@@ -24,17 +25,6 @@ class BaseController {
     if (options.deleteFromWoo) {
       this.deleteFromWoo = options.deleteFromWoo;
     }
-  }
-
-  buildEntityName(model) {
-    const name = model.constructor.name.toLowerCase().replace('model', '');
-    const map = {
-      category: 'categories',
-      brand: 'brands',
-      supplier: 'suppliers',
-      product: 'products',
-    };
-    return map[name] || (name.endsWith('s') ? name : `${name}s`);
   }
 
   setupImageHandlers() {
