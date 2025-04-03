@@ -94,6 +94,24 @@ const GeneralInfoTab = ({
       return 'Aucun';
     }
 
+    if (field === 'brands') {
+      // Vérifier d'abord brandsRefs qui contient les objets marques complets
+      if (entity.brandsRefs && entity.brandsRefs.length > 0) {
+        return entity.brandsRefs.map((brand) => brand.name).join(', ');
+      }
+
+      // Vérifier le tableau brands et récupérer les noms correspondants
+      if (entity.brands && entity.brands.length > 0) {
+        const brandNames = entity.brands.map((brandId) => {
+          const brand = _specialFields.brands?.options?.find((b) => b.value === brandId);
+          return brand ? brand.label : brandId;
+        });
+        return brandNames.join(', ');
+      }
+
+      return 'Aucune marque';
+    }
+
     return value || '-';
   };
 
@@ -131,6 +149,19 @@ const GeneralInfoTab = ({
             className={`${baseInputClass} min-h-[100px]`}
             placeholder={`Entrez une description...`}
           />
+        );
+      case 'brands':
+        return (
+          <select {...register(field)} multiple className={baseInputClass}>
+            <option value="" disabled>
+              Sélectionner des marques
+            </option>
+            {_specialFields.brands?.options?.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         );
       case 'status':
         return (

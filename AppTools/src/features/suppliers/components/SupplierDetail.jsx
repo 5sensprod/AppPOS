@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSupplier, useSupplierExtras } from '../stores/supplierStore';
 import { useSupplierDataStore } from '../stores/supplierStore';
+import { useBrand } from '../../brands/stores/brandStore';
 import { EntityDetail } from '../../../components/common';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ContactInfoTab from '../../../components/common/tabs/ContactInfoTab';
@@ -20,19 +21,55 @@ function SupplierDetail() {
   // Déterminer le mode d'édition basé sur l'URL
   const isNew = location.pathname.endsWith('/new');
   const isEditMode = isNew || location.pathname.endsWith('/edit');
-
+  const [brandsLoaded, setBrandsLoaded] = useState(false);
   // État local
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [supplier, setSupplier] = useState(null);
+  const [specialFields, setSpecialFields] = useState({
+    brands: { options: [] },
+  });
 
   // Hooks et stores pour les fournisseurs
   const { getSupplierById, deleteSupplier, updateSupplier, createSupplier } = useSupplier();
-
-  const { uploadImage, deleteImage } = useSupplierExtras();
-
+  const { uploadImage, deleteImage, addBrandToSupplier, removeBrandFromSupplier } =
+    useSupplierExtras();
   const supplierWsStore = useSupplierDataStore();
+
+  // Hook pour accéder aux marques
+  const brandStore = useBrand();
+  const { fetchBrands } = brandStore;
+
+  // Charger les options de marques
+  useEffect(() => {
+    if (brandsLoaded) return;
+
+    const loadBrands = async () => {
+      try {
+        const response = await fetchBrands();
+        const data = response?.data || [];
+
+        if (Array.isArray(data)) {
+          const brandOptions = data.map((brand) => ({
+            value: brand._id || brand.id,
+            label: brand.name,
+            image: brand.image,
+          }));
+
+          setSpecialFields((prev) => ({
+            ...prev,
+            brands: { options: brandOptions },
+          }));
+          setBrandsLoaded(true);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des marques:', err);
+      }
+    };
+
+    loadBrands();
+  }, [fetchBrands, brandsLoaded]);
 
   // Schéma de validation pour le formulaire
   const validationSchema = getSupplierValidationSchema(isNew);
@@ -42,6 +79,7 @@ function SupplierDetail() {
     name: '',
     supplier_code: '',
     customer_code: '',
+    brands: [],
     contact: {
       name: '',
       email: '',
@@ -80,7 +118,14 @@ function SupplierDetail() {
     setLoading(true);
     getSupplierById(id)
       .then((data) => {
-        setSupplier(data);
+        // Conversion des données pour le formulaire si nécessaire
+        const formattedSupplier = {
+          ...data,
+          // S'assurer que brands est un tableau
+          brands: Array.isArray(data.brands) ? data.brands : [],
+        };
+
+        setSupplier(formattedSupplier);
         setError(null);
       })
       .catch((err) => {
@@ -91,6 +136,52 @@ function SupplierDetail() {
 
     return cleanup;
   }, [id, isNew, getSupplierById, supplierWsStore]);
+
+  // Gérer l'ajout d'une marque
+  const handleAddBrand = async (brandId) => {
+    if (!id || isNew) return;
+
+    try {
+      setLoading(true);
+
+      // Utiliser la méthode API pour ajouter la marque
+      await addBrandToSupplier(id, brandId);
+
+      // Récupérer les données mises à jour
+      const updatedSupplier = await getSupplierById(id);
+      setSupplier(updatedSupplier);
+
+      setSuccess('Marque ajoutée avec succès');
+    } catch (err) {
+      console.error("Erreur lors de l'ajout de la marque:", err);
+      setError(`Erreur lors de l'ajout de la marque: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gérer la suppression d'une marque
+  const handleRemoveBrand = async (brandId) => {
+    if (!id || isNew) return;
+
+    try {
+      setLoading(true);
+
+      // Utiliser la méthode API pour retirer la marque
+      await removeBrandFromSupplier(id, brandId);
+
+      // Récupérer les données mises à jour
+      const updatedSupplier = await getSupplierById(id);
+      setSupplier(updatedSupplier);
+
+      setSuccess('Marque retirée avec succès');
+    } catch (err) {
+      console.error('Erreur lors de la suppression de la marque:', err);
+      setError(`Erreur lors de la suppression de la marque: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Gérer la soumission du formulaire
   const handleSubmit = async (data) => {
@@ -131,7 +222,14 @@ function SupplierDetail() {
           navigate('/products/suppliers');
         }
       } else {
-        // Mise à jour du fournisseur existant...
+        // Mise à jour du fournisseur existant
+        await updateSupplier(id, formattedData);
+
+        // Récupérer les données mises à jour
+        const updatedSupplier = await getSupplierById(id);
+        setSupplier(updatedSupplier);
+
+        setSuccess('Fournisseur mis à jour avec succès');
       }
 
       return { success: true };
@@ -165,6 +263,11 @@ function SupplierDetail() {
       addIfNotEmpty(result, key, data[key]);
     });
 
+    // Ajouter les marques si présentes
+    if (data.brands && Array.isArray(data.brands) && data.brands.length > 0) {
+      result.brands = data.brands;
+    }
+
     // Traitement des objets imbriqués
     ['contact', 'banking', 'payment_terms'].forEach((objKey) => {
       if (data[objKey] && typeof data[objKey] === 'object') {
@@ -190,6 +293,7 @@ function SupplierDetail() {
 
     return result;
   };
+
   // Gérer la suppression du fournisseur
   const handleDelete = async () => {
     try {
@@ -267,8 +371,9 @@ function SupplierDetail() {
         return (
           <GeneralInfoTab
             entity={safeEntity}
-            fields={['name', 'supplier_code', 'customer_code']}
+            fields={['name', 'supplier_code', 'customer_code', 'brands']}
             editable={editable}
+            _specialFields={specialFields}
           />
         );
       case 'contact':
@@ -300,6 +405,12 @@ function SupplierDetail() {
     }
   };
 
+  // Adapter defaultValues pour inclure le champ brands
+  const formDefaultValues = {
+    ...defaultValues,
+    brands: supplier?.brands || [],
+  };
+
   return (
     <EntityDetail
       entity={supplier}
@@ -319,7 +430,8 @@ function SupplierDetail() {
       success={success}
       editable={isEditMode}
       validationSchema={validationSchema}
-      defaultValues={defaultValues}
+      defaultValues={formDefaultValues}
+      formTitle={isNew ? 'Nouveau fournisseur' : `Modifier ${supplier?.name || 'le fournisseur'}`}
     />
   );
 }

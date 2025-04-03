@@ -77,6 +77,7 @@ export const ENTITY_CONFIG = {
       tab: 'general',
     },
     { name: 'customer_code', label: 'Code client', type: 'text', tab: 'general' },
+    { name: 'brands', label: 'Marques', type: 'multiselect', tab: 'general' },
 
     // Contact
     { name: 'contact.name', label: 'Nom du contact', type: 'text', tab: 'contact' },
