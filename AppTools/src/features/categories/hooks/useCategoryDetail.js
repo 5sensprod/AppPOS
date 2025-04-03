@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+// src/features/categories/hooks/useCategoryDetail.js
+import { useEffect, useState, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useCategory, useCategoryExtras } from '../stores/categoryStore';
 import { useHierarchicalCategories } from '../stores/categoryHierarchyStore';
 import {
@@ -10,18 +11,19 @@ import {
   extractCategoryId,
 } from '../services/categoryService';
 
-export function useCategoryDetail() {
+export default function useCategoryDetail() {
   const { id: paramId } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isNew = location.pathname.endsWith('/new');
   const isEditMode = isNew || location.pathname.endsWith('/edit');
+
   const [category, setCategory] = useState(null);
+  const [currentId, setCurrentId] = useState(paramId);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [currentId, setCurrentId] = useState(paramId);
   const [wsInitialized, setWsInitialized] = useState(false);
 
   const { getCategoryById, createCategory, updateCategory, deleteCategory } = useCategory();
@@ -34,20 +36,18 @@ export function useCategoryDetail() {
     loading: hierarchyLoading,
   } = useHierarchicalCategories();
 
-  // Initialisation WebSocket
   useEffect(() => {
     if (!wsInitialized) {
       const cleanup = initWebSocketListeners();
       setWsInitialized(true);
-      return cleanup;
+      return () => typeof cleanup === 'function' && cleanup();
     }
   }, [initWebSocketListeners, wsInitialized]);
 
-  // Chargement de la catégorie
   useEffect(() => {
-    const load = async () => {
+    const loadData = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
         await fetchHierarchicalCategories();
 
         if (isNew) {
@@ -55,24 +55,26 @@ export function useCategoryDetail() {
           return;
         }
 
-        const effectiveId = currentId || paramId;
-        if (!effectiveId) return;
+        const id = currentId || paramId;
+        if (!id) return;
 
-        const data = await getCategoryById(effectiveId);
+        const data = await getCategoryById(id);
         setCategory(data);
+        setError(null);
       } catch (err) {
-        console.error('Erreur de chargement de la catégorie:', err);
-        setError(err.message);
+        console.error('Erreur chargement catégorie:', err);
+        setError(`Erreur: ${err.message}`);
       } finally {
         setLoading(false);
       }
     };
 
-    load();
-  }, [paramId, isNew, currentId, getCategoryById, fetchHierarchicalCategories]);
+    loadData();
+  }, [paramId, currentId, isNew, fetchHierarchicalCategories, getCategoryById]);
 
-  const parentOptions = useMemo(() => {
-    return transformToOptions(hierarchicalCategories, currentId || paramId, isNew);
+  const parentCategories = useMemo(() => {
+    const id = currentId || paramId;
+    return transformToOptions(hierarchicalCategories, id, isNew);
   }, [hierarchicalCategories, currentId, paramId, isNew]);
 
   const handleSubmit = async (data) => {
@@ -84,20 +86,22 @@ export function useCategoryDetail() {
       if (isNew) {
         const created = await createCategory(formatted);
         const newId = extractCategoryId(created);
+        if (!newId) throw new Error("Impossible d'obtenir l'ID de la nouvelle catégorie");
         setCurrentId(newId);
         setSuccess('Catégorie créée avec succès');
-        const newCategory = await getCategoryById(newId);
-        setCategory(newCategory);
+        const newData = await getCategoryById(newId);
+        setCategory(newData);
         navigate(`/products/categories/${newId}`, { replace: true });
       } else {
-        const effectiveId = currentId || paramId;
-        await updateCategory(effectiveId, formatted);
-        const updated = await getCategoryById(effectiveId);
+        const id = currentId || paramId;
+        await updateCategory(id, formatted);
+        setSuccess('Catégorie mise à jour');
+        const updated = await getCategoryById(id);
         setCategory(updated);
-        setSuccess('Catégorie mise à jour avec succès');
       }
     } catch (err) {
-      setError(err.message);
+      console.error('Erreur submit:', err);
+      setError(`Erreur: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -106,38 +110,42 @@ export function useCategoryDetail() {
   const handleDelete = async () => {
     try {
       setLoading(true);
-      const effectiveId = currentId || paramId;
-      await deleteCategory(effectiveId);
+      await deleteCategory(currentId || paramId);
       navigate('/products/categories');
     } catch (err) {
-      setError(err.message);
+      setError(`Erreur suppression: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    navigate(isNew ? '/products/categories' : `/products/categories/${currentId || paramId}`);
+    if (isNew) {
+      navigate('/products/categories');
+    } else {
+      navigate(`/products/categories/${currentId || paramId}`);
+    }
   };
 
   const handleSync = async () => {
     try {
       setLoading(true);
-      const effectiveId = currentId || paramId;
-      await syncCategory(effectiveId);
-      const updated = await getCategoryById(effectiveId);
+      const id = currentId || paramId;
+      await syncCategory(id);
+      const updated = await getCategoryById(id);
       setCategory(updated);
       setSuccess('Catégorie synchronisée avec succès');
-    } catch (error) {
-      setError('Erreur lors de la synchronisation de la catégorie');
+    } catch (err) {
+      console.error(err);
+      setError('Erreur synchronisation');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUploadImage = async (entityId, imageFile) => {
+  const handleUploadImage = async (entityId, file) => {
     try {
-      await uploadImage(entityId, imageFile);
+      await uploadImage(entityId, file);
       const updated = await getCategoryById(entityId);
       setCategory(updated);
     } catch (err) {
@@ -155,24 +163,23 @@ export function useCategoryDetail() {
     }
   };
 
-  const validationSchema = useMemo(() => getValidationSchema(), []);
-
   return {
     category,
+    parentCategories,
+    isNew,
+    editable: isEditMode,
     loading: loading || hierarchyLoading,
     error,
     success,
-    editable: isEditMode,
-    isNew,
-    parentOptions,
     currentId: currentId || paramId,
-    validationSchema,
-    defaultValues,
     handleSubmit,
     handleDelete,
     handleCancel,
     handleSync,
     handleUploadImage,
     handleDeleteImage,
+    validationSchema: getValidationSchema(),
+    defaultValues,
+    hierarchicalCategories,
   };
 }

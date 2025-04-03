@@ -1,180 +1,169 @@
 // src/features/products/hooks/useProductDetail.js
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useProduct, useProductExtras } from '../stores/productStore';
 import { useHierarchicalCategories } from '../../categories/stores/categoryHierarchyStore';
 import { ENTITY_CONFIG } from '../constants';
 import getValidationSchema from '../components/validationSchema/getValidationSchema';
 import apiService from '../../../services/api';
-import ProductPriceSection from '../components/ProductPriceSection';
-import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
-import InventoryTab from '../components/tabs/InventoryTab';
-import ImagesTab from '../../../components/common/tabs/ImagesTab';
-import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 
-export function useProductDetail() {
+export default function useProductDetail() {
   const { id: paramId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-
   const isNew = location.pathname.endsWith('/new');
   const isEditMode = isNew || location.pathname.endsWith('/edit');
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [currentId, setCurrentId] = useState(paramId);
-  const effectiveId = useMemo(() => currentId || paramId, [currentId, paramId]);
-
-  const [relatedData, setRelatedData] = useState({ brands: [], suppliers: [] });
-  const [dataFetched, setDataFetched] = useState(false);
 
   const { getProductById, createProduct, updateProduct, deleteProduct, syncProduct } = useProduct();
   const { uploadImage, deleteImage, setMainImage } = useProductExtras();
 
+  const [product, setProduct] = useState(null);
+  const [currentId, setCurrentId] = useState(paramId);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [dataFetched, setDataFetched] = useState(false);
+
+  const [relatedData, setRelatedData] = useState({ brands: [], suppliers: [] });
+
   const {
     hierarchicalCategories,
     fetchHierarchicalCategories,
-    initWebSocketListeners: initCategoryWebSocketListeners,
+    initWebSocketListeners,
     loading: hierarchyLoading,
   } = useHierarchicalCategories();
 
-  const validationSchema = getValidationSchema(isNew);
-
-  const defaultValues = useMemo(
-    () => ({
-      name: '',
-      sku: '',
-      description: '',
-      price: null,
-      regular_price: null,
-      sale_price: null,
-      purchase_price: null,
-      stock: 0,
-      min_stock: null,
-      manage_stock: false,
-      status: 'draft',
-      category_id: null,
-      categories: [],
-      brand_id: null,
-      supplier_id: null,
-      brand_ref: null,
-      supplier_ref: null,
-    }),
-    []
-  );
-
+  // WebSocket init
   useEffect(() => {
-    const cleanup = initCategoryWebSocketListeners();
-    return () => typeof cleanup === 'function' && cleanup();
-  }, [initCategoryWebSocketListeners]);
+    const cleanup = initWebSocketListeners();
+    return cleanup;
+  }, [initWebSocketListeners]);
 
+  // Fetch all data (brands, suppliers, categories)
   useEffect(() => {
     if (dataFetched) return;
-    const fetchAllData = async () => {
+
+    const fetchAll = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
         await fetchHierarchicalCategories();
+
         const [brands, suppliers] = await Promise.all([
           apiService.get('/api/brands'),
           apiService.get('/api/suppliers'),
         ]);
+
         setRelatedData({
-          brands: brands.data.data || [],
-          suppliers: suppliers.data.data || [],
+          brands: brands?.data?.data || [],
+          suppliers: suppliers?.data?.data || [],
         });
+
         setDataFetched(true);
       } catch (err) {
-        console.error('Erreur fetch form data:', err);
-        setError('Erreur lors de la récupération des données');
+        setError('Erreur chargement des données liées');
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    fetchAllData();
+
+    fetchAll();
   }, [dataFetched, fetchHierarchicalCategories]);
 
+  // Load product if not new
   useEffect(() => {
-    if (isNew) return setProduct(defaultValues);
-    if (!effectiveId) return;
+    if (isNew) {
+      setProduct(defaultValues);
+      return;
+    }
+
+    if (!paramId) return;
+
     setLoading(true);
-    getProductById(effectiveId)
+    getProductById(paramId)
       .then((data) => setProduct(data))
-      .catch((err) => setError(`Erreur: ${err.message}`))
+      .catch((err) => {
+        console.error(err);
+        setError(`Erreur récupération produit: ${err.message}`);
+      })
       .finally(() => setLoading(false));
-  }, [effectiveId, isNew, getProductById, defaultValues]);
+  }, [paramId, isNew, getProductById]);
 
-  const transformCategoryOptions = useCallback((categories, prefix = '') => {
-    if (!Array.isArray(categories)) return [];
-    let options = [];
-    categories.forEach((cat) => {
-      options.push({ value: cat._id, label: prefix + cat.name });
-      if (cat.children?.length) {
-        options.push(...transformCategoryOptions(cat.children, prefix + '— '));
+  // Utils: option builders
+  const toOptions = (items) => items.map((i) => ({ value: i._id, label: i.name }));
+
+  const categoryOptions = useMemo(() => {
+    const transform = (cats, prefix = '') => {
+      return cats.flatMap((cat) => [
+        { value: cat._id, label: prefix + cat.name },
+        ...(cat.children ? transform(cat.children, prefix + '— ') : []),
+      ]);
+    };
+    return transform(hierarchicalCategories);
+  }, [hierarchicalCategories]);
+
+  const brandOptions = useMemo(() => toOptions(relatedData.brands), [relatedData.brands]);
+  const supplierOptions = useMemo(() => toOptions(relatedData.suppliers), [relatedData.suppliers]);
+
+  // Submission
+  const preprocessData = useCallback(
+    (data) => {
+      const d = { ...data };
+      if (!d.category_id) d.category_id = null;
+      if (!d.brand_id) d.brand_id = null;
+      if (!d.supplier_id) d.supplier_id = null;
+      d.description ||= '';
+      d.sku ||= '';
+      d.stock ||= 0;
+
+      // Relations + catégories imbriquées
+      const catRef = categoryOptions.find((c) => c.value === d.category_id);
+      d.category_info = {
+        refs: d.categories?.map((id) => ({
+          id,
+          name: categoryOptions.find((c) => c.value === id)?.label || '',
+        })),
+        primary: d.category_id
+          ? {
+              id: d.category_id,
+              name: catRef?.label || '',
+            }
+          : null,
+      };
+
+      if (d.brand_id) {
+        const brand = relatedData.brands.find((b) => b._id === d.brand_id);
+        if (brand) d.brand_ref = { id: brand._id, name: brand.name };
       }
-    });
-    return options;
-  }, []);
 
-  const categoryOptions = useMemo(
-    () => transformCategoryOptions(hierarchicalCategories),
-    [hierarchicalCategories, transformCategoryOptions]
-  );
+      if (d.supplier_id) {
+        const sup = relatedData.suppliers.find((s) => s._id === d.supplier_id);
+        if (sup) d.supplier_ref = { id: sup._id, name: sup.name };
+      }
 
-  const brandOptions = useMemo(
-    () => relatedData.brands.map((b) => ({ value: b._id, label: b.name })),
-    [relatedData.brands]
-  );
-
-  const supplierOptions = useMemo(
-    () => relatedData.suppliers.map((s) => ({ value: s._id, label: s.name })),
-    [relatedData.suppliers]
-  );
-
-  const enhancedInventoryFields = useMemo(
-    () => ({
-      category_id: {
-        type: 'select',
-        options: [{ value: '', label: 'Aucune catégorie' }, ...categoryOptions],
-      },
-      categories: { type: 'multiselect', options: categoryOptions },
-      brand_id: {
-        type: 'select',
-        options: [{ value: '', label: 'Aucune marque' }, ...brandOptions],
-      },
-      supplier_id: {
-        type: 'select',
-        options: [{ value: '', label: 'Aucun fournisseur' }, ...supplierOptions],
-      },
-    }),
-    [categoryOptions, brandOptions, supplierOptions]
+      return d;
+    },
+    [categoryOptions, relatedData]
   );
 
   const handleSubmit = async (data) => {
     setLoading(true);
     setError(null);
     try {
-      const processed = preprocessProductData(data, {
-        brands: relatedData.brands,
-        suppliers: relatedData.suppliers,
-        categories: hierarchicalCategories,
-      });
-
+      const processed = preprocessData(data);
       if (isNew) {
         const created = await createProduct(processed);
-        const newId = extractProductId(created);
-        if (!newId) throw new Error("Impossible de récupérer l'ID du produit créé");
+        const newId = created?.id || created?._id || created?.data?.id || created?.data?._id;
         setCurrentId(newId);
-        setSuccess('Produit créé avec succès');
-        const newProduct = await getProductById(newId);
-        setProduct(newProduct);
+        setSuccess('Produit créé');
+        const newData = await getProductById(newId);
+        setProduct(newData);
         navigate(`/products/${newId}`, { replace: true });
       } else {
-        const id = currentId || paramId;
-        await updateProduct(id, processed);
-        setSuccess('Produit mis à jour avec succès');
-        const updated = await getProductById(id);
+        await updateProduct(paramId, processed);
+        const updated = await getProductById(paramId);
         setProduct(updated);
+        setSuccess('Produit mis à jour');
       }
     } catch (err) {
       setError(err.message);
@@ -183,76 +172,76 @@ export function useProductDetail() {
     }
   };
 
-  const renderTabContent = (entity, activeTab, formProps = {}) => {
-    const { editable, register, control, errors } = formProps;
-    switch (activeTab) {
-      case 'general':
-        return (
-          <GeneralInfoTab
-            entity={entity}
-            fields={['name', 'sku', 'description', 'status']}
-            editable={editable}
-            additionalSection={
-              <ProductPriceSection
-                product={entity}
-                editable={editable}
-                register={register}
-                errors={errors}
-              />
-            }
-          />
-        );
-      case 'inventory':
-        return (
-          <InventoryTab
-            product={entity}
-            editable={editable}
-            register={register}
-            control={control}
-            errors={errors}
-            specialFields={editable ? enhancedInventoryFields : {}}
-            hierarchicalCategories={hierarchicalCategories}
-          />
-        );
-      case 'images':
-        return (
-          <ImagesTab
-            entity={entity}
-            entityId={effectiveId}
-            entityType="product"
-            galleryMode={true}
-            onUploadImage={uploadImage}
-            onDeleteImage={deleteImage}
-            onSetMainImage={setMainImage}
-            isLoading={loading}
-            error={error}
-          />
-        );
-      case 'woocommerce':
-        return <WooCommerceTab entity={entity} entityType="product" onSync={syncProduct} />;
-      default:
-        return null;
+  const handleDelete = async () => {
+    try {
+      setLoading(true);
+      await deleteProduct(paramId);
+      navigate('/products');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    navigate(isNew ? '/products' : `/products/${paramId}`);
+  };
+
+  const handleSync = async () => {
+    try {
+      setLoading(true);
+      await syncProduct(paramId);
+      const updated = await getProductById(paramId);
+      setProduct(updated);
+      setSuccess('Produit synchronisé');
+    } catch (err) {
+      setError('Erreur sync');
+    } finally {
+      setLoading(false);
     }
   };
 
   return {
     product,
-    renderTabContent,
-    visibleTabs: isNew
-      ? ENTITY_CONFIG.tabs.filter((tab) => !['images', 'woocommerce'].includes(tab.id))
-      : ENTITY_CONFIG.tabs,
-    defaultValues,
-    handleDelete: async () => {
-      await deleteProduct(effectiveId);
-      navigate('/products');
-    },
-    handleSubmit,
-    handleCancel: () => navigate(isNew ? '/products' : `/products/${effectiveId}`),
-    handleSync: async () => await syncProduct(effectiveId),
     loading: loading || hierarchyLoading,
-    success,
     error,
+    success,
+    isNew,
     editable: isEditMode,
-    validationSchema,
+    currentId: currentId || paramId,
+    handleSubmit,
+    handleDelete,
+    handleCancel,
+    handleSync,
+    validationSchema: getValidationSchema(isNew),
+    defaultValues,
+    categoryOptions,
+    brandOptions,
+    supplierOptions,
+    uploadImage,
+    deleteImage,
+    setMainImage,
+    hierarchicalCategories,
   };
 }
+
+const defaultValues = {
+  name: '',
+  sku: '',
+  description: '',
+  price: null,
+  regular_price: null,
+  sale_price: null,
+  purchase_price: null,
+  stock: 0,
+  min_stock: null,
+  manage_stock: false,
+  status: 'draft',
+  category_id: null,
+  categories: [],
+  brand_id: null,
+  supplier_id: null,
+  brand_ref: null,
+  supplier_ref: null,
+};
