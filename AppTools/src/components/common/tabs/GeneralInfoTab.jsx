@@ -1,4 +1,4 @@
-// src/features/common/tabs/GeneralInfoTab.jsx
+// src/components/common/tabs/GeneralInfoTab.jsx
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Controller } from 'react-hook-form';
@@ -6,12 +6,13 @@ import HierarchicalParentSelector from '../../common/HierarchicalParentSelector'
 
 const GeneralInfoTab = ({
   entity,
-  fields,
+  fields = [],
   description,
   productCount,
   additionalSection,
   // Nouvelles props pour le mode édition
   editable = false,
+  _specialFields = {}, // Pour passer les options des champs spéciaux comme supplier_id
 }) => {
   // Récupération du contexte du formulaire si en mode édition
   const formContext = editable ? useFormContext() : null;
@@ -29,6 +30,7 @@ const GeneralInfoTab = ({
     customer_code: 'Code client',
     slug: 'Slug',
     parent_id: 'Catégorie parente',
+    supplier_id: 'Fournisseur',
   };
 
   // Options pour les champs de type select
@@ -38,6 +40,7 @@ const GeneralInfoTab = ({
       { value: 'draft', label: 'Brouillon' },
       { value: 'archived', label: 'Archivé' },
     ],
+    supplier_id: _specialFields.supplier_id?.options || [],
   };
 
   // Rendu personnalisé pour certains champs en mode lecture
@@ -67,6 +70,28 @@ const GeneralInfoTab = ({
 
     if (field === 'parent_id') {
       return entity.parent_name || value || 'Aucune';
+    }
+
+    if (field === 'supplier_id') {
+      // Vérifier d'abord suppliersRefs qui contient les objets fournisseurs complets
+      if (entity.suppliersRefs && entity.suppliersRefs.length > 0) {
+        return entity.suppliersRefs[0].name;
+      }
+      // Ensuite vérifier suppliers_ref (ancienne structure)
+      if (entity.supplier_ref && entity.supplier_ref.name) {
+        return entity.supplier_ref.name;
+      }
+      // Enfin vérifier le tableau suppliers et récupérer le nom correspondant
+      if (entity.suppliers && entity.suppliers.length > 0) {
+        // Vous devrez peut-être récupérer le nom du fournisseur à partir de l'ID
+        // Cela pourrait être fait en recherchant dans les options
+        const supplierId = entity.suppliers[0];
+        const supplier = _specialFields.supplier_id?.options?.find((s) => s.value === supplierId);
+        if (supplier) {
+          return supplier.label;
+        }
+      }
+      return 'Aucun';
     }
 
     return value || '-';
@@ -115,6 +140,21 @@ const GeneralInfoTab = ({
                 {option.label}
               </option>
             ))}
+          </select>
+        );
+      case 'supplier_id':
+        return (
+          <select {...register(field)} className={baseInputClass}>
+            <option value="">Sélectionner un fournisseur</option>
+            {fieldOptions.supplier_id && fieldOptions.supplier_id.length > 0 ? (
+              fieldOptions.supplier_id.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            ) : (
+              <option disabled>Chargement des fournisseurs...</option>
+            )}
           </select>
         );
       default:
