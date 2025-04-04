@@ -5,7 +5,7 @@ import { useSupplier, useSupplierExtras } from '../stores/supplierStore';
 import { useSupplierDataStore } from '../stores/supplierStore';
 import { useBrand } from '../../brands/stores/brandStore';
 import { getSupplierValidationSchema } from '../components/validationSchema/getValidationSchema';
-
+import imageProxyService from '../../../services/imageProxyService';
 export default function useSupplierDetail(id, isNew) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -27,7 +27,7 @@ export default function useSupplierDetail(id, isNew) {
         const options = (res?.data || []).map((b) => ({
           value: b._id || b.id,
           label: b.name,
-          image: b.image,
+          image: b.image?.src ? imageProxyService.getImageUrl(b.image.src) : null,
         }));
         setSpecialFields({ brands: { options } });
         setBrandsLoaded(true);
@@ -170,8 +170,10 @@ function formatSupplierData(data) {
     addIfNotEmpty(result, key, data[key]);
   });
 
-  if (Array.isArray(data.brands) && data.brands.length > 0) {
+  if (Array.isArray(data.brands)) {
     result.brands = data.brands;
+  } else {
+    result.brands = [];
   }
 
   ['contact', 'banking', 'payment_terms'].forEach((objKey) => {

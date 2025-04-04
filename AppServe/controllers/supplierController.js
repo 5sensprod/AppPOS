@@ -1,4 +1,4 @@
-//AppServe\controllers\supplierController.js
+// AppServe/controllers/supplierController.js
 const BaseController = require('./base/BaseController');
 const Supplier = require('../models/Supplier');
 const Brand = require('../models/Brand');
@@ -37,6 +37,16 @@ class SupplierController extends BaseController {
         await Brand.updateProductCount(brandId);
       }
 
+      // Ajout des refs marques enrichies
+      if (updated.brands?.length) {
+        const brands = await Brand.find({ _id: { $in: updated.brands } });
+        updated.brandsRefs = brands.map((b) => ({
+          id: b._id,
+          name: b.name,
+          image: b.image,
+        }));
+      }
+
       return ResponseHandler.success(res, updated);
     } catch (error) {
       return ResponseHandler.error(res, error);
@@ -67,6 +77,26 @@ class SupplierController extends BaseController {
 
       this.eventService.updated(id, updatedItem);
       return ResponseHandler.success(res, updatedItem);
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  async getById(req, res) {
+    try {
+      const supplier = await this.model.findById(req.params.id);
+      if (!supplier) return ResponseHandler.notFound(res);
+
+      const brandIds = supplier.brands || [];
+      const brands = await Brand.find({ _id: { $in: brandIds } });
+
+      supplier.brandsRefs = brands.map((b) => ({
+        id: b._id,
+        name: b.name,
+        image: b.image,
+      }));
+
+      return ResponseHandler.success(res, supplier);
     } catch (error) {
       return ResponseHandler.error(res, error);
     }

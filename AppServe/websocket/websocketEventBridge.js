@@ -29,6 +29,11 @@ function initializeWebSocketEventBridge() {
     websocketManager.notifyCategoryTreeChange();
   });
 
+  apiEventEmitter.on('suppliers.tree.changed', () => {
+    console.log(`[EVENT-WS] Événement suppliers.tree.changed relayé vers WebSocket`);
+    websocketManager.notifySupplierTreeChange();
+  });
+
   apiEventEmitter.on('brands.count.updated', ({ id, count }) => {
     console.log(`[EVENT-WS] Événement brands.count.updated pour ${id} relayé vers WebSocket`);
     websocketManager.notifyEntityCountUpdated('brands', id, count);

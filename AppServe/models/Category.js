@@ -1,4 +1,4 @@
-//AppServe\services\relationService.js
+//AppServe\models\Category.js
 const BaseModel = require('./base/BaseModel');
 const db = require('../config/database');
 const { buildCategoryPath } = require('../utils/categoryHelpers');

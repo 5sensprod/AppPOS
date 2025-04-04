@@ -25,7 +25,6 @@ const EntityTable = ({
   defaultSort = { field: 'name', direction: 'asc' },
   actions = ['view', 'edit', 'delete', 'sync'],
   batchActions = ['delete', 'sync'],
-  syncEnabled = false,
   pagination = {
     enabled: true,
     pageSize: 10,

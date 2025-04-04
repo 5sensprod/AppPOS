@@ -1,3 +1,4 @@
+//AppTools\src\factories\createEntityStore.js
 import { create } from 'zustand';
 import { pluralize, capitalize } from '../utils/entityUtils';
 import apiService from '../services/api';

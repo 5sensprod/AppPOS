@@ -1,6 +1,8 @@
 // AppServe\models\Brand.js
 const BaseModel = require('./base/BaseModel');
 const db = require('../config/database');
+const Supplier = require('./Supplier');
+const { buildSupplierPathFlat } = require('../utils/supplierHelpers');
 
 class Brand extends BaseModel {
   constructor() {
@@ -46,6 +48,46 @@ class Brand extends BaseModel {
       await Promise.all(updatePromises);
       return true;
     } catch (error) {
+      throw error;
+    }
+  }
+
+  async findByIdWithSupplierInfo(id) {
+    try {
+      const brand = await this.findById(id);
+      if (!brand) return null;
+
+      const supplierIds = brand.suppliers || [];
+      if (supplierIds.length === 0) {
+        return {
+          ...brand,
+          supplier_info: {
+            refs: [],
+            primary: null,
+          },
+        };
+      }
+
+      const allSuppliers = await Supplier.find({ _id: { $in: supplierIds } });
+
+      const refs = allSuppliers.map((supplier) => {
+        const pathInfo = buildSupplierPathFlat(supplier, brand);
+        return {
+          id: supplier._id,
+          name: supplier.name,
+          ...pathInfo,
+        };
+      });
+
+      return {
+        ...brand,
+        supplier_info: {
+          refs,
+          primary: refs[0] || null,
+        },
+      };
+    } catch (error) {
+      console.error('Erreur récupération marque avec fournisseurs:', error);
       throw error;
     }
   }

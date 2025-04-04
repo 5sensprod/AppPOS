@@ -35,6 +35,18 @@ export const ENTITY_CONFIG = {
     { key: 'supplier_code', label: 'Code fournisseur', sortable: true },
     { key: 'customer_code', label: 'Code client', sortable: true },
     {
+      key: 'brands_count',
+      label: 'Marques',
+      sortable: false,
+      render: (supplier) => (
+        <div className="text-center">
+          <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
+            {supplier.brands?.length || 0}
+          </span>
+        </div>
+      ),
+    },
+    {
       key: 'product_count',
       label: 'Articles',
       sortable: true,

@@ -3,7 +3,8 @@ import React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Controller } from 'react-hook-form';
 import HierarchicalParentSelector from '../../common/HierarchicalParentSelector';
-
+import BrandSelectField from '../fields/BrandSelectField';
+import imageProxyService from '../../../services/imageProxyService';
 const GeneralInfoTab = ({
   entity,
   fields = [],
@@ -95,21 +96,23 @@ const GeneralInfoTab = ({
     }
 
     if (field === 'brands') {
-      // Vérifier d'abord brandsRefs qui contient les objets marques complets
-      if (entity.brandsRefs && entity.brandsRefs.length > 0) {
-        return entity.brandsRefs.map((brand) => brand.name).join(', ');
-      }
-
-      // Vérifier le tableau brands et récupérer les noms correspondants
-      if (entity.brands && entity.brands.length > 0) {
-        const brandNames = entity.brands.map((brandId) => {
-          const brand = _specialFields.brands?.options?.find((b) => b.value === brandId);
-          return brand ? brand.label : brandId;
-        });
-        return brandNames.join(', ');
-      }
-
-      return 'Aucune marque';
+      const brands = entity.brandsRefs || [];
+      return (
+        <div className="flex flex-wrap gap-2">
+          {brands.map((brand) => (
+            <div key={brand.id} className="flex items-center gap-2 border px-2 py-1 rounded">
+              {brand.image?.src && (
+                <img
+                  src={imageProxyService.getImageUrl(brand.image.src)}
+                  alt={brand.name}
+                  className="w-6 h-6 object-cover rounded"
+                />
+              )}
+              <span>{brand.name}</span>
+            </div>
+          ))}
+        </div>
+      );
     }
 
     return value || '-';
@@ -152,16 +155,11 @@ const GeneralInfoTab = ({
         );
       case 'brands':
         return (
-          <select {...register(field)} multiple className={baseInputClass}>
-            <option value="" disabled>
-              Sélectionner des marques
-            </option>
-            {_specialFields.brands?.options?.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <BrandSelectField
+            name="brands"
+            editable={editable}
+            options={_specialFields.brands?.options || []}
+          />
         );
       case 'status':
         return (

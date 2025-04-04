@@ -74,6 +74,13 @@ class WebSocketManager {
     console.log("[WS-DEBUG] Notification de changement dans l'arborescence des catégories envoyée");
   }
 
+  notifySupplierTreeChange() {
+    this.broadcast('suppliers.tree.changed', { timestamp: Date.now() }, ['suppliers']);
+    console.log(
+      "[WS-DEBUG] Notification de changement dans l'arborescence des fournisseurs envoyée"
+    );
+  }
+
   notifyEntityCountUpdated(entityType, entityId, count) {
     const entityPlural = standardizeEntityType(entityType);
     this.broadcast(`${entityPlural}.count.updated`, { entityId, count }, [entityPlural]);

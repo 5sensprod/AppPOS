@@ -16,6 +16,16 @@ class BrandController extends BaseController {
     this.eventService = getEntityEventService(this.entityName);
   }
 
+  async getById(req, res) {
+    try {
+      const brand = await this.model.findByIdWithSupplierInfo(req.params.id);
+      if (!brand) return ResponseHandler.notFound(res);
+      return ResponseHandler.success(res, brand);
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   async getBySupplier(req, res) {
     try {
       const brands = await this.model.findBySupplier(req.params.supplierId);

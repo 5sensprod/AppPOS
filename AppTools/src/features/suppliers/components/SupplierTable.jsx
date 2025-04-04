@@ -1,3 +1,4 @@
+//AppTools\src\features\suppliers\components\SupplierTable.jsx
 import React, { useEffect } from 'react';
 import { useSupplier, useSupplierDataStore } from '../stores/supplierStore';
 import { EntityTable } from '../../../components/common/';

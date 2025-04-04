@@ -1,3 +1,4 @@
+//AppTools\src\factories\createWebSocketStore.js
 import { create } from 'zustand';
 import websocketService from '../services/websocketService';
 
@@ -10,6 +11,8 @@ export function createWebSocketStore(options) {
     additionalChannels = [],
     additionalEvents = [],
     apiService,
+    initialState = {},
+    customMethods = () => ({}),
   } = options;
 
   const entityNameLower = entityName.toLowerCase();
@@ -140,6 +143,8 @@ export function createWebSocketStore(options) {
       initWebSocket: setupWebSocketListeners,
       cleanup,
       debugListeners,
+      ...initialState,
+      ...customMethods(set, get),
     };
   });
 }

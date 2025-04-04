@@ -37,6 +37,11 @@ class ApiEventEmitter extends EventEmitter {
     this.emit('categories.tree.changed', { timestamp: Date.now() });
   }
 
+  supplierTreeChanged() {
+    console.log(`[EVENT] Émission de suppliers.tree.changed`);
+    this.emit('suppliers.tree.changed', { timestamp: Date.now() });
+  }
+
   countUpdated(entityType, id, count) {
     const normalized = standardizeEntityType(entityType);
     console.log(`[EVENT] Émission de ${normalized}.count.updated`);

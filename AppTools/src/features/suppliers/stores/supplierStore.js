@@ -1,3 +1,4 @@
+//AppTools\src\features\suppliers\stores\supplierStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import apiService from '../../../services/api';
@@ -12,8 +13,24 @@ export const useSupplierDataStore = createWebSocketStore({
   entityName: SUPPLIER_CONFIG.entityName,
   apiEndpoint: SUPPLIER_CONFIG.apiEndpoint,
   apiService,
-  additionalChannels: [],
-  additionalEvents: [],
+  initialState: {
+    hierarchicalItems: [],
+  },
+  customMethods: (set, get) => ({
+    fetchHierarchicalSuppliers: async () => {
+      try {
+        const response = await apiService.get('/api/suppliers/hierarchical');
+        if (response.success) {
+          set({ hierarchicalItems: response.data });
+          console.log('🌲 Arborescence des fournisseurs mise à jour');
+        } else {
+          console.warn('⚠️ Échec de récupération de l’arborescence');
+        }
+      } catch (error) {
+        console.error('❌ fetchHierarchicalSuppliers erreur:', error);
+      }
+    },
+  }),
 });
 
 // Étendre useSupplier avec l'initialisation directe WebSocket

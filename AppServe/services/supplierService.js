@@ -1,6 +1,8 @@
 //AppServe\services\supplierService.js
 const Supplier = require('../models/Supplier');
 const Brand = require('../models/Brand');
+const db = require('../config/database');
+const Product = require('../models/Product');
 const { getEntityEventService } = require('../services/events/entityEvents');
 
 // ------- EXISTANT -------
@@ -51,6 +53,9 @@ async function createSupplier(data) {
   await syncSupplierWithBrands(newSupplier._id.toString(), brands);
 
   supplierEvents.created(newSupplier);
+
+  getEntityEventService('suppliers').supplierTreeChanged();
+
   return newSupplier;
 }
 
@@ -82,6 +87,7 @@ async function updateSupplier(id, updateData) {
   await syncSupplierWithBrands(id, addedBrands);
 
   getEntityEventService('suppliers').updated(id, updated);
+  getEntityEventService('suppliers').supplierTreeChanged();
 
   return Supplier.findById(id);
 }
@@ -90,17 +96,83 @@ async function deleteSupplier(supplier) {
   const { _id, brands = [] } = supplier;
   const supplierEvents = getEntityEventService('suppliers');
 
+  // 🔒 Vérifie s'il y a encore des produits liés à ce fournisseur
+  const linkedProducts = await db.products.find({ supplier_id: _id });
+  if (linkedProducts.length > 0) {
+    throw new Error(
+      `Impossible de supprimer ce fournisseur : ${linkedProducts.length} produit(s) encore lié(s)`
+    );
+  }
+
+  // ➡️ On supprime les relations avec les marques
   await removeSupplierFromBrands(_id, brands);
+
+  // ➡️ Suppression du fournisseur
   await Supplier.delete(_id);
 
+  // ➡️ Notification des événements
   supplierEvents.deleted(_id);
 
+  // ➡️ Mise à jour des compteurs de marques
   for (const brandId of brands) {
     await Brand.updateProductCount(brandId);
   }
 
+  getEntityEventService('suppliers').supplierTreeChanged();
+
   return { message: 'Fournisseur supprimé avec succès' };
 }
+
+async function buildSupplierTree() {
+  const allSuppliers = await Supplier.findAll();
+  const allBrands = await Brand.findAll();
+  const allProducts = await Product.findAll();
+
+  const suppliersMap = new Map();
+
+  // Initialiser les fournisseurs
+  allSuppliers.forEach((supplier) => {
+    suppliersMap.set(supplier._id, {
+      ...supplier,
+      brands: [],
+      brandCount: 0,
+    });
+  });
+
+  // Associer les marques aux fournisseurs
+  allBrands.forEach((brand) => {
+    const supplierIds = brand.suppliers || [];
+
+    // Produits liés à cette marque
+    const brandProducts = allProducts.filter((product) => product.brand_id === brand._id);
+
+    const brandNode = {
+      _id: brand._id,
+      name: brand.name,
+      productCount: brandProducts.length,
+      products: brandProducts.map((p) => ({
+        _id: p._id,
+        name: p.name,
+        sku: p.sku || null,
+      })),
+    };
+
+    supplierIds.forEach((supplierId) => {
+      const supplierNode = suppliersMap.get(supplierId);
+      if (supplierNode) {
+        supplierNode.brands.push(brandNode);
+        supplierNode.brandCount += 1;
+      }
+    });
+  });
+
+  return Array.from(suppliersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+module.exports = {
+  ...// tes autres exports
+  buildSupplierTree,
+};
 
 // ------- EXPORT -------
 module.exports = {
@@ -110,4 +182,5 @@ module.exports = {
   createSupplier,
   updateSupplier,
   deleteSupplier,
+  buildSupplierTree,
 };

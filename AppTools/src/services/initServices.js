@@ -91,6 +91,16 @@ function setupGlobalWebSocketEventHandlers() {
     console.log('🌳 Arborescence des catégories modifiée, notification globale reçue');
   });
 
+  websocketService.on('suppliers.tree.changed', () => {
+    console.log('🌲 Arborescence des fournisseurs modifiée, notification reçue');
+    const supplierStore = useSupplierDataStore.getState();
+    if (supplierStore.fetchHierarchicalSuppliers) {
+      supplierStore.fetchHierarchicalSuppliers();
+    } else {
+      console.warn('⚠️ Méthode fetchHierarchicalSuppliers non trouvée dans le store fournisseur');
+    }
+  });
+
   // Abonnement aux événements produits pour les compteurs
   websocketService.on('products.updated', (data) => {
     console.log('📦 Produit mis à jour, vérification des compteurs');

@@ -54,6 +54,8 @@ async function createBrand(data) {
 
   await Brand.updateProductCount(brand._id);
 
+  getEntityEventService('suppliers').supplierTreeChanged();
+
   brandEvents.created(brand);
   return brand;
 }
@@ -92,6 +94,7 @@ async function updateBrand(id, updateData) {
   );
 
   getEntityEventService('brands').updated(id, updated);
+  getEntityEventService('suppliers').supplierTreeChanged();
 
   return Brand.findById(id);
 }
@@ -100,14 +103,29 @@ async function deleteBrand(brand) {
   const { _id, suppliers = [] } = brand;
   const brandEvents = getEntityEventService('brands');
 
+  // 🔒 Vérifie s'il y a encore des produits liés à cette marque
+  const productCount = await db.products.count({ brand_id: _id });
+  if (productCount > 0) {
+    throw new Error(
+      `Impossible de supprimer cette marque : ${productCount} produit(s) encore lié(s)`
+    );
+  }
+
+  // ➡️ Supprimer les relations avec les fournisseurs
   await removeBrandFromSuppliers(_id, suppliers);
+
+  // ➡️ Supprimer la marque
   await Brand.delete(_id);
 
+  // ➡️ Événement
   brandEvents.deleted(_id);
 
+  // ➡️ Mise à jour des compteurs fournisseurs
   for (const supplierId of suppliers) {
     await Supplier.updateProductCount(supplierId);
   }
+
+  getEntityEventService('suppliers').supplierTreeChanged();
 
   return { message: 'Marque supprimée avec succès' };
 }
