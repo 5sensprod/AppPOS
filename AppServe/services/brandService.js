@@ -1,3 +1,4 @@
+//AppServe\services\brandService.js
 const Brand = require('../models/Brand');
 const Supplier = require('../models/Supplier');
 const { getEntityEventService } = require('../services/events/entityEvents');

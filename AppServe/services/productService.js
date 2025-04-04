@@ -1,3 +1,4 @@
+//AppServe\services\productService.js
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Brand = require('../models/Brand');

@@ -1,3 +1,4 @@
+//AppServe\controllers\productController.js
 const BaseController = require('./base/BaseController');
 const Product = require('../models/Product');
 const Brand = require('../models/Brand');

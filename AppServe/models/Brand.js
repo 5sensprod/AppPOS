@@ -1,3 +1,4 @@
+// AppServe\models\Brand.js
 const BaseModel = require('./base/BaseModel');
 const db = require('../config/database');
 

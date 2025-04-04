@@ -1,3 +1,4 @@
+// AppServe\controllers\categoryController.js
 const BaseController = require('./base/BaseController');
 const Category = require('../models/Category');
 const categoryWooCommerceService = require('../services/CategoryWooCommerceService');

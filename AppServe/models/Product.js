@@ -1,3 +1,4 @@
+//AppServe\models\Product.js
 const BaseModel = require('./base/BaseModel');
 const db = require('../config/database');
 const Category = require('./Category');
