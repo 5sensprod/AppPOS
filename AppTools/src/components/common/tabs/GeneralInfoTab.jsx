@@ -32,6 +32,7 @@ const GeneralInfoTab = ({
     slug: 'Slug',
     parent_id: 'Catégorie parente',
     supplier_id: 'Fournisseur',
+    brands: 'Marques',
   };
 
   // Options pour les champs de type select

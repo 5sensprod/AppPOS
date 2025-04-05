@@ -67,12 +67,8 @@ async function updateSupplier(id, updateData) {
   let newBrands = oldBrands;
 
   if (Array.isArray(updateData.brands)) {
-    if (updateData.brands.length > 0) {
-      await validateBrands(updateData.brands);
-      newBrands = [...new Set([...oldBrands, ...updateData.brands])];
-    } else {
-      newBrands = [];
-    }
+    await validateBrands(updateData.brands);
+    newBrands = updateData.brands; // ← ✅ on garde juste les nouvelles marques
     updateData.brands = newBrands;
   } else {
     delete updateData.brands;
@@ -80,6 +76,7 @@ async function updateSupplier(id, updateData) {
 
   const updated = await Supplier.update(id, updateData);
 
+  // Calcul du diff
   const removedBrands = oldBrands.filter((id) => !newBrands.includes(id));
   const addedBrands = newBrands.filter((id) => !oldBrands.includes(id));
 

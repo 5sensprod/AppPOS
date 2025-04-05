@@ -94,10 +94,15 @@ function setupGlobalWebSocketEventHandlers() {
   websocketService.on('suppliers.tree.changed', () => {
     console.log('🌲 Arborescence des fournisseurs modifiée, notification reçue');
     const supplierStore = useSupplierDataStore.getState();
+
+    // Recharger la hiérarchie si disponible
     if (supplierStore.fetchHierarchicalSuppliers) {
       supplierStore.fetchHierarchicalSuppliers();
-    } else {
-      console.warn('⚠️ Méthode fetchHierarchicalSuppliers non trouvée dans le store fournisseur');
+    }
+
+    // 💡 Recharger aussi la liste plate des fournisseurs !
+    if (supplierStore.fetchSuppliers) {
+      supplierStore.fetchSuppliers();
     }
   });
 

@@ -41,6 +41,11 @@ class EntityEventService {
     apiEventEmitter.categoryTreeChanged();
   }
 
+  supplierTreeChanged() {
+    console.log(`[EVENT] Émission d'événement de changement de l'arborescence des fournisseurs`);
+    apiEventEmitter.supplierTreeChanged();
+  }
+
   syncCompleted(id, data) {
     console.log(`[EVENT] Émission d'événement de synchronisation pour ${this.entityType}: ${id}`);
     apiEventEmitter.entityUpdated(this.entityType, id, data);

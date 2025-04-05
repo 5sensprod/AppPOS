@@ -20,8 +20,8 @@ export const useSupplierDataStore = createWebSocketStore({
     fetchHierarchicalSuppliers: async () => {
       try {
         const response = await apiService.get('/api/suppliers/hierarchical');
-        if (response.success) {
-          set({ hierarchicalItems: response.data });
+        if (response.data?.success) {
+          set({ hierarchicalItems: response.data.data });
           console.log('🌲 Arborescence des fournisseurs mise à jour');
         } else {
           console.warn('⚠️ Échec de récupération de l’arborescence');
