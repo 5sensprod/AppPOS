@@ -40,6 +40,7 @@ class Product extends BaseModel {
           name: category.name,
           woo_id: category.woo_id || null,
           ...pathInfo,
+          path_string: pathInfo.path ? pathInfo.path.join(' > ') : '', // ← ✅ ici
         };
       });
 

@@ -22,10 +22,13 @@ class Supplier extends BaseModel {
           .then((supplier) => {
             if (!supplier) return reject(new Error(`Fournisseur avec ID ${supplierId} non trouvé`));
 
-            const brandIds = Array.isArray(supplier.brands) ? supplier.brands : [];
+            const brandIds = (Array.isArray(supplier.brands) ? supplier.brands : []).map((b) =>
+              b.toString()
+            );
             const count = allProducts.reduce((acc, product) => {
-              const matchesSupplier = product.supplier_id === supplierId;
-              const matchesBrand = brandIds.includes(product.brand_id);
+              const matchesSupplier =
+                (product.supplier_id || '').toString() === supplierId.toString();
+              const matchesBrand = brandIds.includes((product.brand_id || '').toString());
               return acc + (matchesSupplier || matchesBrand ? 1 : 0);
             }, 0);
 

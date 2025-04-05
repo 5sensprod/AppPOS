@@ -377,11 +377,20 @@ async function migrateProducts(shouldReset = false) {
         processedIds.add(oldProduct._id);
 
         // Récupérer les informations de la marque à partir de son nom
-        const brandName = oldProduct.marque || oldProduct.brand;
+        const brandName = (oldProduct.marque || oldProduct.brand || '').trim();
         const brandInfo = await getBrandInfoByName(brandName, brandsDb);
 
+        if (!brandInfo && brandName) {
+          console.warn(`⚠️ Marque "${brandName}" introuvable dans brands.db`);
+        }
+
         // Récupérer les informations du fournisseur à partir de son ID
-        const supplierInfo = await getSupplierInfoById(oldProduct.supplierId, suppliersDb);
+        const supplierId = oldProduct.supplierId || '';
+        const supplierInfo = await getSupplierInfoById(supplierId, suppliersDb);
+
+        if (!supplierInfo && supplierId) {
+          console.warn(`⚠️ Fournisseur avec ID "${supplierId}" introuvable dans suppliers.db`);
+        }
 
         // Récupérer les informations de la catégorie avec hiérarchie
         const categoryId = oldProduct.categorie;

@@ -90,6 +90,26 @@ export const ENTITY_CONFIG = {
       sortable: false,
     },
     {
+      key: 'supplier_brand_path',
+      label: 'Marque',
+      render: (product) => {
+        const brand = product.brand_ref?.name || '-';
+        const supplier = product.supplier_ref?.name;
+
+        return (
+          <div className="flex flex-col">
+            <span className=" text-gray-900 dark:text-white">{brand}</span>
+            {supplier && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {supplier} › {brand}
+              </span>
+            )}
+          </div>
+        );
+      },
+      sortable: false,
+    },
+    {
       key: 'woo_status',
       label: 'Statut WEB',
       render: (product) => {

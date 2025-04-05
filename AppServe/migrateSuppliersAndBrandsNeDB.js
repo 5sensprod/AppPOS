@@ -291,13 +291,16 @@ async function migrateSuppliersBrands(shouldReset = false) {
           const currentBrandsRefs = Array.isArray(supplier.brandsRefs) ? supplier.brandsRefs : [];
 
           // Vérifier si cette marque est déjà référencée dans le fournisseur
-          const hasNameInArray = currentBrands.includes(brandName);
+          // const hasNameInArray = currentBrands.includes(brandName);
           const hasIdInRefs = currentBrandsRefs.some((ref) => ref.id === brandInfo.id);
-
-          // Mise à jour des tableaux de marques
-          if (!hasNameInArray) {
-            currentBrands.push(brandName);
+          const hasIdInArray = currentBrands.includes(brandInfo.id);
+          if (!hasIdInArray) {
+            currentBrands.push(brandInfo.id);
           }
+          // Mise à jour des tableaux de marques
+          // if (!hasNameInArray) {
+          //   currentBrands.push(brandName);
+          // }
 
           if (!hasIdInRefs) {
             currentBrandsRefs.push({ id: brandInfo.id, name: brandName });
@@ -330,6 +333,18 @@ async function migrateSuppliersBrands(shouldReset = false) {
     console.log(
       `Migration terminée: ${importedSuppliers} fournisseurs et ${importedBrands} marques importés, ${errorCount} erreurs.`
     );
+    // Recalcul des compteurs produits pour les marques et fournisseurs
+    try {
+      const Supplier = require('./models/Supplier');
+      const Brand = require('./models/Brand');
+
+      await Supplier.recalculateAllProductCounts();
+      await Brand.recalculateAllProductCounts();
+
+      console.log('🔄 Compteurs recalculés avec succès pour les marques et fournisseurs.');
+    } catch (err) {
+      console.warn('⚠️ Erreur lors du recalcul des compteurs produits:', err.message);
+    }
 
     return {
       success: true,
