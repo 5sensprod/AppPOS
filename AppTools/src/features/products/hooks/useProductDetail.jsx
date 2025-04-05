@@ -90,7 +90,15 @@ export default function useProductDetail() {
   }, [paramId, isNew, getProductById]);
 
   // Utils: option builders
-  const toOptions = (items) => items.map((i) => ({ value: i._id, label: i.name }));
+  const toOptions = (items, includeRelations = false) =>
+    items.map((i) => ({
+      value: i._id,
+      label: i.name,
+      ...(includeRelations && {
+        suppliers: i.suppliers || [],
+        brands: i.brands || [],
+      }),
+    }));
 
   const categoryOptions = useMemo(() => {
     const transform = (cats, prefix = '') => {
@@ -102,8 +110,12 @@ export default function useProductDetail() {
     return transform(hierarchicalCategories);
   }, [hierarchicalCategories]);
 
-  const brandOptions = useMemo(() => toOptions(relatedData.brands), [relatedData.brands]);
-  const supplierOptions = useMemo(() => toOptions(relatedData.suppliers), [relatedData.suppliers]);
+  const brandOptions = useMemo(() => toOptions(relatedData.brands, true), [relatedData.brands]);
+
+  const supplierOptions = useMemo(
+    () => toOptions(relatedData.suppliers, true),
+    [relatedData.suppliers]
+  );
 
   // Submission
   const preprocessData = useCallback(

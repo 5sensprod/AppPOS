@@ -1,6 +1,5 @@
-// src/features/products/components/tabs/InventoryTab.jsx
-import React from 'react';
-import { Controller } from 'react-hook-form';
+import React, { useMemo, useEffect } from 'react';
+import { Controller, useFormContext } from 'react-hook-form';
 import MultiHierarchicalSelector from '../../../../components/common/MultiHierarchicalSelector';
 
 const InventoryTab = ({
@@ -12,7 +11,7 @@ const InventoryTab = ({
   specialFields = {},
   hierarchicalCategories = [],
 }) => {
-  // Si en mode lecture
+  // 🎯 Si en mode lecture
   if (!editable) {
     return (
       <div className="space-y-8">
@@ -101,7 +100,39 @@ const InventoryTab = ({
     );
   }
 
-  // Si en mode édition
+  // 🎯 En mode édition : logique de sélection croisée
+  const { watch, setValue } = useFormContext();
+  const selectedBrandId = watch('brand_id');
+  const selectedSupplierId = watch('supplier_id');
+
+  const allBrands = specialFields.brand_id?.options || [];
+  const allSuppliers = specialFields.supplier_id?.options || [];
+
+  const filteredBrands = useMemo(() => {
+    if (!selectedSupplierId) return allBrands;
+    return allBrands.filter((brand) => brand.suppliers?.includes(selectedSupplierId));
+  }, [selectedSupplierId, allBrands]);
+
+  const filteredSuppliers = useMemo(() => {
+    if (!selectedBrandId) return allSuppliers;
+    return allSuppliers.filter((supplier) => supplier.brands?.includes(selectedBrandId));
+  }, [selectedBrandId, allSuppliers]);
+
+  // ⚠️ Reset l'autre champ si non valide
+  useEffect(() => {
+    const brand = allBrands.find((b) => b.value === selectedBrandId);
+    if (selectedSupplierId && brand && !brand.suppliers?.includes(selectedSupplierId)) {
+      setValue('brand_id', '');
+    }
+  }, [selectedSupplierId]);
+
+  useEffect(() => {
+    const supplier = allSuppliers.find((s) => s.value === selectedSupplierId);
+    if (selectedBrandId && supplier && !supplier.brands?.includes(selectedBrandId)) {
+      setValue('supplier_id', '');
+    }
+  }, [selectedBrandId]);
+
   return (
     <div className="space-y-8">
       <div>
@@ -161,7 +192,7 @@ const InventoryTab = ({
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {/* Catégorie principale avec HierarchicalParentSelector */}
+          {/* Catégorie principale */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Catégorie principale
@@ -201,12 +232,11 @@ const InventoryTab = ({
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Sélectionner une marque</option>
-              {specialFields.brand_id?.options &&
-                specialFields.brand_id.options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+              {filteredBrands.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
             {errors?.brand_id && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-500">
@@ -225,12 +255,11 @@ const InventoryTab = ({
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Sélectionner un fournisseur</option>
-              {specialFields.supplier_id?.options &&
-                specialFields.supplier_id.options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+              {filteredSuppliers.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
             {errors?.supplier_id && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-500">
