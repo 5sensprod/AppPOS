@@ -5,6 +5,7 @@ import { useBrand, useBrandExtras } from '../stores/brandStore';
 import { useBrandDataStore } from '../stores/brandStore';
 import { useSupplier } from '../../suppliers/stores/supplierStore';
 import getValidationSchema from '../components/validationSchema/getValidationSchema';
+import apiService from '../../../services/api';
 
 export default function useBrandDetail(id, isNew) {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export default function useBrandDetail(id, isNew) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [specialFields, setSpecialFields] = useState({
-    supplier_id: { options: [] },
+    suppliers: { options: [] },
   });
 
   const { getBrandById, createBrand, updateBrand, deleteBrand } = useBrand();
@@ -26,13 +27,24 @@ export default function useBrandDetail(id, isNew) {
     const loadSuppliers = async () => {
       try {
         const res = await supplierStore.fetchSuppliers();
-        const data = res?.data || [];
-        const supplierOptions = data.map((s) => ({ value: s._id || s.id, label: s.name }));
-        setSpecialFields({ supplier_id: { options: supplierOptions } });
+        const data = res || []; // ✅ correction ici
+        console.log('[SUPPLIERS LOADED]', data);
+        const supplierOptions = data.map((s) => ({
+          value: s._id || s.id,
+          label: s.name,
+          image: s.image ? { src: s.image.src } : null,
+        }));
+
+        setSpecialFields((prev) => ({
+          ...prev,
+          supplier_id: { options: supplierOptions },
+          suppliers: { options: supplierOptions },
+        }));
       } catch (err) {
         console.error('Erreur chargement fournisseurs:', err);
       }
     };
+
     loadSuppliers();
   }, []);
 
@@ -54,16 +66,55 @@ export default function useBrandDetail(id, isNew) {
     return cleanup;
   }, [id, isNew, getBrandById, brandWsStore]);
 
+  useEffect(() => {
+    if (!id || isNew) return;
+
+    const enrichSuppliersWithImages = async () => {
+      try {
+        const fetchedBrand = await getBrandById(id);
+
+        const refs = fetchedBrand?.supplier_info?.refs || [];
+
+        const enrichedRefs = await Promise.all(
+          refs.map(async (ref) => {
+            try {
+              const res = await apiService.get(`/api/suppliers/${ref.id}`);
+              return {
+                ...ref,
+                image: res.data?.data?.image || null,
+              };
+            } catch (e) {
+              console.warn(`❌ Impossible de charger l'image du fournisseur ${ref.id}`, e);
+              return ref;
+            }
+          })
+        );
+
+        setBrand({
+          ...fetchedBrand,
+          supplier_info: {
+            ...fetchedBrand.supplier_info,
+            refs: enrichedRefs,
+          },
+        });
+      } catch (error) {
+        console.error('Erreur enrichissement des fournisseurs:', error);
+      }
+    };
+
+    enrichSuppliersWithImages();
+  }, [id, isNew]);
+
   const handleSubmit = async (data) => {
     setLoading(true);
     setError(null);
     try {
-      const { supplier_id, ...fields } = data;
+      const { suppliers = [], ...fields } = data;
       const payload = {
         name: fields.name || '',
         description: fields.description || null,
         slug: fields.slug || null,
-        suppliers: supplier_id ? [supplier_id] : [],
+        suppliers: suppliers, // ← tableau d’IDs
       };
       if (isNew) {
         const created = await createBrand(payload);
@@ -135,7 +186,7 @@ export default function useBrandDetail(id, isNew) {
       name: '',
       description: '',
       slug: '',
-      supplier_id: '',
+      suppliers: [],
     },
     uploadImage,
     deleteImage,

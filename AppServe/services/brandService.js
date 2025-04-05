@@ -71,12 +71,8 @@ async function updateBrand(id, updateData) {
   if (supplier_id?.trim()) await validateSuppliers([supplier_id]);
 
   if (Array.isArray(suppliers)) {
-    if (suppliers.length > 0) {
-      await validateSuppliers(suppliers);
-      newSuppliers = [...new Set([...oldSuppliers, ...suppliers])];
-    } else {
-      newSuppliers = [];
-    }
+    await validateSuppliers(suppliers);
+    newSuppliers = suppliers;
     updateData.suppliers = newSuppliers;
   } else {
     delete updateData.suppliers;

@@ -69,7 +69,12 @@ export const ENTITY_CONFIG = {
     { name: 'name', label: 'Nom', type: 'text', required: true },
     { name: 'description', label: 'Description', type: 'textarea', rows: 4 },
     { name: 'slug', label: 'Slug', type: 'text' },
-    { name: 'supplier_id', label: 'Fournisseur', type: 'select' }, // Ajout du champ fournisseur
+    {
+      name: 'suppliers',
+      label: 'Fournisseurs',
+      type: 'multiselect',
+      tab: 'general',
+    },
   ],
   defaultSort: {
     field: 'name',

@@ -5,6 +5,8 @@ import { Controller } from 'react-hook-form';
 import HierarchicalParentSelector from '../../common/HierarchicalParentSelector';
 import BrandSelectField from '../fields/BrandSelectField';
 import imageProxyService from '../../../services/imageProxyService';
+import SupplierSelectField from '../fields/SupplierSelectField';
+
 const GeneralInfoTab = ({
   entity,
   fields = [],
@@ -33,6 +35,7 @@ const GeneralInfoTab = ({
     parent_id: 'Catégorie parente',
     supplier_id: 'Fournisseur',
     brands: 'Marques',
+    suppliers: 'Fournisseurs',
   };
 
   // Options pour les champs de type select
@@ -94,6 +97,28 @@ const GeneralInfoTab = ({
         }
       }
       return 'Aucun';
+    }
+
+    if (field === 'suppliers') {
+      const suppliers = entity.supplier_info?.refs || [];
+      if (suppliers.length === 0) return 'Aucun';
+
+      return (
+        <div className="flex flex-wrap gap-2">
+          {suppliers.map((s) => (
+            <div key={s.id} className="flex items-center gap-2 border px-2 py-1 rounded">
+              {s.image?.src && (
+                <img
+                  src={imageProxyService.getImageUrl(s.image.src)}
+                  alt={s.name}
+                  className="w-6 h-6 object-cover rounded"
+                />
+              )}
+              <span>{s.name}</span>
+            </div>
+          ))}
+        </div>
+      );
     }
 
     if (field === 'brands') {
@@ -171,6 +196,14 @@ const GeneralInfoTab = ({
               </option>
             ))}
           </select>
+        );
+      case 'suppliers':
+        return (
+          <SupplierSelectField
+            name="suppliers"
+            editable={editable}
+            options={_specialFields.suppliers?.options || []}
+          />
         );
       case 'supplier_id':
         return (

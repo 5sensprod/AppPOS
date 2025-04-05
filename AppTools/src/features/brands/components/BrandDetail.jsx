@@ -41,7 +41,7 @@ function BrandDetail() {
         return (
           <GeneralInfoTab
             entity={brand}
-            fields={['name', 'slug', 'description', 'supplier_id']}
+            fields={['name', 'slug', 'description', 'suppliers']}
             editable={editable}
             additionalSection={null}
             _specialFields={specialFields}
