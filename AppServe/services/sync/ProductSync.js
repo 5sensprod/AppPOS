@@ -91,25 +91,32 @@ class ProductSyncStrategy extends SyncStrategy {
 
   _prepareImageData(product) {
     const images = [];
+    const processedIds = new Set();
 
+    // Ajouter l'image principale si elle existe et a un wp_id
     if (product.image?.wp_id) {
       images.push({
         id: parseInt(product.image.wp_id),
-        src: product.image.url,
+        src: product.image.url || product.image.src,
         position: 0,
         alt: product.name,
       });
+      processedIds.add(product.image.wp_id);
     }
 
+    // Ajouter les images de la galerie sans doublons
     if (product.gallery_images?.length) {
       const gallery = product.gallery_images
-        .filter((img) => img.wp_id && (!product.image || img.wp_id !== product.image.wp_id))
-        .map((img, i) => ({
-          id: parseInt(img.wp_id),
-          src: img.url,
-          position: i + 1,
-          alt: `${product.name} - ${i + 1}`,
-        }));
+        .filter((img) => img.wp_id && !processedIds.has(img.wp_id))
+        .map((img, i) => {
+          processedIds.add(img.wp_id);
+          return {
+            id: parseInt(img.wp_id),
+            src: img.url || img.src,
+            position: i + 1,
+            alt: `${product.name} - ${i + 1}`,
+          };
+        });
 
       images.push(...gallery);
     }
@@ -143,24 +150,88 @@ class ProductSyncStrategy extends SyncStrategy {
   }
 
   async _syncPendingImages(product) {
-    const wpSync = new WordPressImageSync();
-    const updated = [...(product.gallery_images || [])];
+    if (!product.gallery_images?.length) return product;
 
-    for (let i = 0; i < updated.length; i++) {
-      const img = updated[i];
+    const pendingImages = product.gallery_images.filter((img) => !img.wp_id && img.local_path);
+
+    if (!pendingImages.length) return product;
+
+    const wpSync = new WordPressImageSync();
+    const updatedGallery = [...product.gallery_images];
+
+    // Map pour suivre les chemins d'images déjà téléversées
+    const processedPaths = new Map();
+
+    // Téléverser chaque image en attente
+    for (let i = 0; i < updatedGallery.length; i++) {
+      const img = updatedGallery[i];
       if (!img.wp_id && img.local_path) {
-        const wp = await wpSync.uploadToWordPress(img.local_path);
-        updated[i] = { ...img, wp_id: wp.id, url: wp.url, status: 'active' };
+        try {
+          // Si cette image a déjà été téléversée (même chemin), réutiliser les résultats
+          if (processedPaths.has(img.local_path)) {
+            const existingUpload = processedPaths.get(img.local_path);
+            updatedGallery[i] = {
+              ...img,
+              wp_id: existingUpload.wp_id,
+              url: existingUpload.url,
+              status: 'active',
+            };
+          } else {
+            // Sinon, téléverser l'image
+            const wpData = await wpSync.uploadToWordPress(img.local_path);
+            updatedGallery[i] = {
+              ...img,
+              wp_id: wpData.id,
+              url: wpData.url,
+              status: 'active',
+            };
+            // Enregistrer ce résultat pour réutilisation
+            processedPaths.set(img.local_path, {
+              wp_id: wpData.id,
+              url: wpData.url,
+            });
+          }
+        } catch (error) {
+          console.error(`Erreur upload WP pour image ${i}:`, error);
+        }
       }
     }
 
-    let main = product.image;
-    if (main && !main.wp_id && main.local_path) {
-      const wp = await wpSync.uploadToWordPress(main.local_path);
-      main = { ...main, wp_id: wp.id, url: wp.url, status: 'active' };
+    // Mettre à jour l'image principale si nécessaire
+    let mainImage = product.image;
+    if (mainImage && !mainImage.wp_id && mainImage.local_path) {
+      try {
+        // Vérifier si cette image a déjà été téléversée
+        if (processedPaths.has(mainImage.local_path)) {
+          const existingUpload = processedPaths.get(mainImage.local_path);
+          mainImage = {
+            ...mainImage,
+            wp_id: existingUpload.wp_id,
+            url: existingUpload.url,
+            status: 'active',
+          };
+        } else {
+          // Sinon téléverser l'image
+          const wpData = await wpSync.uploadToWordPress(mainImage.local_path);
+          mainImage = {
+            ...mainImage,
+            wp_id: wpData.id,
+            url: wpData.url,
+            status: 'active',
+          };
+        }
+      } catch (error) {
+        console.error(`Erreur upload WP pour image principale:`, error);
+      }
     }
 
-    await Product.update(product._id, { gallery_images: updated, image: main });
+    // Sauvegarder les modifications
+    await Product.update(product._id, {
+      gallery_images: updatedGallery,
+      image: mainImage,
+    });
+
+    // Recharger le produit avec les images mises à jour
     return await Product.findById(product._id);
   }
 
@@ -168,7 +239,7 @@ class ProductSyncStrategy extends SyncStrategy {
     const product = await Product.findById(productId);
     const mainImage = wcData.images?.[0];
 
-    // Préserver les propriétés locales de l'image
+    // Préserver les propriétés locales de l'image principale
     const image = mainImage
       ? {
           _id: product.image?._id || uuidv4(),
@@ -183,22 +254,32 @@ class ProductSyncStrategy extends SyncStrategy {
         }
       : null;
 
-    // Préserver les chemins locaux de la galerie
-    const gallery = (wcData.images || []).map((img, i) => {
-      const existingImg =
-        product.gallery_images?.find((g) => g.wp_id === img.id) || product.gallery_images?.[i];
+    // Préserver les chemins locaux de la galerie SANS CRÉER DE DOUBLONS
+    const gallery = [];
+    const addedWpIds = new Set();
 
-      return {
+    // Ajouter chaque image de WooCommerce sans duplication
+    for (const wcImage of wcData.images || []) {
+      // Éviter les doublons en vérifiant si l'ID a déjà été traité
+      if (addedWpIds.has(wcImage.id)) continue;
+
+      // Marquer cet ID comme traité
+      addedWpIds.add(wcImage.id);
+
+      // Chercher l'image correspondante dans la galerie actuelle
+      const existingImg = product.gallery_images?.find((g) => g.wp_id === wcImage.id);
+
+      gallery.push({
         _id: existingImg?._id || uuidv4(),
-        wp_id: img.id,
-        url: img.src,
-        src: existingImg?.src || img.src,
+        wp_id: wcImage.id,
+        url: wcImage.src,
+        src: existingImg?.src || wcImage.src,
         local_path: existingImg?.local_path || null,
         status: 'active',
         type: existingImg?.type || null,
         metadata: existingImg?.metadata || null,
-      };
-    });
+      });
+    }
 
     await Product.update(productId, {
       woo_id: wcData.id,
