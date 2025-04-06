@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useProduct, useProductDataStore } from '../stores/productStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
-
+import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
+  const [selectedFilters, setSelectedFilters] = useState([]);
+
   const {
     products,
     loading: productsLoading,
@@ -75,30 +77,68 @@ function ProductTable(props) {
   ];
 
   return (
-    <EntityTable
-      data={localProducts}
-      isLoading={isLoading}
-      error={error}
-      columns={ENTITY_CONFIG.columns}
-      entityName="produit"
-      entityNamePlural="produits"
-      baseRoute="/products"
-      filters={filters}
-      searchFields={['name', 'sku']}
-      onDelete={handleDeleteEntity}
-      syncEnabled={syncEnabled}
-      actions={['view', 'edit', 'delete', 'sync']}
-      batchActions={['delete', 'sync']}
-      onSync={handleSyncEntity}
-      pagination={{
-        enabled: true,
-        pageSize: 10,
-        showPageSizeOptions: true,
-        pageSizeOptions: [5, 10, 25, 50],
-      }}
-      defaultSort={ENTITY_CONFIG.defaultSort}
-      {...props}
-    />
+    <>
+      <UnifiedFilterBar
+        filterOptions={[
+          { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
+          { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
+          { label: 'Avec image', value: 'has_image', type: 'image' },
+          { label: 'Sans image', value: 'no_image', type: 'image' },
+        ]}
+        selectedFilters={selectedFilters}
+        onChange={setSelectedFilters}
+      />
+
+      <EntityTable
+        data={useMemo(() => {
+          let data = localProducts;
+
+          const wooFilter = selectedFilters.find((f) => f.type === 'woo')?.value;
+          const imageFilter = selectedFilters.find((f) => f.type === 'image')?.value;
+
+          if (wooFilter === 'woo_synced') {
+            data = data.filter((p) => p.woo_id != null);
+          } else if (wooFilter === 'woo_unsynced') {
+            data = data.filter((p) => p.woo_id == null);
+          }
+
+          if (imageFilter === 'has_image') {
+            data = data.filter(
+              (p) =>
+                p.image?.url || (Array.isArray(p.gallery_images) && p.gallery_images.length > 0)
+            );
+          } else if (imageFilter === 'no_image') {
+            data = data.filter(
+              (p) =>
+                !p.image?.url && (!Array.isArray(p.gallery_images) || p.gallery_images.length === 0)
+            );
+          }
+
+          return data;
+        }, [localProducts, selectedFilters])}
+        isLoading={isLoading}
+        error={error}
+        columns={ENTITY_CONFIG.columns}
+        entityName="produit"
+        entityNamePlural="produits"
+        baseRoute="/products"
+        filters={filters}
+        searchFields={['name', 'sku']}
+        onDelete={handleDeleteEntity}
+        syncEnabled={syncEnabled}
+        actions={['view', 'edit', 'delete', 'sync']}
+        batchActions={['delete', 'sync']}
+        onSync={handleSyncEntity}
+        pagination={{
+          enabled: true,
+          pageSize: 10,
+          showPageSizeOptions: true,
+          pageSizeOptions: [5, 10, 25, 50],
+        }}
+        defaultSort={ENTITY_CONFIG.defaultSort}
+        {...props}
+      />
+    </>
   );
 }
 
