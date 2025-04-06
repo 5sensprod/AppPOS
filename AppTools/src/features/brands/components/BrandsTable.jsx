@@ -41,15 +41,22 @@ function BrandsTable(props) {
 
   const filterOptions = useMemo(() => {
     const wooOptions = [
-      { label: 'Synchronisé WooCommerce', value: 'woo_synced', type: 'woo' },
-      { label: 'Non synchronisé WooCommerce', value: 'woo_unsynced', type: 'woo' },
+      { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
+      { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
     ];
 
     const supplierOptions = Array.from(
       new Map(
         brands
           .flatMap((b) => b.suppliersRefs || [])
-          .map((s) => [s.id, { value: `supplier_${s.id}`, label: s.name, type: 'supplier' }])
+          .map((s) => [
+            s.id,
+            {
+              value: `supplier_${s.id}`,
+              label: s.name,
+              type: 'supplier',
+            },
+          ])
       ).values()
     );
 
@@ -59,8 +66,8 @@ function BrandsTable(props) {
   const filteredBrands = useMemo(() => {
     if (selectedFilters.length === 0) return brands;
 
-    return brands.filter((brand) => {
-      return selectedFilters.every((filter) => {
+    return brands.filter((brand) =>
+      selectedFilters.every((filter) => {
         if (filter.type === 'woo') {
           return filter.value === 'woo_synced' ? brand.woo_id != null : brand.woo_id == null;
         }
@@ -71,8 +78,8 @@ function BrandsTable(props) {
         }
 
         return true;
-      });
-    });
+      })
+    );
   }, [brands, selectedFilters]);
 
   return (
