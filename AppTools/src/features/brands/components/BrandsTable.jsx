@@ -49,14 +49,7 @@ function BrandsTable(props) {
       new Map(
         brands
           .flatMap((b) => b.suppliersRefs || [])
-          .map((s) => [
-            s.id,
-            {
-              value: `supplier_${s.id}`,
-              label: s.name,
-              type: 'supplier',
-            },
-          ])
+          .map((s) => [s.id, { value: `supplier_${s.id}`, label: s.name, type: 'supplier' }])
       ).values()
     );
 

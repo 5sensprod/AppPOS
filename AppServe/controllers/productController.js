@@ -93,6 +93,27 @@ class ProductController extends BaseController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  async filter(req, res) {
+    try {
+      const query = {};
+
+      // 🔍 Filtre pour produits avec au moins une image
+      if (req.query.has_image === 'true') {
+        query.$or = [
+          { 'image.src': { $exists: true, $ne: '', $ne: null } },
+          { 'gallery_images.0.src': { $exists: true, $ne: '', $ne: null } },
+        ];
+      }
+
+      // ➕ Tu peux ajouter d'autres filtres ici (brand_id, price, etc.)
+
+      const products = await this.model.find(query);
+      return ResponseHandler.success(res, products);
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
 }
 
 const productController = new ProductController();
@@ -110,4 +131,5 @@ module.exports = exportController(productController, [
   'deleteImage',
   'setMainImage',
   'recalculateAllCounts',
+  'filter',
 ]);

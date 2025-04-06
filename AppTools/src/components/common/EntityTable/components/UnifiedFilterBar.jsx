@@ -1,59 +1,102 @@
-// src/components/common/EntityTable/components/UnifiedFilterBar.jsx
 import React, { useState } from 'react';
 import Select from 'react-select';
 
 const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }) => {
-  const [editingFilter, setEditingFilter] = useState(null);
+  const [editingType, setEditingType] = useState(null);
 
-  const handleEdit = (filter) => {
-    setEditingFilter(filter);
+  const alreadySelectedTypes = selectedFilters.map((f) => f.type);
+
+  const filterGroups = filterOptions.reduce((acc, option) => {
+    if (!acc[option.type]) acc[option.type] = [];
+    acc[option.type].push(option);
+    return acc;
+  }, {});
+
+  const filterTypeLabels = {
+    woo: 'Synchronisation',
+    supplier: 'Fournisseur',
   };
 
-  const handleValueChange = (selected) => {
-    if (!editingFilter || !selected) return;
+  const availableTypes = Object.entries(filterGroups)
+    .filter(([type]) => !alreadySelectedTypes.includes(type))
+    .map(([type]) => ({
+      label: filterTypeLabels[type] || type,
+      value: type,
+    }));
 
-    const newFilters = selectedFilters.map((f) =>
-      f.type === editingFilter.type
-        ? {
-            ...f,
-            value: selected.value,
-            label: `${getLabelForType(f.type)}: ${selected.label}`,
-          }
-        : f
+  const handleTypeSelect = (selected) => {
+    setEditingType(selected?.value || null);
+  };
+
+  const handleValueSelect = (selected) => {
+    if (!editingType || !selected) return;
+
+    const isAlreadySelected = selectedFilters.some(
+      (f) => f.type === editingType && f.value === selected.value
     );
 
-    onChange(newFilters);
-    setEditingFilter(null);
+    // Supprime les filtres de même type avant d'ajouter le nouveau (pour éviter les contradictions)
+    const filtered = selectedFilters.filter((f) => f.type !== editingType);
+
+    if (!isAlreadySelected) {
+      const newFilter = {
+        type: editingType,
+        value: selected.value,
+        label: `${filterTypeLabels[editingType] || editingType}: ${selected.label}`,
+      };
+
+      onChange([...filtered, newFilter]);
+    }
+
+    setEditingType(null);
   };
 
   const handleRemove = (filterToRemove) => {
-    const newFilters = selectedFilters.filter(
-      (f) => !(f.type === filterToRemove.type && f.value === filterToRemove.value)
+    onChange(
+      selectedFilters.filter(
+        (f) => !(f.type === filterToRemove.type && f.value === filterToRemove.value)
+      )
     );
-    onChange(newFilters);
   };
 
-  const getLabelForType = (type) => {
-    const def = filterOptions.find((f) => f.type === type);
-    return def?.label || type;
+  const handleEdit = (filter) => {
+    setEditingType(filter.type);
   };
 
-  const getOptionsForType = (type) =>
-    filterOptions.filter((f) => f.type === type).map(({ value, label }) => ({ value, label }));
+  const getOptionsForType = (type) => {
+    const selectedValues = selectedFilters.filter((f) => f.type === type).map((f) => f.value);
+
+    return (filterGroups[type] || []).map((opt) => ({
+      ...opt,
+      isDisabled: selectedValues.includes(opt.value),
+    }));
+  };
 
   return (
     <div className="space-y-3 w-full max-w-xl">
-      <Select
-        isMulti
-        options={filterOptions}
-        value={selectedFilters}
-        onChange={onChange}
-        placeholder="Ajouter des filtres..."
-        classNamePrefix="react-select"
-        closeMenuOnSelect={false}
-      />
+      {/* Étape 1 : Choix du type de filtre */}
+      {!editingType && (
+        <Select
+          options={availableTypes}
+          onChange={handleTypeSelect}
+          placeholder="Ajouter un critère de filtre..."
+          classNamePrefix="react-select"
+        />
+      )}
 
-      {/* Tags interactifs */}
+      {/* Étape 2 : Choix de la valeur pour le type sélectionné */}
+      {editingType && (
+        <Select
+          options={getOptionsForType(editingType)}
+          onChange={handleValueSelect}
+          placeholder={`Choisir une valeur pour "${filterTypeLabels[editingType]}"`}
+          classNamePrefix="react-select"
+          className="max-w-sm"
+          autoFocus
+        />
+      )}
+
+      {/* Affichage des filtres actifs sous forme de tags */}
       {selectedFilters.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selectedFilters.map((filter, idx) => (
@@ -64,7 +107,7 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
               <span
                 className="cursor-pointer"
                 onClick={() => handleEdit(filter)}
-                title="Cliquer pour modifier"
+                title="Modifier ce filtre"
               >
                 {filter.label}
               </span>
@@ -78,18 +121,6 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
             </div>
           ))}
         </div>
-      )}
-
-      {/* Popup de modification */}
-      {editingFilter && (
-        <Select
-          options={getOptionsForType(editingFilter.type)}
-          onChange={handleValueChange}
-          placeholder={`Modifier ${getLabelForType(editingFilter.type)}...`}
-          classNamePrefix="react-select"
-          className="max-w-sm mt-2"
-          autoFocus
-        />
       )}
     </div>
   );

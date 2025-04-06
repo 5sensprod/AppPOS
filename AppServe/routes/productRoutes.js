@@ -9,6 +9,7 @@ const wooSyncMiddleware = require('../middleware/wooSyncMiddleware');
 const Product = require('../models/Product');
 
 router.get('/', productController.getAll);
+router.get('/filter', productController.filter);
 router.get('/:id', productController.getById);
 router.get('/:id/category-path', async (req, res) => {
   try {
