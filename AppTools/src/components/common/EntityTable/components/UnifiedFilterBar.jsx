@@ -12,8 +12,10 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
 
   const filterTypeLabels = {
     woo: 'Synchronisation',
-    supplier: 'Fournisseur',
     image: 'Image',
+    supplier: 'Fournisseur',
+    brand: 'Marque',
+    category: 'Catégorie',
   };
 
   const alreadySelectedValues = new Set(selectedFilters.map((f) => `${f.type}:${f.value}`));

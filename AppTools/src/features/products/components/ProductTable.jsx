@@ -76,15 +76,56 @@ function ProductTable(props) {
     },
   ];
 
+  const filterOptions = useMemo(() => {
+    const wooOptions = [
+      { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
+      { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
+    ];
+
+    const imageOptions = [
+      { label: 'Avec image', value: 'has_image', type: 'image' },
+      { label: 'Sans image', value: 'no_image', type: 'image' },
+    ];
+
+    const brandOptions = Array.from(
+      new Map(
+        products
+          .map((p) => p.brand_ref)
+          .filter(Boolean)
+          .map((b) => [b.id, { value: `brand_${b.id}`, label: b.name, type: 'brand' }])
+      ).values()
+    );
+
+    const supplierOptions = Array.from(
+      new Map(
+        products
+          .map((p) => p.supplier_ref)
+          .filter(Boolean)
+          .map((s) => [s.id, { value: `supplier_${s.id}`, label: s.name, type: 'supplier' }])
+      ).values()
+    );
+
+    const categoryOptions = Array.from(
+      new Map(
+        products
+          .flatMap((p) => p.categories_refs || [])
+          .map((c) => [c.id, { value: `category_${c.id}`, label: c.name, type: 'category' }])
+      ).values()
+    );
+
+    return [
+      ...wooOptions,
+      ...imageOptions,
+      ...brandOptions,
+      ...supplierOptions,
+      ...categoryOptions,
+    ];
+  }, [products]);
+
   return (
     <>
       <UnifiedFilterBar
-        filterOptions={[
-          { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
-          { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
-          { label: 'Avec image', value: 'has_image', type: 'image' },
-          { label: 'Sans image', value: 'no_image', type: 'image' },
-        ]}
+        filterOptions={filterOptions}
         selectedFilters={selectedFilters}
         onChange={setSelectedFilters}
       />
@@ -93,25 +134,39 @@ function ProductTable(props) {
         data={useMemo(() => {
           let data = localProducts;
 
-          const wooFilter = selectedFilters.find((f) => f.type === 'woo')?.value;
-          const imageFilter = selectedFilters.find((f) => f.type === 'image')?.value;
+          for (const filter of selectedFilters) {
+            if (filter.type === 'woo') {
+              if (filter.value === 'woo_synced') {
+                data = data.filter((p) => p.woo_id != null);
+              } else if (filter.value === 'woo_unsynced') {
+                data = data.filter((p) => p.woo_id == null);
+              }
+            }
 
-          if (wooFilter === 'woo_synced') {
-            data = data.filter((p) => p.woo_id != null);
-          } else if (wooFilter === 'woo_unsynced') {
-            data = data.filter((p) => p.woo_id == null);
-          }
+            if (filter.type === 'image') {
+              const hasImage = (p) =>
+                p.image?.url || (Array.isArray(p.gallery_images) && p.gallery_images.length > 0);
+              if (filter.value === 'has_image') {
+                data = data.filter(hasImage);
+              } else if (filter.value === 'no_image') {
+                data = data.filter((p) => !hasImage(p));
+              }
+            }
 
-          if (imageFilter === 'has_image') {
-            data = data.filter(
-              (p) =>
-                p.image?.url || (Array.isArray(p.gallery_images) && p.gallery_images.length > 0)
-            );
-          } else if (imageFilter === 'no_image') {
-            data = data.filter(
-              (p) =>
-                !p.image?.url && (!Array.isArray(p.gallery_images) || p.gallery_images.length === 0)
-            );
+            if (filter.type === 'supplier') {
+              const supplierId = filter.value.replace('supplier_', '');
+              data = data.filter((p) => p.supplier_id === supplierId);
+            }
+
+            if (filter.type === 'brand') {
+              const brandId = filter.value.replace('brand_', '');
+              data = data.filter((p) => p.brand_id === brandId);
+            }
+
+            if (filter.type === 'category') {
+              const categoryId = filter.value.replace('category_', '');
+              data = data.filter((p) => p.categories?.includes(categoryId));
+            }
           }
 
           return data;
