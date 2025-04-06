@@ -4,7 +4,7 @@ import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
-import { useFilterStore } from '../../../stores/filterStore';
+import { useEntityFilter } from '@/hooks/useEntityFilter';
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
@@ -17,8 +17,7 @@ function ProductTable(props) {
   } = useProductDataStore();
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
 
-  const { filters, setFilters } = useFilterStore();
-  const selectedFilters = filters.product || [];
+  const { selectedFilters, setSelectedFilters } = useEntityFilter('product');
 
   const [localProducts, setLocalProducts] = useState([]);
   const [error, setError] = useState(null);
@@ -168,7 +167,7 @@ function ProductTable(props) {
       <UnifiedFilterBar
         filterOptions={filterOptions}
         selectedFilters={selectedFilters}
-        onChange={(newFilters) => setFilters('product', newFilters)}
+        onChange={setSelectedFilters}
       />
 
       <EntityTable
@@ -190,7 +189,7 @@ function ProductTable(props) {
           enabled: true,
           pageSize: 10,
           showPageSizeOptions: true,
-          pageSizeOptions: [5, 10, 25, 50],
+          pageSizeOptions: [5, 10, 25, 50, 100],
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
         {...props}

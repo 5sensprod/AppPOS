@@ -5,6 +5,7 @@ import EntityTable from '@/components/common/EntityTable/index';
 import UnifiedFilterBar from '@/components/common/EntityTable/components/UnifiedFilterBar';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
+import { useEntityFilter } from '@/hooks/useEntityFilter';
 
 function BrandsTable(props) {
   const { deleteBrand, syncBrand } = useBrand();
@@ -37,7 +38,7 @@ function BrandsTable(props) {
   }, [initWebSocket, fetchBrands, brands.length, syncEnabled]);
 
   // 👇 Unified filtering logic
-  const [selectedFilters, setSelectedFilters] = useState([]);
+  const { selectedFilters, setSelectedFilters } = useEntityFilter('brand');
 
   const filterOptions = useMemo(() => {
     const wooOptions = [

@@ -6,10 +6,12 @@ import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
+import { useEntityFilter } from '@/hooks/useEntityFilter';
+
 function CategoriesTable(props) {
   const { deleteCategory, syncCategory } = useCategory();
   const { sync, hierarchy } = ENTITY_CONFIG.features;
-  const [selectedFilters, setSelectedFilters] = useState([]);
+  const { selectedFilters, setSelectedFilters } = useEntityFilter('category');
   // Hiérarchie activée
   const {
     hierarchicalCategories,

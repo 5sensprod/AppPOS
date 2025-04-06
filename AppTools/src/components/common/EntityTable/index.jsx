@@ -29,7 +29,7 @@ const EntityTable = ({
     enabled: true,
     pageSize: 10,
     showPageSizeOptions: true,
-    pageSizeOptions: [5, 10, 25, 50],
+    pageSizeOptions: [5, 10, 25, 50, 100],
   },
   onDelete,
   onSync,
