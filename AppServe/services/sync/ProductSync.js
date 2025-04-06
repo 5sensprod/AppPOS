@@ -44,20 +44,37 @@ class ProductSyncStrategy extends SyncStrategy {
           ? [product.category_id]
           : [];
 
+    if (categoryIds.length === 0) return [];
+
     const categories = await Category.findAll();
     const productCategories = categories.filter((c) => categoryIds.includes(c._id));
     const unsynced = productCategories.filter((c) => !c.woo_id);
 
+    // 🔁 Étape 1 : synchro automatique si woo_id manquant
     if (unsynced.length > 0) {
+      console.log(
+        `[SYNC] 🔄 Synchronisation automatique de ${unsynced.length} catégorie(s) :`,
+        unsynced.map((c) => c.name)
+      );
       await categoryService.syncToWooCommerce(unsynced);
     }
 
-    const updated = await Category.findAll();
-    return (
-      updated
-        .filter((c) => categoryIds.includes(c._id) && c.woo_id)
-        .map((c) => ({ id: parseInt(c.woo_id) })) || [{ id: 1 }]
-    );
+    // 🧪 Étape 2 : vérification post-synchro
+    const updatedCategories = await Category.findAll();
+    const mapped = updatedCategories
+      .filter((c) => categoryIds.includes(c._id) && c.woo_id)
+      .map((c) => ({ id: parseInt(c.woo_id) }));
+
+    const stillMissing = updatedCategories.filter((c) => categoryIds.includes(c._id) && !c.woo_id);
+
+    if (stillMissing.length > 0) {
+      throw new Error(
+        `⛔ Certaines catégories n'ont pas pu être synchronisées avec WooCommerce : ${stillMissing.map((c) => c.name).join(', ')}`
+      );
+    }
+
+    // ✅ WooCommerce exige au moins une catégorie : fallback si nécessaire
+    return mapped.length > 0 ? mapped : [{ id: 1 }]; // ID 1 = catégorie par défaut Woo
   }
 
   async _prepareBrandData(brandId) {

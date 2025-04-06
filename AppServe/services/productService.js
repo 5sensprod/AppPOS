@@ -4,6 +4,7 @@ const Category = require('../models/Category');
 const Brand = require('../models/Brand');
 const Supplier = require('../models/Supplier');
 const { getEntityEventService } = require('../services/events/entityEvents');
+const brandService = require('./BrandWooCommerceService');
 
 // ----- VALIDATION -----
 async function validateCategories(categoryIds = [], { enforceWooSync = false } = {}) {
@@ -25,6 +26,19 @@ async function validateCategories(categoryIds = [], { enforceWooSync = false } =
   }
 
   return validCategories;
+}
+
+async function validateBrand(brandId, { enforceWooSync = false } = {}) {
+  if (!brandId) return;
+
+  const brand = await Brand.findById(brandId);
+  if (!brand) throw new Error("La marque spécifiée n'existe pas");
+
+  if (enforceWooSync && !brand.woo_id) {
+    throw new Error(`Marque non synchronisée avec WooCommerce: ${brand.name}`);
+  }
+
+  return brand;
 }
 
 // ----- COMPARATEURS / LOGIQUE DE CHANGEMENT -----
@@ -71,7 +85,14 @@ async function createProduct(data) {
 
   const newProduct = await Product.create({ ...data, categories });
 
-  if (brand_id) await Brand.updateProductCount(brand_id);
+  if (brand_id) {
+    const brand = await validateBrand(brand_id);
+    if (!brand.woo_id) {
+      await brandService.syncToWooCommerce([brand]);
+    }
+    await Brand.updateProductCount(brand_id);
+  }
+
   if (supplier_id) await Supplier.updateProductCount(supplier_id);
 
   notifyCategoryTreeChangedIfNeeded(categories.length > 0);
@@ -102,6 +123,13 @@ async function updateProduct(id, updateData) {
 
   const updated = await Product.updateWithCategoryInfo(id, payload);
 
+  if (payload.brand_id) {
+    const brand = await validateBrand(payload.brand_id);
+    if (!brand.woo_id) {
+      await brandService.syncToWooCommerce([brand]);
+    }
+  }
+
   await updateBrandAndSupplierCount(oldBrand, payload.brand_id, oldSupplier, payload.supplier_id);
   notifyCategoryTreeChangedIfNeeded(categoryChanged);
 
@@ -125,6 +153,7 @@ async function deleteProduct(product) {
 // ----- EXPORT -----
 module.exports = {
   validateCategories,
+  validateBrand,
   updateBrandAndSupplierCount,
   categoriesChanged,
   notifyCategoryTreeChangedIfNeeded,
