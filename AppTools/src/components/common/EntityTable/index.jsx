@@ -162,6 +162,7 @@ const EntityTable = ({
                   onDelete={onDelete}
                   onSync={hasSync ? onSync : undefined}
                   baseRoute={baseRoute}
+                  syncEnabled={hasSync}
                 />
               ))
             )}

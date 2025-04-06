@@ -260,13 +260,13 @@ const GeneralInfoTab = ({
                 // Mode lecture
                 <div>
                   {field === 'description' ? (
-                    <p className="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-line">
+                    <div className="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-line">
                       {renderReadOnlyField(field, entity[field])}
-                    </p>
+                    </div>
                   ) : (
-                    <p className="mt-1 text-gray-900 dark:text-gray-100">
+                    <div className="mt-1 text-gray-900 dark:text-gray-100">
                       {renderReadOnlyField(field, entity[field])}
-                    </p>
+                    </div>
                   )}
                 </div>
               )}

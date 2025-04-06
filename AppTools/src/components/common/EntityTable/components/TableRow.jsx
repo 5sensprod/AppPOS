@@ -12,7 +12,6 @@ export const TableRow = ({
   onRowClick,
   onDelete,
   onSync,
-  baseRoute,
 }) => {
   const navigate = useNavigate();
 
