@@ -134,39 +134,48 @@ function ProductTable(props) {
         data={useMemo(() => {
           let data = localProducts;
 
-          for (const filter of selectedFilters) {
-            if (filter.type === 'woo') {
-              if (filter.value === 'woo_synced') {
-                data = data.filter((p) => p.woo_id != null);
-              } else if (filter.value === 'woo_unsynced') {
-                data = data.filter((p) => p.woo_id == null);
-              }
-            }
+          const wooFilter = selectedFilters.find((f) => f.type === 'woo')?.value;
+          const imageFilter = selectedFilters.find((f) => f.type === 'image')?.value;
+          const supplierFilters = selectedFilters.filter((f) => f.type === 'supplier');
+          const brandFilters = selectedFilters.filter((f) => f.type === 'brand');
+          const categoryFilters = selectedFilters.filter((f) => f.type === 'category');
 
-            if (filter.type === 'image') {
-              const hasImage = (p) =>
-                p.image?.url || (Array.isArray(p.gallery_images) && p.gallery_images.length > 0);
-              if (filter.value === 'has_image') {
-                data = data.filter(hasImage);
-              } else if (filter.value === 'no_image') {
-                data = data.filter((p) => !hasImage(p));
-              }
-            }
+          // 🔹 Synchronisation
+          if (wooFilter === 'woo_synced') {
+            data = data.filter((p) => p.woo_id != null);
+          } else if (wooFilter === 'woo_unsynced') {
+            data = data.filter((p) => p.woo_id == null);
+          }
 
-            if (filter.type === 'supplier') {
-              const supplierId = filter.value.replace('supplier_', '');
-              data = data.filter((p) => p.supplier_id === supplierId);
-            }
+          // 🔹 Image
+          const hasImage = (p) =>
+            p.image?.url || (Array.isArray(p.gallery_images) && p.gallery_images.length > 0);
+          if (imageFilter === 'has_image') {
+            data = data.filter(hasImage);
+          } else if (imageFilter === 'no_image') {
+            data = data.filter((p) => !hasImage(p));
+          }
 
-            if (filter.type === 'brand') {
-              const brandId = filter.value.replace('brand_', '');
-              data = data.filter((p) => p.brand_id === brandId);
-            }
+          // 🔹 Fournisseurs : au moins 1 des sélectionnés
+          if (supplierFilters.length > 0) {
+            const supplierIds = supplierFilters.map((f) => f.value.replace('supplier_', ''));
+            data = data.filter((p) => supplierIds.includes(p.supplier_id));
+          }
 
-            if (filter.type === 'category') {
-              const categoryId = filter.value.replace('category_', '');
-              data = data.filter((p) => p.categories?.includes(categoryId));
-            }
+          // 🔹 Marques : au moins 1 des sélectionnées
+          if (brandFilters.length > 0) {
+            const brandIds = brandFilters.map((f) => f.value.replace('brand_', ''));
+            data = data.filter((p) => brandIds.includes(p.brand_id));
+          }
+
+          // 🔹 Catégories : au moins 1 des sélectionnées
+          if (categoryFilters.length > 0) {
+            const categoryIds = categoryFilters.map((f) => f.value.replace('category_', ''));
+            data = data.filter(
+              (p) =>
+                Array.isArray(p.categories) &&
+                p.categories.some((catId) => categoryIds.includes(catId))
+            );
           }
 
           return data;
