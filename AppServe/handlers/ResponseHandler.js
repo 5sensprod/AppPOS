@@ -23,7 +23,17 @@ class ResponseHandler {
   }
 
   static badRequest(res, data) {
-    return this.error(res, { message: data.message || 'Requête invalide' }, 400);
+    // Si data est un objet avec message et d'autres champs, on les conserve
+    if (typeof data === 'object' && data !== null) {
+      const { message, ...otherData } = data;
+      return res.status(400).json({
+        success: false,
+        error: message,
+        details: otherData, // Inclut les détails supplémentaires
+      });
+    }
+    // Sinon, on traite comme avant
+    return this.error(res, { message: data.message || data }, 400);
   }
 
   static partialSuccess(res, data, syncError) {

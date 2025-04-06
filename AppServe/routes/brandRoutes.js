@@ -7,6 +7,7 @@ const { createBrandSchema, updateBrandSchema } = require('../validation/schemas'
 const brandImageRoutes = require('./image/brandImageRoutes');
 const wooSyncMiddleware = require('../middleware/wooSyncMiddleware');
 const Brand = require('../models/Brand');
+const Product = require('../models/Product');
 const ResponseHandler = require('../handlers/ResponseHandler');
 
 // Routes principales
@@ -24,10 +25,21 @@ router.delete('/:id', async (req, res) => {
       return ResponseHandler.notFound(res, 'Marque non trouvée');
     }
 
-    // Utiliser directement le compteur products_count
-    if (brand.products_count > 0) {
+    // Rechercher les produits liés à cette marque
+    const linkedProducts = await Product.find({ brand_id: brand._id });
+
+    if (linkedProducts && linkedProducts.length > 0) {
+      // Préparation de la liste détaillée des produits
+      const productDetails = linkedProducts.map((p) => ({
+        _id: p._id,
+        name: p.name,
+        sku: p.sku || null,
+        supplier_id: p.supplier_id,
+      }));
+
       return ResponseHandler.badRequest(res, {
         message: 'La marque contient un/des produits associés à un fournisseur',
+        linkedProducts: productDetails,
       });
     }
 
