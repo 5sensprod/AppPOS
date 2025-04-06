@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
 
 const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }) => {
@@ -82,6 +82,21 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
     }));
   };
 
+  const valueSelectRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (editingType && valueSelectRef.current && !valueSelectRef.current.contains(event.target)) {
+        setEditingType(null); // Revenir à "Ajouter un critère"
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [editingType]);
+
   return (
     <div className="space-y-3 w-full max-w-xl">
       {!editingType && (
@@ -90,19 +105,25 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
           onChange={handleTypeSelect}
           placeholder="Ajouter un critère de filtre..."
           classNamePrefix="react-select"
+          className="max-w-xl w-full"
         />
       )}
 
       {editingType && (
-        <Select
-          options={getOptionsForType(editingType)}
-          onChange={handleValueSelect}
-          placeholder={`Choisir une valeur pour "${filterTypeLabels[editingType]}"`}
-          isMulti={editingType === 'supplier'}
-          classNamePrefix="react-select"
-          className="max-w-sm"
-          autoFocus
-        />
+        <div ref={valueSelectRef} className="max-w-xl w-full">
+          <Select
+            options={getOptionsForType(editingType)}
+            onChange={handleValueSelect}
+            placeholder={`Choisir une valeur pour "${filterTypeLabels[editingType]}"`}
+            isMulti={
+              editingType === 'supplier' || editingType === 'brand' || editingType === 'category'
+            }
+            classNamePrefix="react-select"
+            className="w-full"
+            autoFocus
+            menuIsOpen={true} // 👈 Ouvre automatiquement le menu
+          />
+        </div>
       )}
 
       {selectedFilters.length > 0 && (

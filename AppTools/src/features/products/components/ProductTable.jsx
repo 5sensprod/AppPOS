@@ -4,10 +4,10 @@ import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
+import { useFilterStore } from '../../../stores/filterStore';
+
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
-  const [selectedFilters, setSelectedFilters] = useState([]);
-
   const {
     products,
     loading: productsLoading,
@@ -15,20 +15,17 @@ function ProductTable(props) {
     fetchProducts,
     initWebSocket,
   } = useProductDataStore();
-
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
+
+  const { filters, setFilters } = useFilterStore();
+  const selectedFilters = filters.product || [];
 
   const [localProducts, setLocalProducts] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (syncEnabled) {
-      initWebSocket();
-    }
-
-    if (products.length === 0) {
-      fetchProducts();
-    }
+    if (syncEnabled) initWebSocket();
+    if (products.length === 0) fetchProducts();
   }, [initWebSocket, fetchProducts, products.length, syncEnabled]);
 
   useEffect(() => {
@@ -63,7 +60,7 @@ function ProductTable(props) {
 
   const isLoading = productsLoading || operationLoading;
 
-  const filters = [
+  const statusFilters = [
     {
       id: 'status',
       type: 'select',
@@ -122,71 +119,67 @@ function ProductTable(props) {
     ];
   }, [products]);
 
+  const filteredProducts = useMemo(() => {
+    let data = localProducts;
+
+    const wooFilter = selectedFilters.find((f) => f.type === 'woo')?.value;
+    const imageFilter = selectedFilters.find((f) => f.type === 'image')?.value;
+    const supplierFilters = selectedFilters.filter((f) => f.type === 'supplier');
+    const brandFilters = selectedFilters.filter((f) => f.type === 'brand');
+    const categoryFilters = selectedFilters.filter((f) => f.type === 'category');
+
+    if (wooFilter === 'woo_synced') {
+      data = data.filter((p) => p.woo_id != null);
+    } else if (wooFilter === 'woo_unsynced') {
+      data = data.filter((p) => p.woo_id == null);
+    }
+
+    const hasImage = (p) =>
+      p.image?.url || (Array.isArray(p.gallery_images) && p.gallery_images.length > 0);
+    if (imageFilter === 'has_image') {
+      data = data.filter(hasImage);
+    } else if (imageFilter === 'no_image') {
+      data = data.filter((p) => !hasImage(p));
+    }
+
+    if (supplierFilters.length > 0) {
+      const supplierIds = supplierFilters.map((f) => f.value.replace('supplier_', ''));
+      data = data.filter((p) => supplierIds.includes(p.supplier_id));
+    }
+
+    if (brandFilters.length > 0) {
+      const brandIds = brandFilters.map((f) => f.value.replace('brand_', ''));
+      data = data.filter((p) => brandIds.includes(p.brand_id));
+    }
+
+    if (categoryFilters.length > 0) {
+      const categoryIds = categoryFilters.map((f) => f.value.replace('category_', ''));
+      data = data.filter(
+        (p) =>
+          Array.isArray(p.categories) && p.categories.some((catId) => categoryIds.includes(catId))
+      );
+    }
+
+    return data;
+  }, [localProducts, selectedFilters]);
+
   return (
     <>
       <UnifiedFilterBar
         filterOptions={filterOptions}
         selectedFilters={selectedFilters}
-        onChange={setSelectedFilters}
+        onChange={(newFilters) => setFilters('product', newFilters)}
       />
 
       <EntityTable
-        data={useMemo(() => {
-          let data = localProducts;
-
-          const wooFilter = selectedFilters.find((f) => f.type === 'woo')?.value;
-          const imageFilter = selectedFilters.find((f) => f.type === 'image')?.value;
-          const supplierFilters = selectedFilters.filter((f) => f.type === 'supplier');
-          const brandFilters = selectedFilters.filter((f) => f.type === 'brand');
-          const categoryFilters = selectedFilters.filter((f) => f.type === 'category');
-
-          // 🔹 Synchronisation
-          if (wooFilter === 'woo_synced') {
-            data = data.filter((p) => p.woo_id != null);
-          } else if (wooFilter === 'woo_unsynced') {
-            data = data.filter((p) => p.woo_id == null);
-          }
-
-          // 🔹 Image
-          const hasImage = (p) =>
-            p.image?.url || (Array.isArray(p.gallery_images) && p.gallery_images.length > 0);
-          if (imageFilter === 'has_image') {
-            data = data.filter(hasImage);
-          } else if (imageFilter === 'no_image') {
-            data = data.filter((p) => !hasImage(p));
-          }
-
-          // 🔹 Fournisseurs : au moins 1 des sélectionnés
-          if (supplierFilters.length > 0) {
-            const supplierIds = supplierFilters.map((f) => f.value.replace('supplier_', ''));
-            data = data.filter((p) => supplierIds.includes(p.supplier_id));
-          }
-
-          // 🔹 Marques : au moins 1 des sélectionnées
-          if (brandFilters.length > 0) {
-            const brandIds = brandFilters.map((f) => f.value.replace('brand_', ''));
-            data = data.filter((p) => brandIds.includes(p.brand_id));
-          }
-
-          // 🔹 Catégories : au moins 1 des sélectionnées
-          if (categoryFilters.length > 0) {
-            const categoryIds = categoryFilters.map((f) => f.value.replace('category_', ''));
-            data = data.filter(
-              (p) =>
-                Array.isArray(p.categories) &&
-                p.categories.some((catId) => categoryIds.includes(catId))
-            );
-          }
-
-          return data;
-        }, [localProducts, selectedFilters])}
+        data={filteredProducts}
         isLoading={isLoading}
         error={error}
         columns={ENTITY_CONFIG.columns}
         entityName="produit"
         entityNamePlural="produits"
         baseRoute="/products"
-        filters={filters}
+        filters={statusFilters}
         searchFields={['name', 'sku']}
         onDelete={handleDeleteEntity}
         syncEnabled={syncEnabled}
