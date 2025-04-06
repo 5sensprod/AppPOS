@@ -38,9 +38,12 @@ export const ENTITY_CONFIG = {
       render: (brand) => <div className="max-w-xs truncate">{brand.description || '-'}</div>,
     },
     {
-      key: 'supplier_ref',
+      key: 'suppliersRefs',
       label: 'Fournisseur',
-      render: (brand) => <div>{brand.supplier_ref?.name || '-'}</div>,
+      render: (brand) =>
+        brand.suppliersRefs && brand.suppliersRefs.length > 0
+          ? brand.suppliersRefs.map((s) => s.name).join(', ')
+          : '-',
     },
     {
       key: 'woo_status',
@@ -65,6 +68,7 @@ export const ENTITY_CONFIG = {
       ),
     },
   ],
+
   formFields: [
     { name: 'name', label: 'Nom', type: 'text', required: true },
     { name: 'description', label: 'Description', type: 'textarea', rows: 4 },

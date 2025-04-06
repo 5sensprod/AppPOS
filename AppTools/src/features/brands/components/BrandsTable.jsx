@@ -1,3 +1,4 @@
+// src/features/brands/components/BrandsTable.jsx
 import React, { useEffect } from 'react';
 import { useBrand, useBrandDataStore } from '../stores/brandStore';
 import EntityTable from '@/components/common/EntityTable/index';
@@ -6,17 +7,13 @@ import { useEntityTable } from '@/hooks/useEntityTable';
 
 function BrandsTable(props) {
   const { deleteBrand, syncBrand } = useBrand();
-
   const { brands, loading: brandsLoading, fetchBrands, initWebSocket } = useBrandDataStore();
-
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
 
-  // Initialiser les WebSockets uniquement si le sync est activé
   useEffect(() => {
     if (syncEnabled) {
       initWebSocket();
     }
-
     if (brands.length === 0) {
       fetchBrands();
     }
@@ -32,17 +29,24 @@ function BrandsTable(props) {
     fetchEntities: fetchBrands,
     deleteEntity: async (id) => {
       await deleteBrand(id);
-      // Pas besoin de refetch si WebSocket actif
     },
     syncEntity: syncEnabled
       ? async (id) => {
           await syncBrand(id);
-          // Pas besoin de refetch si WebSocket actif
         }
       : undefined,
   });
 
   const isLoading = brandsLoading || operationLoading;
+
+  // 🧠 Générer dynamiquement les fournisseurs pour le filtre
+  const supplierOptions = Array.from(
+    new Map(
+      brands
+        .flatMap((b) => b.suppliersRefs || [])
+        .map((s) => [s.id, { value: s.id, label: s.name }])
+    ).values()
+  );
 
   return (
     <EntityTable
@@ -53,7 +57,25 @@ function BrandsTable(props) {
       entityName="marque"
       entityNamePlural="marques"
       baseRoute="/products/brands"
-      filters={[]}
+      filters={[
+        {
+          id: 'woo_id',
+          label: 'Synchronisation WooCommerce',
+          type: 'select',
+          options: [
+            { value: 'synced', label: 'Synchronisé' },
+            { value: 'unsynced', label: 'Non synchronisé' },
+          ],
+          allLabel: 'Tous',
+        },
+        {
+          id: 'suppliers',
+          label: 'Fournisseur',
+          type: 'select',
+          options: supplierOptions,
+          allLabel: 'Tous les fournisseurs',
+        },
+      ]}
       searchFields={['name', 'description']}
       onDelete={handleDeleteEntity}
       onSync={handleSyncEntity}

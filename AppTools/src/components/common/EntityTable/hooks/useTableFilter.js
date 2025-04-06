@@ -42,10 +42,26 @@ export const useTableFilter = (
         const filterConfig = filters.find((f) => f.id === filterId);
         if (!filterConfig) return true;
         if (filterConfig.type === 'select') {
+          if (filterId === 'woo_id') {
+            if (filterValue === 'synced') return item.woo_id != null;
+            if (filterValue === 'unsynced') return item.woo_id == null;
+            return true;
+          }
+
+          if (filterId === 'suppliers') {
+            return item.suppliers?.includes(filterValue);
+          }
+
           return item[filterId] === filterValue;
         }
         if (filterConfig.type === 'boolean') {
-          return item[filterId] === (filterValue === 'true');
+          const isTrue = filterValue === 'true';
+
+          // Cas spécial : champ est "truthy" ou "null" (ex: woo_id)
+          const fieldValue = item[filterId];
+
+          // On considère que "synchronisé" = woo_id != null
+          return isTrue ? fieldValue !== null && fieldValue !== undefined : fieldValue == null;
         }
         if (filterConfig.type === 'range') {
           const value = item[filterId];

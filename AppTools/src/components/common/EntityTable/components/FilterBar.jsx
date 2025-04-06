@@ -1,39 +1,69 @@
 // src/components/common/EntityTable/components/FilterBar.jsx
 import React from 'react';
+import Select from 'react-select';
 
 export const FilterBar = ({ filters, activeFilters, onFilterChange }) => {
   return (
-    <div className="flex flex-wrap gap-2">
-      {filters.map((filter) => (
-        <div key={filter.id} className="flex-shrink-0">
-          {filter.type === 'select' && (
-            <select
-              value={activeFilters[filter.id] || 'all'}
-              onChange={(e) => onFilterChange(filter.id, e.target.value)}
-              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-            >
-              <option value="all">{filter.allLabel || 'Tous'}</option>
-              {filter.options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          )}
+    <div className="flex flex-wrap gap-4 items-center">
+      {filters.map((filter) => {
+        const commonProps = {
+          className: 'min-w-[180px]',
+        };
 
-          {filter.type === 'boolean' && (
-            <select
-              value={activeFilters[filter.id] || 'all'}
-              onChange={(e) => onFilterChange(filter.id, e.target.value)}
-              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-            >
-              <option value="all">{filter.label}</option>
-              <option value="true">Oui</option>
-              <option value="false">Non</option>
-            </select>
-          )}
-        </div>
-      ))}
+        if (filter.type === 'boolean') {
+          const options = [
+            { value: 'all', label: 'Tous' },
+            { value: 'true', label: 'Oui' },
+            { value: 'false', label: 'Non' },
+          ];
+
+          const currentValue =
+            options.find((opt) => opt.value === (activeFilters[filter.id] || 'all')) || options[0];
+
+          return (
+            <div key={filter.id} {...commonProps}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                {filter.label}
+              </label>
+              <Select
+                value={currentValue}
+                options={options}
+                onChange={(selected) => onFilterChange(filter.id, selected.value)}
+                className="react-select-container"
+                classNamePrefix="react-select"
+              />
+            </div>
+          );
+        }
+
+        // fallback pour les autres types (ex: select standard)
+        if (filter.type === 'select') {
+          const options = [
+            { value: 'all', label: filter.allLabel || 'Tous' },
+            ...filter.options.map((o) => ({ value: o.value, label: o.label })),
+          ];
+
+          const currentValue =
+            options.find((opt) => opt.value === (activeFilters[filter.id] || 'all')) || options[0];
+
+          return (
+            <div key={filter.id} {...commonProps}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                {filter.label}
+              </label>
+              <Select
+                value={currentValue}
+                options={options}
+                onChange={(selected) => onFilterChange(filter.id, selected.value)}
+                className="react-select-container"
+                classNamePrefix="react-select"
+              />
+            </div>
+          );
+        }
+
+        return null;
+      })}
     </div>
   );
 };
