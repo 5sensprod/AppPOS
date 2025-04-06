@@ -59,20 +59,25 @@ function BrandsTable(props) {
   const filteredBrands = useMemo(() => {
     if (selectedFilters.length === 0) return brands;
 
-    return brands.filter((brand) =>
-      selectedFilters.every((filter) => {
-        if (filter.type === 'woo') {
-          return filter.value === 'woo_synced' ? brand.woo_id != null : brand.woo_id == null;
-        }
+    const wooFilters = selectedFilters.filter((f) => f.type === 'woo');
+    const supplierFilters = selectedFilters.filter((f) => f.type === 'supplier');
 
-        if (filter.type === 'supplier') {
+    return brands.filter((brand) => {
+      // 🌀 Woo filter : doit passer tous les woo_filters
+      const wooOk = wooFilters.every((filter) => {
+        return filter.value === 'woo_synced' ? brand.woo_id != null : brand.woo_id == null;
+      });
+
+      // 🌀 Supplier filter : au moins un des suppliers doit être présent
+      const supplierOk =
+        supplierFilters.length === 0 ||
+        supplierFilters.some((filter) => {
           const supplierId = filter.value.replace('supplier_', '');
           return brand.suppliers?.includes(supplierId);
-        }
+        });
 
-        return true;
-      })
-    );
+      return wooOk && supplierOk;
+    });
   }, [brands, selectedFilters]);
 
   return (

@@ -31,23 +31,26 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
   const handleValueSelect = (selected) => {
     if (!editingType || !selected) return;
 
-    const isAlreadySelected = selectedFilters.some(
-      (f) => f.type === editingType && f.value === selected.value
-    );
+    const isMulti = editingType === 'supplier';
+    const selectedValues = Array.isArray(selected) ? selected : [selected];
 
-    // Supprime les filtres de même type avant d'ajouter le nouveau (pour éviter les contradictions)
-    const filtered = selectedFilters.filter((f) => f.type !== editingType);
-
-    if (!isAlreadySelected) {
-      const newFilter = {
+    const newFilters = selectedValues
+      .filter((s) => !selectedFilters.some((f) => f.type === editingType && f.value === s.value))
+      .map((s) => ({
         type: editingType,
-        value: selected.value,
-        label: `${filterTypeLabels[editingType] || editingType}: ${selected.label}`,
-      };
+        value: s.value,
+        label: `${filterTypeLabels[editingType] || editingType}: ${s.label}`,
+      }));
 
-      onChange([...filtered, newFilter]);
+    let updatedFilters;
+    if (isMulti) {
+      updatedFilters = [...selectedFilters, ...newFilters];
+    } else {
+      // Un seul filtre autorisé pour ce type (ex: woo)
+      updatedFilters = [...selectedFilters.filter((f) => f.type !== editingType), ...newFilters];
     }
 
+    onChange(updatedFilters);
     setEditingType(null);
   };
 
@@ -93,6 +96,7 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
           classNamePrefix="react-select"
           className="max-w-sm"
           autoFocus
+          isMulti={editingType === 'supplier'}
         />
       )}
 
