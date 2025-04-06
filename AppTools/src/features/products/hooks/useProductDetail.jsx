@@ -15,7 +15,8 @@ export default function useProductDetail() {
   const isEditMode = isNew || location.pathname.endsWith('/edit');
 
   const { getProductById, createProduct, updateProduct, deleteProduct, syncProduct } = useProduct();
-  const { uploadImage, deleteImage, setMainImage } = useProductExtras();
+  // Obtenir les fonctions correctes du hook useProductExtras
+  const productExtras = useProductExtras();
 
   const [product, setProduct] = useState(null);
   const [currentId, setCurrentId] = useState(paramId);
@@ -33,11 +34,68 @@ export default function useProductDetail() {
     loading: hierarchyLoading,
   } = useHierarchicalCategories();
 
-  // WebSocket init
+  // WebSocket init pour les mises à jour de produits
   useEffect(() => {
+    // Initialisation du WebSocket principal via le hook existant
     const cleanup = initWebSocketListeners();
-    return cleanup;
-  }, [initWebSocketListeners]);
+
+    // Importation directe du service WebSocket
+    // Cette approche est similaire à celle utilisée dans useBrandDetail
+    import('../../../services/websocketService')
+      .then((module) => {
+        const websocketService = module.default;
+
+        if (!websocketService) {
+          console.error('[PRODUCT_DETAIL] Service WebSocket non trouvé');
+          return;
+        }
+
+        const effectiveId = currentId || paramId;
+
+        if (!effectiveId) {
+          console.log("[PRODUCT_DETAIL] Pas d'ID de produit, pas d'écouteur WebSocket");
+          return;
+        }
+
+        console.log(
+          `[PRODUCT_DETAIL] Configuration de l'écouteur WebSocket pour le produit ${effectiveId}`
+        );
+
+        // Fonction de gestion des événements de mise à jour
+        const handleProductUpdate = (payload) => {
+          if (payload?.entityId === effectiveId) {
+            console.log(
+              `[PRODUCT_DETAIL] Mise à jour WebSocket pour le produit ${effectiveId}, rechargement`
+            );
+            getProductById(effectiveId)
+              .then((updatedProduct) => {
+                setProduct(updatedProduct);
+              })
+              .catch((err) => console.error('[PRODUCT_DETAIL] Erreur lors du rechargement:', err));
+          }
+        };
+
+        // S'abonner aux événements
+        websocketService.on('products.updated', handleProductUpdate);
+
+        // S'assurer que nous sommes abonnés au canal products
+        websocketService.subscribe('products');
+      })
+      .catch((err) => {
+        console.error("[PRODUCT_DETAIL] Erreur lors de l'import du service WebSocket:", err);
+      });
+
+    // Nettoyage lors du démontage
+    return () => {
+      if (typeof cleanup === 'function') {
+        cleanup();
+      }
+
+      // Le désabonnement se fait automatiquement lors du démontage
+      // car nous avons utilisé import dynamique, le websocketService
+      // n'est pas disponible dans cette portée
+    };
+  }, [initWebSocketListeners, currentId, paramId, getProductById]);
 
   // Fetch all data (brands, suppliers, categories)
   useEffect(() => {
@@ -214,6 +272,112 @@ export default function useProductDetail() {
     }
   };
 
+  // Fonctions corrigées pour la gestion des images
+  const handleUploadImage = async (entityId, file) => {
+    try {
+      setLoading(true);
+      // Utiliser la fonction correcte du hook useProductExtras
+      await productExtras.uploadGalleryImage(entityId, file);
+      const effectiveId = currentId || paramId;
+      // Rafraîchir les données du produit
+      const updated = await getProductById(effectiveId);
+      setProduct(updated);
+      return true;
+    } catch (err) {
+      console.error("Erreur lors de l'upload d'image:", err);
+      setError(`Erreur upload image: ${err.message}`);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteImage = async (entityId, imageIdOrIndex) => {
+    try {
+      setLoading(true);
+      console.log("Tentative de suppression d'image:", { entityId, imageIdOrIndex });
+
+      // Récupérer le produit actuel pour avoir les données à jour
+      const currentProduct = await getProductById(entityId);
+      console.log('Images dans la galerie:', currentProduct?.gallery_images);
+
+      // Déterminer si imageIdOrIndex est un index numérique ou un ID string
+      let imageIndex = -1;
+
+      if (typeof imageIdOrIndex === 'number') {
+        // Si c'est déjà un index numérique, l'utiliser directement
+        imageIndex = imageIdOrIndex;
+        console.log('Index numérique détecté:', imageIndex);
+      } else if (currentProduct?.gallery_images) {
+        // Sinon, essayer de trouver l'index par ID
+        // Tester plusieurs propriétés possibles où l'ID pourrait se trouver
+        imageIndex = currentProduct.gallery_images.findIndex(
+          (img) =>
+            img._id === imageIdOrIndex ||
+            img.id === imageIdOrIndex ||
+            img.imageId === imageIdOrIndex
+        );
+        console.log("Index trouvé à partir de l'ID:", imageIndex);
+      }
+
+      // Si on n'a toujours pas trouvé l'index, essayer de traiter l'image comme étant la première
+      if (imageIndex === -1 && currentProduct?.gallery_images?.length > 0) {
+        console.log('Image non trouvée par ID, tentative avec la première image');
+        imageIndex = 0;
+      }
+
+      // Vérifier si nous avons un index valide
+      if (
+        imageIndex === -1 ||
+        !currentProduct?.gallery_images ||
+        imageIndex >= currentProduct.gallery_images.length
+      ) {
+        console.error("Index d'image invalide:", imageIndex);
+        throw new Error("Index d'image invalide ou galerie vide");
+      }
+
+      // Log l'image qu'on va supprimer
+      console.log(
+        "Suppression de l'image à l'index:",
+        imageIndex,
+        currentProduct.gallery_images[imageIndex]
+      );
+
+      // Appeler la fonction avec l'index trouvé
+      await productExtras.deleteGalleryImage(entityId, imageIndex);
+
+      // Rafraîchir les données du produit
+      const effectiveId = currentId || paramId;
+      const updated = await getProductById(effectiveId);
+      setProduct(updated);
+      return true;
+    } catch (err) {
+      console.error("Erreur lors de la suppression d'image:", err);
+      setError(`Erreur suppression image: ${err.message}`);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetMainImage = async (entityId, imageIndex) => {
+    try {
+      setLoading(true);
+      await productExtras.setMainImage(entityId, imageIndex);
+      const effectiveId = currentId || paramId;
+      // Rafraîchir les données du produit
+      const updated = await getProductById(effectiveId);
+      setProduct(updated);
+      return true;
+    } catch (err) {
+      console.error("Erreur lors de la définition de l'image principale:", err);
+      setError(`Échec de la définition de l'image principale: ${err.message}`);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     product,
     loading: loading || hierarchyLoading,
@@ -231,9 +395,10 @@ export default function useProductDetail() {
     categoryOptions,
     brandOptions,
     supplierOptions,
-    uploadImage,
-    deleteImage,
-    setMainImage,
+    // Exposer les fonctions corrigées
+    uploadImage: handleUploadImage,
+    deleteImage: handleDeleteImage,
+    setMainImage: handleSetMainImage,
     hierarchicalCategories,
   };
 }
