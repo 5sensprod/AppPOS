@@ -7,6 +7,7 @@ const { createBrandSchema, updateBrandSchema } = require('../validation/schemas'
 const brandImageRoutes = require('./image/brandImageRoutes');
 const wooSyncMiddleware = require('../middleware/wooSyncMiddleware');
 const Brand = require('../models/Brand');
+const ResponseHandler = require('../handlers/ResponseHandler');
 
 // Routes principales
 router.get('/', brandController.getAll);
@@ -14,7 +15,28 @@ router.get('/:id', brandController.getById);
 router.get('/supplier/:supplierId', brandController.getBySupplier);
 router.post('/', validateSchema(createBrandSchema), brandController.create);
 router.put('/:id', validateSchema(updateBrandSchema), brandController.update);
-router.delete('/:id', brandController.delete);
+
+// Route de suppression avec vérification du compteur de produits
+router.delete('/:id', async (req, res) => {
+  try {
+    const brand = await Brand.findById(req.params.id);
+    if (!brand) {
+      return ResponseHandler.notFound(res, 'Marque non trouvée');
+    }
+
+    // Utiliser directement le compteur products_count
+    if (brand.products_count > 0) {
+      return ResponseHandler.badRequest(res, {
+        message: 'La marque contient un/des produits associés à un fournisseur',
+      });
+    }
+
+    // Si pas de produits, procéder à la suppression
+    return brandController.delete(req, res);
+  } catch (error) {
+    return ResponseHandler.error(res, error);
+  }
+});
 
 // Route de synchronisation
 router.post(

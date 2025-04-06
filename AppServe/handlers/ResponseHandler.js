@@ -22,6 +22,10 @@ class ResponseHandler {
     return this.error(res, { message }, 404);
   }
 
+  static badRequest(res, data) {
+    return this.error(res, { message: data.message || 'Requête invalide' }, 400);
+  }
+
   static partialSuccess(res, data, syncError) {
     return res.status(207).json({
       success: true,
