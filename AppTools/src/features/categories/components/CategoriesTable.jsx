@@ -5,11 +5,11 @@ import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
-
+import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 function CategoriesTable(props) {
   const { deleteCategory, syncCategory } = useCategory();
   const { sync, hierarchy } = ENTITY_CONFIG.features;
-
+  const [selectedFilters, setSelectedFilters] = useState([]);
   // Hiérarchie activée
   const {
     hierarchicalCategories,
@@ -206,34 +206,56 @@ function CategoriesTable(props) {
   }, [hierarchicalCategories, searchTerm, flattenHierarchy, searchProcessor]);
 
   const isLoading = hierarchicalLoading || operationLoading;
+  const filteredData = useMemo(() => {
+    let data = processedData;
 
+    const wooFilter = selectedFilters.find((f) => f.type === 'woo')?.value;
+    if (wooFilter === 'woo_synced') {
+      data = data.filter((cat) => cat.woo_id != null);
+    } else if (wooFilter === 'woo_unsynced') {
+      data = data.filter((cat) => cat.woo_id == null);
+    }
+
+    return data;
+  }, [processedData, selectedFilters]);
   return (
-    <EntityTable
-      data={processedData}
-      isLoading={isLoading}
-      error={error}
-      columns={ENTITY_CONFIG.columns}
-      entityName="catégorie"
-      entityNamePlural="catégories"
-      baseRoute="/products/categories"
-      filters={[]}
-      searchFields={['_originalName', 'description']}
-      searchProcessor={searchProcessor}
-      onSearch={handleSearch}
-      onDelete={handleDeleteEntity}
-      syncEnabled={sync}
-      actions={['view', 'edit', 'delete', 'sync']}
-      batchActions={['delete', 'sync']}
-      onSync={handleSyncEntity}
-      pagination={{
-        enabled: true,
-        pageSize: 5,
-        showPageSizeOptions: true,
-        pageSizeOptions: [5, 10, 25, 50],
-      }}
-      defaultSort={ENTITY_CONFIG.defaultSort}
-      {...props}
-    />
+    <div className="space-y-4">
+      <UnifiedFilterBar
+        filterOptions={[
+          { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
+          { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
+        ]}
+        selectedFilters={selectedFilters}
+        onChange={setSelectedFilters}
+      />
+
+      <EntityTable
+        data={filteredData}
+        isLoading={isLoading}
+        error={error}
+        columns={ENTITY_CONFIG.columns}
+        entityName="catégorie"
+        entityNamePlural="catégories"
+        baseRoute="/products/categories"
+        filters={[]}
+        searchFields={['_originalName', 'description']}
+        searchProcessor={searchProcessor}
+        onSearch={handleSearch}
+        onDelete={handleDeleteEntity}
+        syncEnabled={sync}
+        actions={['view', 'edit', 'delete', 'sync']}
+        batchActions={['delete', 'sync']}
+        onSync={handleSyncEntity}
+        pagination={{
+          enabled: true,
+          pageSize: 5,
+          showPageSizeOptions: true,
+          pageSizeOptions: [5, 10, 25, 50],
+        }}
+        defaultSort={ENTITY_CONFIG.defaultSort}
+        {...props}
+      />
+    </div>
   );
 }
 

@@ -4,8 +4,6 @@ import Select from 'react-select';
 const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }) => {
   const [editingType, setEditingType] = useState(null);
 
-  const alreadySelectedTypes = selectedFilters.map((f) => f.type);
-
   const filterGroups = filterOptions.reduce((acc, option) => {
     if (!acc[option.type]) acc[option.type] = [];
     acc[option.type].push(option);
@@ -15,10 +13,18 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
   const filterTypeLabels = {
     woo: 'Synchronisation',
     supplier: 'Fournisseur',
+    // Tu peux en ajouter d'autres ici
   };
 
+  const alreadySelectedValues = new Set(selectedFilters.map((f) => `${f.type}:${f.value}`));
+  const alreadySelectedTypes = new Set(selectedFilters.map((f) => f.type));
+
   const availableTypes = Object.entries(filterGroups)
-    .filter(([type]) => !alreadySelectedTypes.includes(type))
+    .filter(([type]) => {
+      // Un seul filtre autorisé pour woo, plusieurs pour supplier
+      const allowMultiple = type === 'supplier';
+      return allowMultiple || !alreadySelectedTypes.has(type);
+    })
     .map(([type]) => ({
       label: filterTypeLabels[type] || type,
       value: type,
@@ -35,7 +41,7 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
     const selectedValues = Array.isArray(selected) ? selected : [selected];
 
     const newFilters = selectedValues
-      .filter((s) => !selectedFilters.some((f) => f.type === editingType && f.value === s.value))
+      .filter((s) => !alreadySelectedValues.has(`${editingType}:${s.value}`))
       .map((s) => ({
         type: editingType,
         value: s.value,
@@ -46,7 +52,6 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
     if (isMulti) {
       updatedFilters = [...selectedFilters, ...newFilters];
     } else {
-      // Un seul filtre autorisé pour ce type (ex: woo)
       updatedFilters = [...selectedFilters.filter((f) => f.type !== editingType), ...newFilters];
     }
 
@@ -77,7 +82,6 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
 
   return (
     <div className="space-y-3 w-full max-w-xl">
-      {/* Étape 1 : Choix du type de filtre */}
       {!editingType && (
         <Select
           options={availableTypes}
@@ -87,20 +91,18 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
         />
       )}
 
-      {/* Étape 2 : Choix de la valeur pour le type sélectionné */}
       {editingType && (
         <Select
           options={getOptionsForType(editingType)}
           onChange={handleValueSelect}
           placeholder={`Choisir une valeur pour "${filterTypeLabels[editingType]}"`}
+          isMulti={editingType === 'supplier'}
           classNamePrefix="react-select"
           className="max-w-sm"
           autoFocus
-          isMulti={editingType === 'supplier'}
         />
       )}
 
-      {/* Affichage des filtres actifs sous forme de tags */}
       {selectedFilters.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selectedFilters.map((filter, idx) => (
