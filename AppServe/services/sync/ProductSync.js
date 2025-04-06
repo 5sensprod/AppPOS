@@ -167,22 +167,38 @@ class ProductSyncStrategy extends SyncStrategy {
   async _updateLocal(productId, wcData) {
     const product = await Product.findById(productId);
     const mainImage = wcData.images?.[0];
+
+    // Préserver les propriétés locales de l'image
     const image = mainImage
       ? {
           _id: product.image?._id || uuidv4(),
           wp_id: mainImage.id,
           url: mainImage.src,
           status: 'active',
+          // Préserver les chemins locaux
+          src: product.image?.src || mainImage.src,
+          local_path: product.image?.local_path || null,
+          type: product.image?.type || null,
+          metadata: product.image?.metadata || null,
         }
       : null;
 
-    const gallery = (wcData.images || []).map((img, i) => ({
-      _id: product.gallery_images?.[i]?._id || uuidv4(),
-      wp_id: img.id,
-      url: img.src,
-      src: img.src,
-      status: 'active',
-    }));
+    // Préserver les chemins locaux de la galerie
+    const gallery = (wcData.images || []).map((img, i) => {
+      const existingImg =
+        product.gallery_images?.find((g) => g.wp_id === img.id) || product.gallery_images?.[i];
+
+      return {
+        _id: existingImg?._id || uuidv4(),
+        wp_id: img.id,
+        url: img.src,
+        src: existingImg?.src || img.src,
+        local_path: existingImg?.local_path || null,
+        status: 'active',
+        type: existingImg?.type || null,
+        metadata: existingImg?.metadata || null,
+      };
+    });
 
     await Product.update(productId, {
       woo_id: wcData.id,
@@ -190,6 +206,7 @@ class ProductSyncStrategy extends SyncStrategy {
       last_sync: new Date(),
       image,
       gallery_images: gallery,
+      pending_sync: false,
     });
   }
 
