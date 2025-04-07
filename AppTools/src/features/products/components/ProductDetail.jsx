@@ -4,12 +4,10 @@ import useProductDetail from '../hooks/useProductDetail';
 import EntityDetail from '../../../components/common/EntityDetail';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import InventoryTab from './tabs/InventoryTab';
-import ImagesTab from '../../../components/common/tabs/ImagesTab';
+import ProductTab from './tabs/ProductTab'; // Importer le nouvel onglet
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import ProductPriceSection from './ProductPriceSection';
 import { ENTITY_CONFIG } from '../constants';
-import AIDescriptionSection from './sections/AIDescriptionSection';
-import ProductDescriptionDisplay from './sections/ProductDescriptionDisplay';
 
 function ProductDetail() {
   const {
@@ -42,34 +40,36 @@ function ProductDetail() {
       switch (activeTab) {
         case 'general':
           return (
-            <>
-              <GeneralInfoTab
-                entity={entity}
-                fields={['name', 'sku', 'status']}
-                editable={editable}
-                additionalSection={
-                  <ProductPriceSection
-                    product={entity}
-                    editable={editable}
-                    register={register}
-                    errors={errors}
-                  />
-                }
-              />
-
-              {/* Affichage de la section de description: mode lecture ou édition */}
-              {editable ? (
-                <AIDescriptionSection
+            <GeneralInfoTab
+              entity={entity}
+              fields={['name', 'sku', 'status']}
+              editable={editable}
+              additionalSection={
+                <ProductPriceSection
                   product={entity}
                   editable={editable}
                   register={register}
-                  setValue={setValue}
-                  watch={watch}
+                  errors={errors}
                 />
-              ) : (
-                <ProductDescriptionDisplay description={entity.description} />
-              )}
-            </>
+              }
+            />
+          );
+        case 'product': // Nouvel onglet Produit
+          return (
+            <ProductTab
+              product={entity}
+              editable={editable}
+              register={register}
+              setValue={setValue}
+              watch={watch}
+              errors={errors}
+              entityId={currentId}
+              uploadImage={uploadImage}
+              deleteImage={deleteImage}
+              setMainImage={setMainImage}
+              isLoading={loading}
+              error={error}
+            />
           );
         case 'inventory':
           return (
@@ -100,21 +100,6 @@ function ProductDetail() {
               hierarchicalCategories={hierarchicalCategories}
             />
           );
-        case 'images':
-          return (
-            <ImagesTab
-              entity={entity}
-              entityId={currentId}
-              entityType="product"
-              galleryMode={true}
-              onUploadImage={uploadImage}
-              onDeleteImage={deleteImage}
-              onSetMainImage={setMainImage}
-              isLoading={loading}
-              error={error}
-              editable={editable}
-            />
-          );
         case 'woocommerce':
           return <WooCommerceTab entity={entity} entityType="product" onSync={handleSync} />;
         default:
@@ -136,9 +121,17 @@ function ProductDetail() {
     ]
   );
 
-  const visibleTabs = isNew
-    ? ENTITY_CONFIG.tabs.filter((t) => !['images', 'woocommerce'].includes(t.id))
-    : ENTITY_CONFIG.tabs;
+  // Définir la liste des onglets visibles avec notre nouvel onglet Produit
+  const visibleTabs = [
+    { id: 'general', label: 'Général', icon: 'info' },
+    { id: 'product', label: 'Produit', icon: 'package' }, // Nouvel onglet
+    { id: 'inventory', label: 'Inventaire', icon: 'archive' },
+  ];
+
+  // Ajouter l'onglet WooCommerce pour les produits existants
+  if (!isNew) {
+    visibleTabs.push({ id: 'woocommerce', label: 'WooCommerce', icon: 'shopping-cart' });
+  }
 
   return (
     <EntityDetail
