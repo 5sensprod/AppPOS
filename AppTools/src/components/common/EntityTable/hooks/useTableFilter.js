@@ -1,5 +1,5 @@
 // src/components/common/EntityTable/hooks/useTableFilter.js
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { usePaginationStore } from '../../../../stores/usePaginationStore';
 
 export const useTableFilter = (
@@ -9,18 +9,36 @@ export const useTableFilter = (
   onSearch,
   onFilter,
   searchProcessor,
-  entityName = 'default' // Ajouter un paramètre pour l'identifiant d'entité
+  entityName = 'default' // Paramètre pour l'identifiant d'entité
 ) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilters, setActiveFilters] = useState({});
+  // Accéder au store pour les valeurs persistantes
+  const {
+    getPaginationParams,
+    setSearchTerm: saveSearchTerm,
+    setActiveFilters: saveActiveFilters,
+    resetPagination,
+  } = usePaginationStore();
 
-  // Accéder au store de pagination pour réinitialiser la pagination lors de recherches/filtres
-  const { resetPagination } = usePaginationStore();
+  // Récupérer les valeurs persistantes
+  const persistedParams = getPaginationParams(entityName);
 
-  // Gestion de la recherche
+  // État local initialisé avec les valeurs persistantes
+  const [searchTerm, setLocalSearchTerm] = useState(persistedParams.searchTerm || '');
+  const [activeFilters, setLocalActiveFilters] = useState(persistedParams.activeFilters || {});
+
+  // Synchronisation des états locaux avec les valeurs persistantes au chargement
+  useEffect(() => {
+    setLocalSearchTerm(persistedParams.searchTerm || '');
+    setLocalActiveFilters(persistedParams.activeFilters || {});
+  }, [persistedParams.searchTerm, persistedParams.activeFilters]);
+
+  // Gestion de la recherche avec persistance
   const handleSearchChange = (e) => {
     const value = e.target.value;
-    setSearchTerm(value);
+    setLocalSearchTerm(value);
+
+    // Sauvegarder dans le store
+    saveSearchTerm(entityName, value);
 
     // Réinitialiser la pagination lors d'une recherche
     resetPagination(entityName);
@@ -30,18 +48,28 @@ export const useTableFilter = (
     }
   };
 
-  // Gestion des filtres
+  // Gestion des filtres avec persistance
   const handleFilterChange = (filterId, value) => {
     // Réinitialiser la pagination lors d'un changement de filtre
     resetPagination(entityName);
 
-    setActiveFilters((prev) => ({
-      ...prev,
+    const newFilters = {
+      ...activeFilters,
       [filterId]: value,
-    }));
+    };
+
+    // Si la valeur est vide ou "all", supprimer le filtre
+    if (!value || value === 'all') {
+      delete newFilters[filterId];
+    }
+
+    setLocalActiveFilters(newFilters);
+
+    // Sauvegarder dans le store
+    saveActiveFilters(entityName, newFilters);
 
     if (onFilter) {
-      onFilter({ ...activeFilters, [filterId]: value });
+      onFilter(newFilters);
     }
   };
 
@@ -107,5 +135,9 @@ export const useTableFilter = (
     filteredData,
     handleSearchChange,
     handleFilterChange,
+    setSearchTerm: (term) => {
+      setLocalSearchTerm(term);
+      saveSearchTerm(entityName, term);
+    },
   };
 };
