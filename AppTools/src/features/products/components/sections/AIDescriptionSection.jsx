@@ -9,6 +9,7 @@ const AIDescriptionSection = ({ product, editable, register, setValue, watch }) 
   const [success, setSuccess] = useState(false);
   const [generatedDescription, setGeneratedDescription] = useState('');
   const [formattedDescription, setFormattedDescription] = useState({
+    title: '',
     intro: '',
     highlights: [],
     technicalTable: '',
@@ -41,11 +42,18 @@ const AIDescriptionSection = ({ product, editable, register, setValue, watch }) 
   // Fonction pour analyser et formater la description générée
   const parseGeneratedDescription = (rawDescription) => {
     const result = {
+      title: '',
       intro: '',
       highlights: [],
       technicalTable: '',
       usage: '',
     };
+
+    // Extraire le titre s'il existe
+    const titleMatch = rawDescription.match(/^##?\s+([^\n]+)/);
+    if (titleMatch && titleMatch[1]) {
+      result.title = titleMatch[1].trim();
+    }
 
     // Extraire la section du tableau technique (préserver intact)
     const tableMatch = rawDescription.match(/<table>[\s\S]*?<\/table>/);
@@ -53,10 +61,16 @@ const AIDescriptionSection = ({ product, editable, register, setValue, watch }) 
       result.technicalTable = tableMatch[0];
     }
 
-    // Extraire l'introduction (paragraphes avant les points forts)
-    const introMatch = rawDescription.split(/\*\*Points Forts:\*\*/)[0];
-    if (introMatch) {
-      result.intro = introMatch.replace(/^#+\s+[^]+?\n\n/, '').trim(); // Enlever le titre
+    // Extraire l'introduction (entre le titre et les points forts)
+    let introSection = '';
+    const sections = rawDescription.split(/\*\*Points Forts:\*\*/);
+    if (sections.length > 0) {
+      introSection = sections[0];
+      // Retirer le titre du début s'il existe
+      if (titleMatch) {
+        introSection = introSection.replace(/^##?\s+[^\n]+\s*\n+/, '');
+      }
+      result.intro = introSection.trim();
     }
 
     // Extraire les points forts
@@ -215,14 +229,15 @@ const AIDescriptionSection = ({ product, editable, register, setValue, watch }) 
 
       {/* Affichage formaté de la description générée */}
       {generatedDescription && (
-        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-medium text-blue-800 dark:text-blue-300">
-              Aperçu de la description générée:
+        <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-md">
+          {/* En-tête de l'aperçu */}
+          <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-t-md">
+            <h4 className="font-medium text-gray-800 dark:text-gray-200">
+              Aperçu de la description générée
             </h4>
             <button
               type="button"
-              className="text-xs px-2 py-1 bg-blue-600 text-white rounded"
+              className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
               onClick={() => {
                 if (setValue) {
                   setValue('description', generatedDescription, {
@@ -237,56 +252,67 @@ const AIDescriptionSection = ({ product, editable, register, setValue, watch }) 
             </button>
           </div>
 
-          {/* Version formatée pour l'aperçu */}
-          <div className="prose dark:prose-invert max-w-none text-sm overflow-y-auto max-h-96">
-            {/* Introduction - Version concise */}
-            {formattedDescription.intro && (
-              <div className="mb-4">
-                <p>{formattedDescription.intro}</p>
-              </div>
-            )}
+          {/* Contenu de l'aperçu */}
+          <div className="p-4 bg-white dark:bg-gray-900 rounded-b-md">
+            <div className="prose dark:prose-invert max-w-none text-sm overflow-y-auto max-h-96">
+              {/* Titre du produit */}
+              {formattedDescription.title && (
+                <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-gray-100">
+                  {formattedDescription.title}
+                </h3>
+              )}
 
-            {/* Points forts - Affichage compact */}
-            {formattedDescription.highlights.length > 0 && (
-              <div className="mb-4">
-                <h5 className="font-medium mb-1">Points Forts:</h5>
-                <ul className="list-disc pl-5 grid grid-cols-2 gap-1">
-                  {formattedDescription.highlights.map((highlight, idx) => (
-                    <li key={idx} className="text-sm">
-                      {highlight}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+              {/* Introduction - Version concise */}
+              {formattedDescription.intro && (
+                <div className="mb-4">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {formattedDescription.intro}
+                  </p>
+                </div>
+              )}
 
-            {/* Tableau technique - Conservé intégralement */}
-            {formattedDescription.technicalTable && (
-              <div className="mb-4 overflow-x-auto">
-                <h5 className="font-medium mb-1">Fiche Technique:</h5>
-                <div
-                  className="w-full"
-                  dangerouslySetInnerHTML={{ __html: formattedDescription.technicalTable }}
-                />
-              </div>
-            )}
+              {/* Points forts - Affichage compact */}
+              {formattedDescription.highlights.length > 0 && (
+                <div className="mb-4">
+                  <h5 className="font-medium mb-2 text-gray-800 dark:text-gray-200">
+                    Points Forts:
+                  </h5>
+                  <ul className="list-disc pl-5 grid grid-cols-2 gap-1">
+                    {formattedDescription.highlights.map((highlight, idx) => (
+                      <li key={idx} className="text-sm text-gray-700 dark:text-gray-300">
+                        {highlight}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-            {/* Conseils d'utilisation - Version concise */}
-            {formattedDescription.usage && (
-              <div className="mb-2">
-                <h5 className="font-medium mb-1">Conseils d'utilisation:</h5>
-                <p className="text-sm">{formattedDescription.usage}</p>
-              </div>
-            )}
+              {/* Tableau technique - Conservé intégralement */}
+              {formattedDescription.technicalTable && (
+                <div className="mb-4 overflow-x-auto product-technical-table">
+                  <h5 className="font-medium mb-2 text-gray-800 dark:text-gray-200">
+                    Fiche Technique:
+                  </h5>
+                  <div
+                    className="w-full"
+                    dangerouslySetInnerHTML={{ __html: formattedDescription.technicalTable }}
+                  />
+                </div>
+              )}
+
+              {/* Conseils d'utilisation - Version concise */}
+              {formattedDescription.usage && (
+                <div className="mb-1">
+                  <h5 className="font-medium mb-2 text-gray-800 dark:text-gray-200">
+                    Conseils d'utilisation:
+                  </h5>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {formattedDescription.usage}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-
-          {/* Version brute cachée pour le développement */}
-          {/* <details className="mt-4">
-            <summary className="text-xs text-gray-500 cursor-pointer">Voir HTML brut</summary>
-            <pre className="text-xs mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded overflow-auto max-h-40">
-              {generatedDescription}
-            </pre>
-          </details> */}
         </div>
       )}
 

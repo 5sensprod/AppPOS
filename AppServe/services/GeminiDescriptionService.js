@@ -3,6 +3,53 @@ const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
 
+/**
+ * Nettoie la description générée par l'IA pour supprimer les symboles Markdown
+ * et s'assurer que le HTML est correctement formaté
+ */
+function cleanGeneratedDescription(description) {
+  if (!description) return '';
+
+  let cleaned = description;
+
+  // 1. Traiter les blocs de code markdown
+  // Remplacer ```html par le contenu HTML direct
+  cleaned = cleaned.replace(/```html\s*([\s\S]*?)```/g, (match, codeContent) => {
+    return codeContent.trim();
+  });
+
+  // Supprimer autres blocs de code markdown
+  cleaned = cleaned.replace(/```[a-z]*\s*([\s\S]*?)```/g, (match, codeContent) => {
+    return codeContent.trim();
+  });
+
+  // 2. Nettoyer les numéros de section
+  cleaned = cleaned.replace(/^\s*\d+\.\s*/gm, '');
+
+  // 3. Convertir le format Markdown pour les points forts et autres sections
+  cleaned = cleaned.replace(/\*\*([^*]+):\*\*/g, '<strong>$1:</strong>');
+  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  cleaned = cleaned.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  // 4. Remplacer les listes à puces Markdown par du HTML
+  const bulletLines = cleaned.match(/^\s*\*\s+(.+)$/gm);
+  if (bulletLines) {
+    bulletLines.forEach((line) => {
+      const cleanedLine = line.replace(/^\s*\*\s+/, '');
+      cleaned = cleaned.replace(line, `<li>${cleanedLine}</li>`);
+    });
+
+    // Entourer les séquences de <li> avec <ul>
+    cleaned = cleaned.replace(/(<li>.*?<\/li>)(\s*<li>.*?<\/li>)*/g, '<ul>$&</ul>');
+  }
+
+  // 5. S'assurer que les tableaux HTML sont bien formés
+  cleaned = cleaned.replace(/<table>\s*<tbody>/g, '<table>');
+  cleaned = cleaned.replace(/<\/tbody>\s*<\/table>/g, '</table>');
+
+  return cleaned;
+}
+
 class GeminiDirectService {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
@@ -12,7 +59,7 @@ class GeminiDirectService {
 
   async generateProductDescription(productData, imagePath) {
     try {
-      // Préparer le texte du prompt - optimisé pour des descriptions plus concises
+      // Préparer le texte du prompt avec instructions claires pour éviter les problèmes Markdown
       let textPrompt = `Tu es un expert en rédaction de fiches produit pour un site e-commerce.
       
 Crée une description commerciale concise mais impactante pour le produit suivant : ${productData.name}`;
@@ -38,14 +85,20 @@ Crée une description commerciale concise mais impactante pour le produit suivan
         }
       }
 
-      // Format de réponse demandé avec moins de texte mais conservation des tableaux techniques
+      // Format de réponse avec instructions claires sur le format HTML attendu
       textPrompt += `\n\nTa réponse doit suivre ce format :
 1. Une description générale courte mais persuasive (1-2 paragraphes maximum)
 2. Les points forts du produit (liste de 3-4 avantages clés)
-3. Une fiche technique détaillée avec les caractéristiques principales, présentée sous forme de tableau HTML avec les balises <table>, <tr>, <th> et <td> - CETTE SECTION DOIT RESTER COMPLÈTE ET DÉTAILLÉE
+3. Une fiche technique détaillée avec les caractéristiques principales, présentée sous forme de tableau HTML
 4. Si pertinent, des conseils d'utilisation courts (1 paragraphe maximum)
 
-Utilise un ton commercial et persuasif. Pour les parties textuelles, sois bref mais accrocheur. Pour la fiche technique, sois exhaustif comme pour un produit WooCommerce.`;
+TRÈS IMPORTANT - FORMATAGE:
+- N'utilise PAS les délimiteurs \`\`\`html et \`\`\` autour du tableau HTML
+- Utilise directement les balises HTML (<table>, <tr>, <th>, <td>) pour le tableau
+- Pour le formatage, utilise des balises HTML simples (<strong>, <em>, <ul>, <li>) plutôt que des marqueurs Markdown
+- Garde la fiche technique détaillée comme pour un produit e-commerce professionnel
+
+Utilise un ton commercial et persuasif. Pour les parties textuelles, sois bref mais accrocheur.`;
 
       // Préparation de la requête
       const requestData = {
@@ -57,7 +110,7 @@ Utilise un ton commercial et persuasif. Pour les parties textuelles, sois bref m
         ],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 1500, // Réduit pour avoir des réponses plus courtes
+          maxOutputTokens: 1500,
           topP: 0.95,
           topK: 40,
         },
@@ -114,14 +167,14 @@ Utilise un ton commercial et persuasif. Pour les parties textuelles, sois bref m
         response.data.candidates[0].content.parts &&
         response.data.candidates[0].content.parts[0]
       ) {
-        const description = response.data.candidates[0].content.parts[0].text;
+        const rawDescription = response.data.candidates[0].content.parts[0].text;
 
-        // Option: post-traitement pour s'assurer que les tableaux HTML sont préservés
-        // mais que le reste du texte reste concis
+        // Post-traitement pour nettoyer les artefacts Markdown et assurer un HTML propre
+        const cleanedDescription = cleanGeneratedDescription(rawDescription);
 
         return {
           product_name: productData.name,
-          description: description,
+          description: cleanedDescription,
         };
       } else {
         throw new Error('Format de réponse inattendu de Gemini');
