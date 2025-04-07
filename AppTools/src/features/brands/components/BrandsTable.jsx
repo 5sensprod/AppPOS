@@ -6,11 +6,16 @@ import UnifiedFilterBar from '@/components/common/EntityTable/components/Unified
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
+import { usePaginationStore } from '@/stores/usePaginationStore'; // Nouvel import
 
 function BrandsTable(props) {
   const { deleteBrand, syncBrand } = useBrand();
   const { brands, loading: brandsLoading, fetchBrands, initWebSocket } = useBrandDataStore();
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
+
+  // Récupérer les paramètres de pagination persistants
+  const { getPaginationParams } = usePaginationStore();
+  const { pageSize: persistedPageSize } = getPaginationParams('brand');
 
   const {
     loading: operationLoading,
@@ -105,11 +110,12 @@ function BrandsTable(props) {
         batchActions={['delete', 'sync']}
         pagination={{
           enabled: true,
-          pageSize: 5,
+          pageSize: persistedPageSize || 5, // Utiliser la taille persistante ou la valeur par défaut
           showPageSizeOptions: true,
           pageSizeOptions: [5, 10, 25, 50],
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
+        paginationEntityId="brand" // Identifiant unique pour la pagination
         {...props}
       />
     </div>

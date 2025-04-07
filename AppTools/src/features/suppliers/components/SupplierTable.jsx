@@ -4,6 +4,7 @@ import { useSupplier, useSupplierDataStore } from '../stores/supplierStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '../../../hooks/useEntityTable';
+import { usePaginationStore } from '../../../stores/usePaginationStore';
 
 function SupplierTable(props) {
   const { deleteSupplier } = useSupplier();
@@ -13,6 +14,10 @@ function SupplierTable(props) {
     fetchSuppliers,
     initWebSocket,
   } = useSupplierDataStore();
+
+  // Utiliser directement le store de pagination
+  const { getPaginationParams } = usePaginationStore();
+  const { pageSize: persistedPageSize } = getPaginationParams('supplier');
 
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
 
@@ -66,11 +71,13 @@ function SupplierTable(props) {
       onSync={handleSyncEntity}
       pagination={{
         enabled: true,
-        pageSize: 5,
+        pageSize: persistedPageSize || 5, // Utiliser la taille persitante ou la valeur par défaut
         showPageSizeOptions: true,
         pageSizeOptions: [5, 10, 25, 50],
       }}
       defaultSort={ENTITY_CONFIG.defaultSort}
+      // Passer l'identifiant d'entité pour la pagination
+      paginationEntityId="supplier"
       {...props}
     />
   );

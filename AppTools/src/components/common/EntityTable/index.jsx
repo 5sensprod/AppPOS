@@ -38,10 +38,19 @@ const EntityTable = ({
   searchFields = ['name'],
   filters = [],
   searchProcessor,
+  paginationEntityId = 'default',
 }) => {
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
   const { searchTerm, activeFilters, filteredData, handleSearchChange, handleFilterChange } =
-    useTableFilter(sortedData, searchFields, filters, onSearch, onFilter, searchProcessor);
+    useTableFilter(
+      sortedData,
+      searchFields,
+      filters,
+      onSearch,
+      onFilter,
+      searchProcessor,
+      paginationEntityId
+    );
   const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(
     data,
     filteredData
@@ -54,7 +63,7 @@ const EntityTable = ({
     setCurrentPage,
     setPageSize,
     paginationInfo,
-  } = useTablePagination(filteredData, pagination);
+  } = useTablePagination(filteredData, pagination, paginationEntityId);
 
   const hasSync = typeof onSync === 'function';
 

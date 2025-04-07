@@ -5,6 +5,7 @@ import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
+import { usePaginationStore } from '@/stores/usePaginationStore'; // Nouvel import
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
@@ -16,6 +17,10 @@ function ProductTable(props) {
     initWebSocket,
   } = useProductDataStore();
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
+
+  // Récupérer les paramètres de pagination persistants
+  const { getPaginationParams } = usePaginationStore();
+  const { pageSize: persistedPageSize } = getPaginationParams('product');
 
   const { selectedFilters, setSelectedFilters } = useEntityFilter('product');
 
@@ -187,11 +192,12 @@ function ProductTable(props) {
         onSync={handleSyncEntity}
         pagination={{
           enabled: true,
-          pageSize: 10,
+          pageSize: persistedPageSize || 10, // Utiliser la taille persistante ou la valeur par défaut
           showPageSizeOptions: true,
           pageSizeOptions: [5, 10, 25, 50, 100],
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
+        paginationEntityId="product" // Identifiant unique pour la pagination
         {...props}
       />
     </>

@@ -7,11 +7,17 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
+import { usePaginationStore } from '@/stores/usePaginationStore'; // Nouvel import
 
 function CategoriesTable(props) {
   const { deleteCategory, syncCategory } = useCategory();
   const { sync, hierarchy } = ENTITY_CONFIG.features;
   const { selectedFilters, setSelectedFilters } = useEntityFilter('category');
+
+  // Récupérer les paramètres de pagination persistants
+  const { getPaginationParams } = usePaginationStore();
+  const { pageSize: persistedPageSize } = getPaginationParams('category');
+
   // Hiérarchie activée
   const {
     hierarchicalCategories,
@@ -220,6 +226,7 @@ function CategoriesTable(props) {
 
     return data;
   }, [processedData, selectedFilters]);
+
   return (
     <div className="space-y-4">
       <UnifiedFilterBar
@@ -250,11 +257,12 @@ function CategoriesTable(props) {
         onSync={handleSyncEntity}
         pagination={{
           enabled: true,
-          pageSize: 5,
+          pageSize: persistedPageSize || 5, // Utiliser la taille persistante ou la valeur par défaut
           showPageSizeOptions: true,
           pageSizeOptions: [5, 10, 25, 50],
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
+        paginationEntityId="category" // Identifiant unique pour la pagination
         {...props}
       />
     </div>

@@ -1,5 +1,6 @@
 // src/components/common/EntityTable/hooks/useTableFilter.js
 import { useState, useMemo } from 'react';
+import { usePaginationStore } from '../../../../stores/usePaginationStore';
 
 export const useTableFilter = (
   data,
@@ -7,15 +8,23 @@ export const useTableFilter = (
   filters,
   onSearch,
   onFilter,
-  searchProcessor
+  searchProcessor,
+  entityName = 'default' // Ajouter un paramètre pour l'identifiant d'entité
 ) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState({});
+
+  // Accéder au store de pagination pour réinitialiser la pagination lors de recherches/filtres
+  const { resetPagination } = usePaginationStore();
 
   // Gestion de la recherche
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
+
+    // Réinitialiser la pagination lors d'une recherche
+    resetPagination(entityName);
+
     if (onSearch) {
       onSearch(value, searchFields);
     }
@@ -23,10 +32,14 @@ export const useTableFilter = (
 
   // Gestion des filtres
   const handleFilterChange = (filterId, value) => {
+    // Réinitialiser la pagination lors d'un changement de filtre
+    resetPagination(entityName);
+
     setActiveFilters((prev) => ({
       ...prev,
       [filterId]: value,
     }));
+
     if (onFilter) {
       onFilter({ ...activeFilters, [filterId]: value });
     }
@@ -47,19 +60,15 @@ export const useTableFilter = (
             if (filterValue === 'unsynced') return item.woo_id == null;
             return true;
           }
-
           if (filterId === 'suppliers') {
             return item.suppliers?.includes(filterValue);
           }
-
           return item[filterId] === filterValue;
         }
         if (filterConfig.type === 'boolean') {
           const isTrue = filterValue === 'true';
-
           // Cas spécial : champ est "truthy" ou "null" (ex: woo_id)
           const fieldValue = item[filterId];
-
           // On considère que "synchronisé" = woo_id != null
           return isTrue ? fieldValue !== null && fieldValue !== undefined : fieldValue == null;
         }
