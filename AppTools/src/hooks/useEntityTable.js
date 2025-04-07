@@ -6,12 +6,14 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
   const [error, setError] = useState(null);
   const operationInProgress = useRef(false);
 
+  // Stocker les fonctions dans une ref pour éviter de recréer les callbacks
   const functionsRef = useRef({
     fetchEntities,
     deleteEntity,
     syncEntity,
   });
 
+  // Mettre à jour la ref quand les fonctions changent
   useEffect(() => {
     functionsRef.current = { fetchEntities, deleteEntity, syncEntity };
   }, [fetchEntities, deleteEntity, syncEntity]);
@@ -41,14 +43,15 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
     });
   }, [executeOperation]);
 
+  // Exécuter une seule fois au montage du composant
   useEffect(() => {
-    loadEntities();
-  }, [loadEntities]);
+    // Ne pas appeler loadEntities ici
+    // Le chargement initial doit être contrôlé par ProductTable
+  }, []); // Tableau de dépendances vide = exécution unique au montage
 
   const handleDeleteEntity = useCallback(
     async (id) => {
       if (!functionsRef.current.deleteEntity) return;
-
       return executeOperation(async () => {
         await functionsRef.current.deleteEntity(id);
         if (typeof functionsRef.current.fetchEntities === 'function') {
@@ -62,7 +65,6 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
   const handleSyncEntity = useCallback(
     async (id) => {
       if (!functionsRef.current.syncEntity) return;
-
       return executeOperation(async () => {
         await functionsRef.current.syncEntity(id);
         if (typeof functionsRef.current.fetchEntities === 'function') {
@@ -78,7 +80,7 @@ export const useEntityTable = ({ fetchEntities, deleteEntity, syncEntity }) => {
     error,
     loadEntities,
     handleDeleteEntity,
-    ...(syncEntity && { handleSyncEntity }), // clé conditionnelle
+    ...(syncEntity && { handleSyncEntity }),
     executeOperation,
     operationInProgress: operationInProgress.current,
   };

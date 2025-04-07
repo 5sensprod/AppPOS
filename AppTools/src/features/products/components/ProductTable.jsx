@@ -29,8 +29,21 @@ function ProductTable(props) {
 
   useEffect(() => {
     if (syncEnabled) initWebSocket();
-    if (products.length === 0) fetchProducts();
-  }, [initWebSocket, fetchProducts, products.length, syncEnabled]);
+
+    // Charger les produits uniquement au montage initial
+    const fetchInitialProducts = async () => {
+      if (products.length === 0) {
+        await fetchProducts();
+      }
+    };
+
+    fetchInitialProducts();
+
+    // Nettoyage lors du démontage du composant
+    return () => {
+      // Ajouter ici le code pour fermer le websocket si nécessaire
+    };
+  }, []);
 
   useEffect(() => {
     setLocalProducts(products || []);
@@ -41,12 +54,16 @@ function ProductTable(props) {
     loading: operationLoading,
     handleDeleteEntity,
     handleSyncEntity,
+    loadEntities, // Ajouter cette référence
   } = useEntityTable({
     entityType: 'product',
-    fetchEntities: fetchProducts,
+    // Ne pas inclure fetchEntities ici, car il crée une boucle
+    // fetchEntities: fetchProducts,
     deleteEntity: async (id) => {
       console.log(`🗑️ Suppression du produit #${id}`);
       await deleteProduct(id);
+      // Après la suppression, charger les données manuellement
+      await fetchProducts();
     },
     syncEntity: syncEnabled
       ? async (id) => {
@@ -54,6 +71,8 @@ function ProductTable(props) {
           try {
             await syncProduct(id);
             console.log(`✅ Fin de synchronisation du produit #${id}`);
+            // Après la synchronisation, charger les données manuellement
+            await fetchProducts();
           } catch (error) {
             console.error(`❌ Erreur lors de la synchronisation:`, error);
             throw error;

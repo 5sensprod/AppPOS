@@ -1,5 +1,5 @@
 // src/components/common/EntityTable/hooks/useTableFilter.js
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePaginationStore } from '../../../../stores/usePaginationStore';
 
 export const useTableFilter = (
@@ -9,9 +9,12 @@ export const useTableFilter = (
   onSearch,
   onFilter,
   searchProcessor,
-  entityName = 'default' // Paramètre pour l'identifiant d'entité
+  entityName = 'default'
 ) => {
-  // Accéder au store pour les valeurs persistantes
+  // Utiliser useRef pour stocker les valeurs persistantes récupérées une seule fois
+  const persistedParamsRef = useRef(null);
+
+  // Accéder au store pour les valeurs persistantes et les fonctions
   const {
     getPaginationParams,
     setSearchTerm: saveSearchTerm,
@@ -19,59 +22,77 @@ export const useTableFilter = (
     resetPagination,
   } = usePaginationStore();
 
-  // Récupérer les valeurs persistantes
-  const persistedParams = getPaginationParams(entityName);
+  // Initialiser persistedParamsRef une seule fois
+  if (persistedParamsRef.current === null) {
+    persistedParamsRef.current = getPaginationParams(entityName);
+  }
 
   // État local initialisé avec les valeurs persistantes
-  const [searchTerm, setLocalSearchTerm] = useState(persistedParams.searchTerm || '');
-  const [activeFilters, setLocalActiveFilters] = useState(persistedParams.activeFilters || {});
+  const [searchTerm, setLocalSearchTerm] = useState(persistedParamsRef.current.searchTerm || '');
+  const [activeFilters, setLocalActiveFilters] = useState(
+    persistedParamsRef.current.activeFilters || {}
+  );
 
-  // Synchronisation des états locaux avec les valeurs persistantes au chargement
+  // Référence aux fonctions pour éviter les recréations à chaque rendu
+  const callbacksRef = useRef({
+    onSearch,
+    onFilter,
+  });
+
+  // Mettre à jour les références des callbacks lorsqu'elles changent
   useEffect(() => {
-    setLocalSearchTerm(persistedParams.searchTerm || '');
-    setLocalActiveFilters(persistedParams.activeFilters || {});
-  }, [persistedParams.searchTerm, persistedParams.activeFilters]);
+    callbacksRef.current = {
+      onSearch,
+      onFilter,
+    };
+  }, [onSearch, onFilter]);
 
   // Gestion de la recherche avec persistance
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setLocalSearchTerm(value);
+  const handleSearchChange = useMemo(
+    () => (e) => {
+      const value = e.target.value;
+      setLocalSearchTerm(value);
 
-    // Sauvegarder dans le store
-    saveSearchTerm(entityName, value);
+      // Sauvegarder dans le store
+      saveSearchTerm(entityName, value);
 
-    // Réinitialiser la pagination lors d'une recherche
-    resetPagination(entityName);
+      // Réinitialiser la pagination lors d'une recherche
+      resetPagination(entityName);
 
-    if (onSearch) {
-      onSearch(value, searchFields);
-    }
-  };
+      if (callbacksRef.current.onSearch) {
+        callbacksRef.current.onSearch(value, searchFields);
+      }
+    },
+    [saveSearchTerm, resetPagination, entityName, searchFields]
+  );
 
   // Gestion des filtres avec persistance
-  const handleFilterChange = (filterId, value) => {
-    // Réinitialiser la pagination lors d'un changement de filtre
-    resetPagination(entityName);
+  const handleFilterChange = useMemo(
+    () => (filterId, value) => {
+      // Réinitialiser la pagination lors d'un changement de filtre
+      resetPagination(entityName);
 
-    const newFilters = {
-      ...activeFilters,
-      [filterId]: value,
-    };
+      const newFilters = {
+        ...activeFilters,
+        [filterId]: value,
+      };
 
-    // Si la valeur est vide ou "all", supprimer le filtre
-    if (!value || value === 'all') {
-      delete newFilters[filterId];
-    }
+      // Si la valeur est vide ou "all", supprimer le filtre
+      if (!value || value === 'all') {
+        delete newFilters[filterId];
+      }
 
-    setLocalActiveFilters(newFilters);
+      setLocalActiveFilters(newFilters);
 
-    // Sauvegarder dans le store
-    saveActiveFilters(entityName, newFilters);
+      // Sauvegarder dans le store
+      saveActiveFilters(entityName, newFilters);
 
-    if (onFilter) {
-      onFilter(newFilters);
-    }
-  };
+      if (callbacksRef.current.onFilter) {
+        callbacksRef.current.onFilter(newFilters);
+      }
+    },
+    [activeFilters, saveActiveFilters, resetPagination, entityName]
+  );
 
   // Appliquer les filtres et la recherche aux données
   const filteredData = useMemo(() => {

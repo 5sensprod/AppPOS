@@ -50,6 +50,17 @@ const EntityDetail = ({
     mode: 'onChange',
   });
 
+  // Log pour vérifier les méthodes du formulaire
+  useEffect(() => {
+    if (editable) {
+      console.log('formMethods disponibles:', {
+        setValue: !!formMethods.setValue,
+        watch: !!formMethods.watch,
+        getValues: !!formMethods.getValues,
+      });
+    }
+  }, [editable, formMethods]);
+
   // Mettre à jour le formulaire si l'entité change
   useEffect(() => {
     if (editable && entity) {
@@ -274,7 +285,9 @@ const EntityDetail = ({
                     control: formMethods.control,
                     register: formMethods.register,
                     errors: formMethods.formState.errors,
+                    setValue: formMethods.setValue, // Utilisez formMethods.setValue
                     watch: formMethods.watch,
+                    getValues: formMethods.getValues,
                   })}
               </div>
             </form>

@@ -8,6 +8,7 @@ import ImagesTab from '../../../components/common/tabs/ImagesTab';
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import ProductPriceSection from './ProductPriceSection';
 import { ENTITY_CONFIG } from '../constants';
+import AIDescriptionSection from './sections/AIDescriptionSection';
 
 function ProductDetail() {
   const {
@@ -35,24 +36,52 @@ function ProductDetail() {
 
   const renderTabContent = useCallback(
     (entity, activeTab, formProps = {}) => {
-      const { editable, register, control, errors } = formProps;
+      const { editable, register, control, errors, setValue, watch } = formProps;
 
       switch (activeTab) {
         case 'general':
           return (
-            <GeneralInfoTab
-              entity={entity}
-              fields={['name', 'sku', 'description', 'status']}
-              editable={editable}
-              additionalSection={
-                <ProductPriceSection
+            <>
+              <GeneralInfoTab
+                entity={entity}
+                fields={['name', 'sku', 'status']}
+                editable={editable}
+                additionalSection={
+                  <ProductPriceSection
+                    product={entity}
+                    editable={editable}
+                    register={register}
+                    errors={errors}
+                  />
+                }
+              />
+
+              {/* Affichage de la section de description: mode lecture ou édition */}
+              {editable ? (
+                <AIDescriptionSection
                   product={entity}
                   editable={editable}
                   register={register}
-                  errors={errors}
+                  setValue={setValue}
+                  watch={watch}
                 />
-              }
-            />
+              ) : (
+                <div className="mb-6 mt-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Description du produit
+                  </h3>
+                  <div className="bg-white dark:bg-gray-800 p-4 rounded-md border dark:border-gray-700">
+                    {entity.description ? (
+                      <div dangerouslySetInnerHTML={{ __html: entity.description }} />
+                    ) : (
+                      <p className="text-gray-500 dark:text-gray-400 italic">
+                        Aucune description disponible
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           );
         case 'inventory':
           return (
