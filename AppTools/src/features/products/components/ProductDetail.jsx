@@ -112,6 +112,7 @@ function ProductDetail() {
               onSetMainImage={setMainImage}
               isLoading={loading}
               error={error}
+              editable={editable}
             />
           );
         case 'woocommerce':

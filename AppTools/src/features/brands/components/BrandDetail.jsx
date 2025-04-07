@@ -59,6 +59,7 @@ function BrandDetail() {
             onDeleteImage={deleteImage}
             isLoading={loading}
             error={error}
+            editable={editable}
           />
         );
       case 'woocommerce':

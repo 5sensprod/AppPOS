@@ -104,6 +104,7 @@ function CategorieDetail() {
               onDeleteImage={handleDeleteImage}
               isLoading={loading}
               error={error}
+              editable={editable}
             />
           );
 
