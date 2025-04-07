@@ -17,7 +17,12 @@ const ProductPriceSection = ({ product, editable = false, register, errors }) =>
               {product.price ? `${product.price.toFixed(2)} €` : '-'}
             </p>
           </div>
-
+          <div>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Prix d'achat</h3>
+            <p className="mt-1 text-gray-900 dark:text-gray-100">
+              {product.purchase_price ? `${product.purchase_price.toFixed(2)} €` : '-'}
+            </p>
+          </div>
           <div>
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Prix régulier</h3>
             <p className="mt-1 text-gray-900 dark:text-gray-100">
@@ -33,9 +38,16 @@ const ProductPriceSection = ({ product, editable = false, register, errors }) =>
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Prix d'achat</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Taux de marge</h3>
             <p className="mt-1 text-gray-900 dark:text-gray-100">
-              {product.purchase_price ? `${product.purchase_price.toFixed(2)} €` : '-'}
+              {product.margin_rate ? `${product.margin_rate.toFixed(2)} %` : '-'}
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">TVA</h3>
+            <p className="mt-1 text-gray-900 dark:text-gray-100">
+              {product.tax_rate ? `${product.tax_rate.toFixed(2)}` : '-'}
             </p>
           </div>
 
@@ -86,6 +98,23 @@ const ProductPriceSection = ({ product, editable = false, register, errors }) =>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Prix d'achat (€)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            {...register('purchase_price')}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+          {errors?.purchase_price && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-500">
+              {errors.purchase_price.message}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Prix régulier (€)
           </label>
           <input
@@ -114,23 +143,6 @@ const ProductPriceSection = ({ product, editable = false, register, errors }) =>
           {errors?.sale_price && (
             <p className="mt-1 text-sm text-red-600 dark:text-red-500">
               {errors.sale_price.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Prix d'achat (€)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            {...register('purchase_price')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          />
-          {errors?.purchase_price && (
-            <p className="mt-1 text-sm text-red-600 dark:text-red-500">
-              {errors.purchase_price.message}
             </p>
           )}
         </div>

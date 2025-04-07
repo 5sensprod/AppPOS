@@ -462,27 +462,7 @@ const EntityImageManager = ({
     );
   };
 
-  // Return principal du composant
   return renderContent();
-  // Gestion des erreurs, similaire à EntityTable
-  if (error) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900 p-6 rounded-lg">
-        <h2 className="text-red-800 dark:text-red-200 text-lg font-medium mb-2">
-          Une erreur est survenue
-        </h2>
-        <p className="text-red-700 dark:text-red-300">{error}</p>
-      </div>
-    );
-  }
-
-  // Return principal du composant avec le style du conteneur comme dans EntityTable
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-      {renderImageSection('main')}
-      {galleryMode && renderImageSection('gallery')}
-    </div>
-  );
 };
 
 export default EntityImageManager;
