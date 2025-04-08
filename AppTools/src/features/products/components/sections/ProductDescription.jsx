@@ -1,98 +1,38 @@
-// src/features/products/components/sections/EnhancedAIDescriptionSection.jsx
+// src/features/products/components/sections/ProductDescription.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Image, MessageSquare, Paperclip, X, ChevronUp, Check } from 'lucide-react';
 import apiService from '../../../../services/api';
-import { formatDescriptionForDisplay } from '../../../../utils/formatDescription';
+import {
+  formatDescriptionForDisplay,
+  cleanAIGeneratedContent,
+} from '../../../../utils/formatDescription';
 
-const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, watch }) => {
-  // État pour le mode d'interface (texte simple ou chat IA)
+/**
+ * Composant unifié pour la gestion des descriptions de produit
+ * - Gère à la fois l'affichage et l'édition
+ * - Intègre l'assistance IA
+ */
+const ProductDescription = ({ product, editable = false, register, setValue, watch, errors }) => {
+  // États et références
   const [chatMode, setChatMode] = useState(false);
-
-  // États existants
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const [customImage, setCustomImage] = useState(null);
-  const [customImagePreview, setCustomImagePreview] = useState(null);
-
-  // États pour le mode chat
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
   const chatEndRef = useRef(null);
-
-  // État pour la description formatée
-  const [formattedDescription, setFormattedDescription] = useState({
-    title: '',
-    intro: '',
-    highlights: [],
-    technicalTable: '',
-    usage: '',
-  });
-
-  // Fonction pour formater la description générée
-  const parseGeneratedDescription = (rawDescription) => {
-    const result = {
-      title: '',
-      intro: '',
-      highlights: [],
-      technicalTable: '',
-      usage: '',
-    };
-
-    // Extraire le titre s'il existe (à partir d'une balise h1 ou de markdown)
-    const titleMatch =
-      rawDescription.match(/<h1[^>]*>(.*?)<\/h1>/i) || rawDescription.match(/^#\s+(.*)$/m);
-    if (titleMatch && titleMatch[1]) {
-      result.title = titleMatch[1].trim();
-    }
-
-    // Extraire la section du tableau technique (préserver intact)
-    const tableMatch = rawDescription.match(/<table>[\s\S]*?<\/table>/);
-    if (tableMatch) {
-      result.technicalTable = tableMatch[0];
-    }
-
-    // Extraire l'introduction (tout texte avant les points forts)
-    const pointsFortsIndex = rawDescription.indexOf('<h2>Points Forts</h2>');
-    if (pointsFortsIndex > -1) {
-      let intro = rawDescription.substring(0, pointsFortsIndex);
-      // Supprimer le titre s'il a été trouvé
-      if (titleMatch) {
-        intro = intro.replace(/<h1[^>]*>.*?<\/h1>/i, '').replace(/^#\s+.*$/m, '');
-      }
-      result.intro = intro.trim();
-    }
-
-    // Extraire les points forts
-    const highlightsMatch = rawDescription.match(/<ul>([\s\S]*?)<\/ul>/);
-    if (highlightsMatch && highlightsMatch[1]) {
-      result.highlights = highlightsMatch[1]
-        .match(/<li>([\s\S]*?)<\/li>/g)
-        .map((item) => item.replace(/<\/?li>/g, '').trim());
-    }
-
-    // Extraire les conseils d'utilisation
-    const usageMatch = rawDescription.match(/<h2>Conseils d'utilisation<\/h2>([\s\S]*?)(?=$|<h2>)/);
-    if (usageMatch && usageMatch[1]) {
-      result.usage = usageMatch[1].trim();
-    }
-
-    return result;
-  };
+  const editorRef = useRef(null);
 
   // Fonction pour basculer vers le mode chat
   const toggleChatMode = () => {
     if (!chatMode) {
-      // Si on passe en mode chat, initialiser avec un message de bienvenue
       const initialMessages = [
         {
           type: 'system',
           content: `Bonjour ! Je suis votre assistant pour créer une description captivante pour "${product?.name || 'votre produit'}". Vous pouvez me partager des informations spécifiques, des images, ou me poser des questions.`,
         },
       ];
-
-      // Si une description existe déjà, l'ajouter au contexte
       const currentDescription = watch ? watch('description') : '';
       if (currentDescription && currentDescription.trim() !== '') {
         initialMessages.push({
@@ -100,18 +40,76 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
           content: `J'ai remarqué que vous avez déjà commencé une description. Je la prendrai en compte dans nos échanges.`,
         });
       }
-
       setMessages(initialMessages);
     }
-
     setChatMode(!chatMode);
+  };
+
+  // Récupérer la description de l'IA et éviter le problème de perte de focus
+  const handleEditorInput = (e) => {
+    if (setValue) {
+      // Mémoriser la position du curseur avant de mettre à jour
+      const selection = window.getSelection();
+      const range = selection.getRangeAt(0);
+      const preSelectionRange = range.cloneRange();
+      preSelectionRange.selectNodeContents(editorRef.current);
+      preSelectionRange.setEnd(range.startContainer, range.startOffset);
+      const start = preSelectionRange.toString().length;
+
+      // Mettre à jour la valeur
+      setValue('description', e.currentTarget.innerHTML, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+
+      // Permettre au navigateur de terminer le rendu
+      setTimeout(() => {
+        if (editorRef.current) {
+          // Restaurer la position du curseur
+          const newRange = document.createRange();
+          const sel = window.getSelection();
+
+          let charIndex = 0;
+          let foundStart = false;
+
+          // Fonction pour parcourir les nœuds et trouver la position
+          function traverseNodes(node) {
+            if (node.nodeType === 3) {
+              // Nœud texte
+              const nextCharIndex = charIndex + node.length;
+              if (!foundStart && start >= charIndex && start <= nextCharIndex) {
+                newRange.setStart(node, start - charIndex);
+                foundStart = true;
+              }
+              charIndex = nextCharIndex;
+            } else if (node.nodeType === 1) {
+              // Nœud élément
+              // Parcourir les enfants
+              for (let i = 0; i < node.childNodes.length; i++) {
+                traverseNodes(node.childNodes[i]);
+                if (foundStart) break;
+              }
+            }
+          }
+
+          // Parcourir les nœuds de l'éditeur
+          traverseNodes(editorRef.current);
+
+          // Si la position a été trouvée, appliquer la sélection
+          if (foundStart) {
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          }
+        }
+      }, 0);
+    }
   };
 
   // Fonction pour envoyer un message dans le chat
   const sendMessage = async () => {
     if (!userInput.trim() && attachedFiles.length === 0) return;
 
-    // Ajouter le message de l'utilisateur
     const newUserMessage = {
       type: 'user',
       content: userInput,
@@ -129,14 +127,16 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
       formData.append('message', userInput);
       formData.append('name', product?.name || '');
 
+      // Ajouter le SKU/référence si disponible
+      if (product?.sku) {
+        formData.append('sku', product.sku);
+      }
       if (product?.category_info?.primary?.name) {
         formData.append('category', product.category_info.primary.name);
       }
-
       if (product?.brand_ref?.name) {
         formData.append('brand', product.brand_ref.name);
       }
-
       if (product?.price) {
         formData.append('price', product.price.toString());
       }
@@ -156,8 +156,7 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
         }
       }
 
-      // Ajouter les fichiers - CORRECTION ICI pour que chaque image soit prise en compte
-      // Utiliser le nom générique 'file' pour tous les fichiers
+      // Ajouter les fichiers
       attachedFiles.forEach((file) => {
         formData.append('file', file);
       });
@@ -167,17 +166,12 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
 
       // Appel à l'API
       const response = await apiService.post('/api/descriptions/chat', formData);
-
-      // Traiter la réponse
       const aiResponse = response.data.data?.message || response.data.message;
-
-      // Ajouter la réponse de l'IA
       const newAiMessage = {
         type: 'assistant',
         content: aiResponse,
         description: response.data.data?.description || response.data.description,
       };
-
       setMessages((prev) => [...prev, newAiMessage]);
     } catch (error) {
       console.error("Erreur lors de la communication avec l'IA:", error);
@@ -194,19 +188,15 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
     }
   };
 
-  // Fonction pour ajouter des fichiers
+  // Fonction pour gérer l'upload de fichiers
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
-
-    // Validations des fichiers
     const validFiles = files.filter((file) => {
       const isImage = file.type.startsWith('image/');
       const isPDF = file.type === 'application/pdf';
       const isAcceptableSize = file.size <= 5 * 1024 * 1024; // 5MB max
-
       return (isImage || isPDF) && isAcceptableSize;
     });
-
     setAttachedFiles((prev) => [...prev, ...validFiles]);
   };
 
@@ -221,20 +211,10 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
       setError('Aucune description disponible à appliquer');
       return;
     }
-
     if (setValue && typeof setValue === 'function') {
       setValue('description', description, { shouldValidate: true, shouldDirty: true });
-
-      // Analyser la description pour l'affichage formaté
-      const parsed = parseGeneratedDescription(description);
-      setFormattedDescription(parsed);
-
       setSuccess(true);
-
-      // Optionnel: revenir au mode édition standard
       setChatMode(false);
-
-      // Afficher un message temporaire de succès
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
@@ -248,18 +228,38 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
     }
   }, [messages]);
 
+  // Rendu en mode lecture seule (non éditable)
   if (!editable) {
-    return null; // Ne rien afficher en mode lecture
+    if (!product?.description) {
+      return (
+        <div className="mb-6 mt-4">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            Description du produit
+          </h3>
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-md border dark:border-gray-700">
+            <p className="text-gray-500 dark:text-gray-400 italic">Aucune description disponible</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-6 mt-0 product-description">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">
+          Description du produit
+        </h3>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-md border dark:border-gray-700">
+          <div className="prose dark:prose-invert max-w-none">
+            <div
+              dangerouslySetInnerHTML={{ __html: formatDescriptionForDisplay(product.description) }}
+            />
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const cleanAIMessage = (content) => {
-    if (!content) return '';
-    return content
-      .replace(/```html/g, '')
-      .replace(/```/g, '')
-      .trim();
-  };
-
+  // Rendu en mode édition
   return (
     <div className="mb-6">
       <div className="flex justify-between items-center mb-4">
@@ -282,26 +282,19 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
         </button>
       </div>
 
-      {/* Mode éditeur de texte standard */}
+      {/* Mode éditeur standard */}
       {!chatMode && (
         <>
           <div
+            ref={editorRef}
             contentEditable
             suppressContentEditableWarning
             className="prose dark:prose-invert max-w-none w-full px-6 py-4 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md min-h-[250px] focus:outline-none focus:ring-2 focus:ring-blue-500"
             dangerouslySetInnerHTML={{
               __html: formatDescriptionForDisplay(watch('description') || ''),
             }}
-            onInput={(e) => {
-              if (setValue) {
-                setValue('description', e.currentTarget.innerHTML, {
-                  shouldValidate: true,
-                  shouldDirty: true,
-                });
-              }
-            }}
+            onInput={handleEditorInput}
           />
-
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             Rédigez une description manuellement ou cliquez sur "Générer avec IA" pour une
             assistance interactive.
@@ -341,7 +334,9 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
                     <div
                       className="prose dark:prose-invert max-w-none"
                       dangerouslySetInnerHTML={{
-                        __html: formatDescriptionForDisplay(cleanAIMessage(message.content)),
+                        __html: formatDescriptionForDisplay(
+                          cleanAIGeneratedContent(message.content)
+                        ),
                       }}
                     />
                   ) : (
@@ -418,7 +413,6 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
                 className="flex-1 p-2 border dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md mr-2"
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
               />
-
               <label className="cursor-pointer p-2 border rounded-md mr-2 hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-600">
                 <input
                   type="file"
@@ -429,7 +423,6 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
                 />
                 <Paperclip size={18} className="text-gray-500" />
               </label>
-
               <button
                 type="button"
                 onClick={sendMessage}
@@ -444,7 +437,6 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
       )}
 
       {error && <p className="mt-1 text-sm text-red-600 dark:text-red-500">{error}</p>}
-
       {success && (
         <p className="mt-1 text-sm text-green-600 dark:text-green-500">
           Description mise à jour avec succès!
@@ -454,4 +446,4 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
   );
 };
 
-export default EnhancedAIDescriptionSection;
+export default ProductDescription;

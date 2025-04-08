@@ -1,7 +1,6 @@
 // src/features/products/components/tabs/ProductTab.jsx
 import React from 'react';
-import EnhancedAIDescriptionSection from '../sections/EnhancedAIDescriptionSection';
-import ProductDescriptionDisplay from '../sections/ProductDescriptionDisplay';
+import ProductDescription from '../sections/ProductDescription';
 import EntityImageManager from '../../../../components/common/EntityImageManager';
 
 /**
@@ -24,19 +23,16 @@ const ProductTab = ({
 }) => {
   return (
     <div className="flex flex-col md:flex-row gap-8">
-      {/* Colonne gauche: Section Description avec IA - plus large */}
+      {/* Colonne gauche: Section Description unifiée - plus large */}
       <div className="w-full md:w-3/5">
-        {editable ? (
-          <EnhancedAIDescriptionSection
-            product={product}
-            editable={editable}
-            register={register}
-            setValue={setValue}
-            watch={watch}
-          />
-        ) : (
-          <ProductDescriptionDisplay description={product?.description} />
-        )}
+        <ProductDescription
+          product={product}
+          editable={editable}
+          register={register}
+          setValue={setValue}
+          watch={watch}
+          errors={errors}
+        />
       </div>
 
       {/* Colonne droite: Section Images - moins large */}
