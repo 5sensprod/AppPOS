@@ -1,17 +1,7 @@
 // src/features/products/components/sections/EnhancedAIDescriptionSection.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Loader2,
-  Image,
-  Upload,
-  MessageSquare,
-  Paperclip,
-  X,
-  ChevronUp,
-  Check,
-} from 'lucide-react';
+import { Loader2, Image, MessageSquare, Paperclip, X, ChevronUp, Check } from 'lucide-react';
 import apiService from '../../../../services/api';
-import imageProxyService from '../../../../services/imageProxyService';
 
 const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, watch }) => {
   // État pour le mode d'interface (texte simple ou chat IA)

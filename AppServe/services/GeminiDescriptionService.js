@@ -1,6 +1,5 @@
 // services/GeminiDirectService.js
 const axios = require('axios');
-const FormData = require('form-data');
 const fs = require('fs');
 
 /**
@@ -13,37 +12,40 @@ function cleanGeneratedDescription(description) {
   let cleaned = description;
 
   // 1. Traiter les blocs de code markdown
-  // Remplacer ```html par le contenu HTML direct
   cleaned = cleaned.replace(/```html\s*([\s\S]*?)```/g, (match, codeContent) => {
     return codeContent.trim();
   });
-
-  // Supprimer autres blocs de code markdown
   cleaned = cleaned.replace(/```[a-z]*\s*([\s\S]*?)```/g, (match, codeContent) => {
     return codeContent.trim();
   });
 
-  // 2. Nettoyer les numéros de section
+  // 2. Extraire uniquement le contenu du body si structure HTML complète
+  if (cleaned.includes('<!DOCTYPE html>') || cleaned.includes('<html')) {
+    const bodyMatch = cleaned.match(/<body>([\s\S]*?)<\/body>/i);
+    if (bodyMatch && bodyMatch[1]) {
+      cleaned = bodyMatch[1].trim();
+    }
+  }
+
+  // 3. Nettoyer les numéros de section
   cleaned = cleaned.replace(/^\s*\d+\.\s*/gm, '');
 
-  // 3. Convertir le format Markdown pour les points forts et autres sections
+  // 4. Convertir le format Markdown pour les points forts et autres sections
   cleaned = cleaned.replace(/\*\*([^*]+):\*\*/g, '<strong>$1:</strong>');
   cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   cleaned = cleaned.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
-  // 4. Remplacer les listes à puces Markdown par du HTML
+  // 5. Remplacer les listes à puces Markdown par du HTML
   const bulletLines = cleaned.match(/^\s*\*\s+(.+)$/gm);
   if (bulletLines) {
     bulletLines.forEach((line) => {
       const cleanedLine = line.replace(/^\s*\*\s+/, '');
       cleaned = cleaned.replace(line, `<li>${cleanedLine}</li>`);
     });
-
-    // Entourer les séquences de <li> avec <ul>
     cleaned = cleaned.replace(/(<li>.*?<\/li>)(\s*<li>.*?<\/li>)*/g, '<ul>$&</ul>');
   }
 
-  // 5. S'assurer que les tableaux HTML sont bien formés
+  // 6. S'assurer que les tableaux HTML sont bien formés
   cleaned = cleaned.replace(/<table>\s*<tbody>/g, '<table>');
   cleaned = cleaned.replace(/<\/tbody>\s*<\/table>/g, '</table>');
 
@@ -259,7 +261,13 @@ Utilise un ton commercial et persuasif. Pour les parties textuelles, sois bref m
         4. Un tableau HTML <h2>Caractéristiques Techniques</h2> avec TOUTES les spécifications mentionnées
         5. Une section <h2>Conseils d'utilisation</h2> si pertinent
         
-        IMPORTANT: Utilise uniquement les informations disponibles dans notre conversation ou visibles sur les images.`,
+        IMPORTANT: Utilise uniquement les informations disponibles dans notre conversation ou visibles sur les images.
+        TRÈS IMPORTANT:
+- Ne génère PAS une page HTML complète (pas de <!DOCTYPE>, <html>, <head>, <body>)
+- Fournis UNIQUEMENT le contenu HTML des sections demandées
+- Assure-toi que le contenu est proprement formaté pour être intégré directement
+- Utilise les balises HTML pour la mise en forme (<h1>, <h2>, <p>, <ul>, <li>, <table>)
+        `,
         },
       ];
 
