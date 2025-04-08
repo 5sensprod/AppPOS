@@ -29,6 +29,7 @@ router.post('/generate', upload.single('image'), async (req, res) => {
       category: req.body.category,
       brand: req.body.brand,
       price: req.body.price,
+      currentDescription: req.body.currentDescription, // AJOUT: récupérer la description actuelle
       specifications: req.body.specifications ? JSON.parse(req.body.specifications) : {},
     };
 

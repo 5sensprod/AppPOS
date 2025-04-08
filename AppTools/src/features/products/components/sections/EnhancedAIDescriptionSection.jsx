@@ -168,6 +168,12 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
         formData.append('price', product.price.toString());
       }
 
+      // NOUVEAU: Récupérer la description actuelle depuis le formulaire
+      const currentDescription = watch ? watch('description') : '';
+      if (currentDescription && currentDescription.trim() !== '') {
+        formData.append('currentDescription', currentDescription);
+      }
+
       // Ajouter les spécifications si disponibles
       if (product?.specifications) {
         try {

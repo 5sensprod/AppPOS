@@ -1,10 +1,10 @@
 // src/features/products/components/ProductDetail.jsx
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import useProductDetail from '../hooks/useProductDetail';
 import EntityDetail from '../../../components/common/EntityDetail';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import InventoryTab from './tabs/InventoryTab';
-import ProductTab from './tabs/ProductTab'; // Importer le nouvel onglet
+import ProductTab from './tabs/ProductTab';
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import ProductPriceSection from './ProductPriceSection';
 import { ENTITY_CONFIG } from '../constants';
@@ -54,7 +54,7 @@ function ProductDetail() {
               }
             />
           );
-        case 'product': // Nouvel onglet Produit
+        case 'product':
           return (
             <ProductTab
               product={entity}
@@ -121,16 +121,20 @@ function ProductDetail() {
     ]
   );
 
-  // Définir la liste des onglets visibles avec notre nouvel onglet Produit
-  const visibleTabs = [
-    { id: 'general', label: 'Général', icon: 'info' },
-    { id: 'product', label: 'Produit', icon: 'package' }, // Nouvel onglet
-    { id: 'inventory', label: 'Inventaire', icon: 'archive' },
-  ];
+  // Définir la liste des onglets visibles en fonction de l'état de création
+  let visibleTabs = [];
 
-  // Ajouter l'onglet WooCommerce pour les produits existants
-  if (!isNew) {
-    visibleTabs.push({ id: 'woocommerce', label: 'WooCommerce', icon: 'shopping-cart' });
+  if (isNew) {
+    // En mode création, afficher uniquement l'onglet Général
+    visibleTabs = [{ id: 'general', label: 'Général', icon: 'info' }];
+  } else {
+    // En mode édition, afficher tous les onglets
+    visibleTabs = [
+      { id: 'general', label: 'Général', icon: 'info' },
+      { id: 'product', label: 'Produit', icon: 'package' },
+      { id: 'inventory', label: 'Inventaire', icon: 'archive' },
+      { id: 'woocommerce', label: 'WooCommerce', icon: 'shopping-cart' },
+    ];
   }
 
   return (
@@ -143,7 +147,7 @@ function ProductDetail() {
       tabs={visibleTabs}
       renderTabContent={renderTabContent}
       actions={['edit', 'delete']}
-      syncEnabled={true}
+      syncEnabled={!isNew}
       onDelete={handleDelete}
       onSubmit={handleSubmit}
       onCancel={handleCancel}

@@ -77,6 +77,11 @@ Crée une description commerciale concise mais impactante pour le produit suivan
         textPrompt += `\nPrix : ${productData.price} €`;
       }
 
+      // NOUVEAU: Ajouter la description actuelle si disponible
+      if (productData.currentDescription) {
+        textPrompt += `\n\nVoici la description existante que tu dois prendre en compte et améliorer :\n"${productData.currentDescription}"`;
+      }
+
       // Ajouter les spécifications si disponibles
       if (productData.specifications && Object.keys(productData.specifications).length > 0) {
         textPrompt += '\n\nVoici les spécifications connues du produit :';
