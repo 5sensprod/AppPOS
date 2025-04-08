@@ -18,6 +18,7 @@ function cleanGeneratedDescription(description) {
   cleaned = cleaned.replace(/```[a-z]*\s*([\s\S]*?)```/g, (match, codeContent) => {
     return codeContent.trim();
   });
+  cleaned = cleaned.replace(/<\/?h1[^>]*>/g, '');
 
   // 2. Extraire uniquement le contenu du body si structure HTML complète
   if (cleaned.includes('<!DOCTYPE html>') || cleaned.includes('<html')) {

@@ -251,6 +251,14 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
     return null; // Ne rien afficher en mode lecture
   }
 
+  const cleanAIMessage = (content) => {
+    if (!content) return '';
+    return content
+      .replace(/```html/g, '')
+      .replace(/```/g, '')
+      .trim();
+  };
+
   return (
     <div className="mb-6">
       <div className="flex justify-between items-center mb-4">
@@ -276,14 +284,20 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
       {/* Mode éditeur de texte standard */}
       {!chatMode && (
         <>
-          {register && (
-            <textarea
-              {...register('description')}
-              rows={8}
-              className="w-full px-3 py-2 border dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md"
-              placeholder="Description du produit..."
-            />
-          )}
+          <div
+            contentEditable
+            suppressContentEditableWarning
+            className="prose dark:prose-invert max-w-none w-full px-6 py-4 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md min-h-[250px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+            dangerouslySetInnerHTML={{ __html: watch('description') || '' }}
+            onInput={(e) => {
+              if (setValue) {
+                setValue('description', e.currentTarget.innerHTML, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                });
+              }
+            }}
+          />
 
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             Rédigez une description manuellement ou cliquez sur "Générer avec IA" pour une
@@ -320,7 +334,14 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
                           : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
                   }`}
                 >
-                  {message.content}
+                  {message.type === 'assistant' && message.content?.includes('<') ? (
+                    <div
+                      className="prose dark:prose-invert max-w-none"
+                      dangerouslySetInnerHTML={{ __html: cleanAIMessage(message.content) }}
+                    />
+                  ) : (
+                    <p>{message.content}</p>
+                  )}
 
                   {/* Afficher les fichiers attachés aux messages de l'utilisateur */}
                   {message.files && message.files.length > 0 && (
