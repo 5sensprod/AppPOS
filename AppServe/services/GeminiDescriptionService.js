@@ -4,21 +4,15 @@ const fs = require('fs');
 
 /**
  * Nettoie la description générée par l'IA pour supprimer les symboles Markdown
- * et s'assurer que le HTML est correctement formaté
+ * et s'assurer que le HTML est correctement formaté pour WooCommerce
  */
 function cleanGeneratedDescription(description) {
   if (!description) return '';
 
   let cleaned = description;
 
-  // 1. Traiter les blocs de code markdown
-  cleaned = cleaned.replace(/```html\s*([\s\S]*?)```/g, (match, codeContent) => {
-    return codeContent.trim();
-  });
-  cleaned = cleaned.replace(/```[a-z]*\s*([\s\S]*?)```/g, (match, codeContent) => {
-    return codeContent.trim();
-  });
-  cleaned = cleaned.replace(/<\/?h1[^>]*>/g, '');
+  // 1. Supprimer tous les blocs de code markdown complètement
+  cleaned = cleaned.replace(/```[a-z]*\s*([\s\S]*?)```/g, '$1');
 
   // 2. Extraire uniquement le contenu du body si structure HTML complète
   if (cleaned.includes('<!DOCTYPE html>') || cleaned.includes('<html')) {
@@ -28,27 +22,58 @@ function cleanGeneratedDescription(description) {
     }
   }
 
-  // 3. Nettoyer les numéros de section
+  // 3. Nettoyer les numéros de section et les explications
   cleaned = cleaned.replace(/^\s*\d+\.\s*/gm, '');
 
-  // 4. Convertir le format Markdown pour les points forts et autres sections
+  // 4. Supprimer les lignes qui sont des instructions ou des commentaires
+  cleaned = cleaned.replace(/^(Voici|Voilà|Ici|J'ai créé|J'ai généré|Voici le code HTML).*$/gm, '');
+  cleaned = cleaned.replace(/^(Note|Important|Remarque):.*$/gm, '');
+
+  // 5. Convertir le format Markdown tout en PRÉSERVANT les attributs style
+  // Rechercher les balises avec attributs style et les protéger
+  const styleMatches = [];
+  let counter = 0;
+  cleaned = cleaned.replace(
+    /<([a-z0-9]+)([^>]*?style="[^"]*")([^>]*)>/gi,
+    (match, tag, styleAttr, rest) => {
+      const placeholder = `__STYLE_PLACEHOLDER_${counter}__`;
+      styleMatches[counter] = { tag, styleAttr, rest };
+      counter++;
+      return placeholder;
+    }
+  );
+
+  // Appliquer les conversions Markdown standard
   cleaned = cleaned.replace(/\*\*([^*]+):\*\*/g, '<strong>$1:</strong>');
   cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   cleaned = cleaned.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
-  // 5. Remplacer les listes à puces Markdown par du HTML
-  const bulletLines = cleaned.match(/^\s*\*\s+(.+)$/gm);
-  if (bulletLines) {
-    bulletLines.forEach((line) => {
-      const cleanedLine = line.replace(/^\s*\*\s+/, '');
-      cleaned = cleaned.replace(line, `<li>${cleanedLine}</li>`);
-    });
-    cleaned = cleaned.replace(/(<li>.*?<\/li>)(\s*<li>.*?<\/li>)*/g, '<ul>$&</ul>');
+  // Restaurer les balises avec attributs style
+  for (let i = 0; i < styleMatches.length; i++) {
+    const { tag, styleAttr, rest } = styleMatches[i];
+    const placeholder = `__STYLE_PLACEHOLDER_${i}__`;
+    cleaned = cleaned.replace(placeholder, `<${tag}${styleAttr}${rest}>`);
   }
 
-  // 6. S'assurer que les tableaux HTML sont bien formés
-  cleaned = cleaned.replace(/<table>\s*<tbody>/g, '<table>');
-  cleaned = cleaned.replace(/<\/tbody>\s*<\/table>/g, '</table>');
+  // 6. Remplacer les listes à puces Markdown par du HTML si non déjà formaté
+  if (!cleaned.includes('<ul style=')) {
+    cleaned = cleaned.replace(
+      /^\s*-\s+(.+)$/gm,
+      '<li style="margin: 0 0 8px 0; padding: 0;">$1</li>'
+    );
+    cleaned = cleaned.replace(
+      /^\s*\*\s+(.+)$/gm,
+      '<li style="margin: 0 0 8px 0; padding: 0;">$1</li>'
+    );
+    cleaned = cleaned.replace(
+      /(<li style.*?<\/li>)(\s*<li style.*?<\/li>)*/g,
+      '<ul style="margin: 0 0 20px 0; padding: 0 0 0 20px; list-style-type: disc;">$&</ul>'
+    );
+  }
+
+  // 7. Nettoyer les espaces inutiles, les lignes vides multiples
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  cleaned = cleaned.trim();
 
   return cleaned;
 }
@@ -62,51 +87,82 @@ class GeminiDirectService {
 
   async generateProductDescription(productData, imagePath) {
     try {
-      // Préparer le texte du prompt avec instructions claires pour éviter les problèmes Markdown
-      let textPrompt = `Tu es un expert en rédaction de fiches produit pour un site e-commerce.
+      // Préparer le texte du prompt avec instructions précises pour le format HTML
+      let textPrompt = `
+Tu es un expert en rédaction de fiches produit pour un site e-commerce WooCommerce.
       
-Crée une description commerciale concise mais impactante pour le produit suivant : ${productData.name}`;
+Crée une description commerciale HTML pour ce produit : "${productData.name}"
+
+Informations disponibles :`;
 
       // Ajouter les informations supplémentaires au prompt
       if (productData.category) {
-        textPrompt += `\nCatégorie de produit : ${productData.category}`;
+        textPrompt += `\n- Catégorie : ${productData.category}`;
       }
 
       if (productData.brand) {
-        textPrompt += `\nMarque : ${productData.brand}`;
+        textPrompt += `\n- Marque : ${productData.brand}`;
       }
 
       if (productData.price) {
-        textPrompt += `\nPrix : ${productData.price} €`;
+        textPrompt += `\n- Prix : ${productData.price} €`;
       }
 
-      // NOUVEAU: Ajouter la description actuelle si disponible
+      // Ajouter la description actuelle si disponible
       if (productData.currentDescription) {
-        textPrompt += `\n\nVoici la description existante que tu dois prendre en compte et améliorer :\n"${productData.currentDescription}"`;
+        textPrompt += `\n\nDescription existante à améliorer :\n"${productData.currentDescription}"`;
       }
 
       // Ajouter les spécifications si disponibles
       if (productData.specifications && Object.keys(productData.specifications).length > 0) {
-        textPrompt += '\n\nVoici les spécifications connues du produit :';
+        textPrompt += '\n\nSpécifications techniques :';
         for (const [key, value] of Object.entries(productData.specifications)) {
           textPrompt += `\n- ${key}: ${value}`;
         }
       }
 
-      // Format de réponse avec instructions claires sur le format HTML attendu
-      textPrompt += `\n\nTa réponse doit suivre ce format :
-1. Une description générale courte mais persuasive (1-2 paragraphes maximum)
-2. Les points forts du produit (liste de 3-4 avantages clés)
-3. Une fiche technique détaillée avec les caractéristiques principales, présentée sous forme de tableau HTML
-4. Si pertinent, des conseils d'utilisation courts (1 paragraphe maximum)
+      // Exemple de structure HTML attendue
+      textPrompt += `\n\nCrée une fiche produit avec la structure HTML EXACTE suivante:
 
-TRÈS IMPORTANT - FORMATAGE:
-- N'utilise PAS les délimiteurs \`\`\`html et \`\`\` autour du tableau HTML
-- Utilise directement les balises HTML (<table>, <tr>, <th>, <td>) pour le tableau
-- Pour le formatage, utilise des balises HTML simples (<strong>, <em>, <ul>, <li>) plutôt que des marqueurs Markdown
-- Garde la fiche technique détaillée comme pour un produit e-commerce professionnel
+<h1>${productData.name}</h1>
 
-Utilise un ton commercial et persuasif. Pour les parties textuelles, sois bref mais accrocheur.`;
+<div class="wc-product-description">
+  <p>[Rédige ici une description commerciale persuasive de 2-3 phrases maximum]</p>
+</div>
+
+<h2 class="wc-product-highlights">Points Forts</h2>
+<ul>
+  <li>[Avantage 1 - une phrase]</li>
+  <li>[Avantage 2 - une phrase]</li>
+  <li>[Avantage 3 - une phrase]</li>
+  <li>[Avantage 4 - une phrase, si pertinent]</li>
+</ul>
+
+<h2 class="wc-product-specs">Caractéristiques Techniques</h2>
+<table class="wc-specs-table">
+  <tr><th>Caractéristique</th><th>Détail</th></tr>
+  [Ajoute ici 5-8 lignes avec toutes les spécifications importantes du produit]
+</table>
+
+<h2 class="wc-product-usage">Conseils d'utilisation</h2>
+<p>[Rédige ici 1-2 phrases avec des conseils d'utilisation pratiques]</p>
+
+RÈGLES STRICTES:
+1. Remplace les instructions entre crochets par du contenu réel, puis SUPPRIME les crochets
+2. Utilise UNIQUEMENT les informations disponibles
+3. Sois concis mais persuasif, chaque section doit être courte
+4. Ne modifie PAS la structure HTML fournie
+5. Ne génère AUCUN texte ou commentaire en dehors de cette structure HTML
+6. N'utilise PAS de balises \`\`\`html ou \`\`\` autour du contenu
+7. N'ajoute PAS de notes explicatives avant ou après le HTML
+
+Limitations STRICTES:
+- Maximum 50 mots pour la description initiale
+- Maximum 4 points forts
+- Maximum 8 lignes dans le tableau technique
+- Maximum 30 mots pour les conseils d'utilisation
+
+Ta réponse doit contenir UNIQUEMENT le HTML pur tel que montré, sans introduction ni conclusion.`;
 
       // Préparation de la requête
       const requestData = {
@@ -117,7 +173,7 @@ Utilise un ton commercial et persuasif. Pour les parties textuelles, sois bref m
           },
         ],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.3, // Température réduite pour plus de conformité
           maxOutputTokens: 1500,
           topP: 0.95,
           topK: 40,
@@ -203,9 +259,9 @@ Utilise un ton commercial et persuasif. Pour les parties textuelles, sois bref m
    */
   async generateChatResponse(productData, userMessage, conversation, filePaths) {
     try {
-      // Format du contexte initial
-      let systemContext = `Tu es un assistant spécialisé dans la création de fiches produit e-commerce.
-      Chacune de tes réponses doit être une fiche produit complète et structurée en HTML.
+      // Format du contexte initial avec des instructions claires
+      let systemContext = `Tu es un assistant spécialisé dans la création de fiches produit e-commerce WooCommerce.
+      Chacune de tes réponses doit être une fiche produit en HTML pur, sans commentaires ni explications.
       
       Informations sur le produit "${productData.name || 'ce produit'}":`;
 
@@ -250,25 +306,93 @@ Utilise un ton commercial et persuasif. Pour les parties textuelles, sois bref m
         }
       }
 
-      // Préparation du message utilisateur final
+      // Préparation du message utilisateur final avec instructions optimisées
+      // Modifiez votre prompt pour inclure des styles CSS inline
+      const optimizedPrompt = `
+Crée une fiche produit e-commerce pour "${productData.name}" avec la structure HTML EXACTE suivante:
+
+<div class="wc-product-container" style="font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0;">
+  <h1 style="font-size: 24px; margin: 0 0 15px 0; padding: 0; color: #333;">[Titre court et accrocheur]</h1>
+  
+  <div class="wc-product-description" style="margin: 0 0 20px 0;">
+    <p style="margin: 0; padding: 0;">[Rédige ici une description commerciale persuasive de 2-3 phrases maximum]</p>
+  </div>
+  
+  <h2 style="font-size: 20px; margin: 25px 0 15px 0; padding: 0; color: #333;">Points Forts</h2>
+  <ul style="margin: 0 0 20px 0; padding: 0 0 0 20px; list-style-type: disc;">
+    <li style="margin: 0 0 8px 0; padding: 0;">[Avantage 1 - une phrase]</li>
+    <li style="margin: 0 0 8px 0; padding: 0;">[Avantage 2 - une phrase]</li>
+    <li style="margin: 0 0 8px 0; padding: 0;">[Avantage 3 - une phrase]</li>
+    <li style="margin: 0 0 0 0; padding: 0;">[Avantage 4 - une phrase, si pertinent]</li>
+  </ul>
+  
+  <h2 style="font-size: 20px; margin: 25px 0 15px 0; padding: 0; color: #333;">Caractéristiques Techniques</h2>
+  <table style="width: 100%; border-collapse: collapse; margin: 0 0 20px 0;">
+    <tr style="background-color: #f5f5f5;">
+      <th style="text-align: left; padding: 10px; border: 1px solid #ddd; width: 40%;">Caractéristique</th>
+      <th style="text-align: left; padding: 10px; border: 1px solid #ddd; width: 60%;">Détail</th>
+    </tr>
+    [Ajoute ici 5-8 lignes avec toutes les spécifications importantes du produit, avec ce format]
+    <tr>
+      <td style="padding: 10px; border: 1px solid #ddd;">[Nom caractéristique]</td>
+      <td style="padding: 10px; border: 1px solid #ddd;">[Valeur]</td>
+    </tr>
+  </table>
+  
+  <h2 style="font-size: 20px; margin: 25px 0 15px 0; padding: 0; color: #333;">Conseils d'utilisation</h2>
+  <p style="margin: 0; padding: 0;">[Rédige ici 1-2 phrases avec des conseils d'utilisation pratiques]</p>
+</div>
+
+RÈGLES STRICTES:
+1. Remplace les instructions entre crochets par du contenu réel, puis SUPPRIME les crochets
+2. Conserve TOUS les attributs style="..." exactement comme indiqués
+3. Utilise UNIQUEMENT les informations disponibles dans cette conversation ou visibles sur les images
+4. Ne modifie PAS la structure HTML fournie
+5. Ne génère AUCUN texte ou commentaire en dehors de cette structure HTML
+6. N'utilise PAS de balises \`\`\`html ou \`\`\` autour du contenu
+
+Voici un exemple du résultat attendu pour un casque:
+
+<div class="wc-product-container" style="font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0;">
+  <h1 style="font-size: 24px; margin: 0 0 15px 0; padding: 0; color: #333;">Casque Audio Bluetooth Premium</h1>
+  
+  <div class="wc-product-description" style="margin: 0 0 20px 0;">
+    <p style="margin: 0; padding: 0;">Ce casque sans fil offre une qualité sonore exceptionnelle avec une autonomie de 30 heures. Sa technologie de réduction de bruit active vous plonge dans une expérience d'écoute immersive.</p>
+  </div>
+  
+  <h2 style="font-size: 20px; margin: 25px 0 15px 0; padding: 0; color: #333;">Points Forts</h2>
+  <ul style="margin: 0 0 20px 0; padding: 0 0 0 20px; list-style-type: disc;">
+    <li style="margin: 0 0 8px 0; padding: 0;">Autonomie exceptionnelle de 30 heures</li>
+    <li style="margin: 0 0 8px 0; padding: 0;">Réduction de bruit active</li>
+    <li style="margin: 0 0 8px 0; padding: 0;">Commandes tactiles intuitives</li>
+    <li style="margin: 0 0 0 0; padding: 0;">Pliable et léger pour un transport facile</li>
+  </ul>
+  
+  <h2 style="font-size: 20px; margin: 25px 0 15px 0; padding: 0; color: #333;">Caractéristiques Techniques</h2>
+  <table style="width: 100%; border-collapse: collapse; margin: 0 0 20px 0;">
+    <tr style="background-color: #f5f5f5;">
+      <th style="text-align: left; padding: 10px; border: 1px solid #ddd; width: 40%;">Caractéristique</th>
+      <th style="text-align: left; padding: 10px; border: 1px solid #ddd; width: 60%;">Détail</th>
+    </tr>
+    <tr>
+      <td style="padding: 10px; border: 1px solid #ddd;">Type</td>
+      <td style="padding: 10px; border: 1px solid #ddd;">Circum-aural fermé</td>
+    </tr>
+    <tr>
+      <td style="padding: 10px; border: 1px solid #ddd;">Connectivité</td>
+      <td style="padding: 10px; border: 1px solid #ddd;">Bluetooth 5.0</td>
+    </tr>
+  </table>
+  
+  <h2 style="font-size: 20px; margin: 25px 0 15px 0; padding: 0; color: #333;">Conseils d'utilisation</h2>
+  <p style="margin: 0; padding: 0;">Chargez complètement le casque avant la première utilisation et conservez-le dans l'étui de protection inclus lorsqu'il n'est pas utilisé.</p>
+</div>
+
+Ta réponse doit contenir UNIQUEMENT le HTML pur tel que montré, sans introduction ni conclusion.`;
+
       const userParts = [
         {
-          text:
-            userMessage +
-            `\n\nCrée une fiche produit COMPLÈTE avec une structure HTML:
-        1. Un titre <h1>
-        2. Une introduction commerciale
-        3. Une liste de points forts <h2>Points Forts</h2> avec liste <ul><li>
-        4. Un tableau HTML <h2>Caractéristiques Techniques</h2> avec TOUTES les spécifications mentionnées
-        5. Une section <h2>Conseils d'utilisation</h2> si pertinent
-        
-        IMPORTANT: Utilise uniquement les informations disponibles dans notre conversation ou visibles sur les images.
-        TRÈS IMPORTANT:
-- Ne génère PAS une page HTML complète (pas de <!DOCTYPE>, <html>, <head>, <body>)
-- Fournis UNIQUEMENT le contenu HTML des sections demandées
-- Assure-toi que le contenu est proprement formaté pour être intégré directement
-- Utilise les balises HTML pour la mise en forme (<h1>, <h2>, <p>, <ul>, <li>, <table>)
-        `,
+          text: userMessage + '\n\n' + optimizedPrompt,
         },
       ];
 
