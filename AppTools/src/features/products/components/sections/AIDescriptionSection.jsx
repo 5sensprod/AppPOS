@@ -188,7 +188,7 @@ const AIDescriptionSection = ({ product, editable, register, setValue, watch }) 
   }
 
   return (
-    <div className="mb-6 mt-4">
+    <div className="mb-4 mt-4">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
           Description du produit

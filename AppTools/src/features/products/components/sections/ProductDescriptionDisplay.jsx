@@ -119,8 +119,8 @@ const ProductDescriptionDisplay = ({ description }) => {
   }, [description]);
 
   return (
-    <div className="mb-6 mt-4 product-description">
-      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+    <div className="mb-6 mt-0 product-description">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">
         Description du produit
       </h3>
       <div className="bg-white dark:bg-gray-800 p-4 rounded-md border dark:border-gray-700">

@@ -232,8 +232,8 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
   }
 
   return (
-    <div className="mb-6 mt-4">
-      <div className="flex justify-between items-center mb-2">
+    <div className="mb-6 ">
+      <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
           Description du produit
         </h3>

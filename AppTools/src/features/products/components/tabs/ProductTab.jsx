@@ -5,7 +5,8 @@ import ProductDescriptionDisplay from '../sections/ProductDescriptionDisplay';
 import EntityImageManager from '../../../../components/common/EntityImageManager';
 
 /**
- * Onglet Produit qui regroupe la description IA et la gestion des images
+ * Onglet Produit qui regroupe la description IA à gauche et la gestion des images à droite
+ * avec l'image à la une au-dessus de la galerie
  */
 const ProductTab = ({
   product,
@@ -22,26 +23,24 @@ const ProductTab = ({
   error,
 }) => {
   return (
-    <div className="space-y-8">
-      {/* Section Description avec IA */}
-      {editable ? (
-        <EnhancedAIDescriptionSection
-          product={product}
-          editable={editable}
-          register={register}
-          setValue={setValue}
-          watch={watch}
-        />
-      ) : (
-        <ProductDescriptionDisplay description={product?.description} />
-      )}
+    <div className="flex flex-col md:flex-row gap-8">
+      {/* Colonne gauche: Section Description avec IA - plus large */}
+      <div className="w-full md:w-3/5">
+        {editable ? (
+          <EnhancedAIDescriptionSection
+            product={product}
+            editable={editable}
+            register={register}
+            setValue={setValue}
+            watch={watch}
+          />
+        ) : (
+          <ProductDescriptionDisplay description={product?.description} />
+        )}
+      </div>
 
-      {/* Section Image avec prévisualisation */}
-      <div className="mt-8 border-t pt-6">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-          Images du produit
-        </h3>
-
+      {/* Colonne droite: Section Images - moins large */}
+      <div className="w-full md:w-2/5">
         <EntityImageManager
           entity={product}
           entityId={entityId}
@@ -53,6 +52,7 @@ const ProductTab = ({
           isLoading={isLoading}
           error={error}
           editable={editable}
+          featuredImageOnTop={true}
         />
       </div>
     </div>
