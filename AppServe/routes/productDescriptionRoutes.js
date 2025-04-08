@@ -4,7 +4,9 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const ResponseHandler = require('../handlers/ResponseHandler');
-const GeminiDescriptionService = require('../services/GeminiDescriptionService');
+
+// Importer le service Gemini depuis la nouvelle structure
+const geminiService = require('../services/gemini');
 
 // Configuration de Multer pour le stockage temporaire des fichiers
 const storage = multer.diskStorage({
@@ -21,26 +23,26 @@ const upload = multer({ storage: storage });
 // Route pour générer une description de produit
 router.post('/generate', upload.single('image'), async (req, res) => {
   try {
-    const geminiService = new GeminiDescriptionService();
-
     // Préparation des données du produit
     const productData = {
       name: req.body.name,
       category: req.body.category,
       brand: req.body.brand,
       price: req.body.price,
-      currentDescription: req.body.currentDescription, // AJOUT: récupérer la description actuelle
+      sku: req.body.sku, // Ajout du SKU/référence du produit
+      currentDescription: req.body.currentDescription,
       specifications: req.body.specifications ? JSON.parse(req.body.specifications) : {},
     };
 
     // Chemin de l'image téléchargée
     const imagePath = req.file ? req.file.path : null;
 
-    // Générer la description
+    // Générer la description en utilisant le service importé
     const result = await geminiService.generateProductDescription(productData, imagePath);
 
     return ResponseHandler.success(res, result);
   } catch (error) {
+    console.error('Erreur lors de la génération de description:', error);
     return ResponseHandler.error(res, error);
   }
 });
@@ -60,14 +62,13 @@ router.post('/chat', (req, res) => {
     }
 
     try {
-      const geminiService = new GeminiDescriptionService();
-
       // Récupérer les informations de base du produit
       const productData = {
         name: req.body.name,
         category: req.body.category,
         brand: req.body.brand,
         price: req.body.price,
+        sku: req.body.sku, // Ajout du SKU/référence
         currentDescription: req.body.currentDescription,
         specifications: req.body.specifications ? JSON.parse(req.body.specifications) : {},
       };
