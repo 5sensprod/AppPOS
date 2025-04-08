@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Image, MessageSquare, Paperclip, X, ChevronUp, Check } from 'lucide-react';
 import apiService from '../../../../services/api';
+import { formatDescriptionForDisplay } from '../../../../utils/formatDescription';
 
 const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, watch }) => {
   // État pour le mode d'interface (texte simple ou chat IA)
@@ -288,7 +289,9 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
             contentEditable
             suppressContentEditableWarning
             className="prose dark:prose-invert max-w-none w-full px-6 py-4 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md min-h-[250px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-            dangerouslySetInnerHTML={{ __html: watch('description') || '' }}
+            dangerouslySetInnerHTML={{
+              __html: formatDescriptionForDisplay(watch('description') || ''),
+            }}
             onInput={(e) => {
               if (setValue) {
                 setValue('description', e.currentTarget.innerHTML, {
@@ -337,7 +340,9 @@ const EnhancedAIDescriptionSection = ({ product, editable, register, setValue, w
                   {message.type === 'assistant' && message.content?.includes('<') ? (
                     <div
                       className="prose dark:prose-invert max-w-none"
-                      dangerouslySetInnerHTML={{ __html: cleanAIMessage(message.content) }}
+                      dangerouslySetInnerHTML={{
+                        __html: formatDescriptionForDisplay(cleanAIMessage(message.content)),
+                      }}
                     />
                   ) : (
                     <p>{message.content}</p>

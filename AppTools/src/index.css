@@ -2,3 +2,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* Styles globaux pour les tableaux techniques */
+.product-technical-table {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.product-technical-table table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #e5e7eb; /* gray-200 */
+}
+
+.product-technical-table th,
+.product-technical-table td {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: top;
+}
+
+.product-technical-table th {
+  background-color: #f9fafb; /* gray-50 */
+  font-weight: 600;
+}

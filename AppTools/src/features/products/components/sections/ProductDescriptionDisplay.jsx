@@ -1,6 +1,6 @@
 // src/features/products/components/sections/ProductDescriptionDisplay.jsx
 import React, { useEffect, useState } from 'react';
-
+import { formatDescriptionForDisplay } from '@/utils/formatDescription';
 /**
  * Composant pour afficher la description du produit en mode lecture
  * Avec conversion des symboles Markdown et formatage correct
@@ -125,7 +125,7 @@ const ProductDescriptionDisplay = ({ description }) => {
       </h3>
       <div className="bg-white dark:bg-gray-800 p-4 rounded-md border dark:border-gray-700">
         <div className="prose dark:prose-invert max-w-none">
-          <div dangerouslySetInnerHTML={{ __html: formattedDescription }} />
+          <div dangerouslySetInnerHTML={{ __html: formatDescriptionForDisplay(description) }} />
         </div>
       </div>
     </div>
