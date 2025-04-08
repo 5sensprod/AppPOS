@@ -45,4 +45,64 @@ router.post('/generate', upload.single('image'), async (req, res) => {
   }
 });
 
+// Route pour l'interaction via chat
+router.post('/chat', (req, res) => {
+  // Utiliser une instance Multer plus permissive pour le traitement de cette route
+  const chatUpload = multer({
+    storage: storage,
+    // Ne pas spécifier de fieldname pour accepter tous les champs de fichiers
+  }).any();
+
+  chatUpload(req, res, async (err) => {
+    if (err) {
+      console.error('Erreur Multer:', err);
+      return ResponseHandler.error(res, err);
+    }
+
+    try {
+      const geminiService = new GeminiDescriptionService();
+
+      // Récupérer les informations de base du produit
+      const productData = {
+        name: req.body.name,
+        category: req.body.category,
+        brand: req.body.brand,
+        price: req.body.price,
+        currentDescription: req.body.currentDescription,
+        specifications: req.body.specifications ? JSON.parse(req.body.specifications) : {},
+      };
+
+      // Récupérer le message de l'utilisateur
+      const userMessage = req.body.message || '';
+
+      // Récupérer l'historique de conversation si disponible
+      let conversation = [];
+      try {
+        if (req.body.conversation) {
+          conversation = JSON.parse(req.body.conversation);
+        }
+      } catch (e) {
+        console.warn('Erreur lors du parsing de la conversation:', e);
+      }
+
+      // Traiter les fichiers téléchargés (maintenant disponibles dans req.files)
+      const files = req.files || [];
+      const filePaths = files.map((file) => file.path);
+
+      // Générer une réponse et une description basées sur le chat
+      const result = await geminiService.generateChatResponse(
+        productData,
+        userMessage,
+        conversation,
+        filePaths
+      );
+
+      return ResponseHandler.success(res, result);
+    } catch (error) {
+      console.error('Erreur lors du traitement de la demande chat:', error);
+      return ResponseHandler.error(res, error);
+    }
+  });
+});
+
 module.exports = router;
