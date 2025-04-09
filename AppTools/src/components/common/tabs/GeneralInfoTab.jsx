@@ -27,6 +27,7 @@ const GeneralInfoTab = ({
   const fieldLabels = {
     name: 'Nom',
     sku: 'SKU',
+    designation: 'Désignation',
     description: 'Description',
     status: 'Statut',
     supplier_code: 'Code fournisseur',

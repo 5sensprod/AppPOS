@@ -38,6 +38,15 @@ export const ENTITY_CONFIG = {
       sortable: true,
     },
     {
+      key: 'designation',
+      label: 'Désignation',
+      render: (product) => {
+        const designation = product.designation || '';
+        return designation.length > 25 ? `${designation.substring(0, 25)}...` : designation;
+      },
+      sortable: true,
+    },
+    {
       key: 'purchase_price',
       label: 'Achat',
       sortable: true,

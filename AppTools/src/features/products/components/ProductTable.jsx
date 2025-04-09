@@ -189,7 +189,7 @@ function ProductTable(props) {
         entityName="produit"
         entityNamePlural="produits"
         baseRoute="/products"
-        searchFields={['name', 'sku']}
+        searchFields={['name', 'sku', 'designation', 'category']}
         onDelete={handleDeleteEntity}
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', 'sync']}

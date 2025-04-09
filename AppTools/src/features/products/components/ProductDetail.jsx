@@ -7,7 +7,6 @@ import InventoryTab from './tabs/InventoryTab';
 import ProductTab from './tabs/ProductTab';
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
 import ProductPriceSection from './ProductPriceSection';
-import { ENTITY_CONFIG } from '../constants';
 
 function ProductDetail() {
   const {
@@ -42,7 +41,7 @@ function ProductDetail() {
           return (
             <GeneralInfoTab
               entity={entity}
-              fields={['name', 'sku', 'status']}
+              fields={['designation', 'sku', 'status']}
               editable={editable}
               additionalSection={
                 <ProductPriceSection
