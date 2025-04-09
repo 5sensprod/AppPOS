@@ -14,7 +14,12 @@ class Product extends BaseModel {
       const product = await this.findById(id);
       if (!product) return null;
 
-      const categoryIds = product.categories || [];
+      // Récupérer les IDs de catégories du produit
+      let categoryIds = product.categories || [];
+      // Ajouter la catégorie principale si nécessaire
+      if (product.category_id && !categoryIds.includes(product.category_id)) {
+        categoryIds.unshift(product.category_id); // Ajouter au début pour priorité
+      }
 
       if (categoryIds.length === 0) {
         return {
@@ -26,29 +31,49 @@ class Product extends BaseModel {
         };
       }
 
-      // 🔍 Requête groupée pour les catégories du produit
-      const allCategories = await Category.find({ _id: { $in: categoryIds } });
-
-      // 🔁 Pour les chemins, on a besoin de toutes les catégories existantes
+      // Récupérer toutes les catégories existantes
       const allExistingCategories = await Category.findAll();
 
-      const categoryInfos = allCategories.map((category) => {
-        const pathInfo = buildCategoryPath(allExistingCategories, category._id);
+      // Préparer les références de catégories avec leurs chemins complets
+      const categoryInfos = [];
 
-        return {
+      // Pour chaque catégorie du produit, construire ses informations complètes
+      for (const categoryId of categoryIds) {
+        const category = allExistingCategories.find((c) => c._id === categoryId);
+        if (!category) continue;
+
+        // Construire le chemin pour cette catégorie
+        const pathInfo = buildCategoryPath(allExistingCategories, categoryId);
+        if (!pathInfo.path || pathInfo.path.length === 0) continue;
+
+        // Ajouter cette catégorie à la liste des refs
+        categoryInfos.push({
           id: category._id,
           name: category.name,
           woo_id: category.woo_id || null,
-          ...pathInfo,
-          path_string: pathInfo.path ? pathInfo.path.join(' > ') : '', // ← ✅ ici
-        };
-      });
+          path: pathInfo.path,
+          path_ids: pathInfo.path_ids,
+          path_string: pathInfo.path.join(' > '),
+        });
+      }
+
+      // Trouver la catégorie principale
+      let primary = null;
+      if (product.category_id) {
+        // Chercher la catégorie principale dans les infos déjà construites
+        primary = categoryInfos.find((ci) => ci.id === product.category_id);
+      }
+
+      // Si aucune catégorie principale n'est explicitement définie, utiliser la première
+      if (!primary && categoryInfos.length > 0) {
+        primary = categoryInfos[0];
+      }
 
       return {
         ...product,
         category_info: {
           refs: categoryInfos,
-          primary: categoryInfos[0] || null,
+          primary: primary,
         },
       };
     } catch (error) {

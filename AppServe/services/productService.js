@@ -116,6 +116,23 @@ async function updateProduct(id, updateData) {
     categories = updateData.categories || [];
     if (categories.length > 0) await validateCategories(categories);
     categoryChanged = categoriesChanged(oldCategories, categories);
+
+    // Si on vide les catégories, supprimer aussi les anciens champs
+    if (categories.length === 0) {
+      updateData.category_ref = null;
+      updateData.categories_refs = [];
+    }
+
+    if (
+      'categories' in updateData &&
+      (!updateData.categories || updateData.categories.length === 0)
+    ) {
+      // Si on supprime toutes les catégories, s'assurer que tout est nettoyé
+      updateData.category_id = null;
+      updateData.category_ref = null;
+      updateData.categories_refs = [];
+      updateData.category_info = { refs: [], primary: null };
+    }
   }
 
   const payload = { ...updateData, categories };

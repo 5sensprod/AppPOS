@@ -115,7 +115,7 @@ function ProductTable(props) {
     const categoryOptions = Array.from(
       new Map(
         products
-          .flatMap((p) => p.categories_refs || [])
+          .flatMap((p) => p.category_info?.refs || [])
           .map((c) => [c.id, { value: `category_${c.id}`, label: c.name, type: 'category' }])
       ).values()
     );
