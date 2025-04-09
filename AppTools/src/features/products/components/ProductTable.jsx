@@ -83,19 +83,6 @@ function ProductTable(props) {
 
   const isLoading = productsLoading || operationLoading;
 
-  const statusFilters = [
-    {
-      id: 'status',
-      type: 'select',
-      allLabel: 'Tous les statuts',
-      options: [
-        { value: 'published', label: 'Publiés' },
-        { value: 'draft', label: 'Brouillons' },
-        { value: 'archived', label: 'Archivés' },
-      ],
-    },
-  ];
-
   const filterOptions = useMemo(() => {
     const wooOptions = [
       { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
@@ -202,7 +189,6 @@ function ProductTable(props) {
         entityName="produit"
         entityNamePlural="produits"
         baseRoute="/products"
-        filters={statusFilters}
         searchFields={['name', 'sku']}
         onDelete={handleDeleteEntity}
         syncEnabled={syncEnabled}

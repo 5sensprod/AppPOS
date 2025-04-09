@@ -1,5 +1,5 @@
 // src/features/products/components/ProductDetail.jsx
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback } from 'react';
 import useProductDetail from '../hooks/useProductDetail';
 import EntityDetail from '../../../components/common/EntityDetail';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
