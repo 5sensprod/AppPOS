@@ -1,4 +1,5 @@
 // migrateSuppliersAndBrandsNeDB.js
+// il faut utilser cleanupLegacyCategoryFields.js et cleanupLegacyFields ensuite
 const fs = require('fs').promises;
 const path = require('path');
 const Datastore = require('nedb');
