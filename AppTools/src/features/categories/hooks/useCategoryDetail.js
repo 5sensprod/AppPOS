@@ -58,8 +58,25 @@ export default function useCategoryDetail() {
         const id = currentId || paramId;
         if (!id) return;
 
-        const data = await getCategoryById(id);
-        setCategory(data);
+        // Chercher dans la hiérarchie
+        const findCategoryById = (categories, id) => {
+          for (const cat of categories || []) {
+            if (cat._id === id) return cat;
+            const found = findCategoryById(cat.children, id);
+            if (found) return found;
+          }
+          return null;
+        };
+
+        const hierarchyCategory = findCategoryById(hierarchicalCategories, id);
+        if (hierarchyCategory) {
+          setCategory(hierarchyCategory);
+        } else {
+          // Fallback au getCategoryById normal
+          const data = await getCategoryById(id);
+          setCategory(data);
+        }
+
         setError(null);
       } catch (err) {
         console.error('Erreur chargement catégorie:', err);
