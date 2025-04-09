@@ -24,16 +24,22 @@ class Brand extends BaseModel {
 
   // 🧮 Met à jour le compteur de produits pour une marque
   async updateProductCount(brandId) {
+    const brandIdStr = brandId.toString();
+
     return new Promise((resolve, reject) => {
-      db.products.count({ brand_id: brandId }, (err, count) => {
-        if (err) return reject(err);
+      db.products.count({ brand_id: brandIdStr }, (err, count) => {
+        if (err) {
+          return reject(err);
+        }
 
         this.collection.update(
           { _id: brandId },
           { $set: { products_count: count } },
           {},
           (updateErr) => {
-            if (updateErr) return reject(updateErr);
+            if (updateErr) {
+              return reject(updateErr);
+            }
             resolve(count);
           }
         );

@@ -3,7 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const Datastore = require('nedb');
 const util = require('util');
-const { v4: uuidv4 } = require('uuid'); // Assurez-vous d'avoir uuid installé
+const { v4: uuidv4 } = require('uuid');
 
 // Chemins des fichiers
 const SOURCE_PRODUCTS_FILE = path.join(__dirname, 'data', 'source', 'old_products.db');
@@ -117,6 +117,7 @@ function getCategoryHierarchy(categoryId, categoryMap, maxDepth = 10) {
       id: category._id,
       name: category.name,
       level: category.level || 0,
+      woo_id: category.woo_id || null,
     });
 
     currentId = category.parent_id;
@@ -126,31 +127,46 @@ function getCategoryHierarchy(categoryId, categoryMap, maxDepth = 10) {
   return hierarchy;
 }
 
-// Fonction pour récupérer le nom d'une catégorie à partir de son ID
-async function getCategoryInfoWithHierarchy(categoryId, categoryMap) {
-  try {
-    if (!categoryId) return null;
+// NOUVELLE FONCTION: Générer directement category_info à partir d'un ID de catégorie
+function generateCategoryInfo(categoryId, categoryMap) {
+  if (!categoryId) return { refs: [], primary: null };
 
-    const category = categoryMap[categoryId];
-    if (!category) return null;
+  // Obtenir la hiérarchie complète
+  const hierarchy = getCategoryHierarchy(categoryId, categoryMap);
+  if (!hierarchy.length) return { refs: [], primary: null };
 
-    // Récupérer la hiérarchie complète
-    const hierarchy = getCategoryHierarchy(categoryId, categoryMap);
+  // Générer les références pour chaque niveau de la hiérarchie
+  const refs = [];
 
-    return {
-      id: category._id,
-      name: category.name,
-      level: category.level || 0,
-      hierarchy: hierarchy,
-    };
-  } catch (error) {
-    console.warn(`Erreur lors de la recherche de la catégorie ${categoryId}:`, error.message);
-    return null;
+  for (let i = 0; i < hierarchy.length; i++) {
+    const level = hierarchy[i];
+
+    // Construire le chemin jusqu'à ce niveau
+    const path = hierarchy.slice(0, i + 1).map((h) => h.name);
+    const pathIds = hierarchy.slice(0, i + 1).map((h) => h.id);
+
+    refs.push({
+      id: level.id,
+      name: level.name,
+      woo_id: level.woo_id || null,
+      path: path,
+      path_ids: pathIds,
+      path_string: path.join(' > '),
+    });
   }
+
+  // La catégorie principale est la catégorie racine (premier élément)
+  const primary = refs.length > 0 ? refs[0] : null;
+
+  return {
+    refs,
+    primary,
+  };
 }
 
 // Fonction pour migrer les images d'un produit
 async function migrateProductImages(oldProduct, newProductId) {
+  // [Le code des images reste inchangé]
   const result = {
     mainImage: null,
     galleryImages: [],
@@ -392,15 +408,11 @@ async function migrateProducts(shouldReset = false) {
           console.warn(`⚠️ Fournisseur avec ID "${supplierId}" introuvable dans suppliers.db`);
         }
 
-        // Récupérer les informations de la catégorie avec hiérarchie
+        // Récupérer les ID de catégorie
         const categoryId = oldProduct.categorie;
-        const categoryInfo = await getCategoryInfoWithHierarchy(categoryId, categoryMap);
 
-        // Créer le tableau de références des catégories
-        const categoriesRefs = [];
-        if (categoryInfo) {
-          categoriesRefs.push(categoryInfo);
-        }
+        // NOUVELLE APPROCHE: Générer directement category_info
+        const category_info = generateCategoryInfo(categoryId, categoryMap);
 
         // Vérifier si le produit existe déjà dans la base cible
         try {
@@ -425,34 +437,24 @@ async function migrateProducts(shouldReset = false) {
         // Vérifier si le stock est disponible pour décider du statut de gestion de stock
         const hasStock = oldProduct.stock && parseInt(oldProduct.stock) > 0;
 
-        // Créer le nouvel objet produit conforme au format correct
+        // Créer le nouvel objet produit conforme au format correct SANS les champs obsolètes
         const newProduct = {
           _id: oldProduct._id,
-          // Utiliser la désignation comme nom si disponible
           name: oldProduct.reference || 'Produit sans nom',
           sku: oldProduct.reference || '',
           description: oldProduct.description || '',
-          // Simplifier la structure pour correspondre au produit fonctionnel
           status: 'draft',
-          // Toujours définir manage_stock à false pour éviter la rupture de stock automatique
           manage_stock: false,
-          // Garder la valeur réelle du stock, même si elle est à 0
           stock: oldProduct.stock || 0,
-          // Assurer que le prix est bien un nombre
           price: parseFloat(oldProduct.prixVente) || 0,
-          // Ajouter les références d'ID
           brand_id: brandInfo ? brandInfo.id : null,
-          // Ajouter la référence complète de la marque
           brand_ref: brandInfo ? brandInfo : null,
           supplier_id: supplierInfo ? supplierInfo.id : null,
-          // Ajouter la référence complète du fournisseur
           supplier_ref: supplierInfo ? supplierInfo : null,
-          categories: categoryInfo ? [categoryInfo.id] : [],
-          // Ajouter les références complètes des catégories avec hiérarchie
-          categories_refs: categoriesRefs,
-          category_id: categoryInfo ? categoryInfo.id : null,
-          // Ajouter la référence complète de la catégorie principale avec hiérarchie
-          category_ref: categoryInfo,
+          categories: categoryId ? [categoryId] : [],
+          category_id: categoryId || null,
+          // NOUVEAU: Utiliser seulement category_info, supprimer category_ref et categories_refs
+          category_info: category_info,
           image: images.mainImage,
           gallery_images: images.galleryImages,
           designation: oldProduct.designation || '',

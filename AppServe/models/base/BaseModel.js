@@ -40,9 +40,8 @@ class BaseModel {
   }
 
   findById(id) {
-    return this.promisifyCall(this.collection.findOne, { _id: id });
+    return this.promisifyCall(this.collection.findOne, { _id: id.toString() });
   }
-
   update(id, updateData) {
     return this.promisifyCall(this.collection.update, { _id: id }, { $set: updateData }, {});
   }
