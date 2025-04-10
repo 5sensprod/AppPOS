@@ -1,6 +1,6 @@
 // src/features/suppliers/constants.js
 import React from 'react';
-import { Truck, Mail, Phone, Building, User, Image, Package } from 'lucide-react';
+import { Truck, Mail, Phone, Building, User, Image } from 'lucide-react';
 import imageProxyService from '../../services/imageProxyService';
 
 export const ENTITY_CONFIG = {

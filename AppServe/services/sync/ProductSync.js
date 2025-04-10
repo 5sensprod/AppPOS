@@ -15,8 +15,9 @@ class ProductSyncStrategy extends SyncStrategy {
   async _mapLocalToWooCommerce(product) {
     const wcData = {
       name: product.name,
-      sku: product.sku,
+      sku: product.sku || '',
       description: product.description || '',
+      short_description: product.short_description || '', // <-- ajout ici
       regular_price: (product.regular_price || product.price).toString(),
       price: product.price.toString(),
       sale_price: (product.sale_price || '').toString(),
