@@ -103,15 +103,10 @@ const updateSupplierSchema = createSupplierSchema.fork(
   (schema) => schema.optional()
 );
 
-const categoryHierarchyItemSchema = Joi.object({
-  id: Joi.string().allow(null, ''),
-  name: Joi.string().allow(null, ''),
-  level: Joi.number().default(0),
-});
-
 const createProductSchema = Joi.object({
   // Champs principaux
   name: Joi.string().required(),
+  slug: Joi.string().allow(null, ''),
   sku: Joi.string().allow(null, '').default(''),
   description: Joi.string().allow(null, '').default(''),
   status: Joi.string().valid('draft', 'published', 'archived').default('draft'),

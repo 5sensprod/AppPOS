@@ -1,5 +1,5 @@
 // src/features/common/tabs/WooCommerceTab.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import { useFormContext } from 'react-hook-form';
 
@@ -8,6 +8,52 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
   const formContext = editable ? useFormContext() : null;
   const register = formContext?.register;
   const errors = formContext?.formState?.errors;
+  const watch = formContext?.watch;
+  const setValue = formContext?.setValue;
+  const getValues = formContext?.getValues;
+
+  const generateSlugFromText = (text) => {
+    if (!text) return '';
+
+    return text
+      .toString()
+      .toLowerCase()
+      .normalize('NFD') // Normaliser les caractères accentués
+      .replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
+      .replace(/[^\w\s-]/g, '') // Supprimer les caractères spéciaux
+      .replace(/\s+/g, '-') // Remplacer les espaces par des tirets
+      .replace(/--+/g, '-') // Supprimer les tirets multiples
+      .trim(); // Supprimer les espaces au début et à la fin
+  };
+
+  // Fonction pour mettre à jour le slug
+  const updateSlug = (value) => {
+    if (value && setValue) {
+      const slug = generateSlugFromText(value);
+      setValue('slug', slug, { shouldDirty: true, shouldTouch: true });
+    }
+  };
+
+  // Effet pour initialiser le slug et suivre les changements
+  useEffect(() => {
+    if (editable && setValue && watch && getValues) {
+      // Force l'écrasement du slug initial avec une valeur basée sur le name actuel
+      const currentName = getValues('name');
+      if (currentName) {
+        updateSlug(currentName);
+      }
+
+      // Observer les changements sur le champ name
+      const subscription = watch((values, { name: fieldName }) => {
+        if (fieldName === 'name') {
+          updateSlug(values.name);
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    }
+  }, [editable, setValue, watch, getValues]);
+  // Fonction pour générer un slug à partir d'un texte
 
   // Options pour le champ statut
   const statusOptions = [
@@ -60,6 +106,49 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
 
   return (
     <div className="space-y-6">
+      {/* Section des informations WooCommerce */}
+      <div>
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+          Informations WooCommerce
+        </h2>
+
+        {/* Champ Titre pour le name */}
+        <div className="mb-4">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Titre (pour WooCommerce)
+          </h3>
+
+          {editable ? (
+            <div>
+              <input
+                type="text"
+                {...register('name', {
+                  onChange: (e) => {
+                    // Mettre à jour explicitement le slug à chaque frappe
+                    updateSlug(e.target.value);
+                  },
+                })}
+                placeholder="Titre sur la boutique en ligne"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+              {errors && errors.name && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-500">{errors.name.message}</p>
+              )}
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Le titre sera utilisé pour l'URL du produit sur la boutique en ligne
+              </p>
+            </div>
+          ) : (
+            <div className="mt-1 text-gray-900 dark:text-gray-100">
+              {entity.name || 'Pas de titre défini'}
+            </div>
+          )}
+        </div>
+
+        {/* Champ slug caché - uniquement en mode édition */}
+        {editable && <input type="hidden" {...register('slug')} />}
+      </div>
+
       {/* Section du statut de publication - conditionnel */}
       {shouldShowStatus && (
         <div>

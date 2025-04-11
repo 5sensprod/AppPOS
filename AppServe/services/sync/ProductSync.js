@@ -29,6 +29,9 @@ class ProductSyncStrategy extends SyncStrategy {
       manage_stock: product.manage_stock || false,
       stock_quantity: product.stock || 0,
       meta_data: [...(product.meta_data || []), { key: 'brand_id', value: product.brand_id }],
+      slug:
+        product.slug ||
+        this._generateSlug(product.name || product.designation || product.sku || ''),
     };
 
     console.log(`[SYNC] 📂 Récupération des catégories pour le produit ${product._id}`);
@@ -46,6 +49,20 @@ class ProductSyncStrategy extends SyncStrategy {
 
     console.log(`[SYNC] ✅ Mapping terminé pour ${product._id}`);
     return wcData;
+  }
+
+  _generateSlug(text) {
+    if (!text) return '';
+
+    return text
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/--+/g, '-')
+      .trim();
   }
 
   async _prepareCategoryData(product) {
