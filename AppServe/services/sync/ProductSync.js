@@ -13,11 +13,15 @@ class ProductSyncStrategy extends SyncStrategy {
   }
 
   async _mapLocalToWooCommerce(product) {
+    console.log(
+      `[SYNC] 🔍 Début mapping produit ${product._id} (${product.name}) pour WooCommerce`
+    );
+
     const wcData = {
       name: product.name,
       sku: product.sku || '',
       description: product.description || '',
-      short_description: product.short_description || '', // <-- ajout ici
+      short_description: product.short_description || '',
       regular_price: (product.regular_price || product.price).toString(),
       price: product.price.toString(),
       sale_price: (product.sale_price || '').toString(),
@@ -27,17 +31,26 @@ class ProductSyncStrategy extends SyncStrategy {
       meta_data: [...(product.meta_data || []), { key: 'brand_id', value: product.brand_id }],
     };
 
+    console.log(`[SYNC] 📂 Récupération des catégories pour le produit ${product._id}`);
     wcData.categories = await this._prepareCategoryData(product);
+    console.log(`[SYNC] 📋 Catégories finales pour WooCommerce:`, wcData.categories);
 
     if (product.brand_id) {
+      console.log(`[SYNC] 🏷️ Récupération des données de marque pour ${product.brand_id}`);
       wcData.brands = await this._prepareBrandData(product.brand_id);
+      console.log(`[SYNC] 🏷️ Marque pour WooCommerce:`, wcData.brands);
     }
 
     wcData.images = this._prepareImageData(product);
+    console.log(`[SYNC] 📸 Images préparées: ${wcData.images.length}`);
+
+    console.log(`[SYNC] ✅ Mapping terminé pour ${product._id}`);
     return wcData;
   }
 
   async _prepareCategoryData(product) {
+    console.log(`[SYNC] 🔍 Préparation des catégories pour le produit ${product._id}`);
+
     const categoryIds =
       product.categories?.length > 0
         ? product.categories
@@ -45,32 +58,165 @@ class ProductSyncStrategy extends SyncStrategy {
           ? [product.category_id]
           : [];
 
-    if (categoryIds.length === 0) return [];
+    console.log(`[SYNC] 📂 IDs de catégories trouvés:`, categoryIds);
+
+    if (categoryIds.length === 0) {
+      console.log(`[SYNC] ⚠️ Aucune catégorie à synchroniser`);
+      return [];
+    }
 
     const categories = await Category.findAll();
+    console.log(`[SYNC] 📊 Nombre total de catégories dans la base: ${categories.length}`);
+
     const productCategories = categories.filter((c) => categoryIds.includes(c._id));
+    console.log(
+      `[SYNC] 📋 Catégories du produit:`,
+      productCategories.map((c) => `${c.name} (${c._id}, woo_id: ${c.woo_id || 'null'})`)
+    );
+
     const unsynced = productCategories.filter((c) => !c.woo_id);
 
-    // 🔁 Étape 1 : synchro automatique si woo_id manquant
+    // 🔁 Étape 1 : synchro hiérarchique si woo_id manquant
     if (unsynced.length > 0) {
       console.log(
-        `[SYNC] 🔄 Synchronisation automatique de ${unsynced.length} catégorie(s) :`,
+        `[SYNC] 🔄 Synchronisation hiérarchique nécessaire pour ${unsynced.length} catégorie(s):`,
         unsynced.map((c) => c.name)
       );
-      await categoryService.syncToWooCommerce(unsynced);
+
+      // Synchroniser les catégories parentes d'abord
+      const allCats = await Category.findAll();
+      console.log(`[SYNC] 📊 Vérification hiérarchie des catégories`);
+
+      // Synchroniser d'abord les catégories racines
+      for (const cat of allCats) {
+        if (
+          !cat.parent_id &&
+          !cat.woo_id &&
+          (categoryIds.includes(cat._id) || unsynced.some((u) => u.parent_id === cat._id))
+        ) {
+          console.log(`[SYNC] 🔄 Synchronisation de la catégorie racine ${cat.name} (${cat._id})`);
+          try {
+            await categoryService.syncToWooCommerce(cat);
+          } catch (error) {
+            console.error(`[SYNC] ❌ Erreur synchronisation racine ${cat.name}: ${error.message}`);
+          }
+        }
+      }
+
+      // Puis synchroniser les sous-catégories niveau par niveau
+      let parentsSynced = true;
+      let level = 1;
+      while (parentsSynced && level < 10) {
+        // limite à 10 niveaux pour éviter boucle infinie
+        parentsSynced = false;
+
+        for (const cat of allCats) {
+          if (
+            cat.level === level &&
+            !cat.woo_id &&
+            (categoryIds.includes(cat._id) || unsynced.some((u) => u.parent_id === cat._id))
+          ) {
+            // Vérifier que le parent est synchronisé
+            const parent = allCats.find((p) => p._id === cat.parent_id);
+            if (parent && parent.woo_id) {
+              console.log(
+                `[SYNC] 🔄 Synchronisation de la sous-catégorie ${cat.name} (${cat._id}, niveau ${level})`
+              );
+              try {
+                await categoryService.syncToWooCommerce(cat);
+                parentsSynced = true;
+              } catch (error) {
+                console.error(
+                  `[SYNC] ❌ Erreur synchronisation sous-catégorie ${cat.name}: ${error.message}`
+                );
+              }
+            } else {
+              console.log(
+                `[SYNC] ⚠️ Parent de ${cat.name} (${parent?.name || 'inconnu'}) non synchronisé`
+              );
+            }
+          }
+        }
+
+        level++;
+      }
+
+      // Tenter une synchronisation directe pour les catégories du produit non encore synchronisées
+      for (const cat of unsynced) {
+        if (!cat.woo_id) {
+          console.log(`[SYNC] 🔄 Tentative directe pour ${cat.name} (${cat._id})`);
+          try {
+            await categoryService.syncToWooCommerce(cat);
+          } catch (error) {
+            console.error(`[SYNC] ❌ Échec synchronisation directe ${cat.name}: ${error.message}`);
+          }
+        }
+      }
     }
 
     // 🧪 Étape 2 : vérification post-synchro
+    console.log(`[SYNC] 🔍 Vérification des catégories après synchronisation`);
     const updatedCategories = await Category.findAll();
+
     const mapped = updatedCategories
       .filter((c) => categoryIds.includes(c._id) && c.woo_id)
-      .map((c) => ({ id: parseInt(c.woo_id) }));
+      .map((c) => {
+        console.log(`[SYNC] ✅ Catégorie ${c.name} synchronisée avec woo_id ${c.woo_id}`);
+        return { id: parseInt(c.woo_id) };
+      });
 
     const stillMissing = updatedCategories.filter((c) => categoryIds.includes(c._id) && !c.woo_id);
 
     if (stillMissing.length > 0) {
-      throw new Error(
-        `⛔ Certaines catégories n'ont pas pu être synchronisées avec WooCommerce : ${stillMissing.map((c) => c.name).join(', ')}`
+      console.error(
+        `[SYNC] ❌ Catégories toujours non synchronisées:`,
+        stillMissing.map((c) => `${c.name} (${c._id}, parent: ${c.parent_id || 'aucun'})`)
+      );
+
+      // Synchroniser une dernière fois les catégories manquantes, même si ça risque d'échouer
+      console.log(`[SYNC] 🔄 Tentative finale pour ${stillMissing.length} catégorie(s)`);
+      for (const cat of stillMissing) {
+        // Synchroniser manuellement le parent d'abord si nécessaire
+        if (cat.parent_id) {
+          const parent = updatedCategories.find((p) => p._id === cat.parent_id);
+          if (parent && !parent.woo_id) {
+            console.log(`[SYNC] 🔄 Tentative finale pour le parent ${parent.name} (${parent._id})`);
+            try {
+              await categoryService.syncToWooCommerce(parent);
+            } catch (error) {
+              console.error(`[SYNC] ❌ Échec synchro parent ${parent.name}: ${error.message}`);
+            }
+          }
+        }
+
+        console.log(`[SYNC] 🔄 Tentative finale pour ${cat.name} (${cat._id})`);
+        try {
+          await categoryService.syncToWooCommerce(cat);
+        } catch (error) {
+          console.error(`[SYNC] ❌ Échec synchro finale ${cat.name}: ${error.message}`);
+        }
+      }
+
+      // Vérifier une dernière fois
+      const finalCategories = await Category.findAll();
+      const finalMapped = finalCategories
+        .filter((c) => categoryIds.includes(c._id) && c.woo_id)
+        .map((c) => ({ id: parseInt(c.woo_id) }));
+
+      if (finalMapped.length > 0) {
+        console.log(`[SYNC] ✅ Après tentative finale, catégories synchronisées:`, finalMapped);
+        return finalMapped;
+      }
+
+      // Si on arrive ici, c'est qu'on n'a toujours pas réussi à synchroniser les catégories
+      console.error(
+        `[SYNC] ❌ Impossible de synchroniser les catégories, fallback sur catégorie par défaut`
+      );
+    } else if (mapped.length > 0) {
+      console.log(`[SYNC] ✅ Toutes les catégories sont synchronisées:`, mapped);
+    } else {
+      console.log(
+        `[SYNC] ⚠️ Aucune catégorie à associer au produit, fallback sur catégorie par défaut`
       );
     }
 

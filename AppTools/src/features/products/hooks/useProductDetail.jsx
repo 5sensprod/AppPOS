@@ -220,6 +220,22 @@ export default function useProductDetail() {
     setLoading(true);
     setError(null);
     try {
+      // Vérifier si le champ name est vide ou non défini
+      if (!data.name || data.name.trim() === '') {
+        // Utiliser designation si disponible
+        if (data.designation && data.designation.trim() !== '') {
+          data.name = data.designation;
+        }
+        // Sinon utiliser SKU si disponible
+        else if (data.sku && data.sku.trim() !== '') {
+          data.name = data.sku;
+        }
+        // Sinon, nom par défaut
+        else {
+          data.name = `Produit ${new Date().toISOString()}`;
+        }
+      }
+
       const processed = preprocessData(data);
       if (isNew) {
         const created = await createProduct(processed);

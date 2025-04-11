@@ -4,8 +4,14 @@ import * as yup from 'yup';
 export const getValidationSchema = (isNew = true) => {
   // Structure commune pour les deux schémas
   const commonSchema = {
-    // Champs principaux
-    name: yup.string().required('Le nom est requis'),
+    // Champs principaux - Modification pour rendre le name optionnel et utiliser designation ou sku
+    name: yup.string().transform((value, originalValue) => {
+      if (value) return value;
+
+      // Si name n'est pas défini, utiliser designation ou sku
+      return originalValue?.designation || originalValue?.sku || '';
+    }),
+    designation: yup.string().default(''),
     sku: yup
       .string()
       .transform((value) => (value === null || value === undefined ? '' : value))
