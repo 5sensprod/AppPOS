@@ -404,15 +404,28 @@ const ProductDescription = ({ product, editable = false, register, setValue, wat
               </div>
             )}
 
-            <div className="flex items-center">
-              <input
-                type="text"
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                placeholder="Décrivez votre produit ou posez une question..."
-                className="flex-1 p-2 border dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md mr-2"
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              />
+            <div className="flex items-end">
+              <div className="flex-1 mr-2 relative">
+                <textarea
+                  value={userInput}
+                  onChange={(e) => {
+                    setUserInput(e.target.value);
+                    // Ajuster la hauteur automatiquement
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
+                  }}
+                  placeholder="Décrivez votre produit ou posez une question..."
+                  className="w-full p-2 border dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md resize-none overflow-y-auto"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  rows="1"
+                  style={{ minHeight: '40px', maxHeight: '150px' }}
+                />
+              </div>
               <label className="cursor-pointer p-2 border rounded-md mr-2 hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-600">
                 <input
                   type="file"
