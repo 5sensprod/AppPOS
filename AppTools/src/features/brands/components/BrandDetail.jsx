@@ -63,7 +63,15 @@ function BrandDetail() {
           />
         );
       case 'woocommerce':
-        return <WooCommerceTab entity={brand} entityType="brand" onSync={handleSync} />;
+        return (
+          <WooCommerceTab
+            entity={brand}
+            entityType="brand"
+            onSync={handleSync}
+            editable={editable}
+            showStatus={false} // Explicitement cacher le statut pour les marques
+          />
+        );
       default:
         return null;
     }

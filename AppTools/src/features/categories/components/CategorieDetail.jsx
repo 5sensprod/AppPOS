@@ -50,13 +50,6 @@ function CategorieDetail() {
                     <label className="text-sm font-medium">Description</label>
                     <textarea {...register('description')} className="w-full input" />
                   </div>
-                  <div>
-                    <label className="text-sm font-medium">Statut</label>
-                    <select {...register('status')} className="w-full input">
-                      <option value="published">Publié</option>
-                      <option value="draft">Brouillon</option>
-                    </select>
-                  </div>
                 </div>
               </div>
 
@@ -87,7 +80,7 @@ function CategorieDetail() {
           ) : (
             <GeneralInfoTab
               entity={entity}
-              fields={['name', 'description', 'parent_id', 'status']}
+              fields={['name', 'description', 'parent_id']}
               productCount={entity?.productCount || 0}
               editable={false}
             />
@@ -109,7 +102,15 @@ function CategorieDetail() {
           );
 
         case 'woocommerce':
-          return <WooCommerceTab entity={entity} entityType="category" onSync={handleSync} />;
+          return (
+            <WooCommerceTab
+              entity={entity}
+              entityType="category"
+              onSync={handleSync}
+              editable={editable}
+              showStatus={false} // Explicitement cacher le statut pour les catégories
+            />
+          );
 
         default:
           return null;

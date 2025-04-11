@@ -1,8 +1,21 @@
 // src/features/common/tabs/WooCommerceTab.jsx
 import React from 'react';
 import { CheckCircle, AlertCircle } from 'lucide-react';
+import { useFormContext } from 'react-hook-form';
 
-const WooCommerceTab = ({ entity, entityType, onSync }) => {
+const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStatus = false }) => {
+  // Récupération du contexte du formulaire si en mode édition
+  const formContext = editable ? useFormContext() : null;
+  const register = formContext?.register;
+  const errors = formContext?.formState?.errors;
+
+  // Options pour le champ statut
+  const statusOptions = [
+    { value: 'published', label: 'Publié' },
+    { value: 'draft', label: 'Brouillon' },
+    { value: 'archived', label: 'Archivé' },
+  ];
+
   // Fonction pour obtenir le texte approprié selon le type d'entité
   const getEntityTypeText = () => {
     const types = {
@@ -15,8 +28,76 @@ const WooCommerceTab = ({ entity, entityType, onSync }) => {
     return types[entityType] || 'Élément';
   };
 
+  // Déterminer si on doit afficher le statut selon le type d'entité
+  // Par défaut, on affiche uniquement pour les produits, sauf si showStatus est explicitement à true
+  const shouldShowStatus = showStatus || entityType === 'product';
+
+  // Rendu du statut en mode lecture seule
+  const renderStatusField = (status) => {
+    const statusClasses = {
+      published: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      draft: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      archived: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+      default: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+    };
+    const statusText = {
+      published: 'Publié',
+      draft: 'Brouillon',
+      archived: 'Archivé',
+      default: 'Inconnu',
+    };
+
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          statusClasses[status] || statusClasses.default
+        }`}
+      >
+        {statusText[status] || statusText.default}
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
+      {/* Section du statut de publication - conditionnel */}
+      {shouldShowStatus && (
+        <div>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+            Statut de publication
+          </h2>
+
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Statut</h3>
+
+            {editable ? (
+              <div>
+                <select
+                  {...register('status')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                >
+                  {statusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {errors && errors.status && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-500">
+                    {errors.status.message}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-1 text-gray-900 dark:text-gray-100">
+                {renderStatusField(entity.status)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Section du statut de synchronisation */}
       <div>
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
           Statut de synchronisation

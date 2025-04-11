@@ -41,7 +41,7 @@ function ProductDetail() {
           return (
             <GeneralInfoTab
               entity={entity}
-              fields={['designation', 'sku', 'status']}
+              fields={['designation', 'sku']} // Suppression de 'status'
               editable={editable}
               additionalSection={
                 <ProductPriceSection
@@ -100,7 +100,15 @@ function ProductDetail() {
             />
           );
         case 'woocommerce':
-          return <WooCommerceTab entity={entity} entityType="product" onSync={handleSync} />;
+          return (
+            <WooCommerceTab
+              entity={entity}
+              entityType="product"
+              onSync={handleSync}
+              editable={editable}
+              showStatus={true} // Explicitement afficher le statut pour les produits
+            />
+          );
         default:
           return null;
       }

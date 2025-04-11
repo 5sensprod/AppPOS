@@ -29,7 +29,6 @@ const GeneralInfoTab = ({
     sku: 'Référence',
     designation: 'Désignation',
     description: 'Description',
-    status: 'Statut',
     supplier_code: 'Code fournisseur',
     customer_code: 'Code client',
     slug: 'Slug',
@@ -41,39 +40,11 @@ const GeneralInfoTab = ({
 
   // Options pour les champs de type select
   const fieldOptions = {
-    status: [
-      { value: 'published', label: 'Publié' },
-      { value: 'draft', label: 'Brouillon' },
-      { value: 'archived', label: 'Archivé' },
-    ],
     supplier_id: _specialFields.supplier_id?.options || [],
   };
 
   // Rendu personnalisé pour certains champs en mode lecture
   const renderReadOnlyField = (field, value) => {
-    if (field === 'status') {
-      const statusClasses = {
-        published: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-        draft: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-        default: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-      };
-      const statusText = {
-        published: 'Publié',
-        draft: 'Brouillon',
-        default: 'Archivé',
-      };
-
-      return (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            statusClasses[value] || statusClasses.default
-          }`}
-        >
-          {statusText[value] || statusText.default}
-        </span>
-      );
-    }
-
     if (field === 'parent_id') {
       return entity.parent_name || value || 'Aucune';
     }
@@ -187,16 +158,6 @@ const GeneralInfoTab = ({
             editable={editable}
             options={_specialFields.brands?.options || []}
           />
-        );
-      case 'status':
-        return (
-          <select {...register(field)} className={baseInputClass}>
-            {fieldOptions.status.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
         );
       case 'suppliers':
         return (
