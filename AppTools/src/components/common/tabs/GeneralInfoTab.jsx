@@ -26,7 +26,7 @@ const GeneralInfoTab = ({
   // Conversion des noms de champs en libellés humains
   const fieldLabels = {
     name: 'Nom',
-    sku: 'SKU',
+    sku: 'Référence',
     designation: 'Désignation',
     description: 'Description',
     status: 'Statut',

@@ -34,7 +34,10 @@ export const ENTITY_CONFIG = {
     {
       key: 'sku',
       label: 'Référence',
-      render: (product) => (product.sku ? product.sku : product.name),
+      render: (product) => {
+        const reference = product.sku || product.name || '';
+        return reference.length > 25 ? `${reference.substring(0, 25)}...` : reference;
+      },
       sortable: true,
     },
     {
