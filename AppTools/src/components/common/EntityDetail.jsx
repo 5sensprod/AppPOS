@@ -42,6 +42,7 @@ const EntityDetail = ({
   const [activeTab, setActiveTab] = useState(tabs.length > 0 ? tabs[0].id : 'general');
   const [serverError, setServerError] = useState(error);
   const [successMessage, setSuccessMessage] = useState(success);
+  const [formSubmitted, setFormSubmitted] = useState(false);
 
   // Configuration du formulaire si en mode édition
   const formMethods = useForm({
@@ -50,6 +51,19 @@ const EntityDetail = ({
     mode: 'onChange',
   });
 
+  // État pour suivre si le formulaire a été modifié
+  const [formDirty, setFormDirty] = useState(false);
+
+  // Surveiller les changements dans le formulaire
+  useEffect(() => {
+    if (editable) {
+      const subscription = formMethods.watch(() => {
+        setFormDirty(formMethods.formState.isDirty);
+      });
+      return () => subscription.unsubscribe();
+    }
+  }, [editable, formMethods]);
+
   // Log pour vérifier les méthodes du formulaire
   useEffect(() => {
     if (editable) {
@@ -57,6 +71,7 @@ const EntityDetail = ({
         setValue: !!formMethods.setValue,
         watch: !!formMethods.watch,
         getValues: !!formMethods.getValues,
+        isDirty: formMethods.formState.isDirty,
       });
     }
   }, [editable, formMethods]);
@@ -65,6 +80,7 @@ const EntityDetail = ({
   useEffect(() => {
     if (editable && entity) {
       formMethods.reset({ ...defaultValues, ...entity });
+      setFormDirty(false);
     }
   }, [entity, editable, defaultValues, formMethods]);
 
@@ -113,9 +129,23 @@ const EntityDetail = ({
 
   // Gérer l'annulation du formulaire
   const handleCancel = () => {
+    // Réinitialiser le formulaire aux valeurs initiales de l'entité
+    if (entity) {
+      formMethods.reset({ ...defaultValues, ...entity });
+    }
+
+    // Réinitialiser l'état de soumission et les modifications
+    setFormSubmitted(false);
+    setFormDirty(false);
+
     if (onCancel) {
-      onCancel();
+      // Appeler le callback personnalisé mais rester en mode édition
+      onCancel(false); // Passer false pour indiquer de rester en mode édition
+    } else if (formSubmitted) {
+      // Si le formulaire a été soumis, rester en mode édition
+      // Ne pas naviguer ailleurs
     } else {
+      // Si aucune soumission n'a été faite, revenir à la liste
       navigate(baseRoute);
     }
   };
@@ -123,9 +153,12 @@ const EntityDetail = ({
   // Gérer la soumission du formulaire
   const handleFormSubmit = async (data) => {
     setServerError(null);
+    setFormSubmitted(true);
+
     try {
       await onSubmit(data, entityId);
       setSuccessMessage(`${entityName || "L'élément"} a été mis à jour avec succès.`);
+      setFormDirty(false);
     } catch (error) {
       console.error(`Erreur lors de la mise à jour:`, error);
       setServerError(`Erreur lors de la mise à jour: ${error.message}`);
@@ -258,17 +291,16 @@ const EntityDetail = ({
               )}
             </>
           ) : (
-            // Actions en mode édition
-            <>
-              <ActionButton onClick={handleCancel} icon={X} label="Annuler" variant="secondary" />
-              <ActionButton
-                onClick={formMethods.handleSubmit(handleFormSubmit)}
-                icon={Save}
-                label="Enregistrer"
-                variant="primary"
-                isLoading={isLoading}
-              />
-            </>
+            // Actions en mode édition - seulement le bouton d'enregistrement
+            <ActionButton
+              onClick={formMethods.handleSubmit(handleFormSubmit)}
+              icon={Save}
+              label="Enregistrer"
+              variant="primary"
+              isLoading={isLoading}
+              disabled={!formDirty}
+              className={!formDirty ? 'opacity-50 cursor-not-allowed' : ''}
+            />
           )}
         </div>
       </div>
@@ -297,6 +329,7 @@ const EntityDetail = ({
                     setValue: formMethods.setValue,
                     watch: formMethods.watch,
                     getValues: formMethods.getValues,
+                    formState: formMethods.formState,
                   })}
               </div>
             </form>
