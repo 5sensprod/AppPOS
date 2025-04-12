@@ -58,14 +58,21 @@ export const transformToOptions = (categories, currentId, isNew, prefix = '') =>
 export const formatCategoryData = (data) => {
   const formattedData = { ...data };
 
+  // Supprimer explicitement les champs problématiques
+  delete formattedData.status;
+  delete formattedData.children;
+  delete formattedData.productCount;
+  delete formattedData.path;
+  delete formattedData.path_ids;
+  delete formattedData.path_string;
+  delete formattedData.products;
+
   Object.keys(formattedData).forEach((field) => {
     const value = formattedData[field];
-
     switch (field) {
       case 'parent_id':
         if (value === '') formattedData[field] = null;
         break;
-
       case 'woo_id':
       case 'last_sync':
       case 'createdAt':
@@ -80,7 +87,6 @@ export const formatCategoryData = (data) => {
       case 'gallery_images':
         delete formattedData[field];
         break;
-
       default:
         if (value === '') {
           delete formattedData[field];
@@ -88,7 +94,6 @@ export const formatCategoryData = (data) => {
         break;
     }
   });
-
   return formattedData;
 };
 
