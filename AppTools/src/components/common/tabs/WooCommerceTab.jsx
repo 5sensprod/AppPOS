@@ -1,6 +1,6 @@
 // src/features/common/tabs/WooCommerceTab.jsx
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, AlertCircle, Wand2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Wand2, XCircle } from 'lucide-react';
 import { useFormContext } from 'react-hook-form';
 import apiService from '../../../services/api';
 
@@ -16,6 +16,32 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
   // États pour la génération de titre
   const [isTitleGenerating, setIsTitleGenerating] = useState(false);
   const [titleError, setTitleError] = useState(null);
+
+  // Nouvel état pour vérifier si la synchronisation est possible
+  const [syncValidation, setSyncValidation] = useState({
+    hasImages: !!entity?.gallery_images?.length,
+    hasDescription: !!entity?.description,
+    hasCategory: !!entity?.category_info?.primary?.id,
+    isValid: !!(
+      entity?.gallery_images?.length &&
+      entity?.description &&
+      entity?.category_info?.primary?.id
+    ),
+  });
+
+  // Mise à jour de l'état de validation lorsque l'entité change
+  useEffect(() => {
+    const hasImages = !!entity?.gallery_images?.length;
+    const hasDescription = !!entity?.description;
+    const hasCategory = !!entity?.category_info?.primary?.id;
+
+    setSyncValidation({
+      hasImages,
+      hasDescription,
+      hasCategory,
+      isValid: hasImages && hasDescription && hasCategory,
+    });
+  }, [entity]);
 
   const generateSlugFromText = (text) => {
     if (!text) return '';
@@ -200,6 +226,19 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
     );
   };
 
+  // Fonction pour gérer la synchronisation avec vérification préalable
+  const handleSync = (id) => {
+    if (!syncValidation.isValid) {
+      // Si la synchronisation n'est pas valide, ne rien faire
+      return;
+    }
+
+    // Appeler la fonction de synchronisation normale
+    if (onSync) {
+      onSync(id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Section des informations WooCommerce */}
@@ -311,6 +350,33 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
           Statut de synchronisation
         </h2>
 
+        {/* Nouvelle section d'avertissement pour la synchronisation */}
+        {!syncValidation.isValid && (
+          <div className="bg-red-50 dark:bg-red-900 p-4 rounded-lg mb-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 mt-0.5">
+                <XCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                  Synchronisation impossible
+                </h3>
+                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                  <p>
+                    Pour pouvoir synchroniser ce {getEntityTypeText().toLowerCase()} avec
+                    WooCommerce, il est nécessaire de :
+                  </p>
+                  <ul className="list-disc pl-5 mt-1 space-y-1">
+                    {!syncValidation.hasImages && <li>Ajouter au moins une image</li>}
+                    {!syncValidation.hasDescription && <li>Ajouter une description</li>}
+                    {!syncValidation.hasCategory && <li>Sélectionner une catégorie principale</li>}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {entity.woo_id ? (
           <div className="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
             <div className="flex items-center">
@@ -346,8 +412,13 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
                       </p>
                       {onSync && (
                         <button
-                          onClick={() => onSync(entity.id)}
-                          className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-800 dark:text-blue-100 dark:hover:bg-blue-700"
+                          onClick={() => handleSync(entity.id)}
+                          disabled={!syncValidation.isValid}
+                          className={`mt-2 px-3 py-1 text-xs font-medium rounded-md ${
+                            syncValidation.isValid
+                              ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-800 dark:text-blue-100 dark:hover:bg-blue-700'
+                              : 'bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:text-gray-400'
+                          }`}
                         >
                           Synchroniser les modifications
                         </button>
@@ -372,8 +443,13 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
                   <p>Cet élément n'a pas encore été synchronisé avec WooCommerce.</p>
                   {onSync && (
                     <button
-                      onClick={() => onSync(entity.id)}
-                      className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-800 dark:text-yellow-100 dark:hover:bg-yellow-700"
+                      onClick={() => handleSync(entity.id)}
+                      disabled={!syncValidation.isValid}
+                      className={`mt-2 px-3 py-1 text-xs font-medium rounded-md ${
+                        syncValidation.isValid
+                          ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-800 dark:text-yellow-100 dark:hover:bg-yellow-700'
+                          : 'bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:text-gray-400'
+                      }`}
                     >
                       Synchroniser maintenant
                     </button>

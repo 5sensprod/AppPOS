@@ -57,8 +57,9 @@ const EntityDetail = ({
   // Surveiller les changements dans le formulaire
   useEffect(() => {
     if (editable) {
-      const subscription = formMethods.watch(() => {
-        setFormDirty(formMethods.formState.isDirty);
+      const subscription = formMethods.watch((value, { name, type }) => {
+        // Toute modification rend le formulaire dirty
+        setFormDirty(true);
       });
       return () => subscription.unsubscribe();
     }
