@@ -40,10 +40,16 @@ export const ENTITY_CONFIG = {
     {
       key: 'suppliersRefs',
       label: 'Fournisseur',
-      render: (brand) =>
-        brand.suppliersRefs && brand.suppliersRefs.length > 0
-          ? brand.suppliersRefs.map((s) => s.name).join(', ')
-          : '-',
+      render: (brand) => {
+        const refs = brand.suppliersRefs || brand.supplier_info?.refs;
+        return refs && refs.length > 0 ? refs.map((s) => s.name).join(', ') : '-';
+      },
+    },
+    {
+      key: 'products_count',
+      label: 'Produits',
+      render: (brand) => brand.products_count || 0,
+      sortable: true,
     },
     {
       key: 'woo_status',

@@ -16,6 +16,65 @@ class BrandController extends BaseController {
     this.eventService = getEntityEventService(this.entityName);
   }
 
+  async getAll(req, res) {
+    try {
+      // Récupération des paramètres de pagination si présents
+      const pagination = this.getPaginationParams ? this.getPaginationParams(req) : null;
+      const filters = this.getFilters ? this.getFilters(req) : {};
+
+      let items, total, page, totalPages;
+
+      // Utiliser la pagination si disponible
+      if (pagination) {
+        const result = await this.model.findAllWithPagination(filters, pagination);
+        items = result.items;
+        total = result.total;
+        page = result.page;
+        totalPages = result.totalPages;
+      } else {
+        items = await this.model.findAll(filters);
+      }
+
+      // Enrichir les données avec les informations des fournisseurs
+      const enrichedItems = await Promise.all(
+        items.map(async (brand) => {
+          const supplierIds = brand.suppliers || [];
+          if (supplierIds.length === 0) {
+            return {
+              ...brand,
+              suppliersRefs: [],
+            };
+          }
+
+          const allSuppliers = await Supplier.find({ _id: { $in: supplierIds } });
+
+          const suppliersRefs = allSuppliers.map((supplier) => ({
+            id: supplier._id,
+            name: supplier.name,
+          }));
+
+          return {
+            ...brand,
+            suppliersRefs,
+          };
+        })
+      );
+
+      // Renvoyer avec ou sans pagination selon le cas
+      if (pagination) {
+        return ResponseHandler.successWithPagination(res, enrichedItems, {
+          total,
+          page,
+          totalPages,
+        });
+      } else {
+        return ResponseHandler.success(res, enrichedItems);
+      }
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   async getById(req, res) {
     try {
       const brand = await this.model.findByIdWithSupplierInfo(req.params.id);
