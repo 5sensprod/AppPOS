@@ -1,3 +1,4 @@
+//AppTools\src\components\common\EntityTable\components\UnifiedFilterBar.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
 
@@ -14,6 +15,7 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
     woo: 'Synchronisation',
     image: 'Image',
     supplier: 'Fournisseur',
+    description: 'Description',
     brand: 'Marque',
     category: 'Catégorie',
   };

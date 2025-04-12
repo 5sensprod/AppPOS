@@ -9,30 +9,69 @@ function getProductTitlePrompt(productData) {
   const category = productData.category || 'produit';
   const brand = productData.brand || '';
 
-  // Construire un prompt simple mais avec termes techniques pertinents
+  // Extraire et préparer la description
+  let description = '';
+  if (productData.currentDescription) {
+    description = productData.currentDescription;
+  } else if (productData.description) {
+    description = productData.description;
+  } else if (productData.description_short) {
+    description = productData.description_short;
+  }
+
+  // Extraire le texte des balises HTML si nécessaire
+  if (description && description.includes('<')) {
+    description = description
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Construire un prompt qui utilise explicitement la description
   let optimizedPrompt = `
   Crée un titre simple pour ce ${category} de la marque ${brand} destiné à une boutique de musique en ligne.
  
   RÈGLES STRICTES:
   1. Le titre doit être COURT (2-4 mots maximum, sans compter la marque)
-  2. Format: "[Type de produit] [Qualificatif technique pertinent] ${brand}"
-  3. SEULEMENT inclure un qualificatif technique s'il est IMPORTANT et PERTINENT (Studio, Dynamique, Condensateur, Électrique, etc.)
-  4. ÉVITER les détails non essentiels comme les dimensions en mm, les impédances, etc.
-  5. IMPORTANT: Utiliser les qualificatifs techniques standards du domaine musical
-  6. TOUJOURS INCLURE LA MARQUE "${brand}" À LA FIN DU TITRE si fournie
+  2. TOUJOURS INCLURE LA MARQUE "${brand}" À LA FIN DU TITRE si fournie
+  3. ANALYSE ATTENTIVEMENT LA DESCRIPTION DU PRODUIT pour identifier précisément le type de produit et ses caractéristiques clés
   
-  EXEMPLES DE BONS QUALIFICATIFS PAR CATÉGORIE:
-  - Casque: Studio, Monitoring, DJ, Fermé, Ouvert
-  - Microphone: Dynamique, Condensateur, USB, Cardioïde, Omnidirectionnel
-  - Guitare: Électrique, Acoustique, Classique, Basse, Folk
-  - Ampli: Lampes, Transistor, Combo, Tête
-  - Clavier: Synthétiseur, MIDI, Workstation, Arrangeur
+  FORMATS SELON LE TYPE DE PRODUIT:
+  
+  A) Pour les INSTRUMENTS et ÉQUIPEMENTS:
+     Format: "[Type de produit] [Qualificatif technique pertinent] ${brand}"
+     Exemples: "Casque Studio PRODIPE", "Guitare Électrique FENDER"
+  
+  B) Pour les ACCESSOIRES et HOUSSES:
+     Format: "[Type d'accessoire] pour [instrument concerné précis] ${brand}"
+     Exemples: "Housse pour Guitare Acoustique GATOR", "Support pour Micro KONIG"
+  
+  4. SEULEMENT inclure un qualificatif technique s'il est IMPORTANT et PERTINENT
+  5. Pour les accessoires, TOUJOURS préciser l'instrument PRÉCIS concerné (pas juste "Instruments" mais "Guitare Acoustique", "Micro", etc.)
+  6. UTILISER LES TERMES EXACTS mentionnés dans la description`;
+
+  // Ajouter la description en la mettant très en évidence
+  if (description) {
+    optimizedPrompt += `
+  
+  ===========================================
+  DESCRIPTION DU PRODUIT (À LIRE ATTENTIVEMENT):
+  ===========================================
+  ${description}
+  ===========================================`;
+  }
+
+  // Finaliser le prompt avec des exemples
+  optimizedPrompt += `
   
   EXEMPLES DE TITRES BIEN FORMULÉS:
-  - Casque Studio PRODIPE (et non "Casque 40mm PRODIPE")
-  - Micro Condensateur RODE (et non "Micro 48V RODE")
-  - Guitare Électrique FENDER (et non "Guitare 6 Cordes FENDER")
-  - Ampli Lampes MARSHALL (et non "Ampli 100W MARSHALL")
+  - Casque Studio PRODIPE
+  - Micro Dynamique SHURE
+  - Guitare Électrique FENDER
+  - Housse pour Guitare Acoustique GATOR (PAS "Housse pour Instruments")
+  - Support pour Micro K&M
+  
+  SI LE PRODUIT EST UNE HOUSSE ET QUE LA DESCRIPTION MENTIONNE "GUITARE ACOUSTIQUE", LE TITRE DOIT ÊTRE "Housse pour Guitare Acoustique ${brand}" ET NON PAS "Housse pour Instruments ${brand}".
   
   Réponds UNIQUEMENT avec le titre, sans guillemets, sans préfixe, sans introduction ni explication.`;
 
@@ -53,21 +92,43 @@ function generateExampleTitle(productData) {
   // Intégrer la marque à la fin si disponible
   const brandSuffix = brand ? ` ${brand}` : '';
 
+  // Déterminer si c'est un accessoire
+  const isAccessory = /hous|support|étui|cable|cordon|sangle|stand|pied|alimentation/i.test(
+    category
+  );
+
+  // Utiliser la catégorie parente ou une catégorie par défaut pour les accessoires
+  const forInstrument = isAccessory ? ' pour Guitare' : '';
+
   const prefixMap = {
+    // Instruments
     casque: `Casque Studio${brandSuffix}`,
     audio: `Système Audio${brandSuffix}`,
     guitare: `Guitare Électrique${brandSuffix}`,
     basse: `Basse Électrique${brandSuffix}`,
     ampli: `Ampli Lampes${brandSuffix}`,
     micro: `Micro Dynamique${brandSuffix}`,
-    table: `Table de Mixage${brandSuffix}`,
     clavier: `Clavier Synthétiseur${brandSuffix}`,
     enceinte: `Enceinte Active${brandSuffix}`,
     batterie: `Batterie Acoustique${brandSuffix}`,
+
+    // Accessoires
+    housse: `Housse pour Guitare Acoustique${brandSuffix}`,
+    étui: `Étui pour Guitare Électrique${brandSuffix}`,
+    support: `Support pour Micro${brandSuffix}`,
+    stand: `Stand pour Clavier${brandSuffix}`,
+    cable: `Câble Instrument${brandSuffix}`,
+    sangle: `Sangle pour Guitare${brandSuffix}`,
   };
 
   // Retourne un titre par défaut selon la catégorie ou un titre générique
-  return prefixMap[category.toLowerCase()] || `${category}${brandSuffix}`;
+  if (prefixMap[category.toLowerCase()]) {
+    return prefixMap[category.toLowerCase()];
+  } else if (isAccessory) {
+    return `${category}${forInstrument}${brandSuffix}`;
+  } else {
+    return `${category}${brandSuffix}`;
+  }
 }
 
 module.exports = {

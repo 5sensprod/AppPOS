@@ -94,6 +94,11 @@ function ProductTable(props) {
       { label: 'Sans image', value: 'no_image', type: 'image' },
     ];
 
+    const descriptionOptions = [
+      { label: 'Avec description', value: 'has_description', type: 'description' },
+      { label: 'Sans description', value: 'no_description', type: 'description' },
+    ];
+
     const brandOptions = Array.from(
       new Map(
         products
@@ -123,6 +128,7 @@ function ProductTable(props) {
     return [
       ...wooOptions,
       ...imageOptions,
+      ...descriptionOptions,
       ...brandOptions,
       ...supplierOptions,
       ...categoryOptions,
@@ -137,6 +143,7 @@ function ProductTable(props) {
     const supplierFilters = selectedFilters.filter((f) => f.type === 'supplier');
     const brandFilters = selectedFilters.filter((f) => f.type === 'brand');
     const categoryFilters = selectedFilters.filter((f) => f.type === 'category');
+    const descriptionFilter = selectedFilters.find((f) => f.type === 'description')?.value;
 
     if (wooFilter === 'woo_synced') {
       data = data.filter((p) => p.woo_id != null);
@@ -168,6 +175,12 @@ function ProductTable(props) {
         (p) =>
           Array.isArray(p.categories) && p.categories.some((catId) => categoryIds.includes(catId))
       );
+    }
+
+    if (descriptionFilter === 'has_description') {
+      data = data.filter((p) => p.description && p.description.trim() !== '');
+    } else if (descriptionFilter === 'no_description') {
+      data = data.filter((p) => !p.description || p.description.trim() === '');
     }
 
     return data;
