@@ -119,6 +119,75 @@ class GeminiDirectService {
     }
   }
 
+  /**
+   * Génère uniquement un titre pour un produit
+   * @param {Object} productData Données du produit
+   * @param {string} imagePath Chemin optionnel vers l'image du produit (non utilisé)
+   * @returns {Promise<Object>} Résultat de la génération
+   */
+  async generateProductTitle(productData, imagePath = null) {
+    try {
+      // Importer le template de génération de titre
+      const { getProductTitlePrompt } = require('./prompts/productTitleGenerator');
+
+      // Construire le prompt pour le titre
+      const prompt = getProductTitlePrompt(productData);
+
+      // Préparer la requête API (utiliser les méthodes existantes au lieu de generateContent)
+      const requestData = this._prepareApiRequest(prompt, 0.7);
+
+      // Ajouter une image si fournie (comme dans generateProductDescription)
+      if (imagePath && fs.existsSync(imagePath)) {
+        this._addImageToRequest(requestData, imagePath);
+      }
+
+      // Envoyer la requête à l'API Gemini
+      const response = await this._sendApiRequest(requestData);
+
+      // Traiter la réponse
+      if (this._isValidResponse(response)) {
+        const rawTitle = response.data.candidates[0].content.parts[0].text;
+        const title = this._cleanResponse(rawTitle);
+
+        return {
+          title,
+          success: true,
+          message: 'Titre généré avec succès',
+        };
+      } else {
+        throw new Error('Format de réponse inattendu de Gemini');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la génération du titre:', error);
+      return {
+        title: '',
+        success: false,
+        message: `Erreur lors de la génération: ${error.message || 'Erreur inconnue'}`,
+      };
+    }
+  }
+
+  /**
+   * Nettoie la réponse de l'API pour extraire uniquement le titre
+   * @param {string} response Réponse brute de l'API
+   * @returns {string} Titre nettoyé
+   */
+  _cleanResponse(response) {
+    // Retirer les guillemets si présents
+    let cleaned = response.trim();
+    if (
+      (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+      (cleaned.startsWith("'") && cleaned.endsWith("'"))
+    ) {
+      cleaned = cleaned.substring(1, cleaned.length - 1);
+    }
+
+    // Retirer les préfixes potentiels comme "Titre: " ou "Title: "
+    cleaned = cleaned.replace(/^(titre\s*:|title\s*:)/i, '').trim();
+
+    return cleaned;
+  }
+
   // Méthodes privées d'aide
   _prepareApiRequest(textPrompt, temperature = 0.7) {
     return {

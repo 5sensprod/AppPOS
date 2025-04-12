@@ -42,6 +42,7 @@ const brandRoutes = require('./routes/brandRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const wooSyncRoutes = require('./routes/wooSyncRoutes');
 const productDescriptionRoutes = require('./routes/productDescriptionRoutes');
+const productTitleRoutes = require('./routes/productTitleRoutes'); // Ajout de l'import pour les routes de titre
 
 // Protection des routes API avec le middleware d'authentification
 app.use('/api/categories', authMiddleware, categoryRoutes);
@@ -50,6 +51,7 @@ app.use('/api/brands', authMiddleware, brandRoutes);
 app.use('/api/suppliers', authMiddleware, supplierRoutes);
 app.use('/api/sync', authMiddleware, wooSyncRoutes);
 app.use('/api/descriptions', authMiddleware, productDescriptionRoutes);
+app.use('/api/product-title', authMiddleware, productTitleRoutes); // Ajout des nouvelles routes avec authentification
 
 // Route d'info serveur
 app.get('/api/server-info', (req, res) => {

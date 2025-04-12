@@ -1,6 +1,4 @@
-// services/gemini/index.js
 const GeminiDirectService = require('./GeminiDirectService');
-
 // Créer une instance singleton du service Gemini
 const geminiServiceInstance = new GeminiDirectService();
 
@@ -33,6 +31,16 @@ module.exports = {
       conversation,
       filePaths
     );
+  },
+
+  /**
+   * Génère uniquement un titre pour un produit
+   * @param {Object} productData Données du produit
+   * @param {string} imagePath Chemin optionnel vers l'image du produit
+   * @returns {Promise<Object>} Résultat de la génération contenant le titre
+   */
+  generateProductTitle: async (productData, imagePath) => {
+    return geminiServiceInstance.generateProductTitle(productData, imagePath);
   },
 
   // Pour accéder directement à l'instance du service si nécessaire
