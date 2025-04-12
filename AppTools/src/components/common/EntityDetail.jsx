@@ -195,12 +195,21 @@ const EntityDetail = ({
     </div>
   );
 
+  // Déterminer le titre à afficher avec priorité SKU > désignation > name
+  const getEntityTitle = () => {
+    if (entity) {
+      if (entity.sku) return entity.sku;
+      if (entity.designation) return entity.designation;
+      if (entity.name) return entity.name;
+    }
+    return entityName ? entityName.charAt(0).toUpperCase() + entityName.slice(1) : 'Détails';
+  };
+
   const dynamicTitle =
     title ||
     (editable
-      ? `${entity && entity.name ? `Modifier « ${entity.name} »` : `Ajouter ${entityName}`}`
-      : entity?.name ||
-        `${entityName ? entityName.charAt(0).toUpperCase() + entityName.slice(1) : 'Détails'}`);
+      ? `${entity ? `Modifier « ${getEntityTitle()} »` : `Ajouter ${entityName}`}`
+      : getEntityTitle());
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -285,7 +294,7 @@ const EntityDetail = ({
                     control: formMethods.control,
                     register: formMethods.register,
                     errors: formMethods.formState.errors,
-                    setValue: formMethods.setValue, // Utilisez formMethods.setValue
+                    setValue: formMethods.setValue,
                     watch: formMethods.watch,
                     getValues: formMethods.getValues,
                   })}

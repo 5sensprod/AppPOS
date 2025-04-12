@@ -12,7 +12,6 @@ function ProductsPage() {
       description="Gérez votre catalogue de produits"
       addButtonLabel="Ajouter un produit"
       addButtonPath="/products/new"
-      // Plus besoin de Provider avec Zustand
       contentComponent={ProductTable}
     />
   );

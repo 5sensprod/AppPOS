@@ -197,7 +197,7 @@ export const ENTITY_CONFIG = {
     },
   ],
   defaultSort: {
-    field: 'name',
+    field: 'sku',
     direction: 'asc',
   },
   icons: {

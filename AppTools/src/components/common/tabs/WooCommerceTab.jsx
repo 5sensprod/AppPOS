@@ -1,7 +1,8 @@
 // src/features/common/tabs/WooCommerceTab.jsx
-import React, { useEffect } from 'react';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CheckCircle, AlertCircle, Wand2 } from 'lucide-react';
 import { useFormContext } from 'react-hook-form';
+import apiService from '../../../services/api';
 
 const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStatus = false }) => {
   // Récupération du contexte du formulaire si en mode édition
@@ -11,6 +12,10 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
   const watch = formContext?.watch;
   const setValue = formContext?.setValue;
   const getValues = formContext?.getValues;
+
+  // États pour la génération de titre
+  const [isTitleGenerating, setIsTitleGenerating] = useState(false);
+  const [titleError, setTitleError] = useState(null);
 
   const generateSlugFromText = (text) => {
     if (!text) return '';
@@ -29,11 +34,28 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
   // Fonction pour mettre à jour le slug
   const updateSlug = (value) => {
     if (value && setValue) {
-      const slug = generateSlugFromText(value);
+      // Création du texte pour le slug
+      let slugParts = [value]; // 1. Ajout du name (obligatoire)
+
+      // 2. Ajout du SKU s'il est présent, sinon ajout de la désignation
+      const sku = entity?.sku || getValues?.('sku');
+      if (sku) {
+        slugParts.push(sku);
+      } else {
+        // 3. Ajout de la désignation uniquement si pas de SKU
+        const designation = entity?.designation;
+        if (designation) {
+          slugParts.push(designation);
+        }
+      }
+
+      // Jointure des parties et génération du slug
+      const combinedText = slugParts.join(' ');
+      const slug = generateSlugFromText(combinedText);
+
       setValue('slug', slug, { shouldDirty: true, shouldTouch: true });
     }
   };
-
   // Effet pour initialiser le slug et suivre les changements
   useEffect(() => {
     if (editable && setValue && watch && getValues) {
@@ -53,7 +75,81 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
       return () => subscription.unsubscribe();
     }
   }, [editable, setValue, watch, getValues]);
-  // Fonction pour générer un slug à partir d'un texte
+
+  // Fonction pour générer un titre avec l'IA
+  const generateTitle = async () => {
+    if (!editable || isTitleGenerating) return;
+
+    setIsTitleGenerating(true);
+    setTitleError(null);
+
+    try {
+      // Log des données disponibles
+      console.log('Données produit pour génération de titre:', {
+        name: getValues('name') || '',
+        category: entity.category_info?.primary?.name || '',
+        brand: entity.brand_ref?.name || '',
+        sku: entity.sku || getValues('sku') || '',
+        price: entity.price || '',
+        hasDescription: !!entity.description,
+        hasSpecs: !!entity.specifications && Object.keys(entity.specifications).length > 0,
+      });
+
+      // Rassembler les données du produit pour l'API
+      const formData = new FormData();
+
+      // Ajouter les informations du produit
+      formData.append('name', getValues('name') || '');
+      formData.append('category', entity.category_info?.primary?.name || '');
+      formData.append('brand', entity.brand_ref?.name || '');
+      formData.append('sku', entity.sku || getValues('sku') || '');
+      formData.append('price', entity.price || '');
+
+      // Ajouter la description si disponible
+      if (entity.description) {
+        formData.append('currentDescription', entity.description);
+      }
+
+      // Ajouter les spécifications si disponibles
+      if (entity.specifications && Object.keys(entity.specifications).length > 0) {
+        formData.append('specifications', JSON.stringify(entity.specifications));
+      }
+
+      // Appel à l'API pour générer le titre
+      console.log("Appel de l'API de génération de titre...");
+      const response = await apiService.post('/api/product-title/generate', formData);
+      console.log("Réponse de l'API:", response.data);
+
+      if (response.data.success && response.data.data.title) {
+        // Appliquer le titre généré
+        setValue('name', response.data.data.title, {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+
+        // Mettre à jour le slug automatiquement
+        updateSlug(response.data.data.title);
+      } else {
+        setTitleError(`Erreur: ${response.data.message || 'Réponse invalide du serveur'}`);
+      }
+    } catch (error) {
+      console.error('Erreur détaillée lors de la génération du titre:', error);
+      if (error.response) {
+        console.error("Réponse d'erreur du serveur:", error.response.data);
+        setTitleError(
+          `Erreur serveur: ${error.response.data.message || error.response.statusText}`
+        );
+      } else if (error.request) {
+        console.error('Pas de réponse reçue:', error.request);
+        setTitleError('Pas de réponse du serveur');
+      } else {
+        console.error('Erreur de configuration:', error.message);
+        setTitleError(`Erreur: ${error.message}`);
+      }
+    } finally {
+      setIsTitleGenerating(false);
+    }
+  };
 
   // Options pour le champ statut
   const statusOptions = [
@@ -112,7 +208,7 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
           Informations WooCommerce
         </h2>
 
-        {/* Champ Titre pour le name */}
+        {/* Champ Titre pour le name avec bouton de génération */}
         <div className="mb-4">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
             Titre (pour WooCommerce)
@@ -120,22 +216,45 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
 
           {editable ? (
             <div>
-              <input
-                type="text"
-                {...register('name', {
-                  onChange: (e) => {
-                    // Mettre à jour explicitement le slug à chaque frappe
-                    updateSlug(e.target.value);
-                  },
-                })}
-                placeholder="Titre sur la boutique en ligne"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              />
+              <div className="flex">
+                <input
+                  type="text"
+                  {...register('name', {
+                    onChange: (e) => {
+                      // Mettre à jour explicitement le slug à chaque frappe
+                      updateSlug(e.target.value);
+                    },
+                  })}
+                  placeholder="Titre sur la boutique en ligne"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+                {/* Bouton de génération de titre */}
+                <button
+                  type="button"
+                  onClick={generateTitle}
+                  disabled={isTitleGenerating}
+                  className="flex items-center justify-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-600 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
+                  title="Générer un titre avec l'IA"
+                >
+                  {isTitleGenerating ? (
+                    <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                  ) : (
+                    <Wand2 size={18} />
+                  )}
+                </button>
+              </div>
+
+              {titleError && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-500">{titleError}</p>
+              )}
+
               {errors && errors.name && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-500">{errors.name.message}</p>
               )}
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 Le titre sera utilisé pour l'URL du produit sur la boutique en ligne
+                {entityType === 'product' &&
+                  '. Cliquez sur la baguette magique pour générer automatiquement un titre commercial.'}
               </p>
             </div>
           ) : (
