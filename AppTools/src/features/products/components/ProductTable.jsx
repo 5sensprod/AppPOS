@@ -221,6 +221,7 @@ function ProductTable(props) {
     const brandFilters = selectedFilters.filter((f) => f.type === 'brand');
     const categoryFilters = selectedFilters.filter((f) => f.type === 'category');
     const descriptionFilter = selectedFilters.find((f) => f.type === 'description')?.value;
+    const statusFilter = selectedFilters.find((f) => f.type === 'status')?.value;
 
     if (wooFilter === 'woo_synced') {
       data = data.filter((p) => p.woo_id != null);
@@ -258,6 +259,12 @@ function ProductTable(props) {
       data = data.filter((p) => p.description && p.description.trim() !== '');
     } else if (descriptionFilter === 'no_description') {
       data = data.filter((p) => !p.description || p.description.trim() === '');
+    }
+
+    // Ajouter le filtre par statut
+    if (statusFilter) {
+      const status = statusFilter.replace('status_', '');
+      data = data.filter((p) => p.status === status);
     }
 
     return data;
