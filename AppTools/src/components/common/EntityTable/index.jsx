@@ -33,6 +33,8 @@ const EntityTable = ({
   },
   onDelete,
   onSync,
+  onBatchDelete,
+  onBatchSync,
   onSearch,
   onFilter,
   searchFields = ['name'],
@@ -67,21 +69,58 @@ const EntityTable = ({
 
   const hasSync = typeof onSync === 'function';
 
+  const hasBatchDelete = typeof onBatchDelete === 'function';
+  const hasBatchSync = typeof onBatchSync === 'function';
+
   const handleBatchDelete = () => {
-    if (
-      window.confirm(`Êtes-vous sûr de vouloir supprimer ces ${selectedItems.length} éléments ?`)
-    ) {
-      Promise.all(selectedItems.map((id) => onDelete(id)))
-        .then(() => setSelectedItems([]))
-        .catch((err) => console.error('Erreur lors de la suppression par lot:', err));
+    if (selectedItems.length === 0) return;
+
+    const confirmMessage = `Êtes-vous sûr de vouloir supprimer ces ${selectedItems.length} ${selectedItems.length === 1 ? entityName : entityNamePlural} ?`;
+
+    if (window.confirm(confirmMessage)) {
+      if (hasBatchDelete) {
+        // Utiliser la fonction de suppression par lot si disponible
+        onBatchDelete(selectedItems)
+          .then(() => {
+            setSelectedItems([]);
+          })
+          .catch((err) => {
+            console.error(`Erreur lors de la suppression par lot des ${entityNamePlural}:`, err);
+          });
+      } else if (typeof onDelete === 'function') {
+        // Fallback: supprimer élément par élément
+        Promise.all(selectedItems.map((id) => onDelete(id)))
+          .then(() => {
+            setSelectedItems([]);
+          })
+          .catch((err) => {
+            console.error(`Erreur lors de la suppression par lot des ${entityNamePlural}:`, err);
+          });
+      }
     }
   };
 
   const handleBatchSync = () => {
-    if (hasSync) {
-      Promise.all(selectedItems.map((id) => onSync(id))).catch((err) =>
-        console.error('Erreur lors de la synchronisation par lot:', err)
-      );
+    if (selectedItems.length === 0) return;
+
+    if (hasBatchSync) {
+      // Utiliser la fonction de synchronisation par lot si disponible
+      onBatchSync(selectedItems)
+        .then(() => {
+          // Note: on ne vide pas la sélection après synchronisation
+        })
+        .catch((err) => {
+          console.error(`Erreur lors de la synchronisation par lot des ${entityNamePlural}:`, err);
+        });
+    } else if (hasSync) {
+      // Fallback: synchroniser élément par élément
+      Promise.all(selectedItems.map((id) => onSync(id)))
+        .then(() => {
+          // Note: on ne vide pas la sélection après synchronisation
+        })
+        .catch((err) => {
+          console.error(`Erreur lors de la synchronisation par lot des ${entityNamePlural}:`, err);
+        });
     }
   };
 
@@ -124,9 +163,13 @@ const EntityTable = ({
           selectedItems={selectedItems}
           entityName={entityName}
           entityNamePlural={entityNamePlural}
-          batchActions={batchActions.filter((a) => a !== 'sync' || hasSync)}
+          batchActions={batchActions.filter(
+            (a) =>
+              (a !== 'sync' || hasSync || hasBatchSync) &&
+              (a !== 'delete' || typeof onDelete === 'function' || hasBatchDelete)
+          )}
           onBatchDelete={handleBatchDelete}
-          onBatchSync={hasSync ? handleBatchSync : undefined}
+          onBatchSync={hasSync || hasBatchSync ? handleBatchSync : undefined}
         />
       )}
 

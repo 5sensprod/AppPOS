@@ -5,7 +5,7 @@ import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
-import { usePaginationStore } from '@/stores/usePaginationStore'; // Nouvel import
+import { usePaginationStore } from '@/stores/usePaginationStore';
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
@@ -54,11 +54,12 @@ function ProductTable(props) {
     loading: operationLoading,
     handleDeleteEntity,
     handleSyncEntity,
-    loadEntities, // Ajouter cette référence
+    handleBatchDeleteEntities, // Nouvelle fonction
+    handleBatchSyncEntities, // Nouvelle fonction
+    loadEntities,
   } = useEntityTable({
-    entityType: 'product',
+    entityType: 'product', // Ajout du type d'entité pour les logs
     // Ne pas inclure fetchEntities ici, car il crée une boucle
-    // fetchEntities: fetchProducts,
     deleteEntity: async (id) => {
       console.log(`🗑️ Suppression du produit #${id}`);
       await deleteProduct(id);
@@ -76,6 +77,37 @@ function ProductTable(props) {
           } catch (error) {
             console.error(`❌ Erreur lors de la synchronisation:`, error);
             throw error;
+          }
+        }
+      : undefined,
+    // Ajout des nouvelles fonctions pour le traitement par lot
+    batchDeleteEntities: async (ids) => {
+      console.log(`🗑️ Suppression par lot de ${ids.length} produits`);
+      for (const id of ids) {
+        await deleteProduct(id);
+      }
+      // Rafraîchir les données après avoir tout supprimé
+      await fetchProducts();
+    },
+    batchSyncEntities: syncEnabled
+      ? async (ids) => {
+          console.log(`🔄 Synchronisation par lot de ${ids.length} produits`);
+          const errors = [];
+          for (const id of ids) {
+            try {
+              await syncProduct(id);
+              console.log(`✅ Produit #${id} synchronisé avec succès`);
+            } catch (error) {
+              console.error(`❌ Erreur lors de la synchronisation du produit #${id}:`, error);
+              errors.push({ id, error: error.message || String(error) });
+              // Continuer avec les autres produits même en cas d'erreur
+            }
+          }
+          // Rafraîchir les données après avoir tout synchronisé
+          await fetchProducts();
+
+          if (errors.length > 0) {
+            console.warn(`⚠️ ${errors.length} erreurs lors de la synchronisation par lot`, errors);
           }
         }
       : undefined,
@@ -204,18 +236,20 @@ function ProductTable(props) {
         baseRoute="/products"
         searchFields={['name', 'sku', 'designation', 'category']}
         onDelete={handleDeleteEntity}
+        onBatchDelete={handleBatchDeleteEntities} // Nouvelle prop
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', 'sync']}
         batchActions={['delete', 'sync']}
         onSync={handleSyncEntity}
+        onBatchSync={handleBatchSyncEntities} // Nouvelle prop
         pagination={{
           enabled: true,
-          pageSize: persistedPageSize || 10, // Utiliser la taille persistante ou la valeur par défaut
+          pageSize: persistedPageSize || 10,
           showPageSizeOptions: true,
           pageSizeOptions: [5, 10, 25, 50, 100],
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
-        paginationEntityId="product" // Identifiant unique pour la pagination
+        paginationEntityId="product"
         {...props}
       />
     </>
