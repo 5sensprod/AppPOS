@@ -1,4 +1,4 @@
-// src/services/exportService.js - Mise à jour pour inclure la colonne personnalisée
+// src/services/exportService.js - Version optimisée avec envoi d'IDs uniquement
 import apiService from './api';
 
 /**
@@ -41,10 +41,21 @@ class ExportService {
    */
   async exportProductsToPDF(exportConfig) {
     try {
-      console.log("Demande d'export PDF avec configuration:", exportConfig);
+      // Créer une nouvelle configuration qui n'inclut pas les données complètes des produits
+      // pour éviter les problèmes de taille de requête
+      const streamlinedConfig = {
+        selectedItems: exportConfig.selectedItems,
+        selectedColumns: exportConfig.selectedColumns,
+        orientation: exportConfig.orientation,
+        title: exportConfig.title,
+        customColumn: exportConfig.customColumn,
+        // Ne pas inclure le tableau 'products' complet
+      };
+
+      console.log("Demande d'export PDF avec configuration optimisée:", streamlinedConfig);
 
       // Appel API pour générer le PDF
-      const response = await apiService.post('/api/products/export/pdf', exportConfig, {
+      const response = await apiService.post('/api/products/export/pdf', streamlinedConfig, {
         responseType: 'blob', // Important pour recevoir des données binaires
       });
 
@@ -69,9 +80,18 @@ class ExportService {
    */
   async exportProductsToCSV(exportConfig) {
     try {
-      console.log("Demande d'export CSV avec configuration:", exportConfig);
+      // Créer une nouvelle configuration qui n'inclut pas les données complètes des produits
+      const streamlinedConfig = {
+        selectedItems: exportConfig.selectedItems,
+        selectedColumns: exportConfig.selectedColumns,
+        title: exportConfig.title,
+        customColumn: exportConfig.customColumn,
+        // Ne pas inclure le tableau 'products' complet
+      };
 
-      const response = await apiService.post('/api/products/export/csv', exportConfig, {
+      console.log("Demande d'export CSV avec configuration optimisée:", streamlinedConfig);
+
+      const response = await apiService.post('/api/products/export/csv', streamlinedConfig, {
         responseType: 'blob',
       });
 

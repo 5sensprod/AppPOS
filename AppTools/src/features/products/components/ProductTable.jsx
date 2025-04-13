@@ -119,19 +119,15 @@ function ProductTable(props) {
     try {
       setExportLoading(true);
 
-      // Récupérer les données complètes des produits sélectionnés
-      const productsToExport = products.filter((product) =>
-        exportConfig.selectedItems.includes(product._id)
-      );
-
-      // Ajouter les données des produits à la configuration
-      const completeConfig = {
+      // N'envoyez plus les données complètes des produits dans la configuration
+      // Laissez le serveur récupérer les produits par leur ID
+      const optimizedConfig = {
         ...exportConfig,
-        products: productsToExport,
+        // Ne pas inclure products: productsToExport
       };
 
       // Appeler le service d'export
-      await exportService.exportProducts(completeConfig);
+      await exportService.exportProducts(optimizedConfig);
 
       return true;
     } catch (error) {

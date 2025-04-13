@@ -225,8 +225,15 @@ class ProductExportController {
         const value = this.formatCellValue(product, col.key);
         const width = columnWidths[col.key] - 10; // Moins les marges intérieures
 
-        // Estimer le nombre de lignes nécessaires
-        // (approximatif - PDFKit fait le calcul réel)
+        // Traitement spécial pour les catégories qui peuvent contenir des sauts de ligne
+        if (col.key === 'category' && value.includes('\n')) {
+          const lines = value.split('\n').length;
+          const categoryHeight = lines * (fontSize * 1.2) + 4; // 1.2 pour l'interligne + 4px de marge
+          rowHeight = Math.max(rowHeight, categoryHeight);
+          continue;
+        }
+
+        // Estimer le nombre de lignes nécessaires pour les autres colonnes
         const charsPerLine = Math.floor(width / (fontSize * 0.5));
         if (charsPerLine <= 0) continue;
 
@@ -386,14 +393,40 @@ class ProductExportController {
           // Pour les colonnes normales, afficher la valeur
           const value = this.formatCellValue(product, col.key);
 
-          // Dessiner la valeur de la cellule
-          doc.text(value, x + 5, y + 5, {
-            width: columnWidths[col.key] - 10,
-            align:
-              col.key === 'stock' || col.key === 'price' || col.key === 'purchase_price'
-                ? 'right'
-                : 'left',
-          });
+          // Traitement spécial pour la colonne catégorie qui peut contenir des sauts de ligne
+          if (col.key === 'category' && value.includes('\n')) {
+            const lines = value.split('\n');
+
+            // Première ligne (catégorie principale) en taille normale
+            doc
+              .font('Helvetica')
+              .fontSize(10)
+              .text(lines[0], x + 5, y + 5, { width: columnWidths[col.key] - 10, align: 'left' });
+
+            // Lignes suivantes (chemin et autres catégories) en plus petit et gris
+            doc
+              .font('Helvetica')
+              .fontSize(8)
+              .fillColor('#6B7280') // Équivalent de text-gray-500
+              .text(lines.slice(1).join('\n'), x + 5, doc.y, {
+                width: columnWidths[col.key] - 10,
+                align: 'left',
+              })
+              .fillColor('#000000'); // Remettre la couleur par défaut
+          } else {
+            // Dessiner la valeur de la cellule pour les autres colonnes
+            doc
+              .fillColor('#000000')
+              .font('Helvetica')
+              .fontSize(10)
+              .text(value, x + 5, y + 5, {
+                width: columnWidths[col.key] - 10,
+                align:
+                  col.key === 'stock' || col.key === 'price' || col.key === 'purchase_price'
+                    ? 'right'
+                    : 'left',
+              });
+          }
         }
 
         x += columnWidths[col.key];
@@ -452,6 +485,7 @@ class ProductExportController {
 
   /**
    * Génère un fichier CSV avec les produits
+   *
    * @param {Array} products - Les produits à inclure
    * @param {Array} selectedColumns - Les colonnes à inclure
    * @param {Object} customColumn - La configuration de la colonne personnalisée (optionnel)
@@ -486,8 +520,33 @@ class ProductExportController {
           if (col.isCustom) {
             return '""'; // Cellule vide pour la colonne personnalisée
           }
+
+          // Traitement spécial pour les catégories dans le CSV
+          if (col.key === 'category') {
+            if (product.category_info && product.category_info.primary) {
+              const primary = product.category_info.primary;
+              let categoryText = primary.name || '-';
+
+              // Ajouter le chemin complet si disponible, mais avec " - " au lieu de sauts de ligne
+              if (primary.path && primary.path.length > 1) {
+                categoryText += ` - ${primary.path_string || primary.path.join(' > ')}`;
+              }
+
+              // Ajouter le nombre d'autres catégories si présentes
+              if (product.category_info.refs && product.category_info.refs.length > 1) {
+                categoryText += ` (+${product.category_info.refs.length - 1} autres)`;
+              }
+
+              // Première lettre en majuscule
+              return `"${(categoryText.charAt(0).toUpperCase() + categoryText.slice(1).toLowerCase()).replace(/"/g, '""')}"`;
+            }
+            return '"-"';
+          }
+
           const value = this.formatCellValue(product, col.key);
-          return `"${value.replace(/"/g, '""')}"`;
+          // Remplacer les sauts de ligne par des espaces pour le CSV
+          const formattedValue = value.replace(/\n/g, ' - ');
+          return `"${formattedValue.replace(/"/g, '""')}"`;
         })
         .join(',');
 
@@ -543,9 +602,21 @@ class ProductExportController {
 
       case 'category':
         if (product.category_info && product.category_info.primary) {
-          const catName = product.category_info.primary.name || '-';
-          // Première lettre en majuscule
-          return catName.charAt(0).toUpperCase() + catName.slice(1).toLowerCase();
+          const primary = product.category_info.primary;
+          let categoryText = primary.name || '-';
+
+          // Ajouter le chemin complet si disponible
+          if (primary.path && primary.path.length > 1) {
+            categoryText += `\n${primary.path_string || primary.path.join(' > ')}`;
+          }
+
+          // Ajouter le nombre d'autres catégories si présentes
+          if (product.category_info.refs && product.category_info.refs.length > 1) {
+            categoryText += `\n(+${product.category_info.refs.length - 1} autres)`;
+          }
+
+          // Première lettre en majuscule pour la catégorie principale
+          return categoryText.charAt(0).toUpperCase() + categoryText.slice(1).toLowerCase();
         }
         return '-';
 
