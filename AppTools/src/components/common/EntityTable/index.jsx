@@ -68,7 +68,6 @@ const EntityTable = ({
   } = useTablePagination(filteredData, pagination, paginationEntityId);
 
   const hasSync = typeof onSync === 'function';
-
   const hasBatchDelete = typeof onBatchDelete === 'function';
   const hasBatchSync = typeof onBatchSync === 'function';
 
@@ -103,20 +102,23 @@ const EntityTable = ({
   const handleBatchSync = () => {
     if (selectedItems.length === 0) return;
 
+    console.log('Exécution de la synchronisation par lot', selectedItems);
+
     if (hasBatchSync) {
       // Utiliser la fonction de synchronisation par lot si disponible
       onBatchSync(selectedItems)
         .then(() => {
-          // Note: on ne vide pas la sélection après synchronisation
+          console.log('Synchronisation par lot terminée avec succès');
         })
         .catch((err) => {
           console.error(`Erreur lors de la synchronisation par lot des ${entityNamePlural}:`, err);
         });
     } else if (hasSync) {
       // Fallback: synchroniser élément par élément
+      console.log('Fallback: synchronisation élément par élément');
       Promise.all(selectedItems.map((id) => onSync(id)))
         .then(() => {
-          // Note: on ne vide pas la sélection après synchronisation
+          console.log('Synchronisation élément par élément terminée avec succès');
         })
         .catch((err) => {
           console.error(`Erreur lors de la synchronisation par lot des ${entityNamePlural}:`, err);
@@ -163,11 +165,12 @@ const EntityTable = ({
           selectedItems={selectedItems}
           entityName={entityName}
           entityNamePlural={entityNamePlural}
-          batchActions={batchActions.filter(
-            (a) =>
-              (a !== 'sync' || hasSync || hasBatchSync) &&
-              (a !== 'delete' || typeof onDelete === 'function' || hasBatchDelete)
-          )}
+          // Filtrer correctement les actions disponibles
+          batchActions={batchActions.filter((action) => {
+            if (action === 'sync') return hasSync || hasBatchSync;
+            if (action === 'delete') return typeof onDelete === 'function' || hasBatchDelete;
+            return true; // pour toute autre action
+          })}
           onBatchDelete={handleBatchDelete}
           onBatchSync={hasSync || hasBatchSync ? handleBatchSync : undefined}
         />

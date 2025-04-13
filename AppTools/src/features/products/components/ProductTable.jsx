@@ -54,25 +54,23 @@ function ProductTable(props) {
     loading: operationLoading,
     handleDeleteEntity,
     handleSyncEntity,
-    handleBatchDeleteEntities, // Nouvelle fonction
-    handleBatchSyncEntities, // Nouvelle fonction
+    handleBatchDeleteEntities,
+    handleBatchSyncEntities,
     loadEntities,
   } = useEntityTable({
-    entityType: 'product', // Ajout du type d'entité pour les logs
-    // Ne pas inclure fetchEntities ici, car il crée une boucle
+    entityType: 'product',
     deleteEntity: async (id) => {
       console.log(`🗑️ Suppression du produit #${id}`);
       await deleteProduct(id);
-      // Après la suppression, charger les données manuellement
       await fetchProducts();
     },
+    // Vérifier que syncEntity est défini uniquement si syncEnabled est true
     syncEntity: syncEnabled
       ? async (id) => {
           console.log(`🔄 Début de synchronisation du produit #${id}`);
           try {
             await syncProduct(id);
             console.log(`✅ Fin de synchronisation du produit #${id}`);
-            // Après la synchronisation, charger les données manuellement
             await fetchProducts();
           } catch (error) {
             console.error(`❌ Erreur lors de la synchronisation:`, error);
@@ -80,15 +78,14 @@ function ProductTable(props) {
           }
         }
       : undefined,
-    // Ajout des nouvelles fonctions pour le traitement par lot
     batchDeleteEntities: async (ids) => {
       console.log(`🗑️ Suppression par lot de ${ids.length} produits`);
       for (const id of ids) {
         await deleteProduct(id);
       }
-      // Rafraîchir les données après avoir tout supprimé
       await fetchProducts();
     },
+    // Vérifier que batchSyncEntities est défini uniquement si syncEnabled est true
     batchSyncEntities: syncEnabled
       ? async (ids) => {
           console.log(`🔄 Synchronisation par lot de ${ids.length} produits`);
@@ -100,10 +97,8 @@ function ProductTable(props) {
             } catch (error) {
               console.error(`❌ Erreur lors de la synchronisation du produit #${id}:`, error);
               errors.push({ id, error: error.message || String(error) });
-              // Continuer avec les autres produits même en cas d'erreur
             }
           }
-          // Rafraîchir les données après avoir tout synchronisé
           await fetchProducts();
 
           if (errors.length > 0) {
@@ -112,6 +107,11 @@ function ProductTable(props) {
         }
       : undefined,
   });
+
+  // 3. Ajoutez des console.log de débogage pour vérifier les valeurs:
+  console.log('syncEnabled:', syncEnabled);
+  console.log('handleSyncEntity disponible:', !!handleSyncEntity);
+  console.log('handleBatchSyncEntities disponible:', !!handleBatchSyncEntities);
 
   const isLoading = productsLoading || operationLoading;
 
@@ -238,7 +238,7 @@ function ProductTable(props) {
         onDelete={handleDeleteEntity}
         onBatchDelete={handleBatchDeleteEntities} // Nouvelle prop
         syncEnabled={syncEnabled}
-        actions={['view', 'edit', 'delete', 'sync']}
+        actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
         batchActions={['delete', 'sync']}
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities} // Nouvelle prop
