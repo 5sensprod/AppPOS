@@ -4,7 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const Product = require('../models/Product');
-const { v4: uuidv4 } = require('uuid');
 const ResponseHandler = require('../handlers/ResponseHandler');
 
 // Déplacer tempDir en dehors de la classe comme variable globale
@@ -307,12 +306,10 @@ class ProductExportController {
       // Vérifier si on doit passer à une nouvelle page
       if (y + rowHeight > maxY) {
         // Ajouter le pied de page de la page actuelle
-        doc
-          .fontSize(8)
-          .text(`Page ${pageNum}`, margins.left, pageSize[1] - margins.bottom - 15, {
-            align: 'center',
-            width: availableWidth,
-          });
+        doc.fontSize(8).text(`Page ${pageNum}`, margins.left, pageSize[1] - margins.bottom - 15, {
+          align: 'center',
+          width: availableWidth,
+        });
 
         // Créer une nouvelle page
         doc.addPage({
@@ -439,12 +436,10 @@ class ProductExportController {
     // S'assurer qu'il y a assez d'espace, sinon ajouter une nouvelle page
     if (y + 40 > maxY) {
       // Ajouter numéro de page
-      doc
-        .fontSize(8)
-        .text(`Page ${pageNum}`, margins.left, pageSize[1] - margins.bottom - 15, {
-          align: 'center',
-          width: availableWidth,
-        });
+      doc.fontSize(8).text(`Page ${pageNum}`, margins.left, pageSize[1] - margins.bottom - 15, {
+        align: 'center',
+        width: availableWidth,
+      });
 
       // Nouvelle page pour le total
       doc.addPage({ size: 'A4', layout: orientation, margins: margins });
