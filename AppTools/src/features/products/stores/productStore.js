@@ -103,6 +103,55 @@ export const useProductDataStore = createWebSocketStore({
       },
     },
   ],
+  customMethods: (set, get) => ({
+    updateProductsStatus: async (productIds, newStatus) => {
+      try {
+        set({ loading: true, error: null });
+
+        // Appel API pour mettre à jour le statut de plusieurs produits
+        const response = await apiService.post('/api/products/batch-status', {
+          productIds,
+          status: newStatus,
+        });
+
+        if (response.data.success) {
+          set((state) => {
+            const updatedProducts = state.products.map((product) => {
+              if (productIds.includes(product._id)) {
+                return {
+                  ...product,
+                  status: newStatus,
+                  pending_sync: product.woo_id ? true : product.pending_sync,
+                };
+              }
+              return product;
+            });
+
+            return {
+              ...state,
+              products: updatedProducts,
+              loading: false,
+            };
+          });
+        } else {
+          set({
+            error: response.data.message || 'Échec de mise à jour du statut',
+            loading: false,
+          });
+        }
+
+        return response.data;
+      } catch (error) {
+        console.error('Erreur lors de la mise à jour du statut des produits:', error);
+        set({
+          error:
+            error.response?.data?.message || error.message || 'Erreur de mise à jour du statut',
+          loading: false,
+        });
+        throw error;
+      }
+    },
+  }),
 });
 
 // Étendre useProduct avec l'initWebSocket direct plutôt que la redirection

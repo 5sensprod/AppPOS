@@ -106,7 +106,7 @@ function ProductDetail() {
               entityType="product"
               onSync={handleSync}
               editable={editable}
-              showStatus={true} // Explicitement afficher le statut pour les produits
+              showStatus={true}
             />
           );
         default:

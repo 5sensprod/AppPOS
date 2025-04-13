@@ -16,6 +16,7 @@ function ProductTable(props) {
     error: productsError,
     fetchProducts,
     initWebSocket,
+    updateProductsStatus,
   } = useProductDataStore();
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
 
@@ -136,6 +137,24 @@ function ProductTable(props) {
       return false;
     } finally {
       setExportLoading(false);
+    }
+  };
+
+  const handleBatchStatusChange = async (productIds, newStatus) => {
+    try {
+      console.log(`Modification du statut pour ${productIds.length} produits: ${newStatus}`);
+
+      // Utiliser la fonction du store pour mettre à jour le statut
+      await updateProductsStatus(productIds, newStatus);
+
+      // Recharger les produits après la mise à jour
+      await fetchProducts();
+
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut:', error);
+      setError(`Erreur lors de la mise à jour du statut: ${error.message}`);
+      return false;
     }
   };
 
@@ -265,10 +284,11 @@ function ProductTable(props) {
         onBatchDelete={handleBatchDeleteEntities}
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-        batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export']}
+        batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export', 'status']} // Ajout de 'status'
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities}
         onExport={handleExport}
+        onBatchStatusChange={handleBatchStatusChange} // Ajouter la nouvelle fonction
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,
@@ -277,7 +297,7 @@ function ProductTable(props) {
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
         paginationEntityId="product"
-        externalActiveFilters={selectedFilters} // Modifié ici pour correspondre au nouveau nom
+        externalActiveFilters={selectedFilters}
         {...props}
       />
     </>

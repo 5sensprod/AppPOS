@@ -23,7 +23,7 @@ const EntityTable = ({
   baseRoute = '',
   defaultSort = { field: 'name', direction: 'asc' },
   actions = ['view', 'edit', 'delete', 'sync'],
-  batchActions = ['delete', 'sync', 'export'],
+  batchActions = ['delete', 'sync', 'export', 'status'],
   pagination = {
     enabled: true,
     pageSize: 10,
@@ -33,6 +33,7 @@ const EntityTable = ({
   onDelete,
   onSync,
   onExport,
+  onBatchStatusChange,
   onBatchDelete,
   onBatchSync,
   onSearch,
@@ -153,6 +154,22 @@ const EntityTable = ({
     }
   };
 
+  const handleBatchStatusChange = (itemIds, newStatus) => {
+    if (itemIds.length === 0) return;
+
+    console.log(`Changement de statut par lot: ${newStatus} pour ${itemIds.length} éléments`);
+
+    if (typeof onBatchStatusChange === 'function') {
+      onBatchStatusChange(itemIds, newStatus)
+        .then(() => {
+          console.log(`Statut modifié avec succès pour ${itemIds.length} éléments`);
+        })
+        .catch((err) => {
+          console.error(`Erreur lors du changement de statut: ${err.message}`);
+        });
+    }
+  };
+
   if (isLoading && data.length === 0) {
     return <LoadingState />;
   }
@@ -196,11 +213,13 @@ const EntityTable = ({
             if (action === 'sync') return hasSync || hasBatchSync;
             if (action === 'delete') return typeof onDelete === 'function' || hasBatchDelete;
             if (action === 'export') return hasExport;
+            if (action === 'status') return typeof onBatchStatusChange === 'function';
             return true; // pour toute autre action
           })}
           onBatchDelete={handleBatchDelete}
           onBatchSync={hasSync || hasBatchSync ? handleBatchSync : undefined}
-          onBatchExport={hasExport ? handleBatchExport : undefined} // Ajoutez cette ligne
+          onBatchExport={hasExport ? handleBatchExport : undefined}
+          onBatchStatusChange={handleBatchStatusChange} // Passer la nouvelle fonction
         />
       )}
 

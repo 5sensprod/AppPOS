@@ -1,20 +1,42 @@
 // src/components/common/EntityTable/components/BatchActions.jsx
-import React from 'react';
-import { Trash2, RefreshCw, FileText } from 'lucide-react'; // Ajout de l'icône FileText
+import React, { useState } from 'react';
+import { Trash2, RefreshCw, FileText, ListFilter } from 'lucide-react';
 
 export const BatchActions = ({
   selectedItems = [],
   entityName = '',
   entityNamePlural = '',
-  batchActions = ['delete', 'sync'],
+  batchActions = ['delete', 'sync', 'export', 'status'], // Ajout de 'status'
   onBatchDelete,
   onBatchSync,
-  onBatchExport, // Nouvelle prop pour l'export
+  onBatchExport,
+  onBatchStatusChange, // Nouvelle prop pour gérer le changement de statut
 }) => {
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
   if (selectedItems.length === 0) return null;
 
   const selectedCount = selectedItems.length;
   const itemLabel = selectedCount === 1 ? entityName : entityNamePlural;
+
+  // Options pour le champ statut (reprises de WooCommerceTab)
+  const statusOptions = [
+    {
+      value: 'published',
+      label: 'Publié',
+      color: 'bg-green-100 text-green-800 hover:bg-green-200',
+    },
+    { value: 'draft', label: 'Brouillon', color: 'bg-blue-100 text-blue-800 hover:bg-blue-200' },
+    { value: 'archived', label: 'Archivé', color: 'bg-gray-100 text-gray-800 hover:bg-gray-200' },
+  ];
+
+  // Gestion du changement de statut
+  const handleStatusChange = (status) => {
+    if (typeof onBatchStatusChange === 'function') {
+      onBatchStatusChange(selectedItems, status);
+    }
+    setShowStatusDropdown(false);
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 flex flex-col sm:flex-row justify-between items-center border-b border-gray-200 dark:border-gray-700">
@@ -23,15 +45,45 @@ export const BatchActions = ({
         {selectedCount > 1 ? 's' : ''}
       </div>
       <div className="flex space-x-2">
-        {/* Bouton d'export PDF - toujours disponible si onBatchExport existe */}
-        {typeof onBatchExport === 'function' && (
+        {/* Menu déroulant pour le statut */}
+        {batchActions.includes('status') && typeof onBatchStatusChange === 'function' && (
+          <div className="relative">
+            <button
+              onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+              className="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-md flex items-center text-sm"
+              aria-label="Changer le statut des éléments sélectionnés"
+            >
+              <ListFilter className="h-4 w-4 mr-1" />
+              Statut
+            </button>
+
+            {showStatusDropdown && (
+              <div className="absolute right-0 z-10 mt-1 w-48 rounded-md bg-white shadow-lg dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <div className="py-1">
+                  {statusOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleStatusChange(option.value)}
+                      className={`w-full text-left px-4 py-2 text-sm ${option.color} dark:bg-opacity-20 hover:bg-opacity-80`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bouton d'export PDF */}
+        {batchActions.includes('export') && typeof onBatchExport === 'function' && (
           <button
             onClick={() => onBatchExport(selectedItems)}
             className="px-3 py-1 bg-green-100 hover:bg-green-200 text-green-800 rounded-md flex items-center text-sm"
             aria-label="Exporter les éléments sélectionnés en PDF"
           >
             <FileText className="h-4 w-4 mr-1" />
-            Exporter PDF
+            Exporter
           </button>
         )}
 

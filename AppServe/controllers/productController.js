@@ -81,6 +81,91 @@ class ProductController extends BaseController {
     }
   }
 
+  async batchUpdateStatus(req, res) {
+    try {
+      const { productIds, status } = req.body;
+
+      // Validation
+      if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+        return ResponseHandler.badRequest(
+          res,
+          'IDs de produits requis et doivent être un tableau non vide'
+        );
+      }
+
+      if (!status || !['published', 'draft', 'archived'].includes(status)) {
+        return ResponseHandler.badRequest(
+          res,
+          'Statut invalide. Les valeurs autorisées sont: published, draft, archived'
+        );
+      }
+
+      const updatedProducts = [];
+      const errors = [];
+
+      // Traiter chaque produit
+      for (const productId of productIds) {
+        try {
+          // Chercher le produit
+          const product = await this.model.findById(productId);
+
+          if (!product) {
+            errors.push({
+              productId,
+              message: 'Produit non trouvé',
+            });
+            continue;
+          }
+
+          // Mettre à jour le statut
+          const updatedData = {
+            ...product,
+            status: status,
+            // Si le produit est déjà synchronisé avec WooCommerce, marquer comme en attente de synchro
+            pending_sync: product.woo_id ? true : product.pending_sync,
+          };
+
+          // Utiliser la méthode update existante
+          await this.model.update(productId, updatedData);
+
+          // Déclencher un événement de mise à jour si nécessaire
+          if (this.eventService) {
+            this.eventService.emit('updated', {
+              id: productId,
+              data: updatedData,
+              original: product,
+            });
+          }
+
+          updatedProducts.push(productId);
+        } catch (error) {
+          console.error(`Erreur lors de la mise à jour du produit ${productId}:`, error);
+          errors.push({
+            productId,
+            message: error.message || 'Erreur de mise à jour',
+          });
+        }
+      }
+
+      // Préparer la réponse
+      const result = {
+        success: updatedProducts.length > 0,
+        message: `${updatedProducts.length} produits mis à jour avec succès${errors.length > 0 ? `, ${errors.length} erreurs` : ''}`,
+        updatedProducts,
+      };
+
+      // Ajouter les erreurs à la réponse si nécessaire
+      if (errors.length > 0) {
+        result.errors = errors;
+      }
+
+      return ResponseHandler.success(res, result);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour par lot des statuts:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   async recalculateAllCounts(req, res) {
     try {
       await Brand.recalculateAllProductCounts();
@@ -126,6 +211,7 @@ module.exports = exportController(productController, [
   'create',
   'update',
   'delete',
+  'batchUpdateStatus',
   'uploadImage',
   'updateImageMetadata',
   'deleteImage',
