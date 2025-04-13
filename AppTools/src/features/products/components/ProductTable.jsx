@@ -268,7 +268,7 @@ function ProductTable(props) {
         batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export']}
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities}
-        onExport={handleExport} // Utiliser la fonction générique
+        onExport={handleExport}
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,
@@ -277,6 +277,7 @@ function ProductTable(props) {
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
         paginationEntityId="product"
+        externalActiveFilters={selectedFilters} // Modifié ici pour correspondre au nouveau nom
         {...props}
       />
     </>

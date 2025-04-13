@@ -41,6 +41,7 @@ const EntityTable = ({
   filters = [],
   searchProcessor,
   paginationEntityId = 'default',
+  externalActiveFilters = [], // Renommé ici pour éviter le conflit
 }) => {
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
   const { searchTerm, activeFilters, filteredData, handleSearchChange, handleFilterChange } =
@@ -53,6 +54,7 @@ const EntityTable = ({
       searchProcessor,
       paginationEntityId
     );
+
   const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(
     data,
     filteredData
@@ -72,6 +74,11 @@ const EntityTable = ({
   const hasBatchDelete = typeof onBatchDelete === 'function';
   const hasBatchSync = typeof onBatchSync === 'function';
   const [exportModalOpen, setExportModalOpen] = useState(false);
+
+  const filtersToUse =
+    externalActiveFilters && externalActiveFilters.length > 0
+      ? externalActiveFilters
+      : activeFilters;
 
   const handleBatchDelete = () => {
     if (selectedItems.length === 0) return;
@@ -267,6 +274,7 @@ const EntityTable = ({
         selectedItems={selectedItems}
         entityName={entityName}
         entityNamePlural={entityNamePlural}
+        activeFilters={filtersToUse} // Passer les filtres actifs à la modale
       />
     </div>
   );

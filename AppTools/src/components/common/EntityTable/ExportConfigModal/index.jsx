@@ -1,4 +1,4 @@
-// src/components/common/ExportConfigModal/index.jsx avec colonne personnalisée
+// src/components/common/ExportConfigModal/index.jsx avec titre automatique basé sur les filtres
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Download, FileSpreadsheet } from 'lucide-react';
 import { ENTITY_CONFIG } from '../../../../features/products/constants';
@@ -10,10 +10,11 @@ const ExportConfigModal = ({
   selectedItems = [],
   entityName = 'produit',
   entityNamePlural = 'produits',
+  activeFilters = [], // Ajout du paramètre pour les filtres actifs
 }) => {
   const [selectedColumns, setSelectedColumns] = useState([]);
   const [orientation, setOrientation] = useState('portrait');
-  const [exportTitle, setExportTitle] = useState(`Inventaire ${entityNamePlural}`);
+  const [exportTitle, setExportTitle] = useState('');
   const [exportFormat, setExportFormat] = useState('pdf');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,7 +31,7 @@ const ExportConfigModal = ({
       selected: true,
     }));
 
-  // Initialiser les colonnes sélectionnées au chargement du modal
+  // Initialiser les colonnes sélectionnées et le titre au chargement du modal
   useEffect(() => {
     if (isOpen) {
       // Par défaut, sélectionner toutes les colonnes sauf l'image et les actions
@@ -39,8 +40,48 @@ const ExportConfigModal = ({
         .map((col) => col.key);
 
       setSelectedColumns(defaultSelectedColumns);
+
+      // Générer le titre de l'export en incluant les filtres actifs
+      generateExportTitle();
     }
-  }, [isOpen]);
+  }, [isOpen, activeFilters]);
+
+  // Fonction pour générer automatiquement le titre basé sur les filtres
+  const generateExportTitle = () => {
+    let baseTitle = `Inventaire ${entityNamePlural}`;
+
+    // Si des filtres sont actifs, les ajouter au titre
+    if (activeFilters && activeFilters.length > 0) {
+      // Regrouper les filtres par type
+      const filtersByType = activeFilters.reduce((acc, filter) => {
+        if (!acc[filter.type]) {
+          acc[filter.type] = [];
+        }
+        // Extraire uniquement le libellé de la valeur, pas le type
+        const labelParts = filter.label.split(': ');
+        const valueLabel = labelParts.length > 1 ? labelParts[1] : labelParts[0];
+        acc[filter.type].push(valueLabel);
+        return acc;
+      }, {});
+
+      // Construire la partie filtre du titre
+      const filterParts = [];
+
+      Object.entries(filtersByType).forEach(([type, values]) => {
+        if (values.length === 1) {
+          filterParts.push(values[0]);
+        } else if (values.length > 1) {
+          filterParts.push(`${values.join(', ')}`);
+        }
+      });
+
+      if (filterParts.length > 0) {
+        baseTitle += ` - ${filterParts.join(' - ')}`;
+      }
+    }
+
+    setExportTitle(baseTitle);
+  };
 
   // Fonction pour basculer la sélection d'une colonne
   const toggleColumnSelection = (key) => {
@@ -239,9 +280,14 @@ const ExportConfigModal = ({
               <span className="font-semibold">{selectedColumns.length}</span> colonnes{' '}
               {useCustomColumn ? `+ 1 colonne "${customColumnTitle}"` : ''}{' '}
               {exportFormat === 'pdf'
-                ? `en orientation <span className="font-semibold">${orientation === 'portrait' ? 'portrait' : 'paysage'}</span>`
+                ? `en orientation ${orientation === 'portrait' ? 'portrait' : 'paysage'}`
                 : ''}
               .
+              {activeFilters && activeFilters.length > 0 && (
+                <span className="block mt-1">
+                  Filtres appliqués: <span className="font-semibold">{activeFilters.length}</span>
+                </span>
+              )}
             </p>
           </div>
         </div>
