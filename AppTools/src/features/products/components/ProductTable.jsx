@@ -6,6 +6,7 @@ import { useEntityTable } from '@/hooks/useEntityTable';
 import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
 import { usePaginationStore } from '@/stores/usePaginationStore';
+import exportService from '../../../services/exportService'; // Ajouter cette importation
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
@@ -26,6 +27,7 @@ function ProductTable(props) {
 
   const [localProducts, setLocalProducts] = useState([]);
   const [error, setError] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     if (syncEnabled) initWebSocket();
@@ -113,7 +115,35 @@ function ProductTable(props) {
   console.log('handleSyncEntity disponible:', !!handleSyncEntity);
   console.log('handleBatchSyncEntities disponible:', !!handleBatchSyncEntities);
 
-  const isLoading = productsLoading || operationLoading;
+  const handleExport = async (exportConfig) => {
+    try {
+      setExportLoading(true);
+
+      // Récupérer les données complètes des produits sélectionnés
+      const productsToExport = products.filter((product) =>
+        exportConfig.selectedItems.includes(product._id)
+      );
+
+      // Ajouter les données des produits à la configuration
+      const completeConfig = {
+        ...exportConfig,
+        products: productsToExport,
+      };
+
+      // Appeler le service d'export
+      await exportService.exportProducts(completeConfig);
+
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de l'export:", error);
+      setError(`Erreur lors de l'export: ${error.message}`);
+      return false;
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const isLoading = productsLoading || operationLoading || exportLoading;
 
   const filterOptions = useMemo(() => {
     const wooOptions = [
@@ -236,12 +266,13 @@ function ProductTable(props) {
         baseRoute="/products"
         searchFields={['name', 'sku', 'designation', 'category']}
         onDelete={handleDeleteEntity}
-        onBatchDelete={handleBatchDeleteEntities} // Nouvelle prop
+        onBatchDelete={handleBatchDeleteEntities}
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-        batchActions={['delete', 'sync']}
+        batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export']}
         onSync={handleSyncEntity}
-        onBatchSync={handleBatchSyncEntities} // Nouvelle prop
+        onBatchSync={handleBatchSyncEntities}
+        onExport={handleExport} // Utiliser la fonction générique
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,

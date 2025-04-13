@@ -1,13 +1,15 @@
-// routes/productRoutes.js
+// Mise à jour de routes/productRoutes.js pour inclure les routes d'export
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
+const { exportToPdf, exportToCsv } = require('../controllers/productExportController');
 const validateSchema = require('../validation/validation');
 const { createProductSchema, updateProductSchema } = require('../validation/schemas');
 const productImageRoutes = require('./image/productImageRoutes');
 const wooSyncMiddleware = require('../middleware/wooSyncMiddleware');
 const Product = require('../models/Product');
 
+// Routes existantes
 router.get('/', productController.getAll);
 router.get('/filter', productController.filter);
 router.get('/:id', productController.getById);
@@ -61,6 +63,10 @@ router.post(
 
 // Nouvelle route pour recalculer tous les compteurs de produits
 router.post('/recalculate-counts', productController.recalculateAllCounts);
+
+// Ajouter les routes d'export
+router.post('/export/pdf', exportToPdf);
+router.post('/export/csv', exportToCsv);
 
 router.use('/', productImageRoutes);
 

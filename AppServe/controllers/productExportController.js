@@ -1,0 +1,592 @@
+// AppServe/controllers/productExportController.js
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const Product = require('../models/Product');
+const { v4: uuidv4 } = require('uuid');
+const ResponseHandler = require('../handlers/ResponseHandler');
+
+// Déplacer tempDir en dehors de la classe comme variable globale
+const tempDir = os.tmpdir();
+
+class ProductExportController {
+  /**
+   * Exporte les produits au format PDF
+   * @param {Request} req - La requête Express
+   * @param {Response} res - La réponse Express
+   */
+  async exportToPdf(req, res) {
+    try {
+      const {
+        selectedItems = [],
+        selectedColumns = [],
+        orientation = 'portrait',
+        title = 'Inventaire produits',
+        products = [], // Si les produits complets sont directement fournis
+        customColumn = null, // Nouvelle option pour colonne personnalisée
+      } = req.body;
+
+      // Si aucun produit n'est fourni directement, les récupérer par ID
+      let productsToExport = products;
+      if (products.length === 0 && selectedItems.length > 0) {
+        productsToExport = await this.fetchProductsByIds(selectedItems);
+      }
+
+      if (productsToExport.length === 0) {
+        return ResponseHandler.badRequest(res, 'Aucun produit à exporter');
+      }
+
+      // Générer un nom de fichier unique
+      const filename = `${title.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+      const tempFilePath = path.join(tempDir, filename);
+
+      // Créer le document PDF
+      await this.generatePdf(
+        tempFilePath,
+        productsToExport,
+        selectedColumns,
+        title,
+        orientation,
+        customColumn
+      );
+
+      // Envoyer le fichier en réponse
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      // Lire le fichier et l'envoyer comme réponse
+      const fileStream = fs.createReadStream(tempFilePath);
+      fileStream.pipe(res);
+
+      // Nettoyer le fichier temporaire après l'envoi
+      fileStream.on('end', () => {
+        fs.unlink(tempFilePath, (err) => {
+          if (err) console.error('Erreur lors de la suppression du fichier temporaire:', err);
+        });
+      });
+    } catch (error) {
+      console.error("Erreur lors de l'export PDF:", error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  /**
+   * Exporte les produits au format CSV
+   * @param {Request} req - La requête Express
+   * @param {Response} res - La réponse Express
+   */
+  async exportToCsv(req, res) {
+    try {
+      const {
+        selectedItems = [],
+        selectedColumns = [],
+        title = 'Inventaire produits',
+        products = [],
+        customColumn = null, // Nouvelle option pour colonne personnalisée
+      } = req.body;
+
+      // Si aucun produit n'est fourni directement, les récupérer par ID
+      let productsToExport = products;
+      if (products.length === 0 && selectedItems.length > 0) {
+        productsToExport = await this.fetchProductsByIds(selectedItems);
+      }
+
+      if (productsToExport.length === 0) {
+        return ResponseHandler.badRequest(res, 'Aucun produit à exporter');
+      }
+
+      // Générer un nom de fichier unique
+      const filename = `${title.replace(/\s+/g, '_')}_${Date.now()}.csv`;
+      const tempFilePath = path.join(tempDir, filename);
+
+      // Générer le contenu CSV
+      const csvContent = this.generateCsv(productsToExport, selectedColumns, customColumn);
+
+      // Écrire dans un fichier temporaire
+      fs.writeFileSync(tempFilePath, csvContent, 'utf8');
+
+      // Envoyer le fichier en réponse
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      const fileStream = fs.createReadStream(tempFilePath);
+      fileStream.pipe(res);
+
+      fileStream.on('end', () => {
+        fs.unlink(tempFilePath, (err) => {
+          if (err) console.error('Erreur lors de la suppression du fichier temporaire:', err);
+        });
+      });
+    } catch (error) {
+      console.error("Erreur lors de l'export CSV:", error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  /**
+   * Récupère les produits par leurs IDs
+   * @param {Array} ids - Les IDs des produits
+   * @returns {Array} - Les produits récupérés
+   */
+  async fetchProductsByIds(ids) {
+    const products = [];
+
+    for (const id of ids) {
+      const product = await Product.findByIdWithCategoryInfo(id);
+      if (product) {
+        products.push(product);
+      }
+    }
+
+    return products;
+  }
+
+  /**
+   * Génère un document PDF avec les produits
+   * @param {string} filePath - Le chemin du fichier PDF à générer
+   * @param {Array} products - Les produits à inclure
+   * @param {Array} selectedColumns - Les colonnes à inclure
+   * @param {string} title - Le titre du document
+   * @param {string} orientation - L'orientation du document (portrait ou landscape)
+   * @param {Object} customColumn - La configuration de la colonne personnalisée (optionnel)
+   */
+  async generatePdf(filePath, products, selectedColumns, title, orientation, customColumn = null) {
+    // Déterminer les dimensions du document selon l'orientation
+    const isLandscape = orientation === 'landscape';
+    const pageSize = isLandscape ? [841.89, 595.28] : [595.28, 841.89]; // A4 en points
+
+    // Réduire les marges pour maximiser l'espace du tableau
+    const margins = { top: 40, bottom: 40, left: 30, right: 30 };
+
+    // Créer un nouveau document PDF
+    const doc = new PDFDocument({
+      size: 'A4',
+      layout: orientation,
+      margins: margins,
+      bufferPages: true, // Permet de modifier les pages après leur création (pour numéros de page)
+      info: {
+        Title: title,
+        Author: "Système de gestion d'inventaire",
+        Subject: 'Export de produits',
+        Keywords: 'produits, inventaire, export',
+        Creator: 'ProductExportController',
+      },
+    });
+
+    // Créer un flux de sortie vers le fichier
+    const stream = fs.createWriteStream(filePath);
+    doc.pipe(stream);
+
+    // Entête du document
+    doc.fontSize(18).font('Helvetica-Bold').text(title, { align: 'center' });
+    doc.moveDown(0.5);
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .text(`Généré le ${new Date().toLocaleString('fr-FR')}`, { align: 'center' });
+    doc.moveDown(1);
+
+    // Déterminer les colonnes à afficher
+    const columnsConfig = this.getColumnsConfig(selectedColumns);
+
+    // Ajouter la colonne personnalisée si demandée
+    if (customColumn && customColumn.title) {
+      columnsConfig.push({
+        key: 'custom',
+        label: customColumn.title,
+        weight: 2,
+        isCustom: true,
+      });
+    }
+
+    // Déterminer la largeur disponible pour le tableau
+    const availableWidth = pageSize[0] - margins.left - margins.right;
+
+    // Répartir la largeur entre les colonnes sélectionnées
+    const columnWidths = {};
+
+    // Attribution des largeurs en pourcentage
+    let totalWeight = columnsConfig.reduce((sum, col) => sum + col.weight, 0);
+    columnsConfig.forEach((col) => {
+      columnWidths[col.key] = (col.weight / totalWeight) * availableWidth;
+    });
+
+    // Calculer la hauteur de ligne adaptative selon le contenu
+    const calculateRowHeight = (product, columnsConfig, columnWidths, fontSize = 10) => {
+      // Hauteur minimale de ligne
+      let rowHeight = 20;
+
+      // Vérifier chaque colonne
+      for (const col of columnsConfig) {
+        // Pour la colonne personnalisée, utiliser une hauteur standard
+        if (col.isCustom) continue;
+
+        const value = this.formatCellValue(product, col.key);
+        const width = columnWidths[col.key] - 10; // Moins les marges intérieures
+
+        // Estimer le nombre de lignes nécessaires
+        // (approximatif - PDFKit fait le calcul réel)
+        const charsPerLine = Math.floor(width / (fontSize * 0.5));
+        if (charsPerLine <= 0) continue;
+
+        const lines = Math.ceil(value.length / charsPerLine);
+        const cellHeight = lines * (fontSize * 1.2) + 4; // 1.2 pour l'interligne + 4px de marge
+
+        rowHeight = Math.max(rowHeight, cellHeight);
+      }
+
+      return rowHeight;
+    };
+
+    // Dessiner l'entête du tableau
+    let y = doc.y;
+    const headerHeight = 25; // Hauteur fixe pour l'entête
+
+    // Dessiner le fond de l'entête
+    doc.fillColor('#f3f4f6').rect(margins.left, y, availableWidth, headerHeight).fill();
+    doc
+      .strokeColor('#000000')
+      .lineWidth(0.5)
+      .rect(margins.left, y, availableWidth, headerHeight)
+      .stroke();
+
+    // Dessiner le texte de l'entête
+    doc.fillColor('#000000').font('Helvetica-Bold');
+    let x = margins.left;
+
+    columnsConfig.forEach((col) => {
+      // Capitaliser la première lettre du label
+      const label = col.label.charAt(0).toUpperCase() + col.label.slice(1).toLowerCase();
+
+      doc.text(
+        label,
+        x + 5,
+        y + headerHeight / 2 - 6, // Centrer verticalement (-6 pour compenser la hauteur de la police)
+        {
+          width: columnWidths[col.key] - 10,
+          align: 'left',
+        }
+      );
+
+      // Tracer la ligne verticale de séparation (sauf pour la dernière colonne)
+      if (col !== columnsConfig[columnsConfig.length - 1]) {
+        doc
+          .moveTo(x + columnWidths[col.key], y)
+          .lineTo(x + columnWidths[col.key], y + headerHeight)
+          .stroke();
+      }
+
+      x += columnWidths[col.key];
+    });
+
+    y += headerHeight;
+
+    // Dessiner les lignes du tableau
+    doc.font('Helvetica');
+
+    // Limites de pagination
+    const footerHeight = 30;
+    const maxY = pageSize[1] - margins.bottom - footerHeight;
+    let pageNum = 1;
+
+    // Dessiner les lignes de données
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+
+      // Calculer la hauteur nécessaire pour cette ligne
+      const rowHeight = calculateRowHeight(product, columnsConfig, columnWidths);
+
+      // Vérifier si on doit passer à une nouvelle page
+      if (y + rowHeight > maxY) {
+        // Ajouter le pied de page de la page actuelle
+        doc
+          .fontSize(8)
+          .text(`Page ${pageNum}`, margins.left, pageSize[1] - margins.bottom - 15, {
+            align: 'center',
+            width: availableWidth,
+          });
+
+        // Créer une nouvelle page
+        doc.addPage({
+          size: 'A4',
+          layout: orientation,
+          margins: margins,
+        });
+
+        pageNum++;
+        y = margins.top;
+
+        // Redessiner l'entête du tableau sur la nouvelle page
+        doc.fillColor('#f3f4f6').rect(margins.left, y, availableWidth, headerHeight).fill();
+        doc
+          .strokeColor('#000000')
+          .lineWidth(0.5)
+          .rect(margins.left, y, availableWidth, headerHeight)
+          .stroke();
+
+        doc.fillColor('#000000').font('Helvetica-Bold');
+        x = margins.left;
+
+        columnsConfig.forEach((col) => {
+          // Capitaliser la première lettre du label
+          const label = col.label.charAt(0).toUpperCase() + col.label.slice(1).toLowerCase();
+
+          doc.text(label, x + 5, y + headerHeight / 2 - 6, {
+            width: columnWidths[col.key] - 10,
+            align: 'left',
+          });
+
+          if (col !== columnsConfig[columnsConfig.length - 1]) {
+            doc
+              .moveTo(x + columnWidths[col.key], y)
+              .lineTo(x + columnWidths[col.key], y + headerHeight)
+              .stroke();
+          }
+
+          x += columnWidths[col.key];
+        });
+
+        y += headerHeight;
+      }
+
+      // Alterner les couleurs de fond
+      const bgColor = i % 2 === 0 ? '#ffffff' : '#f9fafb';
+      doc.fillColor(bgColor).rect(margins.left, y, availableWidth, rowHeight).fill();
+      doc
+        .strokeColor('#d1d5db')
+        .lineWidth(0.5)
+        .rect(margins.left, y, availableWidth, rowHeight)
+        .stroke();
+
+      // Dessiner le contenu de la ligne
+      doc.fillColor('#000000').font('Helvetica').fontSize(10);
+      x = margins.left;
+
+      columnsConfig.forEach((col) => {
+        // Tracer la ligne verticale de séparation (sauf pour la dernière colonne)
+        if (col !== columnsConfig[columnsConfig.length - 1]) {
+          doc
+            .strokeColor('#d1d5db')
+            .lineWidth(0.5)
+            .moveTo(x + columnWidths[col.key], y)
+            .lineTo(x + columnWidths[col.key], y + rowHeight)
+            .stroke();
+        }
+
+        // Traitement spécial pour la colonne personnalisée
+        if (col.isCustom) {
+          // Pour la colonne personnalisée, dessiner un cadre vide pour le remplissage manuel
+          doc
+            .strokeColor('#000000')
+            .lineWidth(0.1)
+            .rect(x + 5, y + 3, columnWidths[col.key] - 10, rowHeight - 6)
+            .stroke();
+        } else {
+          // Pour les colonnes normales, afficher la valeur
+          const value = this.formatCellValue(product, col.key);
+
+          // Dessiner la valeur de la cellule
+          doc.text(value, x + 5, y + 5, {
+            width: columnWidths[col.key] - 10,
+            align:
+              col.key === 'stock' || col.key === 'price' || col.key === 'purchase_price'
+                ? 'right'
+                : 'left',
+          });
+        }
+
+        x += columnWidths[col.key];
+      });
+
+      y += rowHeight;
+    }
+
+    // Ajouter le pied de page avec le nombre total sur la dernière page (reste sur la même page)
+    // S'assurer qu'il y a assez d'espace, sinon ajouter une nouvelle page
+    if (y + 40 > maxY) {
+      // Ajouter numéro de page
+      doc
+        .fontSize(8)
+        .text(`Page ${pageNum}`, margins.left, pageSize[1] - margins.bottom - 15, {
+          align: 'center',
+          width: availableWidth,
+        });
+
+      // Nouvelle page pour le total
+      doc.addPage({ size: 'A4', layout: orientation, margins: margins });
+      pageNum++;
+      y = margins.top;
+    } else {
+      // Laisser un peu d'espace
+      y += 10;
+    }
+
+    // Ajouter le total des produits
+    doc
+      .fontSize(10)
+      .font('Helvetica-Bold')
+      .text(`Total: ${products.length} produit${products.length > 1 ? 's' : ''}`, margins.left, y, {
+        align: 'right',
+        width: availableWidth,
+      });
+
+    // Ajouter numéro de page sur la dernière page
+    doc
+      .fontSize(8)
+      .font('Helvetica')
+      .text(`Page ${pageNum}`, margins.left, pageSize[1] - margins.bottom - 15, {
+        align: 'center',
+        width: availableWidth,
+      });
+
+    // Finaliser le document
+    doc.end();
+
+    // Attendre que le fichier soit écrit
+    return new Promise((resolve, reject) => {
+      stream.on('finish', resolve);
+      stream.on('error', reject);
+    });
+  }
+
+  /**
+   * Génère un fichier CSV avec les produits
+   * @param {Array} products - Les produits à inclure
+   * @param {Array} selectedColumns - Les colonnes à inclure
+   * @param {Object} customColumn - La configuration de la colonne personnalisée (optionnel)
+   * @returns {string} - Le contenu CSV
+   */
+  generateCsv(products, selectedColumns, customColumn = null) {
+    const columnsConfig = this.getColumnsConfig(selectedColumns);
+
+    // Ajouter la colonne personnalisée si demandée
+    if (customColumn && customColumn.title) {
+      columnsConfig.push({
+        key: 'custom',
+        label: customColumn.title,
+        isCustom: true,
+      });
+    }
+
+    // Entête CSV
+    let csv =
+      columnsConfig
+        .map((col) => {
+          // Capitaliser la première lettre
+          const label = col.label.charAt(0).toUpperCase() + col.label.slice(1).toLowerCase();
+          return `"${label}"`;
+        })
+        .join(',') + '\n';
+
+    // Lignes de données
+    products.forEach((product) => {
+      const row = columnsConfig
+        .map((col) => {
+          if (col.isCustom) {
+            return '""'; // Cellule vide pour la colonne personnalisée
+          }
+          const value = this.formatCellValue(product, col.key);
+          return `"${value.replace(/"/g, '""')}"`;
+        })
+        .join(',');
+
+      csv += row + '\n';
+    });
+
+    return csv;
+  }
+
+  /**
+   * Retourne la configuration des colonnes
+   * @param {Array} selectedColumns - Les colonnes sélectionnées
+   * @returns {Array} - La configuration des colonnes
+   */
+  getColumnsConfig(selectedColumns) {
+    // Configuration de toutes les colonnes disponibles
+    const allColumns = [
+      { key: 'sku', label: 'Référence', weight: 2 },
+      { key: 'designation', label: 'Désignation', weight: 3 },
+      { key: 'name', label: 'Nom', weight: 3 },
+      { key: 'purchase_price', label: "Prix d'achat", weight: 1.5 },
+      { key: 'price', label: 'Prix de vente', weight: 1.5 },
+      { key: 'stock', label: 'Stock', weight: 1 },
+      { key: 'category', label: 'Catégorie', weight: 2 },
+      { key: 'supplier_brand_path', label: 'Marque/Fournisseur', weight: 2 },
+      { key: 'woo_status', label: 'Statut WEB', weight: 1.5 },
+      { key: 'description', label: 'Description', weight: 4 },
+    ];
+
+    // Si aucune colonne n'est sélectionnée, utiliser toutes les colonnes
+    if (!selectedColumns || selectedColumns.length === 0) {
+      return allColumns;
+    }
+
+    // Filtrer les colonnes selon la sélection
+    return allColumns.filter((col) => selectedColumns.includes(col.key));
+  }
+
+  /**
+   * Formate la valeur d'une cellule
+   * @param {Object} product - Le produit
+   * @param {string} key - La clé de la colonne
+   * @returns {string} - La valeur formatée
+   */
+  formatCellValue(product, key) {
+    switch (key) {
+      case 'purchase_price':
+      case 'price':
+        return product[key] ? `${product[key].toFixed(2)} €` : '0.00 €';
+
+      case 'stock':
+        return product[key]?.toString() || '0';
+
+      case 'category':
+        if (product.category_info && product.category_info.primary) {
+          const catName = product.category_info.primary.name || '-';
+          // Première lettre en majuscule
+          return catName.charAt(0).toUpperCase() + catName.slice(1).toLowerCase();
+        }
+        return '-';
+
+      case 'supplier_brand_path':
+        const brand = product.brand_ref?.name || '-';
+        const supplier = product.supplier_ref?.name || '-';
+        // Première lettre en majuscule
+        return `${brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase()} (${supplier})`;
+
+      case 'woo_status':
+        if (product.woo_id) {
+          if (product.status === 'published') return 'Publié';
+          if (product.status === 'draft') return 'Brouillon';
+          return 'Synchronisé';
+        }
+        return 'Non synchronisé';
+
+      case 'description':
+        const desc = product[key] || '';
+        // Première lettre en majuscule si non vide
+        return desc
+          ? desc.charAt(0).toUpperCase() +
+              desc.slice(1).toLowerCase().replace(/\n/g, ' ').substring(0, 100) +
+              (desc.length > 100 ? '...' : '')
+          : '-';
+
+      default:
+        const val = product[key]?.toString() || '-';
+        // Première lettre en majuscule si non vide et pas un nombre
+        return val !== '-' && isNaN(val)
+          ? val.charAt(0).toUpperCase() + val.slice(1).toLowerCase()
+          : val;
+    }
+  }
+}
+
+// Créer instance du contrôleur
+const productExportController = new ProductExportController();
+
+// Exporter les méthodes individuellement
+module.exports = {
+  exportToPdf: productExportController.exportToPdf.bind(productExportController),
+  exportToCsv: productExportController.exportToCsv.bind(productExportController),
+};

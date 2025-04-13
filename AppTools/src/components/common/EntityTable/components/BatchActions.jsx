@@ -1,6 +1,6 @@
 // src/components/common/EntityTable/components/BatchActions.jsx
 import React from 'react';
-import { Trash2, RefreshCw } from 'lucide-react'; // Assurez-vous que ces icônes sont importées
+import { Trash2, RefreshCw, FileText } from 'lucide-react'; // Ajout de l'icône FileText
 
 export const BatchActions = ({
   selectedItems = [],
@@ -9,6 +9,7 @@ export const BatchActions = ({
   batchActions = ['delete', 'sync'],
   onBatchDelete,
   onBatchSync,
+  onBatchExport, // Nouvelle prop pour l'export
 }) => {
   if (selectedItems.length === 0) return null;
 
@@ -22,17 +23,19 @@ export const BatchActions = ({
         {selectedCount > 1 ? 's' : ''}
       </div>
       <div className="flex space-x-2">
-        {batchActions.includes('sync') && typeof onBatchSync === 'function' && (
+        {/* Bouton d'export PDF - toujours disponible si onBatchExport existe */}
+        {typeof onBatchExport === 'function' && (
           <button
-            onClick={onBatchSync}
-            className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md flex items-center text-sm"
-            aria-label="Synchroniser les éléments sélectionnés"
+            onClick={() => onBatchExport(selectedItems)}
+            className="px-3 py-1 bg-green-100 hover:bg-green-200 text-green-800 rounded-md flex items-center text-sm"
+            aria-label="Exporter les éléments sélectionnés en PDF"
           >
-            <RefreshCw className="h-4 w-4 mr-1" />
-            Synchroniser
+            <FileText className="h-4 w-4 mr-1" />
+            Exporter PDF
           </button>
         )}
 
+        {/* Bouton de suppression */}
         {batchActions.includes('delete') && typeof onBatchDelete === 'function' && (
           <button
             onClick={onBatchDelete}
@@ -41,6 +44,18 @@ export const BatchActions = ({
           >
             <Trash2 className="h-4 w-4 mr-1" />
             Supprimer
+          </button>
+        )}
+
+        {/* Bouton de synchronisation */}
+        {batchActions.includes('sync') && typeof onBatchSync === 'function' && (
+          <button
+            onClick={onBatchSync}
+            className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md flex items-center text-sm"
+            aria-label="Synchroniser les éléments sélectionnés"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Synchroniser
           </button>
         )}
       </div>

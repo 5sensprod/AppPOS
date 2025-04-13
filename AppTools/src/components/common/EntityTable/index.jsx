@@ -1,5 +1,5 @@
 // Composant principal EntityTable (index.jsx) AppTools\src\components\common\EntityTable\index.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { FilterBar } from './components/FilterBar';
 import { BatchActions } from './components/BatchActions';
@@ -11,8 +11,7 @@ import { useTableSelection } from './hooks/useTableSelection';
 import { useTableSort } from './hooks/useTableSort';
 import { useTableFilter } from './hooks/useTableFilter';
 import { useTablePagination } from './hooks/useTablePagination';
-
-// ... imports inchangés ...
+import ExportConfigModal from './ExportConfigModal';
 
 const EntityTable = ({
   data = [],
@@ -24,7 +23,7 @@ const EntityTable = ({
   baseRoute = '',
   defaultSort = { field: 'name', direction: 'asc' },
   actions = ['view', 'edit', 'delete', 'sync'],
-  batchActions = ['delete', 'sync'],
+  batchActions = ['delete', 'sync', 'export'],
   pagination = {
     enabled: true,
     pageSize: 10,
@@ -33,6 +32,7 @@ const EntityTable = ({
   },
   onDelete,
   onSync,
+  onExport,
   onBatchDelete,
   onBatchSync,
   onSearch,
@@ -68,8 +68,10 @@ const EntityTable = ({
   } = useTablePagination(filteredData, pagination, paginationEntityId);
 
   const hasSync = typeof onSync === 'function';
+  const hasExport = typeof onExport === 'function';
   const hasBatchDelete = typeof onBatchDelete === 'function';
   const hasBatchSync = typeof onBatchSync === 'function';
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const handleBatchDelete = () => {
     if (selectedItems.length === 0) return;
@@ -126,6 +128,24 @@ const EntityTable = ({
     }
   };
 
+  // Nouvelle fonction pour gérer l'export
+  const handleBatchExport = () => {
+    // Ouvrir la modale de configuration d'export
+    setExportModalOpen(true);
+  };
+
+  // Gérer la confirmation de l'export
+  const handleExportConfirm = async (exportConfig) => {
+    if (hasExport) {
+      try {
+        await onExport(exportConfig);
+        setExportModalOpen(false);
+      } catch (err) {
+        console.error("Erreur lors de l'export:", err);
+      }
+    }
+  };
+
   if (isLoading && data.length === 0) {
     return <LoadingState />;
   }
@@ -165,14 +185,15 @@ const EntityTable = ({
           selectedItems={selectedItems}
           entityName={entityName}
           entityNamePlural={entityNamePlural}
-          // Filtrer correctement les actions disponibles
           batchActions={batchActions.filter((action) => {
             if (action === 'sync') return hasSync || hasBatchSync;
             if (action === 'delete') return typeof onDelete === 'function' || hasBatchDelete;
+            if (action === 'export') return hasExport;
             return true; // pour toute autre action
           })}
           onBatchDelete={handleBatchDelete}
           onBatchSync={hasSync || hasBatchSync ? handleBatchSync : undefined}
+          onBatchExport={hasExport ? handleBatchExport : undefined} // Ajoutez cette ligne
         />
       )}
 
@@ -238,6 +259,15 @@ const EntityTable = ({
           entityNamePlural={entityNamePlural}
         />
       )}
+
+      <ExportConfigModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        onExport={handleExportConfirm}
+        selectedItems={selectedItems}
+        entityName={entityName}
+        entityNamePlural={entityNamePlural}
+      />
     </div>
   );
 };
