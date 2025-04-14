@@ -86,7 +86,7 @@ websocketManager.initialize(server);
 initializeWebSocketEventBridge();
 
 // Configuration du CRON pour la sauvegarde à 18h quotidiennement
-cron.schedule('23 17 * * *', async () => {
+cron.schedule('30 18 * * *', async () => {
   console.log(`[${new Date().toISOString()}] Sauvegarde planifiée...`);
   try {
     // Sauvegarde des bases de données
