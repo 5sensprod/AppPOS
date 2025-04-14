@@ -1,6 +1,13 @@
 // config/database.js
 const Datastore = require('nedb');
 const path = require('path');
+const fs = require('fs');
+
+// Créer le dossier data s'il n'existe pas
+const dataDir = path.join(__dirname, '../data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
 
 class Database {
   constructor() {
@@ -11,7 +18,7 @@ class Database {
 
   getDbConfig(filename) {
     return {
-      filename: process.env.NODE_ENV === 'test' ? null : path.join(__dirname, '../data', filename),
+      filename: process.env.NODE_ENV === 'test' ? null : path.join(dataDir, filename),
       autoload: true,
     };
   }

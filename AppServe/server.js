@@ -11,6 +11,12 @@ const { authMiddleware } = require('./utils/auth');
 // WebSocket Manager
 const websocketManager = require('./websocket/websocketManager');
 const { initializeWebSocketEventBridge } = require('./websocket/websocketEventBridge');
+
+// Import du système de sauvegarde
+const { performBackup } = require('./backup');
+const { performImagesBackup } = require('./backup-images');
+const cron = require('node-cron');
+
 // Créer l'application Express
 const app = express();
 const defaultPort = process.env.PORT || 3000;
@@ -42,7 +48,9 @@ const brandRoutes = require('./routes/brandRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const wooSyncRoutes = require('./routes/wooSyncRoutes');
 const productDescriptionRoutes = require('./routes/productDescriptionRoutes');
-const productTitleRoutes = require('./routes/productTitleRoutes'); // Ajout de l'import pour les routes de titre
+const productTitleRoutes = require('./routes/productTitleRoutes');
+// Routes de sauvegarde
+const backupRoutes = require('./routes/backupRoutes');
 
 // Protection des routes API avec le middleware d'authentification
 app.use('/api/categories', authMiddleware, categoryRoutes);
@@ -51,7 +59,9 @@ app.use('/api/brands', authMiddleware, brandRoutes);
 app.use('/api/suppliers', authMiddleware, supplierRoutes);
 app.use('/api/sync', authMiddleware, wooSyncRoutes);
 app.use('/api/descriptions', authMiddleware, productDescriptionRoutes);
-app.use('/api/product-title', authMiddleware, productTitleRoutes); // Ajout des nouvelles routes avec authentification
+app.use('/api/product-title', authMiddleware, productTitleRoutes);
+// Ajout des routes de sauvegarde
+app.use('/api/backup', authMiddleware, backupRoutes);
 
 // Route d'info serveur
 app.get('/api/server-info', (req, res) => {
@@ -74,11 +84,33 @@ app.get('/', (req, res) => {
 // Initialiser WebSocket avec le serveur HTTP
 websocketManager.initialize(server);
 initializeWebSocketEventBridge();
+
+// Configuration du CRON pour la sauvegarde à 18h quotidiennement
+cron.schedule('23 17 * * *', async () => {
+  console.log(`[${new Date().toISOString()}] Sauvegarde planifiée...`);
+  try {
+    // Sauvegarde des bases de données
+    await performBackup();
+    console.log(`[${new Date().toISOString()}] Sauvegarde des BDD terminée avec succès`);
+
+    // Sauvegarde des images
+    await performImagesBackup();
+    console.log(`[${new Date().toISOString()}] Sauvegarde des images terminée avec succès`);
+
+    console.log(`[${new Date().toISOString()}] Sauvegarde complète terminée avec succès`);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Erreur de sauvegarde:`, error);
+  }
+});
+
+console.log('Sauvegarde automatique configurée pour 18h quotidiennement');
+
 // Démarrer le serveur avec notre setupServer modifié
 setupServerWithHttp(server, app, defaultPort).catch((error) => {
   console.error('Impossible de démarrer le serveur:', error.message);
   process.exit(1);
 });
+
 // Gestion de l'arrêt propre
 process.on('SIGINT', () => {
   console.log("Signal d'interruption reçu. Arrêt propre du serveur...");
