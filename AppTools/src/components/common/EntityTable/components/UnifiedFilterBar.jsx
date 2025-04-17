@@ -1,4 +1,4 @@
-// Utiliser directement le store categoryHierarchyStore dans UnifiedFilterBar
+// UnifiedFilterBar.jsx
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
 import { useHierarchicalCategories } from '../../../../features/categories/stores/categoryHierarchyStore';
@@ -7,27 +7,33 @@ const UnifiedFilterBar = ({
   filterOptions = [],
   selectedFilters = [],
   onChange,
-  hierarchicalEnabled = true,
+  hierarchicalEnabled = true, // Gardé pour compatibilité
+  enableCategories = true, // Nouveau paramètre pour activer/désactiver les catégories
 }) => {
   const [editingType, setEditingType] = useState(null);
   const [lastEditedType, setLastEditedType] = useState(null);
 
-  // Utiliser directement le store des catégories hiérarchiques
+  // Toujours appeler le hook, mais utiliser les résultats conditionnellement
   const {
-    hierarchicalCategories,
+    hierarchicalCategories: rawHierarchicalCategories,
     loading: categoriesLoading,
     fetchHierarchicalCategories,
   } = useHierarchicalCategories();
 
-  // Charger les catégories au montage du composant
+  // Utiliser les valeurs conditionnellement
+  const hierarchicalCategories = enableCategories ? rawHierarchicalCategories : [];
+
+  // Charger les catégories au montage du composant seulement si enableCategories est true
   useEffect(() => {
-    if (hierarchicalCategories.length === 0 && !categoriesLoading) {
+    if (enableCategories && rawHierarchicalCategories.length === 0 && !categoriesLoading) {
       fetchHierarchicalCategories();
     }
-  }, [hierarchicalCategories, categoriesLoading, fetchHierarchicalCategories]);
+  }, [rawHierarchicalCategories, categoriesLoading, fetchHierarchicalCategories, enableCategories]);
 
-  // Générer les options de catégories à partir des données hiérarchiques
+  // Générer les options de catégories seulement si enableCategories est true
   const categoryOptions = useMemo(() => {
+    if (!enableCategories) return [];
+
     const transform = (cats, path = '') => {
       return cats.flatMap((cat) => [
         {
@@ -40,7 +46,7 @@ const UnifiedFilterBar = ({
     };
 
     return transform(hierarchicalCategories);
-  }, [hierarchicalCategories]);
+  }, [hierarchicalCategories, enableCategories]);
 
   // Ajouter les options de filtre de statut
   const statusOptions = [
@@ -52,7 +58,7 @@ const UnifiedFilterBar = ({
   // Combiner toutes les options de filtre
   const allFilterOptions = useMemo(() => {
     return [...filterOptions, ...statusOptions, ...categoryOptions];
-  }, [filterOptions, categoryOptions]);
+  }, [filterOptions, categoryOptions, statusOptions]);
 
   const filterGroups = useMemo(() => {
     return allFilterOptions.reduce((acc, option) => {

@@ -236,6 +236,7 @@ function CategoriesTable(props) {
         ]}
         selectedFilters={selectedFilters}
         onChange={setSelectedFilters}
+        enableCategories={false}
       />
 
       <EntityTable
