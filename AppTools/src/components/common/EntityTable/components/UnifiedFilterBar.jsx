@@ -1,8 +1,46 @@
-import React, { useState, useRef, useEffect } from 'react';
+// Utiliser directement le store categoryHierarchyStore dans UnifiedFilterBar
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
+import { useHierarchicalCategories } from '../../../../features/categories/stores/categoryHierarchyStore';
 
-const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }) => {
+const UnifiedFilterBar = ({
+  filterOptions = [],
+  selectedFilters = [],
+  onChange,
+  hierarchicalEnabled = true,
+}) => {
   const [editingType, setEditingType] = useState(null);
+  const [lastEditedType, setLastEditedType] = useState(null);
+
+  // Utiliser directement le store des catégories hiérarchiques
+  const {
+    hierarchicalCategories,
+    loading: categoriesLoading,
+    fetchHierarchicalCategories,
+  } = useHierarchicalCategories();
+
+  // Charger les catégories au montage du composant
+  useEffect(() => {
+    if (hierarchicalCategories.length === 0 && !categoriesLoading) {
+      fetchHierarchicalCategories();
+    }
+  }, [hierarchicalCategories, categoriesLoading, fetchHierarchicalCategories]);
+
+  // Générer les options de catégories à partir des données hiérarchiques
+  const categoryOptions = useMemo(() => {
+    const transform = (cats, path = '') => {
+      return cats.flatMap((cat) => [
+        {
+          value: `category_${cat._id}`,
+          label: `${path}${cat.name}`,
+          type: 'category',
+        },
+        ...(cat.children ? transform(cat.children, `${path}${cat.name} > `) : []),
+      ]);
+    };
+
+    return transform(hierarchicalCategories);
+  }, [hierarchicalCategories]);
 
   // Ajouter les options de filtre de statut
   const statusOptions = [
@@ -11,18 +49,22 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
     { label: 'Archivé', value: 'status_archived', type: 'status' },
   ];
 
-  // Combiner les options existantes avec les options de statut
-  const allFilterOptions = [...filterOptions, ...statusOptions];
+  // Combiner toutes les options de filtre
+  const allFilterOptions = useMemo(() => {
+    return [...filterOptions, ...statusOptions, ...categoryOptions];
+  }, [filterOptions, categoryOptions]);
 
-  const filterGroups = allFilterOptions.reduce((acc, option) => {
-    if (!acc[option.type]) acc[option.type] = [];
-    acc[option.type].push(option);
-    return acc;
-  }, {});
+  const filterGroups = useMemo(() => {
+    return allFilterOptions.reduce((acc, option) => {
+      if (!acc[option.type]) acc[option.type] = [];
+      acc[option.type].push(option);
+      return acc;
+    }, {});
+  }, [allFilterOptions]);
 
   const filterTypeLabels = {
     woo: 'Synchronisation',
-    status: 'Statut', // Ajouter le label pour le type de filtre statut
+    status: 'Statut',
     image: 'Image',
     supplier: 'Fournisseur',
     description: 'Description',
@@ -33,24 +75,31 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
   const alreadySelectedValues = new Set(selectedFilters.map((f) => `${f.type}:${f.value}`));
   const alreadySelectedTypes = new Set(selectedFilters.map((f) => f.type));
 
-  const availableTypes = Object.entries(filterGroups)
-    .filter(([type]) => {
-      // Un seul filtre autorisé pour woo et status, plusieurs pour supplier, brand et category
-      const allowMultiple = ['supplier', 'brand', 'category'].includes(type);
-      return allowMultiple || !alreadySelectedTypes.has(type);
-    })
-    .map(([type]) => ({
-      label: filterTypeLabels[type] || type,
-      value: type,
-    }))
-    // Définir l'ordre explicite des options
-    .sort((a, b) => {
-      const order = ['woo', 'status', 'image', 'description', 'category', 'brand', 'supplier'];
-      return order.indexOf(a.value) - order.indexOf(b.value);
-    });
+  const availableTypes = useMemo(() => {
+    return (
+      Object.entries(filterGroups)
+        .filter(([type]) => {
+          // Un seul filtre autorisé pour woo et status, plusieurs pour supplier, brand et category
+          const allowMultiple = ['supplier', 'brand', 'category'].includes(type);
+          return allowMultiple || !alreadySelectedTypes.has(type);
+        })
+        .map(([type]) => ({
+          label: filterTypeLabels[type] || type,
+          value: type,
+        }))
+        // Définir l'ordre explicite des options
+        .sort((a, b) => {
+          const order = ['woo', 'status', 'image', 'description', 'category', 'brand', 'supplier'];
+          return order.indexOf(a.value) - order.indexOf(b.value);
+        })
+    );
+  }, [filterGroups, alreadySelectedTypes]);
 
   const handleTypeSelect = (selected) => {
     setEditingType(selected?.value || null);
+    if (selected?.value) {
+      setLastEditedType(selected.value);
+    }
   };
 
   const handleValueSelect = (selected) => {
@@ -75,7 +124,14 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
     }
 
     onChange(updatedFilters);
-    setEditingType(null);
+
+    // Si c'est un type qui permet les sélections multiples, garder le sélecteur ouvert
+    if (isMulti) {
+      // Ne pas réinitialiser
+    } else {
+      // Sinon, réinitialiser
+      setEditingType(null);
+    }
   };
 
   const handleRemove = (filterToRemove) => {
@@ -84,10 +140,6 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
         (f) => !(f.type === filterToRemove.type && f.value === filterToRemove.value)
       )
     );
-  };
-
-  const handleEdit = (filter) => {
-    setEditingType(filter.type);
   };
 
   const getOptionsForType = (type) => {
@@ -104,7 +156,7 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (editingType && valueSelectRef.current && !valueSelectRef.current.contains(event.target)) {
-        setEditingType(null); // Revenir à "Ajouter un critère"
+        setEditingType(null);
       }
     };
 
@@ -114,32 +166,42 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
     };
   }, [editingType]);
 
-  return (
-    <div className="space-y-3 w-full max-w-xl">
-      {!editingType && (
-        <Select
-          options={availableTypes}
-          onChange={handleTypeSelect}
-          placeholder="Ajouter un critère de filtre..."
-          classNamePrefix="react-select"
-          className="max-w-xl w-full"
-        />
-      )}
+  // Afficher un indicateur de chargement pendant le chargement des catégories
+  if (editingType === 'category' && categoriesLoading) {
+    return <div className="p-2 text-center">Chargement des catégories...</div>;
+  }
 
-      {editingType && (
-        <div ref={valueSelectRef} className="max-w-xl w-full">
-          <Select
-            options={getOptionsForType(editingType)}
-            onChange={handleValueSelect}
-            placeholder={`Choisir une valeur pour "${filterTypeLabels[editingType]}"`}
-            isMulti={['supplier', 'brand', 'category'].includes(editingType)}
-            classNamePrefix="react-select"
-            className="w-full"
-            autoFocus
-            menuIsOpen={true}
-          />
+  return (
+    <div className="space-y-3 w-full">
+      <div className="grid grid-cols-1 gap-3">
+        {/* Sélecteur de type de filtre standard */}
+        <div>
+          {!editingType ? (
+            <Select
+              options={availableTypes}
+              onChange={handleTypeSelect}
+              placeholder="Ajouter un critère de filtre..."
+              classNamePrefix="react-select"
+              className="w-full"
+              // Présélectionner le dernier type utilisé s'il est disponible
+              value={lastEditedType && availableTypes.find((t) => t.value === lastEditedType)}
+            />
+          ) : (
+            <div ref={valueSelectRef} className="w-full">
+              <Select
+                options={getOptionsForType(editingType)}
+                onChange={handleValueSelect}
+                placeholder={`Choisir une valeur pour "${filterTypeLabels[editingType]}"`}
+                isMulti={['supplier', 'brand', 'category'].includes(editingType)}
+                classNamePrefix="react-select"
+                className="w-full"
+                autoFocus
+                menuIsOpen={true}
+              />
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {selectedFilters.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -150,8 +212,14 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
             >
               <span
                 className="cursor-pointer"
-                onClick={() => handleEdit(filter)}
-                title="Modifier ce filtre"
+                title="Filtre appliqué"
+                onClick={() => {
+                  // Réouvrir le sélecteur pour ce type de filtre
+                  if (['supplier', 'brand', 'category'].includes(filter.type)) {
+                    setEditingType(filter.type);
+                    setLastEditedType(filter.type);
+                  }
+                }}
               >
                 {filter.label}
               </span>

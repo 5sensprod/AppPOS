@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProduct, useProductDataStore } from '../stores/productStore';
+import { useHierarchicalCategories } from '../../../features/categories/stores/categoryHierarchyStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
 import { usePaginationStore } from '@/stores/usePaginationStore';
-import exportService from '../../../services/exportService'; // Ajouter cette importation
+import exportService from '../../../services/exportService';
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
@@ -18,6 +19,10 @@ function ProductTable(props) {
     initWebSocket,
     updateProductsStatus,
   } = useProductDataStore();
+
+  // Utiliser le store des catégories hiérarchiques existant
+  const { loading: categoriesLoading } = useHierarchicalCategories();
+
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
 
   // Récupérer les paramètres de pagination persistants
@@ -67,7 +72,6 @@ function ProductTable(props) {
       await deleteProduct(id);
       await fetchProducts();
     },
-    // Vérifier que syncEntity est défini uniquement si syncEnabled est true
     syncEntity: syncEnabled
       ? async (id) => {
           console.log(`🔄 Début de synchronisation du produit #${id}`);
@@ -88,7 +92,6 @@ function ProductTable(props) {
       }
       await fetchProducts();
     },
-    // Vérifier que batchSyncEntities est défini uniquement si syncEnabled est true
     batchSyncEntities: syncEnabled
       ? async (ids) => {
           console.log(`🔄 Synchronisation par lot de ${ids.length} produits`);
@@ -111,25 +114,11 @@ function ProductTable(props) {
       : undefined,
   });
 
-  // 3. Ajoutez des console.log de débogage pour vérifier les valeurs:
-  console.log('syncEnabled:', syncEnabled);
-  console.log('handleSyncEntity disponible:', !!handleSyncEntity);
-  console.log('handleBatchSyncEntities disponible:', !!handleBatchSyncEntities);
-
   const handleExport = async (exportConfig) => {
     try {
       setExportLoading(true);
-
-      // N'envoyez plus les données complètes des produits dans la configuration
-      // Laissez le serveur récupérer les produits par leur ID
-      const optimizedConfig = {
-        ...exportConfig,
-        // Ne pas inclure products: productsToExport
-      };
-
-      // Appeler le service d'export
+      const optimizedConfig = { ...exportConfig };
       await exportService.exportProducts(optimizedConfig);
-
       return true;
     } catch (error) {
       console.error("Erreur lors de l'export:", error);
@@ -143,13 +132,8 @@ function ProductTable(props) {
   const handleBatchStatusChange = async (productIds, newStatus) => {
     try {
       console.log(`Modification du statut pour ${productIds.length} produits: ${newStatus}`);
-
-      // Utiliser la fonction du store pour mettre à jour le statut
       await updateProductsStatus(productIds, newStatus);
-
-      // Recharger les produits après la mise à jour
       await fetchProducts();
-
       return true;
     } catch (error) {
       console.error('Erreur lors de la mise à jour du statut:', error);
@@ -158,7 +142,7 @@ function ProductTable(props) {
     }
   };
 
-  const isLoading = productsLoading || operationLoading || exportLoading;
+  const isLoading = productsLoading || operationLoading || exportLoading || categoriesLoading;
 
   const filterOptions = useMemo(() => {
     const wooOptions = [
@@ -194,21 +178,12 @@ function ProductTable(props) {
       ).values()
     );
 
-    const categoryOptions = Array.from(
-      new Map(
-        products
-          .flatMap((p) => p.category_info?.refs || [])
-          .map((c) => [c.id, { value: `category_${c.id}`, label: c.name, type: 'category' }])
-      ).values()
-    );
-
     return [
       ...wooOptions,
       ...imageOptions,
       ...descriptionOptions,
       ...brandOptions,
       ...supplierOptions,
-      ...categoryOptions,
     ];
   }, [products]);
 
@@ -247,12 +222,28 @@ function ProductTable(props) {
       data = data.filter((p) => brandIds.includes(p.brand_id));
     }
 
+    // Filtrage amélioré pour les catégories hiérarchiques
     if (categoryFilters.length > 0) {
       const categoryIds = categoryFilters.map((f) => f.value.replace('category_', ''));
-      data = data.filter(
-        (p) =>
-          Array.isArray(p.categories) && p.categories.some((catId) => categoryIds.includes(catId))
-      );
+
+      // Fonction pour vérifier si un produit appartient à une catégorie
+      const productInCategory = (product, categoryId) => {
+        // Vérifier la catégorie principale
+        if (product.category_id === categoryId) return true;
+
+        // Vérifier les catégories additionnelles
+        if (Array.isArray(product.categories) && product.categories.includes(categoryId))
+          return true;
+
+        // Vérifier dans les category_info.refs si disponible
+        if (product.category_info?.refs) {
+          return product.category_info.refs.some((ref) => ref.id === categoryId);
+        }
+
+        return false;
+      };
+
+      data = data.filter((p) => categoryIds.some((catId) => productInCategory(p, catId)));
     }
 
     if (descriptionFilter === 'has_description') {
@@ -261,7 +252,7 @@ function ProductTable(props) {
       data = data.filter((p) => !p.description || p.description.trim() === '');
     }
 
-    // Ajouter le filtre par statut
+    // Filtrage par statut
     if (statusFilter) {
       const status = statusFilter.replace('status_', '');
       data = data.filter((p) => p.status === status);
@@ -291,11 +282,11 @@ function ProductTable(props) {
         onBatchDelete={handleBatchDeleteEntities}
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-        batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export', 'status']} // Ajout de 'status'
+        batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export', 'status']}
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities}
         onExport={handleExport}
-        onBatchStatusChange={handleBatchStatusChange} // Ajouter la nouvelle fonction
+        onBatchStatusChange={handleBatchStatusChange}
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,
