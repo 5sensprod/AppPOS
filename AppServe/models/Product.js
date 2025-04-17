@@ -1,8 +1,14 @@
-//AppServe\models\Product.js
+//AppServe\models\Product.js - Modification pour formater les noms de catégories
 const BaseModel = require('./base/BaseModel');
 const db = require('../config/database');
 const Category = require('./Category');
 const { buildCategoryPath } = require('../utils/categoryHelpers');
+
+// Fonction de formatage (identique à celle du categoryController)
+function formatCategoryName(name) {
+  if (!name || typeof name !== 'string') return name;
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
 
 class Product extends BaseModel {
   constructor() {
@@ -46,14 +52,18 @@ class Product extends BaseModel {
         const pathInfo = buildCategoryPath(allExistingCategories, categoryId);
         if (!pathInfo.path || pathInfo.path.length === 0) continue;
 
+        // Formater les noms dans le chemin
+        const formattedPath = pathInfo.path.map((name) => formatCategoryName(name));
+        const formattedPathString = formattedPath.join(' > ');
+
         // Ajouter cette catégorie à la liste des refs
         categoryInfos.push({
           id: category._id,
-          name: category.name,
+          name: formatCategoryName(category.name),
           woo_id: category.woo_id || null,
-          path: pathInfo.path,
+          path: formattedPath,
           path_ids: pathInfo.path_ids,
-          path_string: pathInfo.path.join(' > '),
+          path_string: formattedPathString,
         });
       }
 

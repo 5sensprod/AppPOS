@@ -16,13 +16,18 @@ class Category extends BaseModel {
   async getCategoryPath(categoryId) {
     try {
       const allCategories = await this.findAll();
-
       const pathInfo = buildCategoryPath(allCategories, categoryId);
 
-      return {
+      // Formater les noms dans le chemin
+      const formattedPathInfo = {
         ...pathInfo,
-        path_string: pathInfo.path.join(' > '),
+        path: pathInfo.path.map((name) => formatCategoryName(name)),
       };
+
+      // Reconstruire path_string à partir des noms formatés
+      formattedPathInfo.path_string = formattedPathInfo.path.join(' > ');
+
+      return formattedPathInfo;
     } catch (error) {
       console.error('Erreur récupération chemin catégorie:', error);
       throw error;
