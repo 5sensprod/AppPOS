@@ -1,22 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
-import { Filter } from 'lucide-react';
 
 const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }) => {
-  // S'assurer que selectedFilters est bien un tableau
-  const filtersArray = Array.isArray(selectedFilters) ? selectedFilters : [];
-
   const [editingType, setEditingType] = useState(null);
 
-  // Ajouter les options de statut si elles n'existent pas déjà
-  const allFilterOptions = filterOptions.some((opt) => opt.type === 'status')
-    ? filterOptions
-    : [
-        ...filterOptions,
-        { label: 'Publié', value: 'status_published', type: 'status' },
-        { label: 'Brouillon', value: 'status_draft', type: 'status' },
-        { label: 'Archivé', value: 'status_archived', type: 'status' },
-      ];
+  // Ajouter les options de filtre de statut
+  const statusOptions = [
+    { label: 'Publié', value: 'status_published', type: 'status' },
+    { label: 'Brouillon', value: 'status_draft', type: 'status' },
+    { label: 'Archivé', value: 'status_archived', type: 'status' },
+  ];
+
+  // Combiner les options existantes avec les options de statut
+  const allFilterOptions = [...filterOptions, ...statusOptions];
 
   const filterGroups = allFilterOptions.reduce((acc, option) => {
     if (!acc[option.type]) acc[option.type] = [];
@@ -26,7 +22,7 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
 
   const filterTypeLabels = {
     woo: 'Synchronisation',
-    status: 'Statut',
+    status: 'Statut', // Ajouter le label pour le type de filtre statut
     image: 'Image',
     supplier: 'Fournisseur',
     description: 'Description',
@@ -34,11 +30,12 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
     category: 'Catégorie',
   };
 
-  const alreadySelectedValues = new Set(filtersArray.map((f) => `${f.type}:${f.value}`));
-  const alreadySelectedTypes = new Set(filtersArray.map((f) => f.type));
+  const alreadySelectedValues = new Set(selectedFilters.map((f) => `${f.type}:${f.value}`));
+  const alreadySelectedTypes = new Set(selectedFilters.map((f) => f.type));
 
   const availableTypes = Object.entries(filterGroups)
     .filter(([type]) => {
+      // Un seul filtre autorisé pour woo et status, plusieurs pour supplier, brand et category
       const allowMultiple = ['supplier', 'brand', 'category'].includes(type);
       return allowMultiple || !alreadySelectedTypes.has(type);
     })
@@ -46,6 +43,7 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
       label: filterTypeLabels[type] || type,
       value: type,
     }))
+    // Définir l'ordre explicite des options
     .sort((a, b) => {
       const order = ['woo', 'status', 'image', 'description', 'category', 'brand', 'supplier'];
       return order.indexOf(a.value) - order.indexOf(b.value);
@@ -71,17 +69,29 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
 
     let updatedFilters;
     if (isMulti) {
-      updatedFilters = [...filtersArray, ...newFilters];
+      updatedFilters = [...selectedFilters, ...newFilters];
     } else {
-      updatedFilters = [...filtersArray.filter((f) => f.type !== editingType), ...newFilters];
+      updatedFilters = [...selectedFilters.filter((f) => f.type !== editingType), ...newFilters];
     }
 
     onChange(updatedFilters);
     setEditingType(null);
   };
 
+  const handleRemove = (filterToRemove) => {
+    onChange(
+      selectedFilters.filter(
+        (f) => !(f.type === filterToRemove.type && f.value === filterToRemove.value)
+      )
+    );
+  };
+
+  const handleEdit = (filter) => {
+    setEditingType(filter.type);
+  };
+
   const getOptionsForType = (type) => {
-    const selectedValues = filtersArray.filter((f) => f.type === type).map((f) => f.value);
+    const selectedValues = selectedFilters.filter((f) => f.type === type).map((f) => f.value);
 
     return (filterGroups[type] || []).map((opt) => ({
       ...opt,
@@ -94,7 +104,7 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (editingType && valueSelectRef.current && !valueSelectRef.current.contains(event.target)) {
-        setEditingType(null);
+        setEditingType(null); // Revenir à "Ajouter un critère"
       }
     };
 
@@ -104,103 +114,56 @@ const UnifiedFilterBar = ({ filterOptions = [], selectedFilters = [], onChange }
     };
   }, [editingType]);
 
-  // Styles personnalisés pour correspondre à SearchBar
-  const customStyles = {
-    container: (base) => ({
-      ...base,
-      width: '100%',
-    }),
-    control: (base) => ({
-      ...base,
-      minHeight: '42px',
-      height: '42px',
-      borderRadius: '0.5rem',
-      borderColor: 'var(--border-color, #D1D5DB)',
-      backgroundColor: 'var(--bg-color, white)',
-      boxShadow: 'none',
-      '&:hover': {
-        borderColor: 'var(--border-hover, #9CA3AF)',
-      },
-      paddingLeft: '36px', // Espace pour l'icône
-    }),
-    valueContainer: (base) => ({
-      ...base,
-      padding: '0 8px',
-      paddingLeft: '0',
-    }),
-    indicatorsContainer: (base) => ({
-      ...base,
-      height: '42px',
-    }),
-    dropdownIndicator: (base) => ({
-      ...base,
-      padding: '8px',
-    }),
-    clearIndicator: (base) => ({
-      ...base,
-      padding: '8px',
-    }),
-    input: (base) => ({
-      ...base,
-      margin: '0',
-      padding: '0',
-    }),
-    placeholder: (base) => ({
-      ...base,
-      color: 'var(--placeholder-color, #9CA3AF)',
-    }),
-    menu: (base) => ({
-      ...base,
-      zIndex: 9999,
-    }),
-  };
-
   return (
-    <div className="relative w-64">
-      <Filter className="w-5 h-5 absolute left-3 top-3 text-gray-400 z-10" />
-      {!editingType ? (
+    <div className="space-y-3 w-full max-w-xl">
+      {!editingType && (
         <Select
           options={availableTypes}
           onChange={handleTypeSelect}
-          placeholder="Filtrer par..."
+          placeholder="Ajouter un critère de filtre..."
           classNamePrefix="react-select"
-          className="w-full"
-          isSearchable={false}
-          menuPlacement="auto"
-          styles={customStyles}
-          theme={(theme) => ({
-            ...theme,
-            colors: {
-              ...theme.colors,
-              primary: '#3B82F6', // Focus color (blue-500)
-              primary25: '#EFF6FF', // Option highlight (blue-50)
-              neutral20: '#D1D5DB', // Border color (gray-300)
-            },
-          })}
+          className="max-w-xl w-full"
         />
-      ) : (
-        <div ref={valueSelectRef} className="w-full">
+      )}
+
+      {editingType && (
+        <div ref={valueSelectRef} className="max-w-xl w-full">
           <Select
             options={getOptionsForType(editingType)}
             onChange={handleValueSelect}
-            placeholder={`Choisir ${filterTypeLabels[editingType]}`}
+            placeholder={`Choisir une valeur pour "${filterTypeLabels[editingType]}"`}
             isMulti={['supplier', 'brand', 'category'].includes(editingType)}
             classNamePrefix="react-select"
             className="w-full"
             autoFocus
             menuIsOpen={true}
-            menuPlacement="auto"
-            styles={customStyles}
-            theme={(theme) => ({
-              ...theme,
-              colors: {
-                ...theme.colors,
-                primary: '#3B82F6', // Focus color
-                primary25: '#EFF6FF', // Option highlight
-                neutral20: '#D1D5DB', // Border color
-              },
-            })}
           />
+        </div>
+      )}
+
+      {selectedFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selectedFilters.map((filter, idx) => (
+            <div
+              key={`${filter.type}-${filter.value}-${idx}`}
+              className="flex items-center bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
+            >
+              <span
+                className="cursor-pointer"
+                onClick={() => handleEdit(filter)}
+                title="Modifier ce filtre"
+              >
+                {filter.label}
+              </span>
+              <button
+                onClick={() => handleRemove(filter)}
+                className="ml-2 text-xs font-bold"
+                title="Supprimer ce filtre"
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

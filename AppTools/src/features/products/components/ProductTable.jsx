@@ -3,9 +3,10 @@ import { useProduct, useProductDataStore } from '../stores/productStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
+import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
 import { usePaginationStore } from '@/stores/usePaginationStore';
-import exportService from '../../../services/exportService';
+import exportService from '../../../services/exportService'; // Ajouter cette importation
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
@@ -110,6 +111,11 @@ function ProductTable(props) {
       : undefined,
   });
 
+  // 3. Ajoutez des console.log de débogage pour vérifier les valeurs:
+  console.log('syncEnabled:', syncEnabled);
+  console.log('handleSyncEntity disponible:', !!handleSyncEntity);
+  console.log('handleBatchSyncEntities disponible:', !!handleBatchSyncEntities);
+
   const handleExport = async (exportConfig) => {
     try {
       setExportLoading(true);
@@ -160,12 +166,6 @@ function ProductTable(props) {
       { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
     ];
 
-    const statusOptions = [
-      { label: 'Publié', value: 'status_published', type: 'status' },
-      { label: 'Brouillon', value: 'status_draft', type: 'status' },
-      { label: 'Archivé', value: 'status_archived', type: 'status' },
-    ];
-
     const imageOptions = [
       { label: 'Avec image', value: 'has_image', type: 'image' },
       { label: 'Sans image', value: 'no_image', type: 'image' },
@@ -204,7 +204,6 @@ function ProductTable(props) {
 
     return [
       ...wooOptions,
-      ...statusOptions,
       ...imageOptions,
       ...descriptionOptions,
       ...brandOptions,
@@ -262,7 +261,7 @@ function ProductTable(props) {
       data = data.filter((p) => !p.description || p.description.trim() === '');
     }
 
-    // Filtre par statut
+    // Ajouter le filtre par statut
     if (statusFilter) {
       const status = statusFilter.replace('status_', '');
       data = data.filter((p) => p.status === status);
@@ -272,38 +271,43 @@ function ProductTable(props) {
   }, [localProducts, selectedFilters]);
 
   return (
-    <EntityTable
-      data={filteredProducts}
-      isLoading={isLoading}
-      error={error}
-      columns={ENTITY_CONFIG.columns}
-      entityName="produit"
-      entityNamePlural="produits"
-      baseRoute="/products"
-      searchFields={['name', 'sku', 'designation', 'category']}
-      onDelete={handleDeleteEntity}
-      onBatchDelete={handleBatchDeleteEntities}
-      syncEnabled={syncEnabled}
-      actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-      batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export', 'status']}
-      onSync={handleSyncEntity}
-      onBatchSync={handleBatchSyncEntities}
-      onExport={handleExport}
-      onBatchStatusChange={handleBatchStatusChange}
-      pagination={{
-        enabled: true,
-        pageSize: persistedPageSize || 10,
-        showPageSizeOptions: true,
-        pageSizeOptions: [5, 10, 25, 50, 100],
-      }}
-      defaultSort={ENTITY_CONFIG.defaultSort}
-      paginationEntityId="product"
-      // Props pour UnifiedFilterBar
-      filterOptions={filterOptions}
-      onFilterChange={setSelectedFilters}
-      externalActiveFilters={selectedFilters}
-      {...props}
-    />
+    <>
+      <UnifiedFilterBar
+        filterOptions={filterOptions}
+        selectedFilters={selectedFilters}
+        onChange={setSelectedFilters}
+      />
+
+      <EntityTable
+        data={filteredProducts}
+        isLoading={isLoading}
+        error={error}
+        columns={ENTITY_CONFIG.columns}
+        entityName="produit"
+        entityNamePlural="produits"
+        baseRoute="/products"
+        searchFields={['name', 'sku', 'designation', 'category']}
+        onDelete={handleDeleteEntity}
+        onBatchDelete={handleBatchDeleteEntities}
+        syncEnabled={syncEnabled}
+        actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
+        batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export', 'status']} // Ajout de 'status'
+        onSync={handleSyncEntity}
+        onBatchSync={handleBatchSyncEntities}
+        onExport={handleExport}
+        onBatchStatusChange={handleBatchStatusChange} // Ajouter la nouvelle fonction
+        pagination={{
+          enabled: true,
+          pageSize: persistedPageSize || 10,
+          showPageSizeOptions: true,
+          pageSizeOptions: [5, 10, 25, 50, 100],
+        }}
+        defaultSort={ENTITY_CONFIG.defaultSort}
+        paginationEntityId="product"
+        externalActiveFilters={selectedFilters}
+        {...props}
+      />
+    </>
   );
 }
 

@@ -1,7 +1,7 @@
+// Composant principal EntityTable (index.jsx) AppTools\src\components\common\EntityTable\index.jsx
 import React, { useState } from 'react';
 import { SearchBar } from './components/SearchBar';
-// Import à ajouter:
-import UnifiedFilterBar from './components/UnifiedFilterBar';
+import { FilterBar } from './components/FilterBar';
 import { BatchActions } from './components/BatchActions';
 import { TableHeader } from './components/TableHeader';
 import { TableRow } from './components/TableRow';
@@ -12,7 +12,6 @@ import { useTableSort } from './hooks/useTableSort';
 import { useTableFilter } from './hooks/useTableFilter';
 import { useTablePagination } from './hooks/useTablePagination';
 import ExportConfigModal from './ExportConfigModal';
-import { X } from 'lucide-react';
 
 const EntityTable = ({
   data = [],
@@ -34,36 +33,29 @@ const EntityTable = ({
   onDelete,
   onSync,
   onExport,
+  onBatchStatusChange,
   onBatchDelete,
   onBatchSync,
-  onBatchStatusChange,
   onSearch,
   onFilter,
   searchFields = ['name'],
   filters = [],
   searchProcessor,
   paginationEntityId = 'default',
-  externalActiveFilters = [],
-  // Props pour UnifiedFilterBar
-  filterOptions = [],
-  onFilterChange,
+  externalActiveFilters = [], // Renommé ici pour éviter le conflit
 }) => {
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
-  const {
-    searchTerm,
-    activeFilters: tableActiveFilters,
-    filteredData,
-    handleSearchChange,
-    handleFilterChange,
-  } = useTableFilter(
-    sortedData,
-    searchFields,
-    filters,
-    onSearch,
-    onFilter,
-    searchProcessor,
-    paginationEntityId
-  );
+  const { searchTerm, activeFilters, filteredData, handleSearchChange, handleFilterChange } =
+    useTableFilter(
+      sortedData,
+      searchFields,
+      filters,
+      onSearch,
+      onFilter,
+      searchProcessor,
+      paginationEntityId
+    );
+
   const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(
     data,
     filteredData
@@ -87,10 +79,7 @@ const EntityTable = ({
   const filtersToUse =
     externalActiveFilters && externalActiveFilters.length > 0
       ? externalActiveFilters
-      : tableActiveFilters;
-
-  // Déterminer la fonction de changement de filtre à utiliser
-  const handleFilterChangeFunc = onFilterChange || handleFilterChange;
+      : activeFilters;
 
   const handleBatchDelete = () => {
     if (selectedItems.length === 0) return;
@@ -198,64 +187,23 @@ const EntityTable = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-      {' '}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-4">
-        {/* Disposition des éléments de recherche et filtre */}
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          <div className="w-full sm:w-auto">
-            <SearchBar
-              searchTerm={searchTerm}
-              onSearchChange={handleSearchChange}
-              entityNamePlural={entityNamePlural}
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
+          <SearchBar
+            searchTerm={searchTerm}
+            onSearchChange={handleSearchChange}
+            entityNamePlural={entityNamePlural}
+          />
+          {filters.length > 0 && (
+            <FilterBar
+              filters={filters}
+              activeFilters={activeFilters}
+              onFilterChange={handleFilterChange}
             />
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <UnifiedFilterBar
-              filterOptions={filterOptions}
-              selectedFilters={filtersToUse}
-              onChange={handleFilterChangeFunc}
-            />
-          </div>
+          )}
         </div>
-
-        {/* Affichage des filtres actifs */}
-        {filtersToUse && filtersToUse.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap gap-2">
-              {filtersToUse.map((filter, idx) => (
-                <div
-                  key={`${filter.type}-${filter.value}-${idx}`}
-                  className="flex items-center bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
-                >
-                  <span>{filter.label}</span>
-                  <button
-                    onClick={() =>
-                      handleFilterChangeFunc(
-                        filtersToUse.filter(
-                          (f) => !(f.type === filter.type && f.value === filter.value)
-                        )
-                      )
-                    }
-                    className="ml-2 text-xs font-bold"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Bouton pour effacer tous les filtres avec Lucide */}
-            <button
-              onClick={() => handleFilterChangeFunc([])}
-              className="ml-auto text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md"
-            >
-              <X className="h-3 w-3" />
-              Effacer tous les filtres
-            </button>
-          </div>
-        )}
       </div>
+
       {selectedItems.length > 0 && (
         <BatchActions
           selectedItems={selectedItems}
@@ -274,6 +222,7 @@ const EntityTable = ({
           onBatchStatusChange={handleBatchStatusChange} // Passer la nouvelle fonction
         />
       )}
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <TableHeader
@@ -322,6 +271,7 @@ const EntityTable = ({
           </tbody>
         </table>
       </div>
+
       {pagination.enabled && (totalPages > 1 || filteredData.length >= 5) && (
         <Pagination
           currentPage={currentPage}
@@ -335,6 +285,7 @@ const EntityTable = ({
           entityNamePlural={entityNamePlural}
         />
       )}
+
       <ExportConfigModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
