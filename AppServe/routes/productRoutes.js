@@ -66,6 +66,7 @@ router.post('/recalculate-counts', productController.recalculateAllCounts);
 
 // Ajouter les routes d'export
 router.post('/batch-status', productController.batchUpdateStatus);
+router.post('/batch-category', productController.batchUpdateCategory);
 router.post('/export/pdf', exportToPdf);
 router.post('/export/csv', exportToCsv);
 

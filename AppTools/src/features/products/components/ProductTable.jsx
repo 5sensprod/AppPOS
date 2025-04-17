@@ -8,6 +8,7 @@ import UnifiedFilterBar from '../../../components/common/EntityTable/components/
 import { useEntityFilter } from '@/hooks/useEntityFilter';
 import { usePaginationStore } from '@/stores/usePaginationStore';
 import exportService from '../../../services/exportService';
+import apiService from '../../../services/api';
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
@@ -20,8 +21,12 @@ function ProductTable(props) {
     updateProductsStatus,
   } = useProductDataStore();
 
-  // Utiliser le store des catégories hiérarchiques existant
-  const { loading: categoriesLoading } = useHierarchicalCategories();
+  // Utiliser le store des catégories hiérarchiques
+  const {
+    hierarchicalCategories,
+    loading: categoriesLoading,
+    fetchHierarchicalCategories,
+  } = useHierarchicalCategories();
 
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
 
@@ -46,6 +51,11 @@ function ProductTable(props) {
     };
 
     fetchInitialProducts();
+
+    // Charger les catégories hiérarchiques si elles ne sont pas déjà chargées
+    if (hierarchicalCategories.length === 0 && !categoriesLoading) {
+      fetchHierarchicalCategories();
+    }
 
     // Nettoyage lors du démontage du composant
     return () => {
@@ -142,12 +152,62 @@ function ProductTable(props) {
     }
   };
 
+  // Fonction pour changer la catégorie par lot
+  const handleBatchCategoryChange = async (productIds, categoryId) => {
+    try {
+      console.log(
+        `Modification de la catégorie pour ${productIds.length} produits vers la catégorie ${categoryId}`
+      );
+
+      // Appel à l'API pour mettre à jour les catégories
+      const response = await apiService.post('/api/products/batch-category', {
+        productIds,
+        categoryId,
+      });
+
+      // Vérifier si la réponse est un succès
+      if (response.data && response.data.success) {
+        console.log(`Catégorie modifiée avec succès: ${response.data.message}`);
+
+        // Recharger les produits après la mise à jour
+        await fetchProducts();
+
+        return true;
+      } else {
+        const errorMessage =
+          response.data?.message || 'Erreur lors de la mise à jour des catégories';
+        console.warn('Avertissement lors de la mise à jour des catégories:', errorMessage);
+        setError(`Avertissement: ${errorMessage}`);
+
+        // Si la mise à jour a partiellement réussi, on recharge quand même
+        if (response.data && response.data.success) {
+          await fetchProducts();
+        }
+
+        return false;
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de la catégorie:', error);
+      setError(
+        `Erreur lors de la mise à jour de la catégorie: ${error.message || 'Erreur inconnue'}`
+      );
+      return false;
+    }
+  };
+
   const isLoading = productsLoading || operationLoading || exportLoading || categoriesLoading;
 
+  // Préparation des options de filtre pour les produits
   const filterOptions = useMemo(() => {
     const wooOptions = [
       { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
       { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
+    ];
+
+    const statusOptions = [
+      { label: 'Publié', value: 'status_published', type: 'status' },
+      { label: 'Brouillon', value: 'status_draft', type: 'status' },
+      { label: 'Archivé', value: 'status_archived', type: 'status' },
     ];
 
     const imageOptions = [
@@ -180,12 +240,55 @@ function ProductTable(props) {
 
     return [
       ...wooOptions,
+      ...statusOptions,
       ...imageOptions,
       ...descriptionOptions,
       ...brandOptions,
       ...supplierOptions,
     ];
   }, [products]);
+
+  // Options de catégories pour le menu déroulant de changement de catégorie par lot
+  // Utilisation du store hierarchicalCategories comme dans UnifiedFilterBar
+  const categorySelectOptions = useMemo(() => {
+    if (!hierarchicalCategories || hierarchicalCategories.length === 0) {
+      // Si les catégories hiérarchiques ne sont pas encore chargées,
+      // utiliser les catégories des produits comme fallback
+      const categoriesFromProducts = new Map();
+
+      products.forEach((product) => {
+        if (product.category_info && Array.isArray(product.category_info.refs)) {
+          product.category_info.refs.forEach((cat) => {
+            if (cat.id && cat.name) {
+              categoriesFromProducts.set(cat.id, {
+                value: cat.id,
+                label: cat.path_string || cat.name,
+              });
+            }
+          });
+        }
+      });
+
+      return Array.from(categoriesFromProducts.values()).sort((a, b) =>
+        a.label.localeCompare(b.label)
+      );
+    }
+
+    // Fonction récursive pour transformer les catégories hiérarchiques en liste plate
+    const transform = (cats, path = '') => {
+      return cats.flatMap((cat) => [
+        {
+          value: cat._id,
+          label: path ? `${path} > ${cat.name}` : cat.name,
+        },
+        ...(cat.children && cat.children.length > 0
+          ? transform(cat.children, path ? `${path} > ${cat.name}` : cat.name)
+          : []),
+      ]);
+    };
+
+    return transform(hierarchicalCategories).sort((a, b) => a.label.localeCompare(b.label));
+  }, [hierarchicalCategories, products]);
 
   const filteredProducts = useMemo(() => {
     let data = localProducts;
@@ -282,11 +385,13 @@ function ProductTable(props) {
         onBatchDelete={handleBatchDeleteEntities}
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-        batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export', 'status']}
+        batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export', 'status', 'category']} // Ajout de 'category'
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities}
         onExport={handleExport}
         onBatchStatusChange={handleBatchStatusChange}
+        onBatchCategoryChange={handleBatchCategoryChange}
+        categoryOptions={categorySelectOptions}
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,

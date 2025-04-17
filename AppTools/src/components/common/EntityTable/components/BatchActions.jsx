@@ -1,25 +1,28 @@
 // src/components/common/EntityTable/components/BatchActions.jsx
 import React, { useState } from 'react';
-import { Trash2, RefreshCw, FileText, ListFilter } from 'lucide-react';
+import { Trash2, RefreshCw, FileText, ListFilter, Folder } from 'lucide-react';
 
 export const BatchActions = ({
   selectedItems = [],
   entityName = '',
   entityNamePlural = '',
-  batchActions = ['delete', 'sync', 'export', 'status'], // Ajout de 'status'
+  batchActions = ['delete', 'sync', 'export', 'status', 'category'], // Ajout de 'category'
   onBatchDelete,
   onBatchSync,
   onBatchExport,
-  onBatchStatusChange, // Nouvelle prop pour gérer le changement de statut
+  onBatchStatusChange,
+  onBatchCategoryChange, // Nouvelle prop pour gérer le changement de catégorie
+  categoryOptions = [], // Options de catégories disponibles
 }) => {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   if (selectedItems.length === 0) return null;
 
   const selectedCount = selectedItems.length;
   const itemLabel = selectedCount === 1 ? entityName : entityNamePlural;
 
-  // Options pour le champ statut (reprises de WooCommerceTab)
+  // Options pour le champ statut
   const statusOptions = [
     {
       value: 'published',
@@ -38,6 +41,14 @@ export const BatchActions = ({
     setShowStatusDropdown(false);
   };
 
+  // Gestion du changement de catégorie
+  const handleCategoryChange = (categoryId) => {
+    if (typeof onBatchCategoryChange === 'function') {
+      onBatchCategoryChange(selectedItems, categoryId);
+    }
+    setShowCategoryDropdown(false);
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 p-4 flex flex-col sm:flex-row justify-between items-center border-b border-gray-200 dark:border-gray-700">
       <div className="text-gray-700 dark:text-gray-300 mb-2 sm:mb-0">
@@ -45,6 +56,38 @@ export const BatchActions = ({
         {selectedCount > 1 ? 's' : ''}
       </div>
       <div className="flex space-x-2">
+        {/* Menu déroulant pour la catégorie */}
+        {batchActions.includes('category') &&
+          typeof onBatchCategoryChange === 'function' &&
+          categoryOptions.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                className="px-3 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 rounded-md flex items-center text-sm"
+                aria-label="Changer la catégorie des éléments sélectionnés"
+              >
+                <Folder className="h-4 w-4 mr-1" />
+                Catégorie
+              </button>
+
+              {showCategoryDropdown && (
+                <div className="absolute right-0 z-10 mt-1 w-48 max-h-64 overflow-y-auto rounded-md bg-white shadow-lg dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                  <div className="py-1">
+                    {categoryOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => handleCategoryChange(option.value)}
+                        className="w-full text-left px-4 py-2 text-sm bg-white hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
         {/* Menu déroulant pour le statut */}
         {batchActions.includes('status') && typeof onBatchStatusChange === 'function' && (
           <div className="relative">

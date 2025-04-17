@@ -23,7 +23,7 @@ const EntityTable = ({
   baseRoute = '',
   defaultSort = { field: 'name', direction: 'asc' },
   actions = ['view', 'edit', 'delete', 'sync'],
-  batchActions = ['delete', 'sync', 'export', 'status'],
+  batchActions = ['delete', 'sync', 'export', 'status', 'category'],
   pagination = {
     enabled: true,
     pageSize: 10,
@@ -34,6 +34,8 @@ const EntityTable = ({
   onSync,
   onExport,
   onBatchStatusChange,
+  onBatchCategoryChange, // Nouvelle prop
+  categoryOptions = [],
   onBatchDelete,
   onBatchSync,
   onSearch,
@@ -170,6 +172,24 @@ const EntityTable = ({
     }
   };
 
+  const handleBatchCategoryChange = (itemIds, categoryId) => {
+    if (itemIds.length === 0) return;
+
+    console.log(
+      `Changement de catégorie par lot pour ${itemIds.length} éléments vers la catégorie ${categoryId}`
+    );
+
+    if (typeof onBatchCategoryChange === 'function') {
+      onBatchCategoryChange(itemIds, categoryId)
+        .then(() => {
+          console.log(`Catégorie modifiée avec succès pour ${itemIds.length} éléments`);
+        })
+        .catch((err) => {
+          console.error(`Erreur lors du changement de catégorie: ${err.message}`);
+        });
+    }
+  };
+
   if (isLoading && data.length === 0) {
     return <LoadingState />;
   }
@@ -214,12 +234,16 @@ const EntityTable = ({
             if (action === 'delete') return typeof onDelete === 'function' || hasBatchDelete;
             if (action === 'export') return hasExport;
             if (action === 'status') return typeof onBatchStatusChange === 'function';
+            if (action === 'category')
+              return typeof onBatchCategoryChange === 'function' && categoryOptions.length > 0;
             return true; // pour toute autre action
           })}
           onBatchDelete={handleBatchDelete}
           onBatchSync={hasSync || hasBatchSync ? handleBatchSync : undefined}
           onBatchExport={hasExport ? handleBatchExport : undefined}
-          onBatchStatusChange={handleBatchStatusChange} // Passer la nouvelle fonction
+          onBatchStatusChange={handleBatchStatusChange}
+          onBatchCategoryChange={handleBatchCategoryChange} // Passer la nouvelle fonction
+          categoryOptions={categoryOptions} // Passer les options de catégories
         />
       )}
 

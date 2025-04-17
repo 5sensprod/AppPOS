@@ -7,7 +7,7 @@ const productWooCommerceService = require('../services/ProductWooCommerceService
 const ResponseHandler = require('../handlers/ResponseHandler');
 const { getEntityEventService } = require('../services/events/entityEvents');
 const { createProduct, updateProduct, deleteProduct } = require('../services/productService');
-
+const Category = require('../models/Category');
 class ProductController extends BaseController {
   constructor() {
     super(Product, productWooCommerceService, {
@@ -166,6 +166,112 @@ class ProductController extends BaseController {
     }
   }
 
+  async batchUpdateCategory(req, res) {
+    try {
+      const { productIds, categoryId } = req.body;
+
+      // Validation
+      if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+        return ResponseHandler.badRequest(
+          res,
+          'IDs de produits requis et doivent être un tableau non vide'
+        );
+      }
+
+      if (!categoryId) {
+        return ResponseHandler.badRequest(res, 'ID de catégorie requis');
+      }
+
+      // Vérifier si la catégorie existe
+      const category = await Category.findById(categoryId);
+      if (!category) {
+        return ResponseHandler.notFound(res, 'Catégorie non trouvée');
+      }
+
+      const updatedProducts = [];
+      const errors = [];
+
+      // Traiter chaque produit
+      for (const productId of productIds) {
+        try {
+          // Chercher le produit
+          const product = await this.model.findById(productId);
+
+          if (!product) {
+            errors.push({
+              productId,
+              message: 'Produit non trouvé',
+            });
+            continue;
+          }
+
+          // Préparer les catégories
+          // Nous conservons d'éventuelles catégories secondaires
+          const currentCategories = product.categories || [];
+
+          // Nouvelle liste de catégories avec la nouvelle catégorie principale en premier
+          let newCategories = [categoryId];
+
+          // Ajouter les autres catégories existantes qui ne sont pas la nouvelle catégorie
+          for (const catId of currentCategories) {
+            if (catId !== categoryId) {
+              newCategories.push(catId);
+            }
+          }
+
+          // Mettre à jour le produit
+          const updatedData = {
+            ...product,
+            categories: newCategories,
+            category_id: categoryId, // Définir comme catégorie principale
+            // Si le produit est déjà synchronisé avec WooCommerce, marquer comme en attente de synchro
+            pending_sync: product.woo_id ? true : product.pending_sync,
+          };
+
+          // Utiliser la méthode update existante
+          await this.model.update(productId, updatedData);
+
+          // Déclencher un événement de mise à jour si nécessaire
+          if (this.eventService) {
+            this.eventService.emit('updated', {
+              id: productId,
+              data: updatedData,
+              original: product,
+            });
+          }
+
+          updatedProducts.push(productId);
+        } catch (error) {
+          console.error(
+            `Erreur lors de la mise à jour de la catégorie du produit ${productId}:`,
+            error
+          );
+          errors.push({
+            productId,
+            message: error.message || 'Erreur de mise à jour',
+          });
+        }
+      }
+
+      // Préparer la réponse
+      const result = {
+        success: updatedProducts.length > 0,
+        message: `${updatedProducts.length} produits mis à jour avec succès${errors.length > 0 ? `, ${errors.length} erreurs` : ''}`,
+        updatedProducts,
+      };
+
+      // Ajouter les erreurs à la réponse si nécessaire
+      if (errors.length > 0) {
+        result.errors = errors;
+      }
+
+      return ResponseHandler.success(res, result);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour par lot des catégories:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   async recalculateAllCounts(req, res) {
     try {
       await Brand.recalculateAllProductCounts();
@@ -212,6 +318,7 @@ module.exports = exportController(productController, [
   'update',
   'delete',
   'batchUpdateStatus',
+  'batchUpdateCategory',
   'uploadImage',
   'updateImageMetadata',
   'deleteImage',
