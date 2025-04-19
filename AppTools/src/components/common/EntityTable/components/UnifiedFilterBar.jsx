@@ -8,7 +8,8 @@ const UnifiedFilterBar = ({
   selectedFilters = [],
   onChange,
   hierarchicalEnabled = true, // Gardé pour compatibilité
-  enableCategories = true, // Nouveau paramètre pour activer/désactiver les catégories
+  enableCategories = true,
+  enableStatusFilter = true,
 }) => {
   const [editingType, setEditingType] = useState(null);
   const [lastEditedType, setLastEditedType] = useState(null);
@@ -57,8 +58,13 @@ const UnifiedFilterBar = ({
 
   // Combiner toutes les options de filtre
   const allFilterOptions = useMemo(() => {
-    return [...filterOptions, ...statusOptions, ...categoryOptions];
-  }, [filterOptions, categoryOptions, statusOptions]);
+    // Inclure le filtre de statut uniquement si enableStatusFilter est true
+    if (enableStatusFilter) {
+      return [...filterOptions, ...statusOptions, ...categoryOptions];
+    } else {
+      return [...filterOptions, ...categoryOptions];
+    }
+  }, [filterOptions, categoryOptions, statusOptions, enableStatusFilter]);
 
   const filterGroups = useMemo(() => {
     return allFilterOptions.reduce((acc, option) => {

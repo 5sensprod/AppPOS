@@ -297,6 +297,7 @@ function CategoriesTable(props) {
         selectedFilters={selectedFilters}
         onChange={setSelectedFilters}
         enableCategories={true}
+        enableStatusFilter={false} // Désactiver le filtre de statut pour CategoriesTable
       />
 
       <EntityTable

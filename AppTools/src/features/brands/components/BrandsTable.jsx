@@ -92,7 +92,8 @@ function BrandsTable(props) {
         filterOptions={filterOptions}
         selectedFilters={selectedFilters}
         onChange={setSelectedFilters}
-        enableCategories={false} // Désactiver les catégories pour BrandsTable
+        enableCategories={false}
+        enableStatusFilter={false}
       />
 
       <EntityTable
