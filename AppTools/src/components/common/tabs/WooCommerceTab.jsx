@@ -4,7 +4,14 @@ import { CheckCircle, AlertCircle, Wand2 } from 'lucide-react';
 import { useFormContext } from 'react-hook-form';
 import apiService from '../../../services/api';
 
-const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStatus = false }) => {
+const WooCommerceTab = ({
+  entity,
+  entityType,
+  onSync,
+  editable = false,
+  showStatus = false,
+  enableTitleGeneration = true, // Nouvelle prop pour activer/désactiver la génération de titre
+}) => {
   // Récupération du contexte du formulaire si en mode édition
   const formContext = editable ? useFormContext() : null;
   const register = formContext?.register;
@@ -222,22 +229,24 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
                     },
                   })}
                   placeholder="Titre sur la boutique en ligne"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
-                {/* Bouton de génération de titre */}
-                <button
-                  type="button"
-                  onClick={generateTitle}
-                  disabled={isTitleGenerating}
-                  className="flex items-center justify-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-600 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
-                  title="Générer un titre avec l'IA"
-                >
-                  {isTitleGenerating ? (
-                    <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                  ) : (
-                    <Wand2 size={18} />
-                  )}
-                </button>
+                {/* Bouton de génération de titre - affiché seulement si enableTitleGeneration est true */}
+                {enableTitleGeneration && (
+                  <button
+                    type="button"
+                    onClick={generateTitle}
+                    disabled={isTitleGenerating}
+                    className="flex items-center justify-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-600 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
+                    title="Générer un titre avec l'IA"
+                  >
+                    {isTitleGenerating ? (
+                      <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                    ) : (
+                      <Wand2 size={18} />
+                    )}
+                  </button>
+                )}
               </div>
 
               {titleError && (
@@ -250,6 +259,7 @@ const WooCommerceTab = ({ entity, entityType, onSync, editable = false, showStat
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 Le titre sera utilisé pour l'URL du produit sur la boutique en ligne
                 {entityType === 'product' &&
+                  enableTitleGeneration &&
                   '. Cliquez sur la baguette magique pour générer automatiquement un titre commercial.'}
               </p>
             </div>

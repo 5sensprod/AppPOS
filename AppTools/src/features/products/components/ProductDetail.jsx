@@ -107,6 +107,7 @@ function ProductDetail() {
               onSync={handleSync}
               editable={editable}
               showStatus={true}
+              enableTitleGeneration={true} // Explicitement activer la génération de titre pour les produits
             />
           );
         default:

@@ -70,6 +70,7 @@ function BrandDetail() {
             onSync={handleSync}
             editable={editable}
             showStatus={false} // Explicitement cacher le statut pour les marques
+            enableTitleGeneration={false} // Désactiver la génération de titre pour les marques
           />
         );
       default:

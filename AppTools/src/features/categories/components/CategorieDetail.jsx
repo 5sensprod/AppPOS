@@ -109,6 +109,7 @@ function CategorieDetail() {
               onSync={handleSync}
               editable={editable}
               showStatus={false} // Explicitement cacher le statut pour les catégories
+              enableTitleGeneration={false} // Désactiver la génération de titre pour les catégories
             />
           );
 
