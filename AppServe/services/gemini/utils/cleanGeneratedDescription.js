@@ -78,6 +78,12 @@ function cleanGeneratedDescription(description) {
   // 10. S'assurer que les tableaux HTML sont bien formés
   cleaned = cleaned.replace(/<table>\s*<tbody>/g, '<table>');
   cleaned = cleaned.replace(/<\/tbody>\s*<\/table>/g, '</table>');
+  cleaned = cleaned.replace(/^```html\s*/i, '');
+
+  // Supprimer toute présence résiduelle de balises <html> ou <head>
+  cleaned = cleaned.replace(/<html[^>]*>/gi, '');
+  cleaned = cleaned.replace(/<\/html>/gi, '');
+  cleaned = cleaned.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
 
   // 11. Échapper les chevrons isolés qui ne font pas partie de balises HTML (NOUVEAU)
   // Version simplifiée qui peut avoir des limitations
