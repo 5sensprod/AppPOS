@@ -217,11 +217,71 @@ function CategoriesTable(props) {
   const filteredData = useMemo(() => {
     let data = processedData;
 
+    // Filtre par synchronisation WooCommerce
     const wooFilter = selectedFilters.find((f) => f.type === 'woo')?.value;
     if (wooFilter === 'woo_synced') {
       data = data.filter((cat) => cat.woo_id != null);
     } else if (wooFilter === 'woo_unsynced') {
       data = data.filter((cat) => cat.woo_id == null);
+    }
+
+    // Filtre par catégorie
+    const categoryFilters = selectedFilters.filter((f) => f.type === 'category');
+    if (categoryFilters.length > 0) {
+      const categoryIds = categoryFilters.map((f) => f.value.replace('category_', ''));
+
+      // Fonction pour trouver tous les IDs de catégories enfants d'une catégorie donnée
+      const findAllChildCategoryIds = (categoryId) => {
+        const result = [categoryId]; // Inclure la catégorie elle-même
+
+        // Fonction récursive pour parcourir l'arbre des catégories
+        const findChildren = (catId) => {
+          const category = hierarchicalCategories.find((cat) => cat._id === catId);
+
+          // Si la catégorie existe et a des enfants
+          if (category && category.children && category.children.length > 0) {
+            category.children.forEach((childCat) => {
+              result.push(childCat._id); // Ajouter l'ID de l'enfant
+              findChildren(childCat._id); // Chercher récursivement ses enfants
+            });
+          }
+        };
+
+        // Initialiser la recherche récursive
+        findChildren(categoryId);
+        return result;
+      };
+
+      // Collecter tous les IDs de catégories, y compris les enfants
+      const allCategoryIds = [];
+      categoryIds.forEach((catId) => {
+        allCategoryIds.push(...findAllChildCategoryIds(catId));
+      });
+
+      // Supprimer les doublons
+      const uniqueCategoryIds = [...new Set(allCategoryIds)];
+
+      console.log('IDs de catégories sélectionnées:', categoryIds);
+      console.log('IDs de catégories y compris enfants:', uniqueCategoryIds);
+
+      // Fonction pour vérifier si un produit appartient à une catégorie
+      const productInCategory = (product, categoryId) => {
+        // Vérifier la catégorie principale
+        if (product.category_id === categoryId) return true;
+
+        // Vérifier les catégories additionnelles
+        if (Array.isArray(product.categories) && product.categories.includes(categoryId))
+          return true;
+
+        // Vérifier dans les category_info.refs si disponible
+        if (product.category_info?.refs) {
+          return product.category_info.refs.some((ref) => ref.id === categoryId);
+        }
+
+        return false;
+      };
+
+      data = data.filter((p) => uniqueCategoryIds.some((catId) => productInCategory(p, catId)));
     }
 
     return data;
@@ -236,7 +296,7 @@ function CategoriesTable(props) {
         ]}
         selectedFilters={selectedFilters}
         onChange={setSelectedFilters}
-        enableCategories={false}
+        enableCategories={true}
       />
 
       <EntityTable
