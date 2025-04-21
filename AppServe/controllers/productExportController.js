@@ -585,6 +585,7 @@ class ProductExportController {
   getColumnsConfig(selectedColumns) {
     // Configuration de toutes les colonnes disponibles
     const allColumns = [
+      { key: '_id', label: 'ID', weight: 2 }, // Ajout de l'ID
       { key: 'sku', label: 'Référence', weight: 2 },
       { key: 'designation', label: 'Désignation', weight: 3 },
       { key: 'name', label: 'Nom', weight: 3 },
@@ -614,6 +615,9 @@ class ProductExportController {
    */
   formatCellValue(product, key) {
     switch (key) {
+      case '_id': // Ajout du cas pour l'ID
+        return product[key] || '-';
+
       case 'purchase_price':
       case 'price':
         return product[key] ? `${product[key].toFixed(2)} €` : '0.00 €';

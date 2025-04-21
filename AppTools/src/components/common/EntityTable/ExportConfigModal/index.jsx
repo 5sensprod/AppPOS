@@ -1,4 +1,4 @@
-// src/components/common/ExportConfigModal/index.jsx avec titre automatique basé sur les filtres
+// src/components/common/ExportConfigModal/index.jsx avec ID comme option d'export uniquement
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Download, FileSpreadsheet } from 'lucide-react';
 import { ENTITY_CONFIG } from '../../../../features/products/constants';
@@ -22,6 +22,9 @@ const ExportConfigModal = ({
   const [useCustomColumn, setUseCustomColumn] = useState(false);
   const [customColumnTitle, setCustomColumnTitle] = useState('Décompte');
 
+  // Option pour inclure l'ID
+  const [includeId, setIncludeId] = useState(false);
+
   // Créer une liste de colonnes disponibles à partir des colonnes ENTITY_CONFIG
   const availableColumns = ENTITY_CONFIG.columns
     .filter((column) => column.key !== 'image' && column.key !== 'actions')
@@ -30,6 +33,13 @@ const ExportConfigModal = ({
       label: column.label,
       selected: true,
     }));
+
+  // Fonction pour assainir le nom de fichier
+  const sanitizeFileName = (fileName) => {
+    if (!fileName) return 'export';
+    // Remplacer les caractères non autorisés pour Windows par des underscores
+    return fileName.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_');
+  };
 
   // Initialiser les colonnes sélectionnées et le titre au chargement du modal
   useEffect(() => {
@@ -40,6 +50,7 @@ const ExportConfigModal = ({
         .map((col) => col.key);
 
       setSelectedColumns(defaultSelectedColumns);
+      setIncludeId(false); // Par défaut, ne pas inclure l'ID
 
       // Générer le titre de l'export en incluant les filtres actifs
       generateExportTitle();
@@ -80,7 +91,8 @@ const ExportConfigModal = ({
       }
     }
 
-    setExportTitle(baseTitle);
+    // Assainir le titre pour éviter les caractères problématiques
+    setExportTitle(sanitizeFileName(baseTitle));
   };
 
   // Fonction pour basculer la sélection d'une colonne
@@ -95,11 +107,17 @@ const ExportConfigModal = ({
     setIsLoading(true);
 
     try {
+      // Assainir le titre une dernière fois avant l'export
+      const sanitizedTitle = sanitizeFileName(exportTitle);
+
+      // Préparer les colonnes à exporter, en ajoutant l'ID si demandé
+      const columnsToExport = includeId ? ['_id', ...selectedColumns] : selectedColumns;
+
       await onExport({
         selectedItems,
-        selectedColumns,
+        selectedColumns: columnsToExport,
         orientation,
-        title: exportTitle,
+        title: sanitizedTitle,
         format: exportFormat,
         customColumn: useCustomColumn ? { title: customColumnTitle } : null,
       });
@@ -211,6 +229,29 @@ const ExportConfigModal = ({
             </div>
           )}
 
+          {/* Option pour inclure l'ID */}
+          <div className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-4">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Inclure l'identifiant unique (ID)
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={includeId}
+                  onChange={() => setIncludeId(!includeId)}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="ml-2 text-gray-700 dark:text-gray-300">Activer</span>
+              </label>
+            </div>
+            {includeId && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                L'identifiant unique sera inclus comme première colonne dans l'export.
+              </p>
+            )}
+          </div>
+
           {/* Colonne personnalisée */}
           <div className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-4">
             <div className="flex items-center justify-between">
@@ -278,7 +319,8 @@ const ExportConfigModal = ({
               {selectedItems.length === 1 ? entityName : entityNamePlural} au format{' '}
               <span className="font-semibold">{exportFormat.toUpperCase()}</span> avec{' '}
               <span className="font-semibold">{selectedColumns.length}</span> colonnes{' '}
-              {useCustomColumn ? `+ 1 colonne "${customColumnTitle}"` : ''}{' '}
+              {includeId ? '+ ID ' : ''}
+              {useCustomColumn ? `+ colonne "${customColumnTitle}" ` : ''}
               {exportFormat === 'pdf'
                 ? `en orientation ${orientation === 'portrait' ? 'portrait' : 'paysage'}`
                 : ''}
