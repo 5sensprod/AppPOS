@@ -10,6 +10,18 @@ const ResponseHandler = require('../handlers/ResponseHandler');
 const tempDir = os.tmpdir();
 
 class ProductExportController {
+  // Ajouter cette fonction utilitaire au début de la classe ProductExportController
+  /**
+   * Assainit un nom de fichier en remplaçant les caractères non autorisés
+   * @param {string} fileName - Le nom de fichier à assainir
+   * @returns {string} - Le nom de fichier assaini
+   */
+  sanitizeFileName(fileName) {
+    if (!fileName) return 'export';
+    // Remplacer les caractères non autorisés pour Windows par des underscores
+    return fileName.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_');
+  }
+
   /**
    * Exporte les produits au format PDF
    * @param {Request} req - La requête Express
@@ -22,8 +34,8 @@ class ProductExportController {
         selectedColumns = [],
         orientation = 'portrait',
         title = 'Inventaire produits',
-        products = [], // Si les produits complets sont directement fournis
-        customColumn = null, // Nouvelle option pour colonne personnalisée
+        products = [],
+        customColumn = null,
       } = req.body;
 
       // Si aucun produit n'est fourni directement, les récupérer par ID
@@ -36,11 +48,18 @@ class ProductExportController {
         return ResponseHandler.badRequest(res, 'Aucun produit à exporter');
       }
 
-      // Générer un nom de fichier unique
-      const filename = `${title.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+      // Générer un nom de fichier unique avec sanitization
+      const sanitizedTitle = this.sanitizeFileName(title);
+      const filename = `${sanitizedTitle}_${Date.now()}.pdf`;
+
+      // Vérifier que le dossier temporaire existe
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
       const tempFilePath = path.join(tempDir, filename);
 
-      // Créer le document PDF
+      // Reste du code inchangé...
       await this.generatePdf(
         tempFilePath,
         productsToExport,
@@ -82,7 +101,7 @@ class ProductExportController {
         selectedColumns = [],
         title = 'Inventaire produits',
         products = [],
-        customColumn = null, // Nouvelle option pour colonne personnalisée
+        customColumn = null,
       } = req.body;
 
       // Si aucun produit n'est fourni directement, les récupérer par ID
@@ -95,8 +114,15 @@ class ProductExportController {
         return ResponseHandler.badRequest(res, 'Aucun produit à exporter');
       }
 
-      // Générer un nom de fichier unique
-      const filename = `${title.replace(/\s+/g, '_')}_${Date.now()}.csv`;
+      // Générer un nom de fichier unique avec sanitization
+      const sanitizedTitle = this.sanitizeFileName(title);
+      const filename = `${sanitizedTitle}_${Date.now()}.csv`;
+
+      // Vérifier que le dossier temporaire existe
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
       const tempFilePath = path.join(tempDir, filename);
 
       // Générer le contenu CSV
