@@ -113,6 +113,10 @@ function ProductTable(props) {
     }
   };
 
+  const handleOpenWebCapture = () => {
+    window.electronAPI.openWebCaptureWindow('https://www.qwant.com/?q=prodipe+basse+5+cordes');
+  };
+
   return (
     <>
       <UnifiedFilterBar
@@ -120,6 +124,22 @@ function ProductTable(props) {
         selectedFilters={selectedFilters}
         onChange={setSelectedFilters}
       />
+
+      <div style={{ margin: '10px 0' }}>
+        <button
+          onClick={handleOpenWebCapture}
+          style={{
+            padding: '8px 12px',
+            fontSize: '14px',
+            cursor: 'pointer',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            backgroundColor: '#f5f5f5',
+          }}
+        >
+          🌐 Ouvrir Qwant (WebView)
+        </button>
+      </div>
 
       <EntityTable
         data={filteredProducts}

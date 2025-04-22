@@ -1,6 +1,7 @@
 // main.js
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const bonjour = require('bonjour')(); // ✅ ajout nécessaire
@@ -155,6 +156,30 @@ ipcMain.on('request-network-urls', () => {
   if (mainWindow && webServerInstance) {
     webServer.sendUrlsToWindow(mainWindow);
   }
+});
+
+ipcMain.on('open-web-capture-window', (event, url) => {
+  const captureWindow = new BrowserWindow({
+    width: 1000,
+    height: 800,
+    title: 'Web Capture Tool',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      devTools: true,
+    },
+  });
+
+  captureWindow.loadURL(url);
+
+  // Quand la page est complètement chargée, on injecte le script
+  captureWindow.webContents.on('did-finish-load', () => {
+    const script = fs.readFileSync(path.join(__dirname, 'content-selector-optimized.js'), 'utf8');
+    captureWindow.webContents
+      .executeJavaScript(script)
+      .then(() => console.log('UserScript injecté avec succès'))
+      .catch((err) => console.error('Injection échouée :', err));
+  });
 });
 
 // Créer la fenêtre quand l'app est prête
