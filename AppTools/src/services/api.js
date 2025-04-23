@@ -12,7 +12,6 @@ class ApiService {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         await apiConfigService.init();
-        console.log('✅ Service API initialisé');
         return true;
       } catch (error) {
         console.warn(`⚠️ Tentative ${attempt}/${retries} échouée`);
@@ -26,7 +25,6 @@ class ApiService {
   async request(method, url, data = null, config = {}) {
     try {
       const fullUrl = apiConfigService.createUrl(url);
-      console.log(`🔄 Requête ${method.toUpperCase()} vers: ${fullUrl}`);
       return this.api[method](fullUrl, data, config);
     } catch (error) {
       console.error(`❌ Erreur sur la requête ${method.toUpperCase()} ${url}:`, error);
