@@ -12,6 +12,7 @@ const environment = require(path.join(__dirname, 'modules/environment'));
 const apiServer = require(path.join(__dirname, 'modules/apiServer'));
 const updater = require(path.join(__dirname, 'modules/updater'));
 const webServer = require(path.join(__dirname, 'modules/webServer'));
+const { setupWebCaptureListener } = require(path.join(__dirname, 'modules', 'webCaptureHandler'));
 
 // Variables globales
 let mainWindow;
@@ -158,29 +159,7 @@ ipcMain.on('request-network-urls', () => {
   }
 });
 
-ipcMain.on('open-web-capture-window', (event, url) => {
-  const captureWindow = new BrowserWindow({
-    width: 1000,
-    height: 800,
-    title: 'Web Capture Tool',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      devTools: true,
-    },
-  });
-
-  captureWindow.loadURL(url);
-
-  // Quand la page est complètement chargée, on injecte le script
-  captureWindow.webContents.on('did-finish-load', () => {
-    const script = fs.readFileSync(path.join(__dirname, 'content-selector-optimized.js'), 'utf8');
-    captureWindow.webContents
-      .executeJavaScript(script)
-      .then(() => console.log('UserScript injecté avec succès'))
-      .catch((err) => console.error('Injection échouée :', err));
-  });
-});
+setupWebCaptureListener(ipcMain);
 
 // Créer la fenêtre quand l'app est prête
 app.whenReady().then(() => {
