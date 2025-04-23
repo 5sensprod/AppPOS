@@ -55,7 +55,7 @@ function ProductTable(props) {
 
   const categorySelectOptions = useCategoryOptions(hierarchicalCategories, products);
 
-  const { handleCreateSheet, openWebCaptureWindow } = useWebCapture(products);
+  const { handleCreateSheet, handleContentCapture } = useWebCapture(products);
 
   useEffect(() => {
     if (syncEnabled) initWebSocket();
@@ -118,6 +118,7 @@ function ProductTable(props) {
           'export',
           'status',
           'category',
+          'captureContent',
         ]}
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities}
@@ -126,6 +127,7 @@ function ProductTable(props) {
         onBatchCategoryChange={handleBatchCategoryChange}
         onCreateSheet={handleCreateSheet}
         categoryOptions={categorySelectOptions}
+        onCaptureContent={handleContentCapture}
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,

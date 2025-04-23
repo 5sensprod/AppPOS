@@ -23,7 +23,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWebSocketSupport: () => ({ supported: true }),
 
   // 🔥 Nouvelle fonctionnalité : ouvrir une fenêtre WebView externe (web capture)
-  openWebCaptureWindow: (url) => ipcRenderer.send('open-web-capture-window', url),
+  openWebCaptureWindow: (url, options = {}) =>
+    ipcRenderer.send('open-web-capture-window', url, options),
 });
 
 window.addEventListener('DOMContentLoaded', () => {

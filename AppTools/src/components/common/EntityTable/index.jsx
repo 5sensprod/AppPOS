@@ -36,6 +36,7 @@ const EntityTable = ({
   onBatchStatusChange,
   onBatchCategoryChange,
   onCreateSheet,
+  onCaptureContent,
   categoryOptions = [],
   onBatchDelete,
   onBatchSync,
@@ -182,6 +183,7 @@ const EntityTable = ({
     if (action === 'category')
       return typeof onBatchCategoryChange === 'function' && categoryOptions.length > 0;
     if (action === 'createSheet') return hasCreateSheet;
+    if (action === 'captureContent') return typeof onCaptureContent === 'function';
     return true;
   });
 
@@ -216,6 +218,7 @@ const EntityTable = ({
           onBatchStatusChange={handleBatchStatusChange}
           onBatchCategoryChange={handleBatchCategoryChange}
           onCreateSheet={hasCreateSheet ? onCreateSheet : undefined}
+          onCaptureContent={onCaptureContent}
           categoryOptions={categoryOptions}
         />
       )}

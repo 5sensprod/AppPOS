@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { Trash2, RefreshCw, FileText, ListFilter, Folder, FileOutput } from 'lucide-react';
+import {
+  Trash2,
+  RefreshCw,
+  FileText,
+  ListFilter,
+  Folder,
+  FileOutput,
+  FileSearch,
+} from 'lucide-react';
 
 // Generic dropdown component without clsx
 const Dropdown = ({
@@ -127,6 +135,13 @@ export const BatchActions = ({
       label: 'Synchroniser',
       buttonClass: 'bg-blue-100 hover:bg-blue-200 text-blue-800',
       onAction: onBatchSync,
+    },
+    captureContent: {
+      available: typeof onCaptureContent === 'function',
+      icon: FileSearch, // Importez cette icône
+      label: 'Capture de contenu',
+      buttonClass: 'bg-teal-100 hover:bg-teal-200 text-teal-800',
+      onAction: () => onCaptureContent(selectedItems),
     },
   };
 
