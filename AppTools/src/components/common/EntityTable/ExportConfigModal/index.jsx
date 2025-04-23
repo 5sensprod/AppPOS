@@ -1,3 +1,5 @@
+// src/components/common/ExportConfigModal/index.jsx avec ID comme option d'export uniquement
+
 import React, { useState, useEffect } from 'react';
 import { X, FileText, FileSpreadsheet } from 'lucide-react';
 import { ENTITY_CONFIG } from '../../../../features/products/constants';

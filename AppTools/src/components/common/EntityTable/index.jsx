@@ -1,5 +1,5 @@
-// Composant principal EntityTable (index.jsx) AppTools\src\components\common\EntityTable\index.jsx
-import React, { useState } from 'react';
+// Composant principal EntityTable (index.jsx)
+import React, { useState, useCallback } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { FilterBar } from './components/FilterBar';
 import { BatchActions } from './components/BatchActions';
@@ -7,11 +7,11 @@ import { TableHeader } from './components/TableHeader';
 import { TableRow } from './components/TableRow';
 import { Pagination } from './components/Pagination';
 import { LoadingState } from './components/LoadingState';
+import ExportConfigModal from './ExportConfigModal';
 import { useTableSelection } from './hooks/useTableSelection';
 import { useTableSort } from './hooks/useTableSort';
 import { useTableFilter } from './hooks/useTableFilter';
 import { useTablePagination } from './hooks/useTablePagination';
-import ExportConfigModal from './ExportConfigModal';
 
 const EntityTable = ({
   data = [],
@@ -34,7 +34,7 @@ const EntityTable = ({
   onSync,
   onExport,
   onBatchStatusChange,
-  onBatchCategoryChange, // Nouvelle prop
+  onBatchCategoryChange,
   categoryOptions = [],
   onBatchDelete,
   onBatchSync,
@@ -44,8 +44,17 @@ const EntityTable = ({
   filters = [],
   searchProcessor,
   paginationEntityId = 'default',
-  externalActiveFilters = [], // Renommé ici pour éviter le conflit
+  externalActiveFilters = [],
 }) => {
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+
+  // Fonctionnalités disponibles
+  const hasSync = typeof onSync === 'function';
+  const hasExport = typeof onExport === 'function';
+  const hasBatchDelete = typeof onBatchDelete === 'function';
+  const hasBatchSync = typeof onBatchSync === 'function';
+
+  // Hooks pour la gestion des données
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
   const { searchTerm, activeFilters, filteredData, handleSearchChange, handleFilterChange } =
     useTableFilter(
@@ -57,7 +66,6 @@ const EntityTable = ({
       searchProcessor,
       paginationEntityId
     );
-
   const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(
     data,
     filteredData
@@ -72,79 +80,53 @@ const EntityTable = ({
     paginationInfo,
   } = useTablePagination(filteredData, pagination, paginationEntityId);
 
-  const hasSync = typeof onSync === 'function';
-  const hasExport = typeof onExport === 'function';
-  const hasBatchDelete = typeof onBatchDelete === 'function';
-  const hasBatchSync = typeof onBatchSync === 'function';
-  const [exportModalOpen, setExportModalOpen] = useState(false);
-
-  const filtersToUse =
-    externalActiveFilters && externalActiveFilters.length > 0
-      ? externalActiveFilters
-      : activeFilters;
-
-  const handleBatchDelete = () => {
+  // Actions par lot
+  const handleBatchDelete = useCallback(() => {
     if (selectedItems.length === 0) return;
 
-    const confirmMessage = `Êtes-vous sûr de vouloir supprimer ces ${selectedItems.length} ${selectedItems.length === 1 ? entityName : entityNamePlural} ?`;
-
-    if (window.confirm(confirmMessage)) {
+    if (
+      window.confirm(
+        `Êtes-vous sûr de vouloir supprimer ces ${selectedItems.length} ${
+          selectedItems.length === 1 ? entityName : entityNamePlural
+        } ?`
+      )
+    ) {
       if (hasBatchDelete) {
-        // Utiliser la fonction de suppression par lot si disponible
         onBatchDelete(selectedItems)
-          .then(() => {
-            setSelectedItems([]);
-          })
-          .catch((err) => {
-            console.error(`Erreur lors de la suppression par lot des ${entityNamePlural}:`, err);
-          });
+          .then(() => setSelectedItems([]))
+          .catch((err) => console.error(`Erreur de suppression par lot:`, err));
       } else if (typeof onDelete === 'function') {
-        // Fallback: supprimer élément par élément
         Promise.all(selectedItems.map((id) => onDelete(id)))
-          .then(() => {
-            setSelectedItems([]);
-          })
-          .catch((err) => {
-            console.error(`Erreur lors de la suppression par lot des ${entityNamePlural}:`, err);
-          });
+          .then(() => setSelectedItems([]))
+          .catch((err) => console.error(`Erreur de suppression:`, err));
       }
     }
-  };
+  }, [
+    selectedItems,
+    entityName,
+    entityNamePlural,
+    hasBatchDelete,
+    onBatchDelete,
+    onDelete,
+    setSelectedItems,
+  ]);
 
-  const handleBatchSync = () => {
+  const handleBatchSync = useCallback(() => {
     if (selectedItems.length === 0) return;
 
-    console.log('Exécution de la synchronisation par lot', selectedItems);
-
     if (hasBatchSync) {
-      // Utiliser la fonction de synchronisation par lot si disponible
-      onBatchSync(selectedItems)
-        .then(() => {
-          console.log('Synchronisation par lot terminée avec succès');
-        })
-        .catch((err) => {
-          console.error(`Erreur lors de la synchronisation par lot des ${entityNamePlural}:`, err);
-        });
+      onBatchSync(selectedItems).catch((err) =>
+        console.error(`Erreur de synchronisation par lot:`, err)
+      );
     } else if (hasSync) {
-      // Fallback: synchroniser élément par élément
-      console.log('Fallback: synchronisation élément par élément');
-      Promise.all(selectedItems.map((id) => onSync(id)))
-        .then(() => {
-          console.log('Synchronisation élément par élément terminée avec succès');
-        })
-        .catch((err) => {
-          console.error(`Erreur lors de la synchronisation par lot des ${entityNamePlural}:`, err);
-        });
+      Promise.all(selectedItems.map((id) => onSync(id))).catch((err) =>
+        console.error(`Erreur de synchronisation:`, err)
+      );
     }
-  };
+  }, [selectedItems, hasBatchSync, hasSync, onBatchSync, onSync]);
 
-  // Nouvelle fonction pour gérer l'export
-  const handleBatchExport = () => {
-    // Ouvrir la modale de configuration d'export
-    setExportModalOpen(true);
-  };
+  const handleBatchExport = () => setExportModalOpen(true);
 
-  // Gérer la confirmation de l'export
   const handleExportConfirm = async (exportConfig) => {
     if (hasExport) {
       try {
@@ -157,42 +139,26 @@ const EntityTable = ({
   };
 
   const handleBatchStatusChange = (itemIds, newStatus) => {
-    if (itemIds.length === 0) return;
+    if (itemIds.length === 0 || typeof onBatchStatusChange !== 'function') return;
 
-    console.log(`Changement de statut par lot: ${newStatus} pour ${itemIds.length} éléments`);
-
-    if (typeof onBatchStatusChange === 'function') {
-      onBatchStatusChange(itemIds, newStatus)
-        .then(() => {
-          console.log(`Statut modifié avec succès pour ${itemIds.length} éléments`);
-        })
-        .catch((err) => {
-          console.error(`Erreur lors du changement de statut: ${err.message}`);
-        });
-    }
+    onBatchStatusChange(itemIds, newStatus).catch((err) => {
+      console.error(`Erreur lors du changement de statut:`, err);
+    });
   };
 
   const handleBatchCategoryChange = (itemIds, categoryId) => {
-    if (itemIds.length === 0) return;
+    if (itemIds.length === 0 || typeof onBatchCategoryChange !== 'function') return;
 
-    console.log(
-      `Changement de catégorie par lot pour ${itemIds.length} éléments vers la catégorie ${categoryId}`
-    );
-
-    if (typeof onBatchCategoryChange === 'function') {
-      onBatchCategoryChange(itemIds, categoryId)
-        .then(() => {
-          console.log(`Catégorie modifiée avec succès pour ${itemIds.length} éléments`);
-        })
-        .catch((err) => {
-          console.error(`Erreur lors du changement de catégorie: ${err.message}`);
-        });
-    }
+    onBatchCategoryChange(itemIds, categoryId).catch((err) => {
+      console.error(`Erreur lors du changement de catégorie:`, err);
+    });
   };
 
-  if (isLoading && data.length === 0) {
-    return <LoadingState />;
-  }
+  // Filtres à utiliser
+  const filtersToUse = externalActiveFilters?.length > 0 ? externalActiveFilters : activeFilters;
+
+  // États du composant
+  if (isLoading && data.length === 0) return <LoadingState />;
 
   if (error) {
     return (
@@ -204,6 +170,17 @@ const EntityTable = ({
       </div>
     );
   }
+
+  // Filtrer les actions par lot disponibles
+  const availableBatchActions = batchActions.filter((action) => {
+    if (action === 'sync') return hasSync || hasBatchSync;
+    if (action === 'delete') return typeof onDelete === 'function' || hasBatchDelete;
+    if (action === 'export') return hasExport;
+    if (action === 'status') return typeof onBatchStatusChange === 'function';
+    if (action === 'category')
+      return typeof onBatchCategoryChange === 'function' && categoryOptions.length > 0;
+    return true;
+  });
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
@@ -229,21 +206,13 @@ const EntityTable = ({
           selectedItems={selectedItems}
           entityName={entityName}
           entityNamePlural={entityNamePlural}
-          batchActions={batchActions.filter((action) => {
-            if (action === 'sync') return hasSync || hasBatchSync;
-            if (action === 'delete') return typeof onDelete === 'function' || hasBatchDelete;
-            if (action === 'export') return hasExport;
-            if (action === 'status') return typeof onBatchStatusChange === 'function';
-            if (action === 'category')
-              return typeof onBatchCategoryChange === 'function' && categoryOptions.length > 0;
-            return true; // pour toute autre action
-          })}
+          batchActions={availableBatchActions}
           onBatchDelete={handleBatchDelete}
           onBatchSync={hasSync || hasBatchSync ? handleBatchSync : undefined}
           onBatchExport={hasExport ? handleBatchExport : undefined}
           onBatchStatusChange={handleBatchStatusChange}
-          onBatchCategoryChange={handleBatchCategoryChange} // Passer la nouvelle fonction
-          categoryOptions={categoryOptions} // Passer les options de catégories
+          onBatchCategoryChange={handleBatchCategoryChange}
+          categoryOptions={categoryOptions}
         />
       )}
 
@@ -317,7 +286,7 @@ const EntityTable = ({
         selectedItems={selectedItems}
         entityName={entityName}
         entityNamePlural={entityNamePlural}
-        activeFilters={filtersToUse} // Passer les filtres actifs à la modale
+        activeFilters={filtersToUse}
       />
     </div>
   );
