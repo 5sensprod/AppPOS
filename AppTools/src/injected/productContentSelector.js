@@ -1,6 +1,19 @@
-// IIFE injecté dans la page : on passe directement l'objet `products`
 (function (products) {
   try {
+    // --- Inject Violet-Pink CSS for selected text blocks and active inputs (border only) ---
+    const runtimeStyle = document.createElement('style');
+    runtimeStyle.textContent = `
+      .text-selected { 
+        background: rgba(255, 105, 180, 0.2) !important; 
+        border-radius: 3px; 
+        cursor: pointer; 
+      }
+      .active-input { 
+        border: 2px solid #FF69B4 !important; 
+      }
+    `;
+    document.head.appendChild(runtimeStyle);
+
     const config = {
       selectors: {
         text: 'p,li,div,h1,h2,h3,h4,h5,h6',
@@ -11,7 +24,35 @@
     let currentProductIndex = 0;
     let focusedInput = null;
 
-    // Feedback flottant
+    // --- Helpers for text highlight toggling ---
+    function toggleClass(el, cls) {
+      el.classList.toggle(cls);
+      return el.classList.contains(cls);
+    }
+
+    // Get trimmed content of element
+    function getTextContent(el) {
+      if (el.tagName === 'LI') return el.textContent.trim();
+      if (['UL', 'OL'].includes(el.tagName)) {
+        return Array.from(el.querySelectorAll('li'))
+          .map((li) => '• ' + li.textContent.trim())
+          .join('\n');
+      }
+      return el.textContent.trim();
+    }
+
+    function updateField(input, text, remove = false) {
+      let val = input.value.trim();
+      if (!remove) {
+        input.value = val ? val + '\n\n' + text : text;
+      } else {
+        input.value = val.split(text).join('').trim();
+      }
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      setTimeout(() => input.focus(), 0);
+    }
+
+    // Feedback floating
     const feedback = document.createElement('div');
     feedback.className = 'feedback';
     document.body.appendChild(feedback);
@@ -21,13 +62,18 @@
       setTimeout(() => (feedback.style.opacity = '0'), 2000);
     }
 
-    // Container principal
+    // Main container
     const container = document.createElement('div');
     container.className = 'product-form';
     document.body.appendChild(container);
 
-    // Mise à jour du formulaire pour le produit courant
+    // Update form UI for current product
     function updateForm() {
+      // Clear lingering text highlights
+      document
+        .querySelectorAll('.text-selected')
+        .forEach((el) => el.classList.remove('text-selected'));
+
       const product = products[currentProductIndex];
       const sku = product.sku || 'Sans SKU';
       const designation = product.designation || 'Sans désignation';
@@ -46,37 +92,19 @@
         <label>Produit actuel</label>
         <input type="text" class="input" value="${designation}" readonly>
 
-        <label>
-          Titre
-          <button type="button" id="focus-title" class="btn btn-small btn-secondary">
-            Sélectionner
-          </button>
-        </label>
+        <label>Titre</label>
         <input id="title" type="text" class="input" placeholder="Titre du produit">
 
-        <label>
-          Description
-          <button type="button" id="focus-description" class="btn btn-small btn-secondary">
-            Sélectionner
-          </button>
-        </label>
-        <textarea id="description" class="input" rows="6"
-          placeholder="Description du produit"></textarea>
+        <label>Description</label>
+        <textarea id="description" class="input" rows="6" placeholder="Description du produit"></textarea>
 
         <label>Images <span id="images-counter">(0)</span></label>
-        <div id="image-container"
-             style="display:flex;flex-wrap:wrap;margin:10px 0"></div>
+        <div id="image-container" style="display:flex;flex-wrap:wrap;margin:10px 0"></div>
 
         <div style="display:flex;margin-top:15px;justify-content:space-between">
           <div>
-            <button id="prev-btn" class="btn"
-                    ${currentProductIndex === 0 ? 'disabled' : ''}>
-              ◀ Précédent
-            </button>
-            <button id="next-btn" class="btn"
-                    ${currentProductIndex === products.length - 1 ? 'disabled' : ''}>
-              Suivant ▶
-            </button>
+            <button id="prev-btn" class="btn" ${currentProductIndex === 0 ? 'disabled' : ''}>◀ Précédent</button>
+            <button id="next-btn" class="btn" ${currentProductIndex === products.length - 1 ? 'disabled' : ''}>Suivant ▶</button>
           </div>
           <button id="export-btn" class="btn">Exporter</button>
         </div>
@@ -86,24 +114,20 @@
       loadProductData(product);
     }
 
-    // Liaison des événements sur le formulaire (après innerHTML)
+    // Bind events on form
     function bindFormEvents() {
-      document.getElementById('focus-title').addEventListener('click', () => {
-        focusedInput = document.getElementById('title');
-        document
-          .querySelectorAll('.active-input')
-          .forEach((el) => el.classList.remove('active-input'));
-        focusedInput.classList.add('active-input');
-        showFeedback('Sélectionnez du texte pour le titre');
-      });
-
-      document.getElementById('focus-description').addEventListener('click', () => {
-        focusedInput = document.getElementById('description');
-        document
-          .querySelectorAll('.active-input')
-          .forEach((el) => el.classList.remove('active-input'));
-        focusedInput.classList.add('active-input');
-        showFeedback('Sélectionnez du texte pour la description');
+      // Focus on inputs sets active-input and focusedInput
+      const titleInput = document.getElementById('title');
+      const descInput = document.getElementById('description');
+      [titleInput, descInput].forEach((input) => {
+        input.addEventListener('focus', () => {
+          document
+            .querySelectorAll('.active-input')
+            .forEach((el) => el.classList.remove('active-input'));
+          focusedInput = input;
+          focusedInput.classList.add('active-input');
+          showFeedback(`Champ ${input.id} activé`);
+        });
       });
 
       document.getElementById('prev-btn').addEventListener('click', () => {
@@ -125,18 +149,22 @@
       document.getElementById('export-btn').addEventListener('click', exportProducts);
     }
 
-    // Sauvegarde des champs et vignettes
+    // Save current product data
     function saveCurrentProduct() {
       const product = products[currentProductIndex];
       product._captured = product._captured || {};
       product._captured.title = document.getElementById('title').value;
       product._captured.description = document.getElementById('description').value;
+      // Save text selections
+      product._captured.selections = Array.from(document.querySelectorAll('.text-selected')).map(
+        (el) => getTextContent(el)
+      );
       product._captured.images = Array.from(
         document.getElementById('image-container').children
       ).map((img) => ({ src: img.src, alt: img.alt || '' }));
     }
 
-    // Ajoute une vignette cliquable
+    // Add image thumbnail
     function addImageThumbnail(src, alt) {
       const img = document.createElement('img');
       img.src = src;
@@ -145,9 +173,9 @@
       img.addEventListener('click', () => {
         img.remove();
         updateImagesCounter();
-        document.querySelectorAll('img').forEach((i) => {
-          if (i.src === src) i.classList.remove('image-selected');
-        });
+        document
+          .querySelectorAll(`img[src="${src}"]`)
+          .forEach((i) => i.classList.remove('image-selected'));
         showFeedback('Image retirée');
       });
       document.getElementById('image-container').appendChild(img);
@@ -155,21 +183,26 @@
     }
 
     function updateImagesCounter() {
-      const count = document.getElementById('image-container').children.length;
-      document.getElementById('images-counter').textContent = `(${count})`;
+      document.getElementById('images-counter').textContent =
+        `(${document.getElementById('image-container').children.length})`;
     }
 
-    // Charge ce qui a déjà été capturé
+    // Load previously captured data
     function loadProductData(product) {
       if (!product._captured) return;
       document.getElementById('title').value = product._captured.title || '';
       document.getElementById('description').value = product._captured.description || '';
-      const container = document.getElementById('image-container');
-      container.innerHTML = '';
+      const containerEl = document.getElementById('image-container');
+      containerEl.innerHTML = '';
       (product._captured.images || []).forEach((i) => addImageThumbnail(i.src, i.alt));
+      // Restore text selections
+      (product._captured.selections || []).forEach((txt) => {
+        document.querySelectorAll(config.selectors.text).forEach((el) => {
+          if (getTextContent(el) === txt) el.classList.add('text-selected');
+        });
+      });
     }
 
-    // Génère et télécharge le JSON
     function exportProducts() {
       saveCurrentProduct();
       const exportData = products.map((p) => ({
@@ -178,6 +211,7 @@
         designation: p.designation || null,
         title: p._captured?.title || null,
         description: p._captured?.description || null,
+        selections: p._captured?.selections || [],
         images: p._captured?.images || [],
       }));
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -191,7 +225,7 @@
       showFeedback('Produits exportés !');
     }
 
-    // Survol & sélection de texte/images
+    // Hover & selection of text/images
     document.addEventListener('mouseover', (e) => {
       const el = e.target;
       if (el.closest('.product-form')) return;
@@ -221,10 +255,10 @@
         if (!focusedInput) return showFeedback("Sélectionnez d'abord un champ !");
         e.preventDefault();
         e.stopPropagation();
-        const txt = el.textContent.trim();
-        const curr = focusedInput.value.trim();
-        focusedInput.value = curr ? `${curr}\n\n${txt}` : txt;
-        showFeedback('Texte ajouté');
+        const txt = getTextContent(el);
+        const added = toggleClass(el, 'text-selected');
+        updateField(focusedInput, txt, !added);
+        showFeedback(`Texte ${added ? 'ajouté' : 'retiré'}`);
       } else if (config.enableImageSelection && el.matches(config.selectors.image)) {
         e.preventDefault();
         e.stopPropagation();
@@ -243,7 +277,7 @@
       }
     });
 
-    // Lancement
+    // Init
     updateForm();
     showFeedback('Sélecteur de contenu activé !');
     return true;
