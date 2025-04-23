@@ -1,6 +1,7 @@
-// File: modules/webCaptureHandler.js
+// AppTools/modules/webCaptureHandler.js
+
 const { ipcMain, BrowserWindow } = require('electron');
-const { injectProductDisplay } = require('../src/utils/productDisplayInjector');
+const path = require('path');
 const { injectProductContentSelector } = require('../src/utils/productContentSelector');
 
 function setupWebCaptureListener(ipcMainInstance) {
@@ -8,47 +9,53 @@ function setupWebCaptureListener(ipcMainInstance) {
     if (!url) return;
     console.log('Web capture options:', options);
 
+    // 1) Crée la fenêtre qui va naviguer normalement
     const captureWindow = new BrowserWindow({
       width: 1200,
       height: 800,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        // Ajoutez ces lignes pour permettre le débogage
         devTools: true,
-        webSecurity: false, // Temporairement pour le développement
+        webSecurity: false,
       },
     });
 
-    // Ouvrir les devtools pour déboguer
+    // Pour déboguer
     captureWindow.webContents.openDevTools();
 
-    // Extraire les produits
+    // 2) Extrait la liste des produits depuis l'URL
     const match = url.match(/#APP_PRODUCTS_DATA=([^&]+)/);
     let selectedProducts = [];
-
     if (match && match[1]) {
       try {
         selectedProducts = JSON.parse(decodeURIComponent(match[1]));
-        console.log('Produits analysés correctement:', selectedProducts.length);
+        console.log('Produits analysés correctement :', selectedProducts.length);
       } catch (err) {
-        console.error('Erreur parsing produits:', err);
+        console.error('Erreur parsing produits :', err);
       }
     } else {
       console.warn("Aucune donnée de produit trouvée dans l'URL");
     }
 
-    captureWindow.loadURL(url);
+    const wc = captureWindow.webContents;
 
-    captureWindow.webContents.on('did-finish-load', async () => {
+    // 3) À CHAQUE chargement complet, on réinjecte l'UI avec l'état en mémoire
+    wc.on('did-finish-load', async () => {
       try {
-        console.log('Mode de capture:', options.mode || 'content-capture (default)');
-        // Forcer le mode content-capture si non défini
-        await injectProductContentSelector(captureWindow.webContents, selectedProducts);
+        console.log(
+          'Injection du sélecteur de contenu (mode:',
+          options.mode || 'content-capture',
+          ')'
+        );
+        await injectProductContentSelector(wc, selectedProducts);
       } catch (error) {
-        console.error("Erreur lors de l'injection:", error);
+        console.error('Erreur lors de l’injection du sélecteur :', error);
       }
     });
+
+    // 4) Charge l’URL (la première injection se fera à did-finish-load)
+    captureWindow.loadURL(url);
   });
 }
 
