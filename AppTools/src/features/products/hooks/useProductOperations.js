@@ -4,14 +4,6 @@ import { useEntityTable } from '@/hooks/useEntityTable';
 import apiService from '../../../services/api';
 import { useProductDataStore } from '../stores/productStore';
 
-/**
- * Hook pour gérer les opérations sur les produits (suppression, synchronisation, etc.)
- * @param {Function} deleteProduct - Fonction pour supprimer un produit
- * @param {Function} syncProduct - Fonction pour synchroniser un produit
- * @param {Function} fetchProducts - Fonction pour récupérer les produits
- * @param {Boolean} syncEnabled - Indique si la synchronisation est activée
- * @returns {Object} - Les opérations et états liés aux produits
- */
 export const useProductOperations = ({
   deleteProduct,
   syncProduct,
@@ -21,7 +13,6 @@ export const useProductOperations = ({
   const [error, setError] = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
 
-  // Utilisation du hook entityTable pour les opérations standard
   const {
     loading: operationLoading,
     handleDeleteEntity,
@@ -60,6 +51,7 @@ export const useProductOperations = ({
       ? async (ids) => {
           console.log(`🔄 Synchronisation par lot de ${ids.length} produits`);
           const errors = [];
+
           for (const id of ids) {
             try {
               await syncProduct(id);
@@ -69,6 +61,7 @@ export const useProductOperations = ({
               errors.push({ id, error: error.message || String(error) });
             }
           }
+
           await fetchProducts();
 
           if (errors.length > 0) {
@@ -78,18 +71,10 @@ export const useProductOperations = ({
       : undefined,
   });
 
-  /**
-   * Gère l'export des produits
-   * @param {Object} exportConfig - Configuration de l'export
-   * @returns {Promise<Boolean>} - Succès ou échec de l'opération
-   */
   const handleExport = async (exportConfig) => {
     try {
       setExportLoading(true);
-      const optimizedConfig = { ...exportConfig };
-
-      // Utilisation du service d'export
-      await apiService.post('/api/products/export', optimizedConfig);
+      await apiService.post('/api/products/export', { ...exportConfig });
       return true;
     } catch (error) {
       console.error("Erreur lors de l'export:", error);
@@ -100,12 +85,6 @@ export const useProductOperations = ({
     }
   };
 
-  /**
-   * Gère le changement de statut par lot
-   * @param {Array} productIds - IDs des produits à modifier
-   * @param {String} newStatus - Nouveau statut à appliquer
-   * @returns {Promise<Boolean>} - Succès ou échec de l'opération
-   */
   const handleBatchStatusChange = async (productIds, newStatus) => {
     try {
       console.log(`Modification du statut pour ${productIds.length} produits: ${newStatus}`);
@@ -120,31 +99,18 @@ export const useProductOperations = ({
     }
   };
 
-  /**
-   * Gère le changement de catégorie par lot
-   * @param {Array} productIds - IDs des produits à modifier
-   * @param {String} categoryId - ID de la catégorie à appliquer
-   * @returns {Promise<Boolean>} - Succès ou échec de l'opération
-   */
   const handleBatchCategoryChange = async (productIds, categoryId) => {
     try {
-      console.log(
-        `Modification de la catégorie pour ${productIds.length} produits vers la catégorie ${categoryId}`
-      );
+      console.log(`Modification de la catégorie pour ${productIds.length} produits: ${categoryId}`);
 
-      // Appel à l'API pour mettre à jour les catégories
       const response = await apiService.post('/api/products/batch-category', {
         productIds,
         categoryId,
       });
 
-      // Vérifier si la réponse est un succès
-      if (response.data && response.data.success) {
+      if (response.data?.success) {
         console.log(`Catégorie modifiée avec succès: ${response.data.message}`);
-
-        // Recharger les produits après la mise à jour
         await fetchProducts();
-
         return true;
       } else {
         const errorMessage =
@@ -152,11 +118,7 @@ export const useProductOperations = ({
         console.warn('Avertissement lors de la mise à jour des catégories:', errorMessage);
         setError(`Avertissement: ${errorMessage}`);
 
-        // Si la mise à jour a partiellement réussi, on recharge quand même
-        if (response.data && response.data.success) {
-          await fetchProducts();
-        }
-
+        if (response.data?.success) await fetchProducts();
         return false;
       }
     } catch (error) {

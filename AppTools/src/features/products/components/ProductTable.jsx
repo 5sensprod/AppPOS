@@ -6,15 +6,13 @@ import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 import { usePaginationStore } from '@/stores/usePaginationStore';
-
-// Nouveaux hooks et services
 import { useProductFilters } from '../hooks/useProductFilters';
 import { useProductOperations } from '../hooks/useProductOperations';
 import { useCategoryOptions } from '../hooks/useCategoryOptions';
 import exportService from '../../../services/exportService';
+import { useWebCapture } from '../hooks/useWebCapture';
 
 function ProductTable(props) {
-  // Récupération des fonctions et données des stores
   const { deleteProduct, syncProduct } = useProduct();
   const {
     products,
@@ -24,36 +22,27 @@ function ProductTable(props) {
     initWebSocket,
   } = useProductDataStore();
 
-  // Store des catégories hiérarchiques
   const {
     hierarchicalCategories,
     loading: categoriesLoading,
     fetchHierarchicalCategories,
   } = useHierarchicalCategories();
 
-  // Configuration
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
-
-  // Récupérer les paramètres de pagination persistants
   const { getPaginationParams } = usePaginationStore();
   const { pageSize: persistedPageSize } = getPaginationParams('product');
-
-  // État local des produits
   const [localProducts, setLocalProducts] = useState([]);
 
-  // Utilisation des hooks personnalisés
   const { selectedFilters, setSelectedFilters, filterOptions, filterProducts } =
     useProductFilters(products);
 
   const {
     error,
     setError,
-    operationLoading,
     handleDeleteEntity,
     handleSyncEntity,
     handleBatchDeleteEntities,
     handleBatchSyncEntities,
-    handleExport,
     handleBatchStatusChange,
     handleBatchCategoryChange,
     isLoading,
@@ -64,46 +53,34 @@ function ProductTable(props) {
     syncEnabled,
   });
 
-  // Options de catégories pour les sélecteurs
   const categorySelectOptions = useCategoryOptions(hierarchicalCategories, products);
 
-  // Initialisation et nettoyage
+  const { handleCreateSheet, openWebCaptureWindow } = useWebCapture(products);
+
   useEffect(() => {
     if (syncEnabled) initWebSocket();
 
-    // Charger les produits uniquement au montage initial
-    const fetchInitialProducts = async () => {
-      if (products.length === 0) {
-        await fetchProducts();
-      }
-    };
+    if (products.length === 0) {
+      fetchProducts();
+    }
 
-    fetchInitialProducts();
-
-    // Charger les catégories hiérarchiques si elles ne sont pas déjà chargées
     if (hierarchicalCategories.length === 0 && !categoriesLoading) {
       fetchHierarchicalCategories();
     }
 
-    // Nettoyage lors du démontage du composant
     return () => {
-      // Code pour fermer le websocket si nécessaire
+      // Nettoyage websocket si nécessaire
     };
   }, []);
 
-  // Mise à jour des produits locaux quand les produits du store changent
   useEffect(() => {
     setLocalProducts(products || []);
     setError(productsError);
   }, [products, productsError]);
 
-  // Produits filtrés selon les critères sélectionnés
   const filteredProducts = filterProducts(localProducts);
+  const loading = productsLoading || isLoading || categoriesLoading;
 
-  // État de chargement global
-  const loading = productsLoading || operationLoading || categoriesLoading || isLoading;
-
-  // Fonction d'export adaptée pour utiliser le service exportService
   const handleProductExport = async (exportConfig) => {
     try {
       return await exportService.exportProducts(exportConfig);
@@ -113,10 +90,6 @@ function ProductTable(props) {
     }
   };
 
-  const handleOpenWebCapture = () => {
-    window.electronAPI.openWebCaptureWindow('https://www.qwant.com/?q=prodipe+basse+5+cordes');
-  };
-
   return (
     <>
       <UnifiedFilterBar
@@ -124,22 +97,6 @@ function ProductTable(props) {
         selectedFilters={selectedFilters}
         onChange={setSelectedFilters}
       />
-
-      <div style={{ margin: '10px 0' }}>
-        <button
-          onClick={handleOpenWebCapture}
-          style={{
-            padding: '8px 12px',
-            fontSize: '14px',
-            cursor: 'pointer',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            backgroundColor: '#f5f5f5',
-          }}
-        >
-          🌐 Ouvrir Qwant (WebView)
-        </button>
-      </div>
 
       <EntityTable
         data={filteredProducts}
@@ -154,12 +111,20 @@ function ProductTable(props) {
         onBatchDelete={handleBatchDeleteEntities}
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-        batchActions={['delete', ...(syncEnabled ? ['sync'] : []), 'export', 'status', 'category']}
+        batchActions={[
+          'createSheet',
+          'delete',
+          ...(syncEnabled ? ['sync'] : []),
+          'export',
+          'status',
+          'category',
+        ]}
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities}
         onExport={handleProductExport}
         onBatchStatusChange={handleBatchStatusChange}
         onBatchCategoryChange={handleBatchCategoryChange}
+        onCreateSheet={handleCreateSheet}
         categoryOptions={categorySelectOptions}
         pagination={{
           enabled: true,

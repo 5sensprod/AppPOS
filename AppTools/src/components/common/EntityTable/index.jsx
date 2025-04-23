@@ -23,7 +23,7 @@ const EntityTable = ({
   baseRoute = '',
   defaultSort = { field: 'name', direction: 'asc' },
   actions = ['view', 'edit', 'delete', 'sync'],
-  batchActions = ['delete', 'sync', 'export', 'status', 'category'],
+  batchActions = ['delete', 'sync', 'export', 'status', 'category', 'createSheet'],
   pagination = {
     enabled: true,
     pageSize: 10,
@@ -35,6 +35,7 @@ const EntityTable = ({
   onExport,
   onBatchStatusChange,
   onBatchCategoryChange,
+  onCreateSheet,
   categoryOptions = [],
   onBatchDelete,
   onBatchSync,
@@ -53,6 +54,7 @@ const EntityTable = ({
   const hasExport = typeof onExport === 'function';
   const hasBatchDelete = typeof onBatchDelete === 'function';
   const hasBatchSync = typeof onBatchSync === 'function';
+  const hasCreateSheet = typeof onCreateSheet === 'function';
 
   // Hooks pour la gestion des données
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
@@ -179,6 +181,7 @@ const EntityTable = ({
     if (action === 'status') return typeof onBatchStatusChange === 'function';
     if (action === 'category')
       return typeof onBatchCategoryChange === 'function' && categoryOptions.length > 0;
+    if (action === 'createSheet') return hasCreateSheet;
     return true;
   });
 
@@ -212,6 +215,7 @@ const EntityTable = ({
           onBatchExport={hasExport ? handleBatchExport : undefined}
           onBatchStatusChange={handleBatchStatusChange}
           onBatchCategoryChange={handleBatchCategoryChange}
+          onCreateSheet={hasCreateSheet ? onCreateSheet : undefined}
           categoryOptions={categoryOptions}
         />
       )}

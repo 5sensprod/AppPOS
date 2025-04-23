@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, RefreshCw, FileText, ListFilter, Folder } from 'lucide-react';
+import { Trash2, RefreshCw, FileText, ListFilter, Folder, FileOutput } from 'lucide-react';
 
 // Generic dropdown component without clsx
 const Dropdown = ({
@@ -46,12 +46,13 @@ export const BatchActions = ({
   selectedItems = [],
   entityName = '',
   entityNamePlural = '',
-  batchActions = ['delete', 'sync', 'export', 'status', 'category'],
+  batchActions = ['delete', 'sync', 'export', 'status', 'category', 'createSheet'],
   onBatchDelete,
   onBatchSync,
   onBatchExport,
   onBatchStatusChange,
   onBatchCategoryChange,
+  onCreateSheet,
   categoryOptions = [],
 }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -73,6 +74,13 @@ export const BatchActions = ({
   ];
 
   const actionsConfig = {
+    createSheet: {
+      available: typeof onCreateSheet === 'function',
+      icon: FileOutput,
+      label: 'Créer fiche',
+      buttonClass: 'bg-amber-100 hover:bg-amber-200 text-amber-800',
+      onAction: () => onCreateSheet(selectedItems),
+    },
     category: {
       available: categoryOptions.length > 0 && typeof onBatchCategoryChange === 'function',
       icon: Folder,
