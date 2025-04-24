@@ -55,7 +55,7 @@ function ProductTable(props) {
 
   const categorySelectOptions = useCategoryOptions(hierarchicalCategories, products);
 
-  const { handleCreateSheet, handleContentCapture } = useWebCapture(products);
+  const { handleCreateSheet } = useWebCapture(products);
 
   useEffect(() => {
     if (syncEnabled) initWebSocket();
@@ -127,7 +127,6 @@ function ProductTable(props) {
         onBatchCategoryChange={handleBatchCategoryChange}
         onCreateSheet={handleCreateSheet}
         categoryOptions={categorySelectOptions}
-        onCaptureContent={handleContentCapture}
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,

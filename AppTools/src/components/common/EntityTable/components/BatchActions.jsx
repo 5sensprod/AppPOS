@@ -136,13 +136,6 @@ export const BatchActions = ({
       buttonClass: 'bg-blue-100 hover:bg-blue-200 text-blue-800',
       onAction: onBatchSync,
     },
-    captureContent: {
-      available: typeof onCaptureContent === 'function',
-      icon: FileSearch, // Importez cette icône
-      label: 'Capture de contenu',
-      buttonClass: 'bg-teal-100 hover:bg-teal-200 text-teal-800',
-      onAction: () => onCaptureContent(selectedItems),
-    },
   };
 
   return (
