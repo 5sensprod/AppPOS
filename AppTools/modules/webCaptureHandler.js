@@ -13,6 +13,40 @@ let capturedProductsState = {
 
 let authToken = null;
 
+async function enhanceDescriptionWithAI(productData) {
+  try {
+    console.log(
+      `🧠 Amélioration de la description avec l'IA pour ${productData.name || productData.sku}`
+    );
+
+    const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
+
+    // Appel à l'API de description
+    const response = await apiService.post('/api/descriptions/chat', {
+      name: productData.name || '',
+      category: productData.category_info?.primary?.path_string || '',
+      brand: productData.brand_ref?.name || '',
+      price: productData.price || '',
+      sku: productData.sku || '',
+      currentDescription: productData.description || '',
+      message:
+        "Améliore cette description de produit pour qu'elle soit plus vendeuse et attrayante. Corrige les fautes et structure le texte.",
+    });
+
+    if (response.data?.success && response.data?.data?.description) {
+      console.log(`✅ Description améliorée par l'IA`);
+      return response.data.data.description;
+    } else {
+      console.warn(`⚠️ L'IA n'a pas retourné de description améliorée`);
+      return productData.description;
+    }
+  } catch (err) {
+    console.error(`❌ Erreur lors de l'amélioration de la description par IA:`, err.message);
+    // En cas d'erreur, on retourne la description originale
+    return productData.description;
+  }
+}
+
 function setupWebCaptureListener(ipcMainInstance) {
   ipcMainInstance.on('set-auth-token', (event, token) => {
     console.log('[main] ← set-auth-token', token);
@@ -260,7 +294,8 @@ function setupWebCaptureListener(ipcMainInstance) {
     console.log('[main] ← update-product-description', productId, description);
 
     try {
-      // Import du service CommonJS dédié au main
+      // Import du service API
+      const path = require('path');
       const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
 
       // Injecte le token si on en a un
@@ -268,30 +303,72 @@ function setupWebCaptureListener(ipcMainInstance) {
         apiService.setAuthToken(authToken);
       }
 
-      // (optionnel) init du service
+      // Init du service si nécessaire
       if (typeof apiService.init === 'function') {
         await apiService.init();
       }
 
-      // Envoi de la requête PUT
-      await apiService.put(`/api/products/${productId}`, { description });
+      // 1. D'abord, récupérer les données complètes du produit
+      const productResponse = await apiService.get(`/api/products/${productId}`);
+      const productData = productResponse.data?.data;
+
+      if (!productData) {
+        throw new Error(`Impossible de récupérer les données du produit ${productId}`);
+      }
+
+      // 2. Mettre à jour la description brute dans l'objet produit
+      productData.description = description;
+
+      // 3. Améliorer la description avec l'IA
+      const enhancedDescription = await enhanceDescriptionWithAI(productData);
+
+      // 4. Mettre à jour le produit avec la description améliorée
+      await apiService.put(`/api/products/${productId}`, { description: enhancedDescription });
       console.log(`✅ Description mise à jour pour ${productId}`);
 
-      // Mise à jour du state local
+      // 5. Mise à jour du state local
       const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
       if (prod) {
         prod._captured = prod._captured || {};
-        prod._captured.description = description;
+        prod._captured.description = enhancedDescription;
       }
 
-      // Réémission vers la WebView
+      // 6. Réémission vers la WebView
       event.sender.send('captured-product-update', {
         products: capturedProductsState.products,
         currentProductIndex: capturedProductsState.currentProductIndex,
         productUrls: capturedProductsState.productUrls,
       });
+
+      // 7. Notifier que la description a été améliorée
+      event.sender.send('description-enhanced', {
+        productId,
+        originalDescription: description,
+        enhancedDescription: enhancedDescription,
+      });
     } catch (err) {
       console.error(`❌ Échec de update-product-description pour ${productId}:`, err);
+
+      // En cas d'erreur, on essaie quand même de mettre à jour avec la description originale
+      try {
+        const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
+        await apiService.put(`/api/products/${productId}`, { description });
+        console.log(`✅ Description mise à jour (sans amélioration) pour ${productId}`);
+
+        const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
+        if (prod) {
+          prod._captured = prod._captured || {};
+          prod._captured.description = description;
+        }
+
+        event.sender.send('captured-product-update', {
+          products: capturedProductsState.products,
+          currentProductIndex: capturedProductsState.currentProductIndex,
+          productUrls: capturedProductsState.productUrls,
+        });
+      } catch (backupErr) {
+        console.error(`❌ Échec du plan B pour mise à jour de description:`, backupErr);
+      }
     }
   });
 
@@ -464,6 +541,70 @@ function setupWebCaptureListener(ipcMainInstance) {
       event.sender.send('images-updated', { productId, success: false, error: err.message });
     }
   });
+
+  ipcMainInstance.handle(
+    'preview-enhanced-description',
+    async (event, { productId, description }) => {
+      console.log('[main] ← preview-enhanced-description', productId);
+
+      try {
+        const path = require('path');
+        const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
+
+        // Injecte le token si on en a un
+        if (authToken && typeof apiService.setAuthToken === 'function') {
+          apiService.setAuthToken(authToken);
+        }
+
+        // Init du service si nécessaire
+        if (typeof apiService.init === 'function') {
+          await apiService.init();
+        }
+
+        // Récupérer les données du produit
+        const productResponse = await apiService.get(`/api/products/${productId}`);
+        const productData = productResponse.data?.data;
+
+        if (!productData) {
+          throw new Error(`Impossible de récupérer les données du produit ${productId}`);
+        }
+
+        // Copier la description fournie dans les données du produit
+        const productWithNewDesc = { ...productData, description };
+
+        // Appel à l'API de description
+        const response = await apiService.post('/api/descriptions/chat', {
+          name: productWithNewDesc.name || '',
+          category: productWithNewDesc.category_info?.primary?.path_string || '',
+          brand: productWithNewDesc.brand_ref?.name || '',
+          price: productWithNewDesc.price || '',
+          sku: productWithNewDesc.sku || '',
+          currentDescription: description || '',
+          message:
+            "Améliore cette description de produit pour qu'elle soit plus vendeuse et attrayante. Corrige les fautes et structure le texte.",
+        });
+
+        if (response.data?.success && response.data?.data?.description) {
+          console.log('✅ Prévisualisation de description générée avec succès');
+          return {
+            success: true,
+            originalDescription: description,
+            enhancedDescription: response.data.data.description,
+          };
+        } else {
+          throw new Error("L'API n'a pas retourné de description améliorée");
+        }
+      } catch (err) {
+        console.error('❌ Erreur lors de la prévisualisation de la description:', err);
+        return {
+          success: false,
+          error: err.message,
+          originalDescription: description,
+          enhancedDescription: description,
+        };
+      }
+    }
+  );
 
   ipcMainInstance.on('description-updated', (event, { productId, description }) => {
     console.log(`🔄 Main : description-updated pour ${productId}`);

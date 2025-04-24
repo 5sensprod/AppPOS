@@ -28,6 +28,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('captured-product-update', (_, data) => callback(data)),
 
   onUpdateMessage: (callback) => ipcRenderer.on('update-message', (_, data) => callback(data)),
+
+  onDescriptionEnhanced: (callback) => {
+    ipcRenderer.on('description-enhanced', (_, data) => callback(data));
+  },
+
+  // Fonction pour demander une amélioration de description sans mise à jour immédiate
+  previewEnhancedDescription: (productId, description) => {
+    return ipcRenderer.invoke('preview-enhanced-description', { productId, description });
+  },
 });
 
 // Configurer la communication entre la WebView et l'application principale
