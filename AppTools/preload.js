@@ -1,32 +1,46 @@
+// preload.js
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Exposer des API sécurisées au processus de rendu
+// Configuration standard des APIs exposées à la fenêtre
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Découverte du serveur API via Bonjour
-  discoverApiServer: () => ipcRenderer.invoke('discover-api-server'),
+  // Vos fonctions API existantes...
+  openWebCaptureWindow: (url, options) => ipcRenderer.send('open-web-capture-window', url, options),
 
-  // Découverte mDNS des services
-  webServer: {
-    getMdnsServices: () => ipcRenderer.invoke('get-mdns-services'),
-  },
+  // NOUVELLES FONCTIONS POUR LA GESTION DES PRODUITS CAPTURÉS
 
-  // Vérification manuelle des mises à jour
-  checkForUpdates: () => ipcRenderer.send('check-for-updates'),
+  // Envoyer des données de produit capturées au processus principal
+  sendCapturedProductData: (data) => ipcRenderer.send('captured-product-data', data),
 
-  // Écouteur pour les messages de mise à jour
-  onUpdateMessage: (callback) => {
-    ipcRenderer.on('update-message', (event, data) => callback(data));
-    return () => ipcRenderer.removeListener('update-message', callback);
-  },
+  onUpdateMessage: (callback) => ipcRenderer.on('update-message', (_, data) => callback(data)),
 
-  // Fonctionnalité WebSocket support
-  getWebSocketSupport: () => ({ supported: true }),
+  // Écouter les mises à jour de produits capturés
+  onCapturedProductUpdate: (callback) =>
+    ipcRenderer.on('captured-product-update', (_, data) => callback(data)),
 
-  // 🔥 Nouvelle fonctionnalité : ouvrir une fenêtre WebView externe (web capture)
-  openWebCaptureWindow: (url, options = {}) =>
-    ipcRenderer.send('open-web-capture-window', url, options),
+  // Demander l'état actuel des produits capturés
+  requestCapturedProductsState: () => ipcRenderer.send('request-captured-products-state'),
+
+  // Exporter les produits capturés
+  exportCapturedProducts: (products) => ipcRenderer.send('export-captured-products', products),
 });
 
-window.addEventListener('DOMContentLoaded', () => {
-  console.log('✅ Preload script exécuté – APIs exposées à window.electronAPI');
+// Configurer la communication entre la WebView et l'application principale
+window.addEventListener('message', (event) => {
+  // Vérifier que le message vient du sélecteur de contenu
+  if (event.data && event.data.source === 'product-content-selector') {
+    // Relayer le message au processus principal
+    ipcRenderer.send('product-content-selector-message', event.data);
+  }
+});
+
+// Écouter les messages du processus principal pour les relayer à la WebView
+ipcRenderer.on('main-to-webview', (_, data) => {
+  // Relayer le message à la WebView
+  window.postMessage(
+    {
+      source: 'main-app',
+      ...data,
+    },
+    '*'
+  );
 });

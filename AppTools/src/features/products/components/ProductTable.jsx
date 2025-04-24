@@ -11,6 +11,7 @@ import { useProductOperations } from '../hooks/useProductOperations';
 import { useCategoryOptions } from '../hooks/useCategoryOptions';
 import exportService from '../../../services/exportService';
 import { useWebCapture } from '../hooks/useWebCapture';
+import CapturedProductsManager from './CapturedProductsManager';
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct } = useProduct();
@@ -32,6 +33,9 @@ function ProductTable(props) {
   const { getPaginationParams } = usePaginationStore();
   const { pageSize: persistedPageSize } = getPaginationParams('product');
   const [localProducts, setLocalProducts] = useState([]);
+
+  // État pour afficher/masquer le gestionnaire de produits capturés
+  const [showCapturedProducts, setShowCapturedProducts] = useState(false);
 
   const { selectedFilters, setSelectedFilters, filterOptions, filterProducts } =
     useProductFilters(products);
@@ -90,55 +94,88 @@ function ProductTable(props) {
     }
   };
 
+  // Afficher le panneau de produits capturés après une opération de capture
+  const handleCaptureWithFeedback = async (selectedItems) => {
+    await handleContentCapture(selectedItems);
+    // Attendre un peu pour que les données soient chargées
+    setTimeout(() => {
+      setShowCapturedProducts(true);
+    }, 500);
+  };
+
   return (
     <>
-      <UnifiedFilterBar
-        filterOptions={filterOptions}
-        selectedFilters={selectedFilters}
-        onChange={setSelectedFilters}
-      />
+      {showCapturedProducts ? (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowCapturedProducts(false)}
+            className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded mb-4"
+          >
+            ← Retour à la liste des produits
+          </button>
+          <CapturedProductsManager />
+        </div>
+      ) : (
+        <>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Produits</h2>
+            <button
+              onClick={() => setShowCapturedProducts(true)}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
+            >
+              Voir produits capturés
+            </button>
+          </div>
 
-      <EntityTable
-        data={filteredProducts}
-        isLoading={loading}
-        error={error}
-        columns={ENTITY_CONFIG.columns}
-        entityName="produit"
-        entityNamePlural="produits"
-        baseRoute="/products"
-        searchFields={['name', 'sku', 'designation', 'category']}
-        onDelete={handleDeleteEntity}
-        onBatchDelete={handleBatchDeleteEntities}
-        syncEnabled={syncEnabled}
-        actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
-        batchActions={[
-          'createSheet',
-          'delete',
-          ...(syncEnabled ? ['sync'] : []),
-          'export',
-          'status',
-          'category',
-          'captureContent',
-        ]}
-        onSync={handleSyncEntity}
-        onBatchSync={handleBatchSyncEntities}
-        onExport={handleProductExport}
-        onBatchStatusChange={handleBatchStatusChange}
-        onBatchCategoryChange={handleBatchCategoryChange}
-        onCreateSheet={handleCreateSheet}
-        categoryOptions={categorySelectOptions}
-        onCaptureContent={handleContentCapture}
-        pagination={{
-          enabled: true,
-          pageSize: persistedPageSize || 10,
-          showPageSizeOptions: true,
-          pageSizeOptions: [5, 10, 25, 50, 100],
-        }}
-        defaultSort={ENTITY_CONFIG.defaultSort}
-        paginationEntityId="product"
-        externalActiveFilters={selectedFilters}
-        {...props}
-      />
+          <UnifiedFilterBar
+            filterOptions={filterOptions}
+            selectedFilters={selectedFilters}
+            onChange={setSelectedFilters}
+          />
+
+          <EntityTable
+            data={filteredProducts}
+            isLoading={loading}
+            error={error}
+            columns={ENTITY_CONFIG.columns}
+            entityName="produit"
+            entityNamePlural="produits"
+            baseRoute="/products"
+            searchFields={['name', 'sku', 'designation', 'category']}
+            onDelete={handleDeleteEntity}
+            onBatchDelete={handleBatchDeleteEntities}
+            syncEnabled={syncEnabled}
+            actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
+            batchActions={[
+              'createSheet',
+              'delete',
+              ...(syncEnabled ? ['sync'] : []),
+              'export',
+              'status',
+              'category',
+              'captureContent',
+            ]}
+            onSync={handleSyncEntity}
+            onBatchSync={handleBatchSyncEntities}
+            onExport={handleProductExport}
+            onBatchStatusChange={handleBatchStatusChange}
+            onBatchCategoryChange={handleBatchCategoryChange}
+            onCreateSheet={handleCreateSheet}
+            categoryOptions={categorySelectOptions}
+            onCaptureContent={handleCaptureWithFeedback}
+            pagination={{
+              enabled: true,
+              pageSize: persistedPageSize || 10,
+              showPageSizeOptions: true,
+              pageSizeOptions: [5, 10, 25, 50, 100],
+            }}
+            defaultSort={ENTITY_CONFIG.defaultSort}
+            paginationEntityId="product"
+            externalActiveFilters={selectedFilters}
+            {...props}
+          />
+        </>
+      )}
     </>
   );
 }

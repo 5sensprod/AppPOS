@@ -1,6 +1,7 @@
 // File: AppTools/src/features/products/hooks/useWebCapture.js
 import { useCallback } from 'react';
 import { buildWebCaptureUrlForProducts, openWebCaptureWindow } from '../services/webCaptureService';
+import { useCapturedProducts } from './useCapturedProducts';
 
 /**
  * Hook pour gérer la création de fiches et la capture de contenu via WebView.
@@ -8,6 +9,9 @@ import { buildWebCaptureUrlForProducts, openWebCaptureWindow } from '../services
  * @returns {{ handleCreateSheet: function(Array<string>): Array<string>, handleContentCapture: function(Array<string|object>): Array<string|object> }}
  */
 export function useWebCapture(products) {
+  // Utiliser le nouveau hook pour gérer les produits capturés
+  const { startCapture } = useCapturedProducts();
+
   /**
    * Gère la création de fiche(s) produit(s) via l'URL Qwant.
    * @param {Array<string>} selectedItemIds - IDs des produits sélectionnés
@@ -50,13 +54,12 @@ export function useWebCapture(products) {
         return selectedItems;
       }
 
-      // 3) Encoder l'intégralité des objets produits pour exporter tous les items
-      const payload = encodeURIComponent(JSON.stringify(selectedProducts));
-      const url = `https://google.com/#APP_PRODUCTS_DATA=${payload}`;
-      openWebCaptureWindow(url, { mode: 'content-capture' });
+      // 3) Utiliser le nouveau hook pour démarrer la capture
+      startCapture(selectedProducts, { mode: 'content-capture' });
+
       return selectedItems;
     },
-    [products]
+    [products, startCapture]
   );
 
   return { handleCreateSheet, handleContentCapture };

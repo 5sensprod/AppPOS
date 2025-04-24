@@ -11,6 +11,28 @@
       .active-input { 
         border: 2px solid #FF69B4 !important; 
       }
+      .btn-icon {
+        margin-right: 5px;
+      }
+      .btn-search {
+        background: #f8a100 !important;
+      }
+      .btn-url {
+        background: #4caf50 !important;
+      }
+      .btn-url:disabled {
+        background: #a5d6a7 !important;
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .action-buttons {
+        display: flex;
+        margin-top: 10px;
+        gap: 5px;
+      }
+      .action-buttons button {
+        flex: 1;
+      }
     `;
     document.head.appendChild(runtimeStyle);
 
@@ -23,6 +45,101 @@
     };
     let currentProductIndex = 0;
     let focusedInput = null;
+    let isFirstLoad = true;
+    let redirectUrl = null;
+    let navInProgress = false;
+    let productUrls = {}; // Stockage local des URLs par produit
+
+    // --- Communication avec l'application principale ---
+    function sendToMainApp(type, data) {
+      window.postMessage(
+        {
+          source: 'product-content-selector',
+          type: type,
+          payload: data,
+        },
+        '*'
+      );
+    }
+
+    // Demander l'état actuel à l'application principale lors de l'initialisation
+    function requestState() {
+      sendToMainApp('REQUEST_STATE', {});
+    }
+
+    // Écouter les messages de l'application principale
+    window.addEventListener('message', (event) => {
+      // Vérifier que le message vient de l'application principale
+      if (event.data.source === 'main-app') {
+        console.log("Message reçu de l'application principale:", event.data);
+
+        switch (event.data.type) {
+          case 'SET_CURRENT_PRODUCT':
+            // Mettre à jour l'index du produit actuel
+            if (event.data.payload.currentProductIndex !== undefined) {
+              currentProductIndex = event.data.payload.currentProductIndex;
+              updateForm();
+            }
+            break;
+
+          case 'LOAD_PRODUCT_DATA':
+            // Charger les données d'un produit
+            if (event.data.payload.productData) {
+              const index = event.data.payload.productIndex || currentProductIndex;
+              if (products[index]) {
+                products[index]._captured = event.data.payload.productData;
+                if (index === currentProductIndex) {
+                  loadProductData(products[index]);
+                }
+              }
+            }
+            break;
+
+          case 'LOAD_PRODUCT_URLS':
+            // Récupérer les URLs stockées
+            if (event.data.payload.productUrls) {
+              productUrls = event.data.payload.productUrls;
+              console.log('URLs de produits chargées:', productUrls);
+              // Mettre à jour l'état du bouton URL si nous sommes déjà sur la page
+              updateUrlButtonState();
+            }
+            break;
+
+          case 'NAVIGATE_TO_URL':
+            // Naviguer vers l'URL spécifiée
+            if (event.data.payload.url) {
+              console.log('Navigation vers URL stockée:', event.data.payload.url);
+              window.location.href = event.data.payload.url;
+            }
+            break;
+
+          case 'PERFORM_SEARCH':
+            // Lancer une recherche pour le produit spécifié
+            if (event.data.payload.productIndex !== undefined) {
+              currentProductIndex = event.data.payload.productIndex;
+              navigateToProductSearch();
+            }
+            break;
+        }
+      }
+    });
+
+    // Mettre à jour l'état du bouton URL en fonction de la disponibilité d'une URL pour le produit actuel
+    function updateUrlButtonState() {
+      const urlBtn = document.getElementById('url-btn');
+      if (!urlBtn) return;
+
+      const product = products[currentProductIndex];
+      const productId = product.id || product._id;
+
+      if (productId && productUrls[productId]) {
+        urlBtn.disabled = false;
+        urlBtn.title = 'Aller à la page produit enregistrée';
+      } else {
+        urlBtn.disabled = true;
+        urlBtn.title = 'Aucune URL de produit enregistrée';
+      }
+    }
 
     // --- Helpers for text highlight toggling ---
     function toggleClass(el, cls) {
@@ -67,6 +184,55 @@
     container.className = 'product-form';
     document.body.appendChild(container);
 
+    // Fonction pour naviguer vers la recherche du produit actuel
+    function navigateToProductSearch() {
+      if (navInProgress) return;
+
+      const product = products[currentProductIndex];
+      const searchTerm = (product.designation || product.sku || '').trim();
+
+      if (!searchTerm) {
+        showFeedback('Pas de terme de recherche pour ce produit');
+        return;
+      }
+
+      // Sauvegarder l'état actuel avant la navigation
+      saveCurrentProduct();
+
+      // Sauvegarder l'URL actuelle avant de naviguer si ce n'est pas une URL de recherche
+      const productId = product.id || product._id;
+      if (
+        productId &&
+        window.location.href &&
+        !window.location.href.includes('google.com/#APP_PRODUCTS_DATA=') &&
+        !window.location.href.includes('qwant.com/?q=')
+      ) {
+        productUrls[productId] = window.location.href;
+
+        // Informer l'application principale de l'URL sauvegardée
+        sendToMainApp('URL_SAVED', {
+          productId: productId,
+          url: window.location.href,
+        });
+      }
+
+      // Informer l'application principale de la navigation imminente
+      sendToMainApp('NAVIGATION_START', {
+        currentProductIndex: currentProductIndex,
+        searchTerm: searchTerm,
+      });
+
+      navInProgress = true;
+
+      // Créer URL de recherche Qwant
+      const encodedSearch = encodeURIComponent(searchTerm);
+      redirectUrl = `https://www.qwant.com/?q=${encodedSearch}`;
+
+      // Rediriger
+      window.location.href = redirectUrl;
+      showFeedback('Recherche: ' + searchTerm);
+    }
+
     // Update form UI for current product
     function updateForm() {
       // Clear lingering text highlights
@@ -77,6 +243,10 @@
       const product = products[currentProductIndex];
       const sku = product.sku || 'Sans SKU';
       const designation = product.designation || 'Sans désignation';
+      const productId = product.id || product._id;
+
+      // Vérifier si on a une URL stockée pour ce produit
+      const hasStoredUrl = productId && productUrls[productId];
 
       container.innerHTML = `
         <div class="nav-row">
@@ -108,10 +278,29 @@
           </div>
           <button id="export-btn" class="btn">Exporter</button>
         </div>
+        
+        <div class="action-buttons">
+          <button id="url-btn" class="btn btn-url" ${!hasStoredUrl ? 'disabled' : ''}>
+            <span class="btn-icon">🔗</span>Page produit
+          </button>
+          <button id="search-btn" class="btn btn-search">
+            <span class="btn-icon">🔍</span>Rechercher
+          </button>
+        </div>
       `;
 
       bindFormEvents();
       loadProductData(product);
+
+      // Informer l'application principale du changement de produit actuel
+      sendToMainApp('PRODUCT_CHANGED', {
+        currentProductIndex: currentProductIndex,
+        product: {
+          id: product.id || product._id,
+          sku: product.sku,
+          designation: product.designation,
+        },
+      });
     }
 
     // Bind events on form
@@ -128,12 +317,31 @@
           focusedInput.classList.add('active-input');
           showFeedback(`Champ ${input.id} activé`);
         });
+
+        // Envoyer les mises à jour des champs à l'application principale
+        input.addEventListener('input', () => {
+          const product = products[currentProductIndex];
+          product._captured = product._captured || {};
+          product._captured[input.id] = input.value;
+
+          sendToMainApp('FIELD_UPDATED', {
+            currentProductIndex: currentProductIndex,
+            field: input.id,
+            value: input.value,
+          });
+        });
       });
 
       document.getElementById('prev-btn').addEventListener('click', () => {
         if (currentProductIndex > 0) {
           saveCurrentProduct();
           currentProductIndex--;
+
+          // Demander à l'application principale la navigation vers l'URL du produit précédent
+          sendToMainApp('NAVIGATE_TO_PRODUCT_URL', {
+            productIndex: currentProductIndex,
+          });
+
           updateForm();
         }
       });
@@ -142,9 +350,48 @@
         if (currentProductIndex < products.length - 1) {
           saveCurrentProduct();
           currentProductIndex++;
+
+          // Demander à l'application principale la navigation vers l'URL du produit suivant
+          sendToMainApp('NAVIGATE_TO_PRODUCT_URL', {
+            productIndex: currentProductIndex,
+          });
+
           updateForm();
         }
       });
+
+      // Bouton de recherche explicite
+      document.getElementById('search-btn').addEventListener('click', () => {
+        navigateToProductSearch();
+      });
+
+      // Bouton pour retourner à l'URL enregistrée
+      const urlBtn = document.getElementById('url-btn');
+      if (urlBtn) {
+        urlBtn.addEventListener('click', () => {
+          const product = products[currentProductIndex];
+          const productId = product.id || product._id;
+
+          if (productId && productUrls[productId]) {
+            // Sauvegarder l'état actuel avant la navigation
+            saveCurrentProduct();
+
+            // Informer l'application principale de la navigation
+            sendToMainApp('NAVIGATION_START', {
+              currentProductIndex: currentProductIndex,
+              targetUrl: productUrls[productId],
+            });
+
+            navInProgress = true;
+
+            // Naviguer vers l'URL enregistrée
+            window.location.href = productUrls[productId];
+            showFeedback('Navigation vers la page produit');
+          } else {
+            showFeedback('Aucune URL produit enregistrée');
+          }
+        });
+      }
 
       document.getElementById('export-btn').addEventListener('click', exportProducts);
     }
@@ -155,13 +402,41 @@
       product._captured = product._captured || {};
       product._captured.title = document.getElementById('title').value;
       product._captured.description = document.getElementById('description').value;
+
       // Save text selections
       product._captured.selections = Array.from(document.querySelectorAll('.text-selected')).map(
         (el) => getTextContent(el)
       );
+
       product._captured.images = Array.from(
         document.getElementById('image-container').children
       ).map((img) => ({ src: img.src, alt: img.alt || '' }));
+
+      // Sauvegarder l'URL actuelle si ce n'est pas une URL système
+      const productId = product.id || product._id;
+      if (
+        productId &&
+        window.location.href &&
+        !window.location.href.includes('google.com/#APP_PRODUCTS_DATA=') &&
+        !window.location.href.includes('qwant.com/?q=')
+      ) {
+        productUrls[productId] = window.location.href;
+
+        // Informer l'application principale de l'URL sauvegardée
+        sendToMainApp('URL_SAVED', {
+          productId: productId,
+          url: window.location.href,
+        });
+
+        // Mettre à jour l'état du bouton URL
+        updateUrlButtonState();
+      }
+
+      // Envoyer les données capturées à l'application principale
+      sendToMainApp('PRODUCT_SAVED', {
+        currentProductIndex: currentProductIndex,
+        productData: product._captured,
+      });
     }
 
     // Add image thumbnail
@@ -177,6 +452,9 @@
           .querySelectorAll(`img[src="${src}"]`)
           .forEach((i) => i.classList.remove('image-selected'));
         showFeedback('Image retirée');
+
+        // Mettre à jour les images enregistrées
+        saveCurrentProduct();
       });
       document.getElementById('image-container').appendChild(img);
       updateImagesCounter();
@@ -206,14 +484,20 @@
     function exportProducts() {
       saveCurrentProduct();
       const exportData = products.map((p) => ({
-        id: p.id || null,
+        id: p.id || p._id || null,
         sku: p.sku || null,
         designation: p.designation || null,
         title: p._captured?.title || null,
         description: p._captured?.description || null,
         selections: p._captured?.selections || [],
         images: p._captured?.images || [],
+        capturedUrl: productUrls[p.id || p._id] || null, // Inclure l'URL capturée
       }));
+
+      // Envoyer la demande d'export à l'application principale
+      sendToMainApp('EXPORT_PRODUCTS', { products: exportData });
+
+      // Créer aussi l'export local comme avant pour compatibilité
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const filename = `produits_captures_${new Date().toISOString().slice(0, 10)}.json`;
       const a = document.createElement('a');
@@ -259,6 +543,9 @@
         const added = toggleClass(el, 'text-selected');
         updateField(focusedInput, txt, !added);
         showFeedback(`Texte ${added ? 'ajouté' : 'retiré'}`);
+
+        // Mettre à jour l'application principale après une sélection de texte
+        setTimeout(() => saveCurrentProduct(), 100);
       } else if (config.enableImageSelection && el.matches(config.selectors.image)) {
         e.preventDefault();
         e.stopPropagation();
@@ -274,11 +561,65 @@
           updateImagesCounter();
           showFeedback('Image retirée');
         }
+
+        // Mettre à jour l'application principale après une sélection d'image
+        setTimeout(() => saveCurrentProduct(), 100);
       }
     });
 
+    // Sauvegarder l'URL actuelle dès le chargement initial et mettre à jour l'état du bouton URL
+    setTimeout(() => {
+      const product = products[currentProductIndex];
+      const productId = product.id || product._id;
+      if (
+        productId &&
+        window.location.href &&
+        !window.location.href.includes('google.com/#APP_PRODUCTS_DATA=') &&
+        !window.location.href.includes('qwant.com/?q=')
+      ) {
+        productUrls[productId] = window.location.href;
+
+        // Informer l'application principale de l'URL sauvegardée
+        sendToMainApp('URL_SAVED', {
+          productId: productId,
+          url: window.location.href,
+        });
+
+        // Mettre à jour l'état du bouton URL
+        updateUrlButtonState();
+      }
+    }, 1000);
+
+    // Demander l'état actuel à l'application principale
+    // après un court délai pour s'assurer que les écouteurs sont en place
+    setTimeout(requestState, 300);
+
     // Init
     updateForm();
+
+    // Lancer une recherche lors du premier chargement
+    if (isFirstLoad && window.location.href.includes('APP_PRODUCTS_DATA')) {
+      // Uniquement si on est sur une nouvelle page (Google par défaut)
+      // et qu'on n'est pas sur une page de résultats Qwant
+      if (
+        window.location.href.includes('google.com') &&
+        !window.location.href.includes('qwant.com/?q=')
+      ) {
+        // Vérifier si on a une URL stockée pour ce produit
+        const product = products[currentProductIndex];
+        const productId = product.id || product._id;
+        if (productId && productUrls[productId]) {
+          // Si on a une URL stockée, naviguer directement vers celle-ci
+          console.log(`Utilisation de l'URL stockée pour ${productId}:`, productUrls[productId]);
+          window.location.href = productUrls[productId];
+          showFeedback('Navigation vers la page enregistrée');
+        } else {
+          // Sinon, lancer une recherche
+          setTimeout(navigateToProductSearch, 300);
+        }
+      }
+    }
+
     showFeedback('Sélecteur de contenu activé !');
     return true;
   } catch (e) {

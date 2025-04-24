@@ -161,6 +161,71 @@ ipcMain.on('request-network-urls', () => {
 
 setupWebCaptureListener(ipcMain);
 
+// Ajout au fichier main.js
+// Ajouter ces lignes après setupWebCaptureListener(ipcMain)
+
+// Gérer l'export des produits capturés
+ipcMain.on('export-captured-products', (event, products) => {
+  try {
+    // Créer le nom du fichier avec la date
+    const date = new Date().toISOString().split('T')[0];
+    const fileName = `produits_captures_${date}.json`;
+
+    // Demander à l'utilisateur où enregistrer le fichier
+    dialog
+      .showSaveDialog({
+        title: 'Enregistrer les produits capturés',
+        defaultPath: path.join(app.getPath('documents'), fileName),
+        filters: [{ name: 'Fichiers JSON', extensions: ['json'] }],
+      })
+      .then((result) => {
+        if (!result.canceled && result.filePath) {
+          // Écrire le fichier
+          fs.writeFileSync(result.filePath, JSON.stringify(products, null, 2), 'utf-8');
+
+          // Notifier l'utilisateur
+          event.reply('export-complete', {
+            success: true,
+            filePath: result.filePath,
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('Erreur lors de la sauvegarde du fichier:', err);
+        event.reply('export-complete', {
+          success: false,
+          error: err.message,
+        });
+      });
+  } catch (error) {
+    console.error("Erreur lors de l'export des produits:", error);
+    event.reply('export-complete', {
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Relayer les messages "captured-product-data" à la fenêtre principale
+ipcMain.on('captured-product-data', (event, data) => {
+  // Envoyer à toutes les fenêtres (mainWindow et autres)
+  BrowserWindow.getAllWindows().forEach((window) => {
+    if (window.webContents) {
+      window.webContents.send('captured-product-update', data);
+    }
+  });
+});
+
+// Relayer les événements de fermeture de la WebView
+ipcMain.on('web-capture-closed', (event, data) => {
+  // Envoyer à toutes les fenêtres
+  BrowserWindow.getAllWindows().forEach((window) => {
+    if (window.webContents) {
+      window.webContents.send('web-capture-closed', data);
+    }
+  });
+});
+
 // Créer la fenêtre quand l'app est prête
 app.whenReady().then(() => {
   console.log('Electron est prêt!');
