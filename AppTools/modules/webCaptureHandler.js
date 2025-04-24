@@ -8,11 +8,16 @@ const { injectProductContentSelector } = require('../src/utils/productContentSel
 let capturedProductsState = {
   currentProductIndex: 0,
   products: [],
-  // Nouvel objet pour stocker les URLs de destination par produit
   productUrls: {},
 };
 
+let authToken = null;
+
 function setupWebCaptureListener(ipcMainInstance) {
+  ipcMainInstance.on('set-auth-token', (event, token) => {
+    console.log('[main] ← set-auth-token', token);
+    authToken = token;
+  });
   // Ouvrir une fenêtre WebView pour la capture
   ipcMainInstance.on('open-web-capture-window', (event, url, options = {}) => {
     if (!url) return;
@@ -50,6 +55,7 @@ function setupWebCaptureListener(ipcMainInstance) {
         if (options.resetUrls) {
           capturedProductsState.productUrls = {};
         }
+        console.log('🗃️ État INITIAL capturé:', JSON.stringify(capturedProductsState, null, 2));
       } catch (err) {
         console.error('Erreur parsing produits :', err);
       }
@@ -236,9 +242,70 @@ function setupWebCaptureListener(ipcMainInstance) {
     }
   });
 
+  ipcMainInstance.on('export-captured-products', (event, productsForCsv) => {
+    console.log('💾 [main] Données reçues pour export CSV :', productsForCsv);
+    // … votre code d’écriture de fichier CSV …
+  });
+
   // Écouter les demandes d'état des produits capturés
   ipcMainInstance.on('request-captured-products-state', (event) => {
     event.reply('captured-product-update', {
+      products: capturedProductsState.products,
+      currentProductIndex: capturedProductsState.currentProductIndex,
+      productUrls: capturedProductsState.productUrls,
+    });
+  });
+
+  ipcMainInstance.on('update-product-description', async (event, { productId, description }) => {
+    console.log('[main] ← update-product-description', productId, description);
+
+    try {
+      // Import du service CommonJS dédié au main
+      const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
+
+      // Injecte le token si on en a un
+      if (authToken && typeof apiService.setAuthToken === 'function') {
+        apiService.setAuthToken(authToken);
+      }
+
+      // (optionnel) init du service
+      if (typeof apiService.init === 'function') {
+        await apiService.init();
+      }
+
+      // Envoi de la requête PUT
+      await apiService.put(`/api/products/${productId}`, { description });
+      console.log(`✅ Description mise à jour pour ${productId}`);
+
+      // Mise à jour du state local
+      const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
+      if (prod) {
+        prod._captured = prod._captured || {};
+        prod._captured.description = description;
+      }
+
+      // Réémission vers la WebView
+      event.sender.send('captured-product-update', {
+        products: capturedProductsState.products,
+        currentProductIndex: capturedProductsState.currentProductIndex,
+        productUrls: capturedProductsState.productUrls,
+      });
+    } catch (err) {
+      console.error(`❌ Échec de update-product-description pour ${productId}:`, err);
+    }
+  });
+  ipcMainInstance.on('description-updated', (event, { productId, description }) => {
+    console.log(`🔄 Main : description-updated pour ${productId}`);
+
+    // ➋ Met à jour le state local
+    const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
+    if (prod) {
+      prod._captured = prod._captured || {};
+      prod._captured.description = description;
+    }
+
+    // ➌ Réémet l’état complet vers la WebView
+    event.sender.send('captured-product-update', {
       products: capturedProductsState.products,
       currentProductIndex: capturedProductsState.currentProductIndex,
       productUrls: capturedProductsState.productUrls,

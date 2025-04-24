@@ -2,27 +2,31 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import apiService from '../services/api';
 
-// Création du contexte
 const AuthContext = createContext();
-
-// Hook personnalisé pour utiliser le contexte
 export const useAuth = () => useContext(AuthContext);
 
-// Provider du contexte d'authentification
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Initialisation de l'authentification
+  // 1️⃣ Déclare logout AVANT le useEffect
+  const logout = useCallback(() => {
+    localStorage.removeItem('authToken');
+    apiService.setAuthToken(null);
+    window.electronAPI.setAuthToken(null);
+    setUser(null);
+    setError(null);
+  }, []);
+
   useEffect(() => {
     const initAuth = async () => {
       try {
         await apiService.init();
         const storedToken = localStorage.getItem('authToken');
-
         if (storedToken) {
           apiService.setAuthToken(storedToken);
+          window.electronAPI.setAuthToken(storedToken);
           const { data } = await apiService.get('/api/auth/me');
           setUser(data?.user || null);
         }
@@ -32,20 +36,18 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       }
     };
-
     initAuth();
-  }, []);
+  }, [logout]); // logout est maintenant défini
 
-  // Fonction de connexion
   const login = useCallback(async (username, password) => {
     setError(null);
     try {
       await apiService.init();
       const { data } = await apiService.post('/api/auth/login', { username, password });
-
       if (data.success) {
         localStorage.setItem('authToken', data.token);
         apiService.setAuthToken(data.token);
+        window.electronAPI.setAuthToken(data.token);
         setUser(data.user);
         return true;
       } else {
@@ -58,7 +60,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Fonction d'inscription
   const register = useCallback(async (userData) => {
     setError(null);
     try {
@@ -70,18 +71,8 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Fonction de déconnexion
-  const logout = useCallback(() => {
-    localStorage.removeItem('authToken');
-    apiService.setAuthToken(null);
-    setUser(null);
-    setError(null);
-  }, []);
-
-  // Vérifier si l'utilisateur a un rôle spécifique
   const hasRole = useCallback((role) => user?.role === role, [user]);
 
-  // Valeur du contexte
   const value = {
     user,
     loading,

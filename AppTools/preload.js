@@ -3,7 +3,21 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Configuration standard des APIs exposées à la fenêtre
 contextBridge.exposeInMainWorld('electronAPI', {
-  openWebCaptureWindow: (url, options) => ipcRenderer.send('open-web-capture-window', url, options),
+  setAuthToken: (token) => {
+    console.log('[preload] → set-auth-token', token);
+    ipcRenderer.send('set-auth-token', token);
+  },
+
+  openWebCaptureWindow: (url, options = {}) =>
+    ipcRenderer.send('open-web-capture-window', url, options),
+
+  updateProductDescription: (productId, description) => {
+    console.log('[preload] envoi update-product-description', productId, description);
+    ipcRenderer.send('update-product-description', { productId, description });
+  },
+
+  onCapturedProductUpdate: (callback) =>
+    ipcRenderer.on('captured-product-update', (_, data) => callback(data)),
 
   onUpdateMessage: (callback) => ipcRenderer.on('update-message', (_, data) => callback(data)),
 });
