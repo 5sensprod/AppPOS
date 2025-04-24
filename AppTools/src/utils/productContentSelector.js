@@ -3,8 +3,10 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Injecte le CSS puis le script d'injection, en passant directement
- * l'objet products (et non une chaîne JSON à parser).
+ * Injecte le CSS puis les modules du sélecteur de contenu.
+ * @param {WebContents} webContents - L'objet webContents d'Electron
+ * @param {Array} products - Liste des produits à manipuler
+ * @returns {Promise<boolean>} Succès de l'injection
  */
 async function injectProductContentSelector(webContents, products) {
   try {
@@ -14,18 +16,46 @@ async function injectProductContentSelector(webContents, products) {
     await webContents.insertCSS(css);
     console.log('✅ CSS injecté avec succès');
 
-    // 2) Script
+    // 2) Approche modulaire - injecter chaque module individuellement
+    const modulesDir = path.resolve(__dirname, '../injected/modules');
+    const moduleFiles = [
+      'productSelectorConfig.js',
+      'productSelectorCommunication.js',
+      'productSelectorUI.js',
+      'productSelectorNavigation.js',
+      'productSelectorSelection.js',
+      'productSelectorProductManager.js',
+      'productSelectorInteractionBlocker.js',
+    ];
+
+    // Injecter chaque module dans l'ordre
+    for (const moduleFile of moduleFiles) {
+      try {
+        const modulePath = path.join(modulesDir, moduleFile);
+        if (fs.existsSync(modulePath)) {
+          const moduleCode = fs.readFileSync(modulePath, 'utf-8');
+          await webContents.executeJavaScript(moduleCode);
+          console.log(`✅ Module ${moduleFile} injecté avec succès`);
+        } else {
+          console.warn(`⚠️ Module ${moduleFile} non trouvé`);
+        }
+      } catch (moduleErr) {
+        console.error(`❌ Erreur lors de l'injection du module ${moduleFile}:`, moduleErr);
+      }
+    }
+
+    // 3) Script principal
     const scriptPath = path.resolve(__dirname, '../injected/productContentSelector.js');
     let script = fs.readFileSync(scriptPath, 'utf-8');
 
-    // On remplace le placeholder par le JSON littéral (pas de backticks ici)
+    // Remplacer le placeholder par les produits
     const productsJson = JSON.stringify(products);
     script = script.replace('/*PLACEHOLDER_PRODUCTS*/', productsJson);
 
-    // 3) Exécution
-    console.log('🔄 Injection du script en cours...');
+    // Exécution du script principal
+    console.log('🔄 Injection du script principal en cours...');
     const result = await webContents.executeJavaScript(script);
-    console.log('✅ Script injecté avec succès');
+    console.log('✅ Script principal injecté avec succès');
 
     return result;
   } catch (err) {
