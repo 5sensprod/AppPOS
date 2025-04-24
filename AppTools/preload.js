@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('update-product-description', { productId, description });
   },
 
+  updateProductImages: (productId, images) => {
+    ipcRenderer.send('update-product-images', { productId, images });
+  },
+
   onCapturedProductUpdate: (callback) =>
     ipcRenderer.on('captured-product-update', (_, data) => callback(data)),
 

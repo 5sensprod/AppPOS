@@ -1,7 +1,7 @@
-// apiMain.js — service API pour le main process (CommonJS)
+// apiMain.js — ajout des méthodes manquantes
 const axiosLib = require('axios');
 
-// URL de base (à configurer via variable d’env. si besoin)
+// URL de base (à configurer via variable d'env. si besoin)
 const baseURL = process.env.API_BASE_URL || 'http://localhost:3000';
 
 class ApiMainService {
@@ -16,7 +16,7 @@ class ApiMainService {
   }
 
   /**
-   * Permet d’injecter le token pour toutes les requêtes suivantes
+   * Permet d'injecter le token pour toutes les requêtes suivantes
    */
   setAuthToken(token) {
     if (token) {
@@ -26,12 +26,21 @@ class ApiMainService {
     }
   }
 
-  put(path, data) {
-    // this.api a déjà le baseURL et les headers
-    return this.api.put(path, data);
+  get(path, config = {}) {
+    return this.api.get(path, config);
   }
 
-  // (éventuellement get, post, delete…)
+  post(path, data, config = {}) {
+    return this.api.post(path, data, config);
+  }
+
+  put(path, data, config = {}) {
+    return this.api.put(path, data, config);
+  }
+
+  delete(path, config = {}) {
+    return this.api.delete(path, config);
+  }
 }
 
 module.exports = new ApiMainService();

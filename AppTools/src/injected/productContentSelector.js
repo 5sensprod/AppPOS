@@ -41,7 +41,7 @@
       navigation.handleInitialNavigation();
       ui.showFeedback('Sélecteur de contenu activé !');
 
-      // ➕ Bouton “Mettre à jour la description”
+      // ➕ Bouton "Mettre à jour le produit"
       const updateBtn = document.createElement('button');
       updateBtn.textContent = 'Mettre à jour le produit';
       Object.assign(updateBtn.style, {
@@ -63,16 +63,29 @@
         const productId = prod.id || prod._id;
         const newDesc = prod._captured?.description || '';
         const newTitle = prod._captured?.title || '';
+        const images = prod._captured?.images || [];
 
-        console.log('[webview] click update product, title=', newTitle, 'desc=', newDesc);
+        console.log(
+          '[webview] click update product, title=',
+          newTitle,
+          'desc=',
+          newDesc,
+          'images=',
+          images.length
+        );
 
-        // Mettre à jour les deux champs si nécessaire
+        // Mettre à jour les champs si nécessaire
         if (newDesc) {
           window.electronAPI.updateProductDescription(productId, newDesc);
         }
 
         if (newTitle) {
           window.electronAPI.updateProductName(productId, newTitle);
+        }
+
+        // Mettre à jour les images si présentes
+        if (images.length > 0) {
+          window.electronAPI.updateProductImages(productId, images);
         }
       });
     }

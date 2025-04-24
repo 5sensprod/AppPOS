@@ -352,6 +352,119 @@ function setupWebCaptureListener(ipcMainInstance) {
     });
   });
 
+  ipcMainInstance.on('update-product-images', async (event, { productId, images }) => {
+    console.log('[main] ← update-product-images', productId, images.length);
+
+    try {
+      // Import des modules nécessaires
+      const path = require('path');
+      const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
+      const axios = require('axios');
+      const FormData = require('form-data');
+      const fs = require('fs');
+      const os = require('os');
+
+      // Injecte le token si on en a un
+      if (authToken && typeof apiService.setAuthToken === 'function') {
+        apiService.setAuthToken(authToken);
+      }
+
+      // Initialisation si nécessaire
+      if (typeof apiService.init === 'function') {
+        await apiService.init();
+      }
+
+      // Récupérer l'état actuel du produit pour vérifier s'il a déjà une image principale
+      const productResponse = await apiService.get(`/api/products/${productId}`);
+      const hasMainImage = !!productResponse.data?.data?.image;
+      console.log(`Produit ${productId} a déjà une image principale: ${hasMainImage}`);
+
+      // Traiter chaque image
+      let firstImageId = null;
+
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        console.log(`Traitement de l'image ${i + 1}/${images.length}: ${img.src}`);
+
+        try {
+          // 1. Télécharger l'image
+          const response = await axios({
+            url: img.src,
+            method: 'GET',
+            responseType: 'arraybuffer',
+          });
+
+          // 2. Déterminer le type MIME et l'extension
+          const contentType = response.headers['content-type'] || 'image/jpeg';
+          const extension = contentType.split('/')[1] || 'jpg';
+
+          // 3. Sauvegarder temporairement l'image
+          const tempDir = os.tmpdir();
+          const tempFilePath = path.join(tempDir, `temp-image-${Date.now()}.${extension}`);
+          fs.writeFileSync(tempFilePath, Buffer.from(response.data));
+
+          // 4. Créer un FormData pour l'upload
+          const formData = new FormData();
+          // La clé attendue est "images" pour les uploads de galerie, pas "image"
+          formData.append('images', fs.createReadStream(tempFilePath));
+
+          // 5. Uploader l'image via l'API
+          const uploadResponse = await apiService.post(
+            `/api/products/${productId}/image`,
+            formData,
+            {
+              headers: {
+                ...formData.getHeaders(),
+              },
+            }
+          );
+
+          // Récupérer l'ID de l'image uploadée
+          const imageId = uploadResponse.data?.data?._id;
+          console.log(`Image ${i + 1} uploadée avec succès, ID: ${imageId}`);
+
+          // Stocker l'ID de la première image pour définir éventuellement l'image principale
+          if (i === 0 && !firstImageId) {
+            firstImageId = imageId;
+          }
+
+          // 6. Supprimer le fichier temporaire
+          fs.unlinkSync(tempFilePath);
+        } catch (imgError) {
+          console.error(`Erreur lors du traitement de l'image ${i + 1}:`, imgError.message);
+        }
+      }
+
+      // Si c'est la première image et qu'il n'y a pas d'image principale, la définir comme principale
+      if (firstImageId && !hasMainImage) {
+        try {
+          console.log(`Définition de l'image ${firstImageId} comme image principale`);
+          await apiService.put(`/api/products/${productId}/main-image`, { imageId: firstImageId });
+        } catch (mainImgError) {
+          console.error(
+            "Erreur lors de la définition de l'image principale:",
+            mainImgError.message
+          );
+        }
+      }
+
+      // Mettre à jour l'état local pour refléter les changements d'images
+      const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
+      if (prod) {
+        prod._captured = prod._captured || {};
+        // On ne modifie pas les images capturées car elles viennent déjà de là
+      }
+
+      console.log(`✅ Images mises à jour pour ${productId}`);
+
+      // Notifier la WebView
+      event.sender.send('images-updated', { productId, success: true });
+    } catch (err) {
+      console.error(`❌ Échec de update-product-images pour ${productId}:`, err);
+      event.sender.send('images-updated', { productId, success: false, error: err.message });
+    }
+  });
+
   ipcMainInstance.on('description-updated', (event, { productId, description }) => {
     console.log(`🔄 Main : description-updated pour ${productId}`);
 
