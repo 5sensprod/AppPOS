@@ -42,9 +42,9 @@
       ui.showFeedback('Sélecteur de contenu activé !');
 
       // ➕ Bouton “Mettre à jour la description”
-      const btn = document.createElement('button');
-      btn.textContent = 'Mettre à jour la description';
-      Object.assign(btn.style, {
+      const updateBtn = document.createElement('button');
+      updateBtn.textContent = 'Mettre à jour le produit';
+      Object.assign(updateBtn.style, {
         position: 'fixed',
         bottom: '1em',
         right: '1em',
@@ -56,17 +56,24 @@
         borderRadius: '4px',
         cursor: 'pointer',
       });
-      document.body.appendChild(btn);
+      document.body.appendChild(updateBtn);
 
-      btn.addEventListener('click', () => {
+      updateBtn.addEventListener('click', () => {
         const prod = products[currentIndex];
         const productId = prod.id || prod._id;
-
-        // Nouvelle desc directement depuis le champ _captured.description
         const newDesc = prod._captured?.description || '';
+        const newTitle = prod._captured?.title || '';
 
-        console.log('[webview] click update from state, newDesc =', newDesc);
-        window.electronAPI.updateProductDescription(productId, newDesc);
+        console.log('[webview] click update product, title=', newTitle, 'desc=', newDesc);
+
+        // Mettre à jour les deux champs si nécessaire
+        if (newDesc) {
+          window.electronAPI.updateProductDescription(productId, newDesc);
+        }
+
+        if (newTitle) {
+          window.electronAPI.updateProductName(productId, newTitle);
+        }
       });
     }
 

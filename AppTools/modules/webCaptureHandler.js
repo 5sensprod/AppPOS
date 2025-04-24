@@ -294,6 +294,64 @@ function setupWebCaptureListener(ipcMainInstance) {
       console.error(`❌ Échec de update-product-description pour ${productId}:`, err);
     }
   });
+
+  ipcMainInstance.on('update-product-name', async (event, { productId, name }) => {
+    console.log('[main] ← update-product-name', productId, name);
+
+    try {
+      // Import du service CommonJS dédié au main
+      const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
+
+      // Injecte le token si on en a un
+      if (authToken && typeof apiService.setAuthToken === 'function') {
+        apiService.setAuthToken(authToken);
+      }
+
+      // (optionnel) init du service
+      if (typeof apiService.init === 'function') {
+        await apiService.init();
+      }
+
+      // Envoi de la requête PUT pour mettre à jour le nom du produit
+      await apiService.put(`/api/products/${productId}`, { name });
+      console.log(`✅ Nom mis à jour pour ${productId}`);
+
+      // Mise à jour du state local
+      const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
+      if (prod) {
+        prod._captured = prod._captured || {};
+        prod._captured.title = name;
+      }
+
+      // Réémission vers la WebView
+      event.sender.send('captured-product-update', {
+        products: capturedProductsState.products,
+        currentProductIndex: capturedProductsState.currentProductIndex,
+        productUrls: capturedProductsState.productUrls,
+      });
+    } catch (err) {
+      console.error(`❌ Échec de update-product-name pour ${productId}:`, err);
+    }
+  });
+
+  ipcMainInstance.on('name-updated', (event, { productId, name }) => {
+    console.log(`🔄 Main : name-updated pour ${productId}`);
+
+    // Met à jour le state local
+    const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
+    if (prod) {
+      prod._captured = prod._captured || {};
+      prod._captured.title = name;
+    }
+
+    // Réémet l'état complet vers la WebView
+    event.sender.send('captured-product-update', {
+      products: capturedProductsState.products,
+      currentProductIndex: capturedProductsState.currentProductIndex,
+      productUrls: capturedProductsState.productUrls,
+    });
+  });
+
   ipcMainInstance.on('description-updated', (event, { productId, description }) => {
     console.log(`🔄 Main : description-updated pour ${productId}`);
 

@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openWebCaptureWindow: (url, options = {}) =>
     ipcRenderer.send('open-web-capture-window', url, options),
 
+  updateProductName: (productId, name) => {
+    ipcRenderer.send('update-product-name', { productId, name });
+  },
+
   updateProductDescription: (productId, description) => {
     console.log('[preload] envoi update-product-description', productId, description);
     ipcRenderer.send('update-product-description', { productId, description });
