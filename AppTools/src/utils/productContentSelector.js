@@ -34,7 +34,12 @@ async function injectProductContentSelector(webContents, products) {
         const modulePath = path.join(modulesDir, moduleFile);
         if (fs.existsSync(modulePath)) {
           const moduleCode = fs.readFileSync(modulePath, 'utf-8');
-          await webContents.executeJavaScript(moduleCode);
+          await webContents.executeJavaScript(`
+            (function(){
+              ${moduleCode}
+              // on termine sans return pour que ça renvoie undefined
+            })()
+          `);
           console.log(`✅ Module ${moduleFile} injecté avec succès`);
         } else {
           console.warn(`⚠️ Module ${moduleFile} non trouvé`);
