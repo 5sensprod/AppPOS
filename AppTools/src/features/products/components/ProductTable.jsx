@@ -73,10 +73,100 @@ function ProductTable(props) {
     };
   }, []);
 
+  // Enrichir les produits avec des informations sur les chemins de catégories
   useEffect(() => {
-    setLocalProducts(products || []);
+    if (products.length > 0 && hierarchicalCategories.length > 0) {
+      // Créer une carte des chemins de catégories
+      const categoryPathMap = {};
+      const categoryHierarchyMap = {};
+
+      // Fonction récursive pour construire les chemins et la hiérarchie
+      const buildCategoryMaps = (categories, parentPath = '', parent = null) => {
+        categories.forEach((cat) => {
+          const currentPath = parentPath ? `${parentPath}/${cat._id}` : cat._id;
+          categoryPathMap[cat._id] = currentPath;
+
+          // Pour chaque catégorie, stocker son parent
+          categoryHierarchyMap[cat._id] = {
+            path: currentPath,
+            parentId: parent ? parent._id : null,
+          };
+
+          if (cat.children && cat.children.length > 0) {
+            buildCategoryMaps(cat.children, currentPath, cat);
+          }
+        });
+      };
+
+      buildCategoryMaps(hierarchicalCategories);
+
+      // console.log("Chemins des catégories construits:", categoryPathMap);
+
+      // Enrichir les produits avec les informations de chemin
+      const enrichedProducts = products.map((product) => {
+        // Créer un objet pour stocker les chemins des catégories associées
+        // Inclure TOUTES les catégories possibles pour une recherche plus efficace
+        const path_info = {};
+
+        // Fonction pour ajouter tous les chemins de catégories parents
+        const addAllCategoryPaths = (catId) => {
+          if (!catId || !categoryPathMap[catId]) return;
+
+          // Ajouter le chemin de cette catégorie
+          path_info[catId] = categoryPathMap[catId];
+
+          // Ajouter tous les chemins parents potentiels
+          Object.keys(categoryPathMap).forEach((potentialParentId) => {
+            // Vérifier si potentialParentId est un parent de catId
+            if (
+              categoryPathMap[catId].startsWith(categoryPathMap[potentialParentId]) &&
+              catId !== potentialParentId
+            ) {
+              path_info[potentialParentId] = categoryPathMap[potentialParentId];
+            }
+          });
+        };
+
+        // Ajouter tous les chemins pour la catégorie principale
+        if (product.category_id) {
+          addAllCategoryPaths(product.category_id);
+        }
+
+        // Ajouter tous les chemins pour les catégories additionnelles
+        if (Array.isArray(product.categories)) {
+          product.categories.forEach((catId) => {
+            addAllCategoryPaths(catId);
+          });
+        }
+
+        // Si les refs de catégorie existent, ajouter leurs chemins aussi
+        if (product.category_info?.refs) {
+          product.category_info.refs.forEach((ref) => {
+            addAllCategoryPaths(ref.id);
+          });
+        }
+
+        // Ajouter une propriété category_id_path au produit
+        const category_id_path = product.category_id ? categoryPathMap[product.category_id] : null;
+
+        return {
+          ...product,
+          category_id_path,
+          category_info: {
+            ...(product.category_info || {}),
+            path_info,
+          },
+        };
+      });
+
+      // console.log("Nombre de produits enrichis:", enrichedProducts.length);
+      setLocalProducts(enrichedProducts);
+    } else {
+      setLocalProducts(products || []);
+    }
+
     setError(productsError);
-  }, [products, productsError]);
+  }, [products, hierarchicalCategories, productsError]);
 
   const filteredProducts = filterProducts(localProducts);
   const loading = productsLoading || isLoading || categoriesLoading;

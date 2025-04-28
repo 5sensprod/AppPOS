@@ -107,24 +107,17 @@ export const useProductFilters = (products = []) => {
     if (categoryFilters.length > 0) {
       const categoryIds = categoryFilters.map((f) => f.value.replace('category_', ''));
 
-      // Fonction pour vérifier si un produit appartient à une catégorie
-      const productInCategory = (product, categoryId) => {
-        // Vérifier la catégorie principale
-        if (product.category_id === categoryId) return true;
-
-        // Vérifier les catégories additionnelles
-        if (Array.isArray(product.categories) && product.categories.includes(categoryId))
-          return true;
-
-        // Vérifier dans les category_info.refs si disponible
-        if (product.category_info?.refs) {
-          return product.category_info.refs.some((ref) => ref.id === categoryId);
-        }
-
-        return false;
+      // Méthode simplifiée et optimisée pour vérifier l'appartenance à une catégorie
+      const productBelongsToCategory = (product, categoryId) => {
+        // Vérifier si le produit a un chemin enregistré pour cette catégorie
+        // Ce qui signifie qu'il appartient à cette catégorie ou à l'une de ses sous-catégories
+        return !!product.category_info?.path_info?.[categoryId];
       };
 
-      data = data.filter((p) => categoryIds.some((catId) => productInCategory(p, catId)));
+      // Filtrer les produits appartenant à l'une des catégories sélectionnées ou à leurs sous-catégories
+      data = data.filter((product) =>
+        categoryIds.some((categoryId) => productBelongsToCategory(product, categoryId))
+      );
     }
 
     // Filtre par présence de description
