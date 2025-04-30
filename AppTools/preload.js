@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   onUpdateMessage: (callback) => ipcRenderer.on('update-message', (_, data) => callback(data)),
 
+  onDescriptionEnhancementStart: (callback) => {
+    ipcRenderer.on('description-enhancement-start', (_, data) => callback(data));
+  },
+
   onDescriptionEnhanced: (callback) => {
     ipcRenderer.on('description-enhanced', (_, data) => callback(data));
   },

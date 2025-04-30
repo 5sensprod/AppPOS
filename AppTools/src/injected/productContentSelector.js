@@ -202,7 +202,7 @@
 
       // Gérer le bouton "Utiliser"
       document.getElementById('use-enhanced-btn').addEventListener('click', () => {
-        const prod = products[currentIndex];
+        const prod = products[currentProductIndex];
         const enhancedDesc = document.getElementById('enhanced-desc').textContent;
 
         // Mettre à jour la description capturée
@@ -234,20 +234,99 @@
       });
 
       // Fermer également lors d'un clic sur l'overlay
-      overlay.addEventListener('click', () => {
-        previewDialog.style.display = 'none';
-        overlay.style.display = 'none';
+      // Écouteur pour les notifications de description en cours d'amélioration
+      window.electronAPI.onDescriptionEnhancementStart((data) => {
+        if (data.productId) {
+          // Afficher le spinner et l'overlay
+          spinner.style.display = 'block';
+          overlay.style.display = 'block';
+          ui.showFeedback('Amélioration de la description en cours...');
+        }
       });
 
-      // Écouteur pour les notifications de description améliorée
+      // Écouteur pour les descriptions améliorées
       window.electronAPI.onDescriptionEnhanced((data) => {
+        // Masquer le spinner et l'overlay
+        spinner.style.display = 'none';
+        overlay.style.display = 'none';
+
         if (data.productId) {
           ui.showFeedback('Description améliorée par IA !');
+
+          // Si la description est fournie dans la notification
+          if (data.enhancedDescription) {
+            // Rechercher le produit directement par ID
+            for (let i = 0; i < products.length; i++) {
+              const prod = products[i];
+              const prodId = prod.id || prod._id;
+
+              if (prodId === data.productId) {
+                // Mettre à jour la description capturée
+                if (prod._captured) {
+                  prod._captured.description = data.enhancedDescription;
+                } else {
+                  prod._captured = { description: data.enhancedDescription };
+                }
+
+                // Mettre à jour l'interface si c'est le produit actuellement affiché
+                // Nous utilisons currentIndex qui est la variable dans votre fichier productContentSelector.js
+                if (i === currentIndex) {
+                  const descInput = document.getElementById('description');
+                  if (descInput) {
+                    descInput.value = data.enhancedDescription;
+                    descInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  }
+                }
+
+                break;
+              }
+            }
+          }
+        }
+      });
+
+      // Modifier l'écouteur existant pour les descriptions améliorées
+      window.electronAPI.onDescriptionEnhanced((data) => {
+        // Masquer le spinner et l'overlay
+        spinner.style.display = 'none';
+        overlay.style.display = 'none';
+
+        if (data.productId) {
+          ui.showFeedback('Description améliorée par IA !');
+
+          // Si la description est fournie dans la notification
+          if (data.enhancedDescription) {
+            // Trouver le produit par son ID
+            const productId = data.productId;
+            const productIndex = products.findIndex((p) => (p.id || p._id) === productId);
+
+            if (productIndex !== -1) {
+              const prod = products[productIndex];
+
+              // Mettre à jour la description capturée
+              if (prod._captured) {
+                prod._captured.description = data.enhancedDescription;
+              } else {
+                prod._captured = { description: data.enhancedDescription };
+              }
+
+              // Si c'est le produit actuellement affiché, mettre à jour le champ
+              if (productIndex === currentProductIndex) {
+                // Assurez-vous que cette variable est correcte pour votre code
+                const descInput = document.getElementById('description');
+                if (descInput) {
+                  descInput.value = data.enhancedDescription;
+                  descInput.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+              }
+            }
+          }
         }
       });
 
       // Gestion du bouton de mise à jour
       updateBtn.addEventListener('click', () => {
+        // Nous utilisons currentIndex qui est la variable dans votre fichier
         const prod = products[currentIndex];
         const productId = prod.id || prod._id;
         const newDesc = prod._captured?.description || '';
@@ -262,6 +341,13 @@
           'images=',
           images.length
         );
+
+        // Afficher le spinner uniquement si une description est mise à jour
+        if (newDesc) {
+          spinner.style.display = 'block';
+          overlay.style.display = 'block';
+          ui.showFeedback('Mise à jour de la description en cours...');
+        }
 
         // Mettre à jour les champs si nécessaire
         if (newDesc) {

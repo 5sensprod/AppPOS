@@ -308,6 +308,9 @@ function setupWebCaptureListener(ipcMainInstance) {
         await apiService.init();
       }
 
+      // Notifier que l'amélioration commence
+      event.sender.send('description-enhancement-start', { productId });
+
       // 1. D'abord, récupérer les données complètes du produit
       const productResponse = await apiService.get(`/api/products/${productId}`);
       const productData = productResponse.data?.data;
@@ -366,8 +369,23 @@ function setupWebCaptureListener(ipcMainInstance) {
           currentProductIndex: capturedProductsState.currentProductIndex,
           productUrls: capturedProductsState.productUrls,
         });
+
+        // Envoyer un événement de fin même en cas d'échec de l'amélioration
+        event.sender.send('description-enhanced', {
+          productId,
+          originalDescription: description,
+          enhancedDescription: description,
+        });
       } catch (backupErr) {
         console.error(`❌ Échec du plan B pour mise à jour de description:`, backupErr);
+
+        // Toujours envoyer un événement de fin, même en cas d'erreur complète
+        event.sender.send('description-enhanced', {
+          productId,
+          originalDescription: description,
+          enhancedDescription: description,
+          error: true,
+        });
       }
     }
   });
