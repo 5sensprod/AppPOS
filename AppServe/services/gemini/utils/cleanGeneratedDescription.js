@@ -1,3 +1,8 @@
+// services/gemini/utils/cleanGeneratedDescription.js
+
+// Importer le nouveau service de validation
+const htmlValidatorService = require('./htmlValidatorService');
+
 /**
  * Nettoie la description générée par l'IA pour supprimer les symboles Markdown
  * et s'assurer que le HTML est correctement formaté pour WooCommerce
@@ -26,11 +31,11 @@ function cleanGeneratedDescription(description) {
   cleaned = cleaned.replace(/^(Voici|Voilà|Ici|J'ai créé|J'ai généré|Voici le code HTML).*$/gm, '');
   cleaned = cleaned.replace(/^(Note|Important|Remarque):.*$/gm, '');
 
-  // 5. Supprimer les balises script et commentaires HTML (NOUVEAU)
+  // 5. Supprimer les balises script et commentaires HTML
   cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
 
-  // 6. Protéger les attributs style avant conversions Markdown (AMÉLIORÉ)
+  // 6. Protéger les attributs style avant conversions Markdown
   const styleMatches = [];
   let counter = 0;
   cleaned = cleaned.replace(
@@ -66,7 +71,7 @@ function cleanGeneratedDescription(description) {
       '<li style="margin: 0 0 8px 0; padding: 0;">$1</li>'
     );
 
-    // Envelopper les items dans des balises ul (AMÉLIORÉ)
+    // Envelopper les items dans des balises ul
     const liPattern = '(<li style[^>]*>[^<]*<\\/li>)';
     const liRegex = new RegExp(`${liPattern}(\\s*${liPattern})*`, 'g');
     cleaned = cleaned.replace(
@@ -85,12 +90,11 @@ function cleanGeneratedDescription(description) {
   cleaned = cleaned.replace(/<\/html>/gi, '');
   cleaned = cleaned.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
 
-  // 11. Échapper les chevrons isolés qui ne font pas partie de balises HTML (NOUVEAU)
-  // Version simplifiée qui peut avoir des limitations
+  // 11. Échapper les chevrons isolés qui ne font pas partie de balises HTML
   cleaned = cleaned.replace(/([^<])<([^a-z\/!\s])/gi, '$1&lt;$2');
   cleaned = cleaned.replace(/([^0-9a-z"\/])>([^>])/gi, '$1&gt;$2');
 
-  // 12. Supprimer les balises non autorisées (NOUVEAU)
+  // 12. Supprimer les balises non autorisées
   const forbiddenTags = [
     'iframe',
     'object',
@@ -112,13 +116,16 @@ function cleanGeneratedDescription(description) {
     cleaned = cleaned.replace(closeTagRegex, '');
   });
 
-  // 13. Nettoyer les événements JavaScript dans les attributs (NOUVEAU)
+  // 13. Nettoyer les événements JavaScript dans les attributs
   cleaned = cleaned.replace(/\s(on\w+)="[^"]*"/gi, '');
   cleaned = cleaned.replace(/\s(on\w+)='[^']*'/gi, '');
 
   // 14. Nettoyer les espaces inutiles, les lignes vides multiples
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
   cleaned = cleaned.trim();
+
+  // 15. NOUVEAU : Validation finale et correction de la structure avec le service de validation
+  cleaned = htmlValidatorService.validateAndClean(cleaned);
 
   return cleaned;
 }

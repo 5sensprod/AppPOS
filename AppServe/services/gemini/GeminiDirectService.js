@@ -1,4 +1,4 @@
-// services/gemini/GeminiDirectService.js
+// services/gemini/GeminiDirectService.js - Avec validation HTML améliorée
 const axios = require('axios');
 const fs = require('fs');
 const apiConfig = require('./config/apiConfig');
@@ -6,6 +6,8 @@ const { cleanGeneratedDescription } = require('./utils/cleanGeneratedDescription
 const { getMimeType } = require('./utils/mimeTypeHelper');
 const { getProductDescriptionPrompt } = require('./prompts/productDescription');
 const { getChatResponsePrompt } = require('./prompts/chatResponse');
+// Ajout du service de validation HTML
+const htmlValidatorService = require('./utils/htmlValidatorService');
 
 /**
  * Service pour interagir avec l'API Gemini et générer des descriptions de produits
@@ -42,11 +44,16 @@ class GeminiDirectService {
       // Traiter la réponse
       if (this._isValidResponse(response)) {
         const rawDescription = response.data.candidates[0].content.parts[0].text;
+
+        // Utiliser cleanGeneratedDescription pour le nettoyage initial
         const cleanedDescription = cleanGeneratedDescription(rawDescription);
+
+        // NOUVEAU : Validation supplémentaire avec le service de validation HTML
+        const validatedDescription = htmlValidatorService.validateAndClean(cleanedDescription);
 
         return {
           product_name: productData.name,
-          description: cleanedDescription,
+          description: validatedDescription,
         };
       } else {
         throw new Error('Format de réponse inattendu de Gemini');
@@ -103,11 +110,16 @@ class GeminiDirectService {
       // Traitement de la réponse
       if (this._isValidResponse(response)) {
         const generatedText = response.data.candidates[0].content.parts[0].text;
+
+        // Utiliser cleanGeneratedDescription pour le nettoyage initial
         const cleanedDescription = cleanGeneratedDescription(generatedText);
+
+        // NOUVEAU : Validation supplémentaire avec le service de validation HTML
+        const validatedDescription = htmlValidatorService.validateAndClean(cleanedDescription);
 
         return {
           message: generatedText,
-          description: cleanedDescription,
+          description: validatedDescription,
           product_name: productData.name,
         };
       } else {
@@ -133,10 +145,10 @@ class GeminiDirectService {
       // Construire le prompt pour le titre
       const prompt = getProductTitlePrompt(productData);
 
-      // Préparer la requête API (utiliser les méthodes existantes au lieu de generateContent)
+      // Préparer la requête API
       const requestData = this._prepareApiRequest(prompt, 0.7);
 
-      // Ajouter une image si fournie (comme dans generateProductDescription)
+      // Ajouter une image si fournie
       if (imagePath && fs.existsSync(imagePath)) {
         this._addImageToRequest(requestData, imagePath);
       }

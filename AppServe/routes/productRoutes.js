@@ -70,6 +70,9 @@ router.post('/batch-category', productController.batchUpdateCategory);
 router.post('/export/pdf', exportToPdf);
 router.post('/export/csv', exportToCsv);
 
+// POST /api/products/:id/repair-images
+router.post('/:id/repair-images', productController.repairProductImages.bind(productController));
+
 router.use('/', productImageRoutes);
 
 module.exports = router;
