@@ -58,14 +58,9 @@ const UnifiedFilterBar = ({
 
   // Combiner toutes les options de filtre
   const allFilterOptions = useMemo(() => {
-    // Inclure le filtre de statut uniquement si enableStatusFilter est true
-    if (enableStatusFilter) {
-      return [...filterOptions, ...statusOptions, ...categoryOptions];
-    } else {
-      return [...filterOptions, ...categoryOptions];
-    }
-  }, [filterOptions, categoryOptions, statusOptions, enableStatusFilter]);
-
+    // Ne plus ajouter les statusOptions du composant car ils sont déjà dans filterOptions
+    return [...filterOptions, ...categoryOptions];
+  }, [filterOptions, categoryOptions]);
   const filterGroups = useMemo(() => {
     return allFilterOptions.reduce((acc, option) => {
       if (!acc[option.type]) acc[option.type] = [];
