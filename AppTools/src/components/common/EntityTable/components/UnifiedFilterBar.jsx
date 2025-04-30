@@ -137,13 +137,9 @@ const UnifiedFilterBar = ({
 
     onChange(updatedFilters);
 
-    // Si c'est un type qui permet les sélections multiples, garder le sélecteur ouvert
-    if (isMulti) {
-      // Ne pas réinitialiser
-    } else {
-      // Sinon, réinitialiser
-      setEditingType(null);
-    }
+    // Toujours réinitialiser le sélecteur après une sélection
+    setEditingType(null);
+    // Ne pas réinitialiser lastEditedType ici pour permettre de cliquer sur les tags
   };
 
   const handleRemove = (filterToRemove) => {
@@ -163,12 +159,19 @@ const UnifiedFilterBar = ({
     }));
   };
 
+  const handleClearAllFilters = () => {
+    onChange([]); // Réinitialiser les filtres avec un tableau vide
+    setEditingType(null); // Fermer le sélecteur
+    setLastEditedType(null); // Réinitialiser le dernier type édité
+  };
+
   const valueSelectRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (editingType && valueSelectRef.current && !valueSelectRef.current.contains(event.target)) {
         setEditingType(null);
+        setLastEditedType(null); // Réinitialiser le dernier type édité
       }
     };
 
@@ -177,7 +180,6 @@ const UnifiedFilterBar = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [editingType]);
-
   // Afficher un indicateur de chargement pendant le chargement des catégories
   if (editingType === 'category' && categoriesLoading) {
     return <div className="p-2 text-center">Chargement des catégories...</div>;
@@ -195,8 +197,6 @@ const UnifiedFilterBar = ({
               placeholder="Ajouter un critère de filtre..."
               classNamePrefix="react-select"
               className="w-full"
-              // Présélectionner le dernier type utilisé s'il est disponible
-              value={lastEditedType && availableTypes.find((t) => t.value === lastEditedType)}
             />
           ) : (
             <div ref={valueSelectRef} className="w-full">
@@ -216,34 +216,41 @@ const UnifiedFilterBar = ({
       </div>
 
       {selectedFilters.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {selectedFilters.map((filter, idx) => (
-            <div
-              key={`${filter.type}-${filter.value}-${idx}`}
-              className="flex items-center bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
-            >
-              <span
-                className="cursor-pointer"
-                title="Filtre appliqué"
-                onClick={() => {
-                  // Réouvrir le sélecteur pour ce type de filtre
-                  if (['supplier', 'brand', 'category'].includes(filter.type)) {
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap gap-2 flex-grow">
+            {selectedFilters.map((filter, idx) => (
+              <div
+                key={`${filter.type}-${filter.value}-${idx}`}
+                className="flex items-center bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
+              >
+                <span
+                  className="cursor-pointer"
+                  title="Filtre appliqué"
+                  onClick={() => {
+                    // Réouvrir le sélecteur pour ce type de filtre
                     setEditingType(filter.type);
                     setLastEditedType(filter.type);
-                  }
-                }}
-              >
-                {filter.label}
-              </span>
-              <button
-                onClick={() => handleRemove(filter)}
-                className="ml-2 text-xs font-bold"
-                title="Supprimer ce filtre"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+                  }}
+                >
+                  {filter.label}
+                </span>
+                <button
+                  onClick={() => handleRemove(filter)}
+                  className="ml-2 text-xs font-bold"
+                  title="Supprimer ce filtre"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={handleClearAllFilters}
+            className="ml-2 text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+            title="Effacer tous les filtres"
+          >
+            Effacer tous les filtres
+          </button>
         </div>
       )}
     </div>
