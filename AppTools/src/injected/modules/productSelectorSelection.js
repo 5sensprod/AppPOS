@@ -84,29 +84,51 @@ const ProductSelectorSelection = (config, communication, ui) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const isSel = toggleClass(el, config.classPrefix + 'image-selected');
+    // Vérifier les dimensions avant la sélection
+    const tempImg = new Image();
+    tempImg.onload = function () {
+      const width = this.width;
+      const height = this.height;
 
-    if (isSel) {
-      ui.addImageThumbnail(el.src, el.alt, (src) => {
-        // Callback lors de la suppression d'image
-        document
-          .querySelectorAll(`img[src="${src}"]`)
-          .forEach((img) => img.classList.remove(config.classPrefix + 'image-selected'));
-      });
-      ui.showFeedback('Image ajoutée');
-    } else {
-      const imgs = document.getElementById('image-container');
-      Array.from(imgs.children).forEach((img) => {
-        if (img.src === el.src) img.remove();
-      });
-      ui.updateImagesCounter();
-      ui.showFeedback('Image retirée');
-    }
+      // Vérifier si l'image est assez grande (min 1024x1024)
+      if (width < 1024 || height < 1024) {
+        ui.showFeedback(`Image trop petite (${width}x${height}). Minimum requis: 1024x1024px`);
+        return;
+      }
 
-    // Mettre à jour l'application principale après une sélection d'image
-    setTimeout(() => {
-      document.dispatchEvent(new CustomEvent('save-current-product'));
-    }, 100);
+      // Continuer le processus normal de sélection
+      const isSel = toggleClass(el, config.classPrefix + 'image-selected');
+
+      if (isSel) {
+        ui.addImageThumbnail(el.src, el.alt, (src) => {
+          // Callback lors de la suppression d'image
+          document
+            .querySelectorAll(`img[src="${src}"]`)
+            .forEach((img) => img.classList.remove(config.classPrefix + 'image-selected'));
+        });
+        ui.showFeedback('Image ajoutée');
+      } else {
+        const imgs = document.getElementById('image-container');
+        Array.from(imgs.children).forEach((img) => {
+          if (img.querySelector('img')?.src === el.src || img.src === el.src) {
+            img.remove();
+          }
+        });
+        ui.updateImagesCounter();
+        ui.showFeedback('Image retirée');
+      }
+
+      // Mettre à jour l'application principale après une sélection d'image
+      setTimeout(() => {
+        document.dispatchEvent(new CustomEvent('save-current-product'));
+      }, 100);
+    };
+
+    tempImg.onerror = function () {
+      ui.showFeedback("Impossible de vérifier les dimensions de l'image");
+    };
+
+    tempImg.src = el.src;
   }
 
   // Récupérer le contenu texte d'un élément
