@@ -12,13 +12,14 @@ export const useProductOperations = ({
 }) => {
   const [error, setError] = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
 
   const {
     loading: operationLoading,
     handleDeleteEntity,
-    handleSyncEntity,
+    handleSyncEntity: originalHandleSyncEntity,
     handleBatchDeleteEntities,
-    handleBatchSyncEntities,
+    handleBatchSyncEntities: originalHandleBatchSyncEntities,
     loadEntities,
   } = useEntityTable({
     entityType: 'product',
@@ -70,6 +71,29 @@ export const useProductOperations = ({
         }
       : undefined,
   });
+
+  // Créez des wrappers pour les fonctions de synchronisation
+  const handleSyncEntity = async (id) => {
+    if (!originalHandleSyncEntity) return;
+
+    setSyncLoading(true);
+    try {
+      await originalHandleSyncEntity(id);
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const handleBatchSyncEntities = async (ids) => {
+    if (!originalHandleBatchSyncEntities) return;
+
+    setSyncLoading(true);
+    try {
+      await originalHandleBatchSyncEntities(ids);
+    } finally {
+      setSyncLoading(false);
+    }
+  };
 
   const handleExport = async (exportConfig) => {
     try {
@@ -135,6 +159,7 @@ export const useProductOperations = ({
     setError,
     exportLoading,
     operationLoading,
+    syncLoading,
     handleDeleteEntity,
     handleSyncEntity,
     handleBatchDeleteEntities,

@@ -45,6 +45,7 @@ function ProductTable(props) {
     handleBatchSyncEntities,
     handleBatchStatusChange,
     handleBatchCategoryChange,
+    syncLoading,
     isLoading,
   } = useProductOperations({
     deleteProduct,
@@ -187,6 +188,16 @@ function ProductTable(props) {
         selectedFilters={selectedFilters}
         onChange={setSelectedFilters}
       />
+
+      {/* Spinner de synchronisation */}
+      {syncLoading && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-20 z-50">
+          <div className="bg-white p-4 rounded-md shadow-lg flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+            <span>Synchronisation en cours...</span>
+          </div>
+        </div>
+      )}
 
       <EntityTable
         data={filteredProducts}
