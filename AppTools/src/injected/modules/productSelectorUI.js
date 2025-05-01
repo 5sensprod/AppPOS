@@ -122,20 +122,70 @@ const ProductSelectorUI = (config, communication) => {
     counter.textContent = `(${container.children.length})`;
   }
 
-  // Ajouter une vignette d'image
+  // Correction de la fonction addImageThumbnail dans productSelectorUI.js
   function addImageThumbnail(src, alt, onRemove) {
     const container = document.getElementById('image-container');
     if (!container) return null;
 
+    // Utiliser la structure originale mais ajouter un attribut data pour stocker les dimensions
     const img = document.createElement('img');
     img.src = src;
     img.alt = alt || '';
     img.className = config.classPrefix + 'image-preview';
-    img.addEventListener('click', () => {
-      img.remove();
+    img.dataset.originalSrc = src; // Stocker l'URL originale pour être sûr
+
+    // Ajouter un style pour positionner l'info de taille
+    img.style.position = 'relative';
+    img.style.maxWidth = '100px';
+    img.style.maxHeight = '100px';
+    img.style.margin = '5px';
+    img.style.border = '1px solid #ccc';
+    img.style.borderRadius = '4px';
+
+    // Créer un div pour les infos de taille qui sera positionné par-dessus l'image
+    const sizeInfo = document.createElement('div');
+    sizeInfo.className = config.classPrefix + 'image-size-info';
+    sizeInfo.style.position = 'absolute';
+    sizeInfo.style.bottom = '0';
+    sizeInfo.style.left = '0';
+    sizeInfo.style.right = '0';
+    sizeInfo.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    sizeInfo.style.color = 'white';
+    sizeInfo.style.fontSize = '10px';
+    sizeInfo.style.padding = '2px 4px';
+    sizeInfo.style.textAlign = 'center';
+    sizeInfo.textContent = 'Chargement...';
+
+    // Conteneur pour l'image et l'info de taille
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'relative';
+    wrapper.style.display = 'inline-block';
+    wrapper.appendChild(img);
+    wrapper.appendChild(sizeInfo);
+
+    // Obtenir les dimensions réelles
+    const tempImg = new Image();
+    tempImg.onload = function () {
+      const width = this.width;
+      const height = this.height;
+      const approxSizeKB = Math.round((width * height * 4) / 1024);
+      sizeInfo.textContent = `${width}×${height} (~${approxSizeKB} KB)`;
+
+      // Stocker les infos comme attributs data
+      img.dataset.width = width;
+      img.dataset.height = height;
+      img.dataset.sizeKB = approxSizeKB;
+    };
+    tempImg.onerror = function () {
+      sizeInfo.textContent = 'Dimension inconnue';
+    };
+    tempImg.src = src;
+
+    // Gestionnaire de clic pour la suppression
+    wrapper.addEventListener('click', () => {
+      wrapper.remove();
       updateImagesCounter();
 
-      // Notifier le callback de suppression si fourni
       if (typeof onRemove === 'function') {
         onRemove(src);
       }
@@ -143,11 +193,43 @@ const ProductSelectorUI = (config, communication) => {
       showFeedback('Image retirée');
     });
 
-    container.appendChild(img);
+    container.appendChild(wrapper);
     updateImagesCounter();
+
+    // CRUCIAL: Conserver l'URL dans la propriété src de l'image
+    console.log('Miniature ajoutée avec URL:', src);
+
     return img;
   }
 
+  const containerEl = document.getElementById('image-container');
+  if (containerEl) {
+    console.log("Sauvegarde des images, nombre d'enfants:", containerEl.children.length);
+
+    product._captured.images = [];
+
+    // Parcourir tous les éléments enfants du conteneur
+    Array.from(containerEl.children).forEach((wrapper) => {
+      // Trouver l'image à l'intérieur du wrapper
+      const img = wrapper.querySelector('img');
+
+      if (img) {
+        // Utiliser d'abord dataset.originalSrc, puis src comme fallback
+        const imgSrc = img.dataset.originalSrc || img.src;
+        console.log('Image trouvée avec URL:', imgSrc);
+
+        product._captured.images.push({
+          src: imgSrc,
+          alt: img.alt || '',
+          width: img.dataset.width,
+          height: img.dataset.height,
+          sizeKB: img.dataset.sizeKB,
+        });
+      }
+    });
+
+    console.log('Images sauvegardées:', product._captured.images.length);
+  }
   // Mettre à jour le contenu d'un champ texte
   function updateField(input, text, remove = false) {
     if (!input) return;

@@ -326,12 +326,36 @@
 
       // Gestion du bouton de mise à jour
       updateBtn.addEventListener('click', () => {
-        // Nous utilisons currentIndex qui est la variable dans votre fichier
+        // Code existant
         const prod = products[currentIndex];
         const productId = prod.id || prod._id;
         const newDesc = prod._captured?.description || '';
         const newTitle = prod._captured?.title || '';
-        const images = prod._captured?.images || [];
+
+        // MODIFICATION CRITIQUE: Récupérer les images correctement
+        const imageContainer = document.getElementById('image-container');
+        let images = [];
+
+        if (imageContainer) {
+          // Trouver toutes les images dans le conteneur, qu'elles soient directes ou dans des wrappers
+          const allImages = imageContainer.querySelectorAll('img');
+          console.log('DIAGNOSTIC: Trouvé', allImages.length, 'images dans le conteneur');
+
+          // Extraire les URLs de toutes les images trouvées
+          images = Array.from(allImages)
+            .map((img) => {
+              const imgSrc = img.src;
+              console.log("DIAGNOSTIC: URL de l'image:", imgSrc);
+              return {
+                src: imgSrc,
+                alt: img.alt || '',
+              };
+            })
+            .filter((img) => img.src && img.src !== 'undefined' && img.src !== '');
+
+          console.log('DIAGNOSTIC: Images finales à envoyer:', images.length);
+          console.log('DIAGNOSTIC: Première image:', images.length > 0 ? images[0].src : 'aucune');
+        }
 
         console.log(
           '[webview] click update product, title=',
