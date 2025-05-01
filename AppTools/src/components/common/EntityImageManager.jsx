@@ -1,6 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, X, CheckCircle, Image as ImageIcon, RefreshCw, Trash, Plus } from 'lucide-react';
 import imageProxyService from '../../services/imageProxyService';
+
+// La fonction formatFileSize existante reste inchangée
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes === 0) return null;
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+// La fonction getImageSize existante reste inchangée
+const getImageSize = (image) => {
+  if (!image) return null;
+
+  // Cas 1: Taille directement à la racine
+  if (image.size) return image.size;
+
+  // Cas 2: Taille dans metadata
+  if (image.metadata && image.metadata.size) return image.metadata.size;
+
+  return null;
+};
+
+// Nouvelle fonction pour obtenir les dimensions de l'image
+const getImageDimensions = (image) => {
+  if (!image) return null;
+
+  // Cas 1: Dimensions directement à la racine
+  if (image.width && image.height) {
+    return { width: image.width, height: image.height };
+  }
+
+  // Cas 2: Dimensions dans metadata
+  if (image.metadata) {
+    if (image.metadata.width && image.metadata.height) {
+      return { width: image.metadata.width, height: image.metadata.height };
+    }
+  }
+
+  return null;
+};
 
 const EntityImageManager = ({
   entity,
@@ -15,7 +56,7 @@ const EntityImageManager = ({
   onSetMainImage,
   isLoading = false,
   error = null,
-  editable = false, // Ajouté ici
+  editable = false,
 }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
@@ -191,6 +232,20 @@ const EntityImageManager = ({
                     )}
                   </div>
 
+                  {mainImage?.src && (
+                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                      {getImageSize(mainImage) && (
+                        <span className="mr-3">{formatFileSize(getImageSize(mainImage))}</span>
+                      )}
+                      {getImageDimensions(mainImage) && (
+                        <span>
+                          {getImageDimensions(mainImage).width} ×{' '}
+                          {getImageDimensions(mainImage).height} px
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-4">
                     Format : {acceptedTypes.map((t) => t.split('/')[1].toUpperCase()).join(', ')}
                     <br />
@@ -251,12 +306,25 @@ const EntityImageManager = ({
                   {galleryImages.length > 0 ? (
                     galleryImages.map((image, index) => (
                       <div key={index} className="relative group">
-                        <div className="w-full h-24 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border">
-                          <img
-                            src={getImageUrl(image.src)}
-                            alt={`Image ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
+                        <div className="w-full h-32 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border flex flex-col">
+                          <div className="flex-grow flex items-center justify-center">
+                            <img
+                              src={getImageUrl(image.src)}
+                              alt={`Image ${index + 1}`}
+                              className="w-full h-24 object-cover"
+                            />
+                          </div>
+                          <div className="p-1 text-center text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {getImageSize(image) && (
+                              <span className="mr-2">{formatFileSize(getImageSize(image))}</span>
+                            )}
+                            {getImageDimensions(image) && (
+                              <span>
+                                {getImageDimensions(image).width} ×{' '}
+                                {getImageDimensions(image).height} px
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {editable && (
@@ -352,6 +420,17 @@ const EntityImageManager = ({
                       alt={entityType}
                       className="max-w-full max-h-48 object-contain"
                     />
+                    <div className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
+                      {getImageSize(mainImage) && (
+                        <span className="mr-3">{formatFileSize(getImageSize(mainImage))}</span>
+                      )}
+                      {getImageDimensions(mainImage) && (
+                        <span>
+                          {getImageDimensions(mainImage).width} ×{' '}
+                          {getImageDimensions(mainImage).height} px
+                        </span>
+                      )}
+                    </div>
                     {editable && (
                       <button
                         onClick={handleDeleteMainImage}

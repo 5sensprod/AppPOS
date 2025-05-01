@@ -1,6 +1,7 @@
 // src/models/base/BaseImage.js
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 
 class BaseImage {
   constructor(entity) {
@@ -28,7 +29,7 @@ class BaseImage {
       const finalFileName = `${cleanFileName}-${timestamp}${path.extname(file.originalname)}`;
 
       // Crée l'objet image avec les données de base
-      return {
+      const imageData = {
         src: `/public/${this.entity}/${entityId}/${finalFileName}`,
         local_path: path.join(uploadDir, finalFileName),
         status: 'pending',
@@ -39,6 +40,16 @@ class BaseImage {
           mimetype: file.mimetype,
         },
       };
+
+      // Utiliser les dimensions du fichier si elles ont été extraites par le middleware
+      if (file.dimensions) {
+        imageData.dimensions = file.dimensions;
+        imageData.width = file.dimensions.width;
+        imageData.height = file.dimensions.height;
+        imageData.metadata.dimensions = file.dimensions;
+      }
+
+      return imageData;
     } catch (error) {
       throw new Error(`Erreur lors de l'upload de l'image: ${error.message}`);
     }
@@ -70,7 +81,7 @@ class BaseImage {
 
   async deleteImage(imagePath) {
     try {
-      await fs.promises.unlink(imagePath);
+      await fs.unlink(imagePath);
       return true;
     } catch (error) {
       throw new Error(`Erreur lors de la suppression de l'image: ${error.message}`);

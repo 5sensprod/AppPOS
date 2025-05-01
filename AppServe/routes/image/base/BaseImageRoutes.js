@@ -1,6 +1,7 @@
 // routes/image/base/BaseImageRoutes.js
 const express = require('express');
 const createImageUploadMiddleware = require('../../../middleware/upload/uploadHandlerFactory');
+const extractImageDimensions = require('../../../middleware/upload/dimensionExtractor');
 const BaseImageController = require('../../../controllers/image/BaseImageController');
 
 class BaseImageRoutes {
@@ -15,10 +16,11 @@ class BaseImageRoutes {
   initializeRoutes(type) {
     const uploadMethod = type === 'gallery' ? 'array' : 'single';
 
-    // Routes existantes
+    // Routes existantes avec middleware d'extraction des dimensions
     this.router.post(
       '/:id/image',
       this.uploadMiddleware[uploadMethod],
+      extractImageDimensions, // Ajout du middleware ici
       this.imageController.uploadImage.bind(this.imageController)
     );
 
