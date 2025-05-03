@@ -90,9 +90,9 @@ const ProductSelectorSelection = (config, communication, ui) => {
       const width = this.width;
       const height = this.height;
 
-      // Vérifier si l'image est assez grande (min 1024x1024)
-      if (width < 1024 || height < 1024) {
-        ui.showFeedback(`Image trop petite (${width}x${height}). Minimum requis: 1024x1024px`);
+      // Vérifier si l'image est assez grande (min 800x800)
+      if (width < 800 || height < 800) {
+        ui.showFeedback(`Image trop petite (${width}x${height}). Minimum requis: 800x800px`);
         return;
       }
 

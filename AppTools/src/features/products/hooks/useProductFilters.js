@@ -1,12 +1,7 @@
 // src/features/products/hooks/useProductFilters.js
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
 
-/**
- * Hook pour gérer les filtres des produits
- * @param {Array} products - Liste des produits à filtrer
- * @returns {Object} - Méthodes et données pour le filtrage des produits
- */
 export const useProductFilters = (products = []) => {
   const { selectedFilters, setSelectedFilters } = useEntityFilter('product');
 
@@ -26,6 +21,7 @@ export const useProductFilters = (products = []) => {
     const imageOptions = [
       { label: 'Avec image', value: 'has_image', type: 'image' },
       { label: 'Sans image', value: 'no_image', type: 'image' },
+      { label: 'Images trop petites (<800px)', value: 'small_image', type: 'image' },
     ];
 
     const descriptionOptions = [
@@ -82,13 +78,32 @@ export const useProductFilters = (products = []) => {
       data = data.filter((p) => p.woo_id == null);
     }
 
-    // Filtre par présence d'images
-    const hasImage = (p) =>
-      p.image?.url || (Array.isArray(p.gallery_images) && p.gallery_images.length > 0);
+    // Filtre par présence d'images et taille d'images
     if (imageFilter === 'has_image') {
-      data = data.filter(hasImage);
+      data = data.filter(
+        (p) => p.image?.url || (Array.isArray(p.gallery_images) && p.gallery_images.length > 0)
+      );
     } else if (imageFilter === 'no_image') {
-      data = data.filter((p) => !hasImage(p));
+      data = data.filter(
+        (p) => !p.image?.url && (!Array.isArray(p.gallery_images) || p.gallery_images.length === 0)
+      );
+    } else if (imageFilter === 'small_image') {
+      data = data.filter((p) => {
+        // Vérifier l'image principale et les images de la galerie
+        const mainImage = p.image;
+        const galleryImages = p.gallery_images || [];
+        const allImages = [mainImage, ...galleryImages].filter(Boolean);
+
+        // S'il n'y a pas d'image, exclure ce produit
+        if (allImages.length === 0) return false;
+
+        // Chercher au moins une image trop petite
+        return allImages.some((img) => {
+          const width = img?.metadata?.dimensions?.width || 0;
+          const height = img?.metadata?.dimensions?.height || 0;
+          return width < 700 || height < 700;
+        });
+      });
     }
 
     // Filtre par fournisseur
@@ -143,3 +158,4 @@ export const useProductFilters = (products = []) => {
     filterProducts,
   };
 };
+export default useProductFilters;
