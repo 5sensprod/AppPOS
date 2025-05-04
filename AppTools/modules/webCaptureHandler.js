@@ -52,6 +52,7 @@ function setupWebCaptureListener(ipcMainInstance) {
     console.log('[main] ← set-auth-token', token);
     authToken = token;
   });
+
   // Ouvrir une fenêtre WebView pour la capture
   ipcMainInstance.on('open-web-capture-window', (event, url, options = {}) => {
     if (!url) return;
@@ -268,17 +269,7 @@ function setupWebCaptureListener(ipcMainInstance) {
           });
         }
         break;
-
-      case 'EXPORT_PRODUCTS':
-        // Relayer la demande d'export à l'application principale
-        event.sender.send('export-captured-products', message.payload.products);
-        break;
     }
-  });
-
-  ipcMainInstance.on('export-captured-products', (event, productsForCsv) => {
-    console.log('💾 [main] Données reçues pour export CSV :', productsForCsv);
-    // … votre code d’écriture de fichier CSV …
   });
 
   // Écouter les demandes d'état des produits capturés
@@ -429,24 +420,6 @@ function setupWebCaptureListener(ipcMainInstance) {
     }
   });
 
-  ipcMainInstance.on('name-updated', (event, { productId, name }) => {
-    console.log(`🔄 Main : name-updated pour ${productId}`);
-
-    // Met à jour le state local
-    const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
-    if (prod) {
-      prod._captured = prod._captured || {};
-      prod._captured.title = name;
-    }
-
-    // Réémet l'état complet vers la WebView
-    event.sender.send('captured-product-update', {
-      products: capturedProductsState.products,
-      currentProductIndex: capturedProductsState.currentProductIndex,
-      productUrls: capturedProductsState.productUrls,
-    });
-  });
-
   ipcMainInstance.on('update-product-images', async (event, { productId, images }) => {
     console.log('[main] ← update-product-images', productId, images.length);
 
@@ -558,88 +531,6 @@ function setupWebCaptureListener(ipcMainInstance) {
       console.error(`❌ Échec de update-product-images pour ${productId}:`, err);
       event.sender.send('images-updated', { productId, success: false, error: err.message });
     }
-  });
-
-  ipcMainInstance.handle(
-    'preview-enhanced-description',
-    async (event, { productId, description }) => {
-      console.log('[main] ← preview-enhanced-description', productId);
-
-      try {
-        const path = require('path');
-        const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
-
-        // Injecte le token si on en a un
-        if (authToken && typeof apiService.setAuthToken === 'function') {
-          apiService.setAuthToken(authToken);
-        }
-
-        // Init du service si nécessaire
-        if (typeof apiService.init === 'function') {
-          await apiService.init();
-        }
-
-        // Récupérer les données du produit
-        const productResponse = await apiService.get(`/api/products/${productId}`);
-        const productData = productResponse.data?.data;
-
-        if (!productData) {
-          throw new Error(`Impossible de récupérer les données du produit ${productId}`);
-        }
-
-        // Copier la description fournie dans les données du produit
-        const productWithNewDesc = { ...productData, description };
-
-        // Appel à l'API de description
-        const response = await apiService.post('/api/descriptions/chat', {
-          name: productWithNewDesc.name || '',
-          category: productWithNewDesc.category_info?.primary?.path_string || '',
-          brand: productWithNewDesc.brand_ref?.name || '',
-          price: productWithNewDesc.price || '',
-          sku: productWithNewDesc.sku || '',
-          currentDescription: description || '',
-          message:
-            "Améliore cette description de produit pour qu'elle soit plus vendeuse et attrayante. Corrige les fautes et structure le texte.",
-        });
-
-        if (response.data?.success && response.data?.data?.description) {
-          console.log('✅ Prévisualisation de description générée avec succès');
-          return {
-            success: true,
-            originalDescription: description,
-            enhancedDescription: response.data.data.description,
-          };
-        } else {
-          throw new Error("L'API n'a pas retourné de description améliorée");
-        }
-      } catch (err) {
-        console.error('❌ Erreur lors de la prévisualisation de la description:', err);
-        return {
-          success: false,
-          error: err.message,
-          originalDescription: description,
-          enhancedDescription: description,
-        };
-      }
-    }
-  );
-
-  ipcMainInstance.on('description-updated', (event, { productId, description }) => {
-    console.log(`🔄 Main : description-updated pour ${productId}`);
-
-    // ➋ Met à jour le state local
-    const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
-    if (prod) {
-      prod._captured = prod._captured || {};
-      prod._captured.description = description;
-    }
-
-    // ➌ Réémet l’état complet vers la WebView
-    event.sender.send('captured-product-update', {
-      products: capturedProductsState.products,
-      currentProductIndex: capturedProductsState.currentProductIndex,
-      productUrls: capturedProductsState.productUrls,
-    });
   });
 }
 

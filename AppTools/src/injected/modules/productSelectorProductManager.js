@@ -132,13 +132,10 @@ const ProductSelectorProductManager = (products, config, communication, ui, navi
       selectionModule.getTextContent(el)
     );
 
-    // Sauvegarder les images
+    // Sauvegarder les images en utilisant la fonction modulaire de l'UI
     const containerEl = document.getElementById('image-container');
     if (containerEl) {
-      product._captured.images = Array.from(containerEl.children).map((img) => ({
-        src: img.src,
-        alt: img.alt || '',
-      }));
+      product._captured.images = ui.extractImagesInfo(containerEl);
     }
 
     // Sauvegarder l'URL actuelle si ce n'est pas une URL système
@@ -156,41 +153,6 @@ const ProductSelectorProductManager = (products, config, communication, ui, navi
       currentProductIndex: currentProductIndex,
       productData: product._captured,
     });
-  }
-
-  // Exporter les produits
-  function exportProducts() {
-    // Sauvegarder d'abord le produit actuel
-    saveCurrentProduct();
-
-    const exportData = products.map((p) => {
-      const productId = p.id || p._id || null;
-      return {
-        id: productId,
-        sku: p.sku || null,
-        designation: p.designation || null,
-        title: p._captured?.title || null,
-        description: p._captured?.description || null,
-        selections: p._captured?.selections || [],
-        images: p._captured?.images || [],
-        capturedUrl: communication.getStoredUrl(productId) || null,
-      };
-    });
-
-    // Envoyer la demande d'export à l'application principale
-    communication.sendToMainApp('EXPORT_PRODUCTS', { products: exportData });
-
-    // Créer aussi l'export local pour compatibilité
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const filename = `produits_captures_${new Date().toISOString().slice(0, 10)}.json`;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    ui.showFeedback('Produits exportés !');
   }
 
   // Attacher les gestionnaires d'événements au formulaire
@@ -279,11 +241,7 @@ const ProductSelectorProductManager = (products, config, communication, ui, navi
       });
     }
 
-    // Bouton export
-    const exportBtn = document.getElementById('export-btn');
-    if (exportBtn) {
-      exportBtn.addEventListener('click', exportProducts);
-    }
+    // Suppression du code pour le bouton export
   }
 
   // API publique
@@ -294,7 +252,6 @@ const ProductSelectorProductManager = (products, config, communication, ui, navi
     setCurrentProductIndex,
     updateProductForm,
     saveCurrentProduct,
-    exportProducts,
   };
 };
 

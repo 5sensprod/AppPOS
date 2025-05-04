@@ -67,7 +67,6 @@ const ProductSelectorUI = (config, communication) => {
             <button id="prev-btn" class="${config.classPrefix}btn" ${currentProductIndex === 0 ? 'disabled' : ''}>◀ Précédent</button>
             <button id="next-btn" class="${config.classPrefix}btn" ${currentProductIndex === totalProducts - 1 ? 'disabled' : ''}>Suivant ▶</button>
           </div>
-          <button id="export-btn" class="${config.classPrefix}btn ${config.classPrefix}btn-export">Exporter</button>
         </div>
         
         <div class="${config.classPrefix}action-buttons">
@@ -122,7 +121,43 @@ const ProductSelectorUI = (config, communication) => {
     counter.textContent = `(${container.children.length})`;
   }
 
-  // Correction de la fonction addImageThumbnail dans productSelectorUI.js
+  /**
+   * Extrait et retourne les informations des images depuis un conteneur
+   * @param {HTMLElement} containerEl - Le conteneur des images
+   * @returns {Array} Un tableau d'objets contenant les informations des images
+   */
+  function extractImagesInfo(containerEl) {
+    if (!containerEl) return [];
+
+    console.log("Extraction des infos d'images, nombre d'éléments:", containerEl.children.length);
+
+    const images = [];
+
+    // Parcourir tous les éléments enfants du conteneur
+    Array.from(containerEl.children).forEach((wrapper) => {
+      // Trouver l'image à l'intérieur du wrapper
+      const img = wrapper.querySelector('img');
+
+      if (img) {
+        // Utiliser d'abord dataset.originalSrc, puis src comme fallback
+        const imgSrc = img.dataset.originalSrc || img.src;
+        console.log('Image trouvée avec URL:', imgSrc);
+
+        images.push({
+          src: imgSrc,
+          alt: img.alt || '',
+          width: img.dataset.width,
+          height: img.dataset.height,
+          sizeKB: img.dataset.sizeKB,
+        });
+      }
+    });
+
+    console.log('Images extraites:', images.length);
+    return images;
+  }
+
+  // Ajouter une miniature d'image au conteneur
   function addImageThumbnail(src, alt, onRemove) {
     const container = document.getElementById('image-container');
     if (!container) return null;
@@ -202,34 +237,6 @@ const ProductSelectorUI = (config, communication) => {
     return img;
   }
 
-  const containerEl = document.getElementById('image-container');
-  if (containerEl) {
-    console.log("Sauvegarde des images, nombre d'enfants:", containerEl.children.length);
-
-    product._captured.images = [];
-
-    // Parcourir tous les éléments enfants du conteneur
-    Array.from(containerEl.children).forEach((wrapper) => {
-      // Trouver l'image à l'intérieur du wrapper
-      const img = wrapper.querySelector('img');
-
-      if (img) {
-        // Utiliser d'abord dataset.originalSrc, puis src comme fallback
-        const imgSrc = img.dataset.originalSrc || img.src;
-        console.log('Image trouvée avec URL:', imgSrc);
-
-        product._captured.images.push({
-          src: imgSrc,
-          alt: img.alt || '',
-          width: img.dataset.width,
-          height: img.dataset.height,
-          sizeKB: img.dataset.sizeKB,
-        });
-      }
-    });
-
-    console.log('Images sauvegardées:', product._captured.images.length);
-  }
   // Mettre à jour le contenu d'un champ texte
   function updateField(input, text, remove = false) {
     if (!input) return;
@@ -260,6 +267,7 @@ const ProductSelectorUI = (config, communication) => {
     addImageThumbnail,
     updateField,
     getFocusedInput,
+    extractImagesInfo,
   };
 };
 

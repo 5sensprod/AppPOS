@@ -7,39 +7,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
     console.log('[preload] → set-auth-token', token);
     ipcRenderer.send('set-auth-token', token);
   },
-
   openWebCaptureWindow: (url, options = {}) =>
     ipcRenderer.send('open-web-capture-window', url, options),
-
   updateProductName: (productId, name) => {
     ipcRenderer.send('update-product-name', { productId, name });
   },
-
   updateProductDescription: (productId, description) => {
     console.log('[preload] envoi update-product-description', productId, description);
     ipcRenderer.send('update-product-description', { productId, description });
   },
-
   updateProductImages: (productId, images) => {
     ipcRenderer.send('update-product-images', { productId, images });
   },
-
   onCapturedProductUpdate: (callback) =>
     ipcRenderer.on('captured-product-update', (_, data) => callback(data)),
-
   onUpdateMessage: (callback) => ipcRenderer.on('update-message', (_, data) => callback(data)),
-
   onDescriptionEnhancementStart: (callback) => {
     ipcRenderer.on('description-enhancement-start', (_, data) => callback(data));
   },
-
   onDescriptionEnhanced: (callback) => {
     ipcRenderer.on('description-enhanced', (_, data) => callback(data));
-  },
-
-  // Fonction pour demander une amélioration de description sans mise à jour immédiate
-  previewEnhancedDescription: (productId, description) => {
-    return ipcRenderer.invoke('preview-enhanced-description', { productId, description });
   },
 });
 
