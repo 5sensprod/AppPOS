@@ -11,7 +11,7 @@ function createUniversalProductTemplate(styles) {
     <!-- Titre principal - court et attractif -->
     <h1 style="${styles.title}">[Titre court et accrocheur]</h1>
     
-    <!-- Description qui DOIT commencer par "Le/La [type de produit] [SKU/UGS]" -->
+    <!-- Description qui DOIT commencer par "Le/La [type de produit]" -->
     <div class="wc-product-description" style="${styles.descriptionContainer}">
       <p style="${styles.descriptionText}">Le/La [type de produit] [référence] [suite de la description commerciale persuasive]. [Ajoutez plusieurs phrases convaincantes ici]. [Développez un second paragraphe sur la qualité et les avantages du produit].</p>
       <p style="${styles.descriptionText}">[Ajoutez un paragraphe supplémentaire si nécessaire pour décrire les utilisations ou l'histoire du produit].</p>

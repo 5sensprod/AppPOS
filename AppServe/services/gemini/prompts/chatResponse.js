@@ -23,10 +23,10 @@ RÈGLES STRICTES:
    - Prends en compte le message de l'utilisateur pour choisir ce titre
 
 2. Pour la description:
-   - TRÈS IMPORTANT: La description DOIT commencer par "Le/La [type de produit] [SKU/UGS]"
+   - TRÈS IMPORTANT: La description DOIT commencer par "Le/La [type de produit]"
    - Exemple: "Le casque 3000B offre..." ou "La perceuse XDR-500 combine..."
    - Utilise le bon article (Le/La/L') selon le type de produit
-   - Le SKU/référence doit être mentionné uniquement au début de la description
+   - Évite d'y mettre le numéro de référence ou SKU
    - DÉVELOPPE une description riche et commerciale (100-150 mots)
    - Structure la description en 2-3 paragraphes avec des éléments convaincants
    - Met en avant l'expertise, la qualité, les matériaux et l'usage du produit
@@ -42,11 +42,13 @@ RÈGLES STRICTES:
    - Adapte les spécifications au type de produit concerné
    - Privilégie les spécifications qui aident à la décision d'achat
    - Organise-les des plus importantes aux moins importantes
+   - Ne laisse jamais de ligne avec une cellule detail vide
 
 5. Conseils d'utilisation:
    - Rédige entre 30 et 50 mots de conseils pratiques
    - Inclus au moins 2 conseils spécifiques et utiles
    - Aide l'utilisateur à tirer le meilleur parti du produit
+   - La dernière ohrase doit être complete
 
 6. Formatage général:
    - Remplace les instructions entre crochets par du contenu réel, puis SUPPRIME les crochets
