@@ -76,8 +76,17 @@ const ProductSelectorUI = (config, communication) => {
           <button id="search-btn" class="${config.classPrefix}btn ${config.classPrefix}btn-search">
             <span class="${config.classPrefix}btn-icon">🔍</span>Rechercher
           </button>
+          <button id="toggle-css-btn" class="${config.classPrefix}btn">
+            <span class="${config.classPrefix}btn-icon">🎨</span>Basculer CSS
+          </button>
         </div>
       `;
+
+    // Ajouter l'écouteur d'événement pour le nouveau bouton
+    const toggleCssBtn = document.getElementById('toggle-css-btn');
+    if (toggleCssBtn) {
+      toggleCssBtn.addEventListener('click', toggleStyleSheets);
+    }
 
     // Émettre un événement pour indiquer que le formulaire a été mis à jour
     document.dispatchEvent(new CustomEvent('form-updated'));
@@ -256,6 +265,36 @@ const ProductSelectorUI = (config, communication) => {
     return focusedInput;
   }
 
+  // Créer une fonction pour basculer l'état des feuilles de style
+  function toggleStyleSheets() {
+    var styleSheets = document.styleSheets;
+    var allDisabled = true;
+
+    // Vérifier si toutes les feuilles de style sont déjà désactivées
+    for (var i = 0; i < styleSheets.length; i++) {
+      if (!styleSheets[i].disabled) {
+        allDisabled = false;
+        break;
+      }
+    }
+
+    // Basculer l'état de toutes les feuilles de style
+    for (var i = 0; i < styleSheets.length; i++) {
+      try {
+        styleSheets[i].disabled = !allDisabled;
+      } catch (e) {
+        console.log('Erreur avec la feuille de style ' + i, e);
+      }
+    }
+
+    console.log(allDisabled ? 'Styles CSS réactivés !' : 'Styles CSS désactivés !');
+
+    // Montrer un feedback à l'utilisateur
+    showFeedback(allDisabled ? 'Styles CSS réactivés !' : 'Styles CSS désactivés !');
+
+    return !allDisabled; // Retourne le nouvel état (true = désactivé, false = activé)
+  }
+
   // API publique
   return {
     createUI,
@@ -268,6 +307,7 @@ const ProductSelectorUI = (config, communication) => {
     updateField,
     getFocusedInput,
     extractImagesInfo,
+    toggleStyleSheets, // Ajouter la nouvelle fonction à l'API publique
   };
 };
 
