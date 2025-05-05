@@ -3,23 +3,36 @@ const ProductSelectorUI = (config, communication) => {
   // Variables d'état
   let container = null;
   let focusedInput = null;
+  let panel = null;
 
   // Créer les éléments d'UI principaux
   function createUI() {
+    // Initialiser le panneau latéral
+    panel = ProductSelectorUIPanel(config).initialize();
+
     // Feedback flottant
     const feedback = document.createElement('div');
     feedback.className = config.classPrefix + 'feedback';
     document.body.appendChild(feedback);
 
-    // Conteneur principal
+    // Créer le conteneur du formulaire
     container = document.createElement('div');
     container.className = config.classPrefix + 'product-form';
-    document.body.appendChild(container);
+
+    // Placer le conteneur dans le panneau
+    const formContainer = ProductSelectorUIPanel(config).getContainer();
+    if (formContainer) {
+      formContainer.appendChild(container);
+    } else {
+      // Si le panneau n'est pas disponible, fallback au body
+      document.body.appendChild(container);
+    }
 
     // Garder une référence à ces éléments dans le DOM
     window._productSelectorElements = {
       feedback,
       container,
+      panel,
     };
   }
 
@@ -287,6 +300,27 @@ const ProductSelectorUI = (config, communication) => {
       }
     }
 
+    // Important : S'assurer que les styles du panneau restent appliqués
+    const panel = document.getElementById('app-tools-panel');
+    if (panel) {
+      // Réappliquer les styles inline pour s'assurer que le panneau reste visible
+      Object.assign(panel.style, {
+        position: 'fixed',
+        top: '0',
+        right: '0',
+        width: '380px',
+        height: '100vh',
+        background: '#fff',
+        zIndex: '2147483647',
+        boxShadow: '-2px 0 6px rgba(0,0,0,.15)',
+        display: 'flex',
+        flexDirection: 'column',
+      });
+
+      // S'assurer que le document reste décalé
+      document.documentElement.style.marginRight = '380px';
+    }
+
     console.log(allDisabled ? 'Styles CSS réactivés !' : 'Styles CSS désactivés !');
 
     // Montrer un feedback à l'utilisateur
@@ -307,7 +341,8 @@ const ProductSelectorUI = (config, communication) => {
     updateField,
     getFocusedInput,
     extractImagesInfo,
-    toggleStyleSheets, // Ajouter la nouvelle fonction à l'API publique
+    toggleStyleSheets,
+    getPanel: () => panel,
   };
 };
 

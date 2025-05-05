@@ -4,6 +4,9 @@
     // Stockage de l'index courant
     let currentIndex = 0;
 
+    // Rendre products accessible globalement pour le panneau
+    window.products = products;
+
     // Import des modules du sélecteur
     const config = ProductSelectorConfig;
     const communication = ProductSelectorCommunication(config);
@@ -41,23 +44,29 @@
       navigation.handleInitialNavigation();
       ui.showFeedback('Sélecteur de contenu activé !');
 
-      // ➕ Bouton "Mettre à jour le produit" avec spinner
+      // Ajouter le bouton de mise à jour
+      addUpdateButton();
+    }
+
+    // Fonction séparée pour ajouter le bouton de mise à jour
+    function addUpdateButton() {
+      // Créer le bouton de mise à jour
       const updateBtn = document.createElement('button');
       updateBtn.innerHTML = '<span>Mettre à jour le produit</span>';
       Object.assign(updateBtn.style, {
-        position: 'fixed',
-        bottom: '1em',
-        right: '1em',
-        zIndex: 9999,
-        padding: '0.5em 1em',
+        padding: '10px 16px',
         background: '#007bff',
         color: '#fff',
         border: 'none',
         borderRadius: '4px',
         cursor: 'pointer',
+        margin: '10px 16px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        fontWeight: 'bold',
+        fontSize: '14px',
+        width: 'calc(100% - 32px)',
       });
 
       // Créer le spinner
@@ -74,19 +83,39 @@
         animation: 'spin 1s linear infinite',
       });
       updateBtn.appendChild(updateSpinner);
-      document.body.appendChild(updateBtn);
 
       // Ajouter l'animation de rotation si elle n'existe pas déjà
       if (!document.getElementById('spinner-style')) {
         const styleElement = document.createElement('style');
         styleElement.id = 'spinner-style';
         styleElement.textContent = `
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `;
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
         document.head.appendChild(styleElement);
+      }
+
+      // Trouver le panneau et ajouter le bouton
+      const panel = document.getElementById('app-tools-panel');
+      if (panel) {
+        // Ajouter le bouton au début du panneau avant le formulaire
+        const formContainer = document.getElementById('form-container');
+        if (formContainer && formContainer.parentNode) {
+          // Créer un div pour le bouton en bas du panneau
+          const buttonContainer = document.createElement('div');
+          Object.assign(buttonContainer.style, {
+            position: 'sticky',
+            bottom: '0',
+            padding: '10px 0',
+            background: '#fff',
+            boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.1)',
+            zIndex: '1',
+          });
+          buttonContainer.appendChild(updateBtn);
+          panel.appendChild(buttonContainer);
+        }
       }
 
       // Gestion du bouton de mise à jour

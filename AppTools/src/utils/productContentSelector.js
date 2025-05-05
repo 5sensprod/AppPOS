@@ -21,6 +21,7 @@ async function injectProductContentSelector(webContents, products) {
     const moduleFiles = [
       'productSelectorConfig.js',
       'productSelectorCommunication.js',
+      'productSelectorUIPanel.js', // Ajout du module de panneau UI
       'productSelectorUI.js',
       'productSelectorNavigation.js',
       'productSelectorSelection.js',

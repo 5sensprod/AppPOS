@@ -1,20 +1,14 @@
 /* AppTools/src/injected/productContentSelector.css */
 
-/* Conteneur principal */
+/* Conteneur principal - adapté pour fonctionner dans le panneau */
 .app-product-form {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 350px;
-  height: 100%;
-  background: #fff;
-  box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
-  z-index: 9999;
-  padding: 20px;
-  overflow-y: auto;
+  padding: 15px;
   font-family: Arial, sans-serif;
   color: #333;
   box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
 }
 
 /* Éléments de la navigation */
@@ -186,4 +180,25 @@
   opacity: 0;
   transition: opacity 0.3s;
   font-size: 14px;
+}
+
+/* Animation du spinner */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.update-spinner {
+  display: none;
+  margin-left: 10px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
