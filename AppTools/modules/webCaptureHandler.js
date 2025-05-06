@@ -22,6 +22,28 @@ if (app && app.isPackaged) {
 
 const { injectProductContentSelector } = require(productSelectorPath);
 
+let createHttpClient;
+try {
+  if (app && app.isPackaged) {
+    // En production
+    createHttpClient = require(path.join(app.getAppPath(), 'httpClient.js'));
+  } else {
+    // En développement
+    createHttpClient = require(path.join(__dirname, '..', 'httpClient.js'));
+  }
+} catch (err) {
+  console.error('Erreur lors du chargement de httpClient:', err);
+  // Définir une version inline en fallback
+  createHttpClient = function (baseURL) {
+    const http = require('http');
+    // Implémentation minimaliste en cas d'erreur...
+    // (version simplifiée de l'implémentation complète)
+  };
+}
+
+// Créer une instance du client
+const apiClient = createHttpClient('http://localhost:3000');
+
 // État global étendu pour stocker les données de produits capturées et les URLs
 let capturedProductsState = {
   currentProductIndex: 0,
@@ -37,10 +59,14 @@ async function enhanceDescriptionWithAI(productData) {
       `🧠 Amélioration de la description avec l'IA pour ${productData.name || productData.sku}`
     );
 
-    const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
+    // Préparer les headers avec le token d'authentification
+    const headers = {};
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
 
-    // Appel à l'API de description
-    const response = await apiService.post('/api/descriptions/chat', {
+    // Préparer les données pour l'appel IA
+    const aiRequestData = {
       name: productData.name || '',
       category: productData.category_info?.primary?.path_string || '',
       brand: productData.brand_ref?.name || '',
@@ -49,7 +75,11 @@ async function enhanceDescriptionWithAI(productData) {
       currentDescription: productData.description || '',
       message:
         "Améliore cette description de produit pour qu'elle soit plus vendeuse et attrayante. Corrige les fautes et structure le texte.",
-    });
+    };
+
+    // Appel à l'API de description
+    console.log(`[main] Appel au service IA pour améliorer la description`);
+    const response = await apiClient.post('/api/descriptions/chat', aiRequestData, headers);
 
     if (response.data?.success && response.data?.data?.description) {
       console.log(`✅ Description améliorée par l'IA`);
@@ -300,29 +330,22 @@ function setupWebCaptureListener(ipcMainInstance) {
   });
 
   ipcMainInstance.on('update-product-description', async (event, { productId, description }) => {
-    console.log('[main] ← update-product-description', productId, description);
+    console.log('[main] ← update-product-description', productId);
     console.log('[main] Token disponible:', authToken ? 'Oui' : 'Non');
 
     try {
-      // Import du service API
-      const path = require('path');
-      const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
-
-      // Injecte le token si on en a un
-      if (authToken && typeof apiService.setAuthToken === 'function') {
-        apiService.setAuthToken(authToken);
-      }
-
-      // Init du service si nécessaire
-      if (typeof apiService.init === 'function') {
-        await apiService.init();
+      // Préparer les headers avec le token d'authentification
+      const headers = {};
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
       }
 
       // Notifier que l'amélioration commence
       event.sender.send('description-enhancement-start', { productId });
 
-      // 1. D'abord, récupérer les données complètes du produit
-      const productResponse = await apiService.get(`/api/products/${productId}`);
+      // 1. Récupérer les données complètes du produit
+      console.log(`[main] Récupération des données du produit ${productId}`);
+      const productResponse = await apiClient.get(`/api/products/${productId}`, headers);
       const productData = productResponse.data?.data;
 
       if (!productData) {
@@ -333,10 +356,18 @@ function setupWebCaptureListener(ipcMainInstance) {
       productData.description = description;
 
       // 3. Améliorer la description avec l'IA
+      console.log(
+        `🧠 Amélioration de la description avec l'IA pour ${productData.name || productData.sku}`
+      );
       const enhancedDescription = await enhanceDescriptionWithAI(productData);
 
       // 4. Mettre à jour le produit avec la description améliorée
-      await apiService.put(`/api/products/${productId}`, { description: enhancedDescription });
+      console.log(`[main] Mise à jour de la description améliorée pour ${productId}`);
+      await apiClient.put(
+        `/api/products/${productId}`,
+        { description: enhancedDescription },
+        headers
+      );
       console.log(`✅ Description mise à jour pour ${productId}`);
 
       // 5. Mise à jour du state local
@@ -360,12 +391,19 @@ function setupWebCaptureListener(ipcMainInstance) {
         enhancedDescription: enhancedDescription,
       });
     } catch (err) {
-      console.error(`❌ Échec de update-product-description pour ${productId}:`, err);
+      console.error(`❌ Échec de update-product-description pour ${productId}:`, err.message);
+
+      if (err.response) {
+        console.error("Détails de l'erreur:", {
+          status: err.response.status,
+          data: err.response.data,
+        });
+      }
 
       // En cas d'erreur, on essaie quand même de mettre à jour avec la description originale
       try {
-        const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
-        await apiService.put(`/api/products/${productId}`, { description });
+        console.log(`[main] Tentative de mise à jour avec la description originale`);
+        await apiClient.put(`/api/products/${productId}`, { description }, headers);
         console.log(`✅ Description mise à jour (sans amélioration) pour ${productId}`);
 
         const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
@@ -404,22 +442,17 @@ function setupWebCaptureListener(ipcMainInstance) {
     console.log('[main] ← update-product-name', productId, name);
 
     try {
-      // Import du service CommonJS dédié au main
-      const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
-
-      // Injecte le token si on en a un
-      if (authToken && typeof apiService.setAuthToken === 'function') {
-        apiService.setAuthToken(authToken);
+      // Préparer les headers avec le token d'authentification
+      const headers = {};
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
       }
 
-      // (optionnel) init du service
-      if (typeof apiService.init === 'function') {
-        await apiService.init();
-      }
+      // Utiliser le client HTTP
+      console.log(`[main] Envoi PUT /api/products/${productId}`);
+      const response = await apiClient.put(`/api/products/${productId}`, { name }, headers);
 
-      // Envoi de la requête PUT pour mettre à jour le nom du produit
-      await apiService.put(`/api/products/${productId}`, { name });
-      console.log(`✅ Nom mis à jour pour ${productId}`);
+      console.log(`✅ Nom mis à jour pour ${productId}, statut:`, response.status);
 
       // Mise à jour du state local
       const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
@@ -435,50 +468,70 @@ function setupWebCaptureListener(ipcMainInstance) {
         productUrls: capturedProductsState.productUrls,
       });
     } catch (err) {
-      console.error(`❌ Échec de update-product-name pour ${productId}:`, err);
+      console.error(`❌ Échec de update-product-name pour ${productId}:`, err.message);
+
+      if (err.response) {
+        console.error("Détails de l'erreur:", {
+          status: err.response.status,
+          data: err.response.data,
+        });
+      }
     }
   });
-
   ipcMainInstance.on('update-product-images', async (event, { productId, images }) => {
     console.log('[main] ← update-product-images', productId, images.length);
 
     try {
-      // Import des modules nécessaires
-      const path = require('path');
-      const apiService = require(path.resolve(__dirname, '../src/services/apiMain.js'));
-      const axios = require('axios');
-      const FormData = require('form-data');
+      // Modules nécessaires au traitement d'images
       const fs = require('fs');
       const os = require('os');
 
-      // Injecte le token si on en a un
-      if (authToken && typeof apiService.setAuthToken === 'function') {
-        apiService.setAuthToken(authToken);
-      }
-
-      // Initialisation si nécessaire
-      if (typeof apiService.init === 'function') {
-        await apiService.init();
+      // Préparer les headers avec le token d'authentification
+      const headers = {};
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
       }
 
       // Récupérer l'état actuel du produit pour vérifier s'il a déjà une image principale
-      const productResponse = await apiService.get(`/api/products/${productId}`);
+      console.log(`[main] Récupération de l'état actuel du produit ${productId}`);
+      const productResponse = await apiClient.get(`/api/products/${productId}`, headers);
       const hasMainImage = !!productResponse.data?.data?.image;
       console.log(`Produit ${productId} a déjà une image principale: ${hasMainImage}`);
 
-      // Traiter chaque image
+      // Première image chargée avec succès (pour définir éventuellement comme principale)
       let firstImageId = null;
 
+      // Traiter chaque image
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         console.log(`Traitement de l'image ${i + 1}/${images.length}: ${img.src}`);
 
         try {
-          // 1. Télécharger l'image
-          const response = await axios({
-            url: img.src,
-            method: 'GET',
-            responseType: 'arraybuffer',
+          // 1. Télécharger l'image avec notre client HTTP
+          const response = await new Promise((resolve, reject) => {
+            const url = new URL(img.src);
+            const httpModule = url.protocol === 'https:' ? require('https') : require('http');
+
+            const req = httpModule.get(img.src, (res) => {
+              if (res.statusCode !== 200) {
+                reject(new Error(`Erreur HTTP ${res.statusCode}`));
+                return;
+              }
+
+              // Déterminer le type MIME
+              const contentType = res.headers['content-type'] || 'image/jpeg';
+
+              // Collecter les morceaux de données
+              const chunks = [];
+              res.on('data', (chunk) => chunks.push(chunk));
+              res.on('end', () => {
+                const buffer = Buffer.concat(chunks);
+                resolve({ data: buffer, headers: { 'content-type': contentType } });
+              });
+            });
+
+            req.on('error', reject);
+            req.end();
           });
 
           // 2. Déterminer le type MIME et l'extension
@@ -488,23 +541,76 @@ function setupWebCaptureListener(ipcMainInstance) {
           // 3. Sauvegarder temporairement l'image
           const tempDir = os.tmpdir();
           const tempFilePath = path.join(tempDir, `temp-image-${Date.now()}.${extension}`);
-          fs.writeFileSync(tempFilePath, Buffer.from(response.data));
+          fs.writeFileSync(tempFilePath, response.data);
 
-          // 4. Créer un FormData pour l'upload
-          const formData = new FormData();
-          // La clé attendue est "images" pour les uploads de galerie, pas "image"
-          formData.append('images', fs.createReadStream(tempFilePath));
+          // 4. Préparer les données pour l'upload
+          // Pour FormData, nous devons créer notre propre implémentation multipart
+          const boundary = `----WebKitFormBoundary${Math.random().toString(16).slice(2)}`;
+          const fileContent = fs.readFileSync(tempFilePath);
 
-          // 5. Uploader l'image via l'API
-          const uploadResponse = await apiService.post(
-            `/api/products/${productId}/image`,
-            formData,
-            {
+          const formData = [
+            `--${boundary}`,
+            `Content-Disposition: form-data; name="images"; filename="image.${extension}"`,
+            `Content-Type: ${contentType}`,
+            '',
+            fileContent.toString('binary'),
+            `--${boundary}--`,
+          ].join('\r\n');
+
+          // 5. Uploader l'image via notre propre requête
+          console.log(`[main] Upload de l'image ${i + 1} pour ${productId}`);
+
+          // Requête HTTP directe pour l'upload
+          const uploadResponse = await new Promise((resolve, reject) => {
+            const url = new URL(`/api/products/${productId}/image`, 'http://localhost:3000');
+
+            const options = {
+              hostname: url.hostname,
+              port: url.port || 80,
+              path: url.pathname,
+              method: 'POST',
               headers: {
-                ...formData.getHeaders(),
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                'Content-Length': Buffer.byteLength(formData, 'binary'),
+                ...headers,
               },
-            }
-          );
+            };
+
+            const req = require('http').request(options, (res) => {
+              let responseData = '';
+
+              res.on('data', (chunk) => {
+                responseData += chunk;
+              });
+
+              res.on('end', () => {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                  try {
+                    resolve({
+                      data: responseData ? JSON.parse(responseData) : {},
+                      status: res.statusCode,
+                    });
+                  } catch (e) {
+                    resolve({
+                      data: responseData,
+                      status: res.statusCode,
+                    });
+                  }
+                } else {
+                  reject({
+                    response: {
+                      status: res.statusCode,
+                      data: responseData ? JSON.parse(responseData) : {},
+                    },
+                  });
+                }
+              });
+            });
+
+            req.on('error', reject);
+            req.write(formData, 'binary');
+            req.end();
+          });
 
           // Récupérer l'ID de l'image uploadée
           const imageId = uploadResponse.data?.data?._id;
@@ -526,7 +632,11 @@ function setupWebCaptureListener(ipcMainInstance) {
       if (firstImageId && !hasMainImage) {
         try {
           console.log(`Définition de l'image ${firstImageId} comme image principale`);
-          await apiService.put(`/api/products/${productId}/main-image`, { imageId: firstImageId });
+          await apiClient.put(
+            `/api/products/${productId}/main-image`,
+            { imageId: firstImageId },
+            headers
+          );
         } catch (mainImgError) {
           console.error(
             "Erreur lors de la définition de l'image principale:",
@@ -535,19 +645,20 @@ function setupWebCaptureListener(ipcMainInstance) {
         }
       }
 
-      // Mettre à jour l'état local pour refléter les changements d'images
-      const prod = capturedProductsState.products.find((p) => (p.id || p._id) === productId);
-      if (prod) {
-        prod._captured = prod._captured || {};
-        // On ne modifie pas les images capturées car elles viennent déjà de là
-      }
-
       console.log(`✅ Images mises à jour pour ${productId}`);
 
       // Notifier la WebView
       event.sender.send('images-updated', { productId, success: true });
     } catch (err) {
-      console.error(`❌ Échec de update-product-images pour ${productId}:`, err);
+      console.error(`❌ Échec de update-product-images pour ${productId}:`, err.message);
+
+      if (err.response) {
+        console.error("Détails de l'erreur:", {
+          status: err.response.status,
+          data: err.response.data,
+        });
+      }
+
       event.sender.send('images-updated', { productId, success: false, error: err.message });
     }
   });

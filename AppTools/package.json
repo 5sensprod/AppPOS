@@ -60,7 +60,8 @@
       "dist/**/*",
       "main.js",
       "preload.js",
-      "modules/**/*"
+      "modules/**/*",
+      "httpClient.js"
     ],
     "extraResources": [
       {
