@@ -2,7 +2,25 @@
 
 const { ipcMain, BrowserWindow } = require('electron');
 const path = require('path');
-const { injectProductContentSelector } = require('../src/utils/productContentSelector');
+const electron = require('electron');
+const app = electron.app || (electron.remote ? electron.remote.app : null);
+let productSelectorPath;
+
+if (app && app.isPackaged) {
+  // En production
+  productSelectorPath = path.join(
+    process.resourcesPath,
+    'AppTools',
+    'src',
+    'utils',
+    'productContentSelector'
+  );
+} else {
+  // En développement
+  productSelectorPath = path.join(__dirname, '..', 'src', 'utils', 'productContentSelector');
+}
+
+const { injectProductContentSelector } = require(productSelectorPath);
 
 // État global étendu pour stocker les données de produits capturées et les URLs
 let capturedProductsState = {
@@ -49,7 +67,7 @@ async function enhanceDescriptionWithAI(productData) {
 
 function setupWebCaptureListener(ipcMainInstance) {
   ipcMainInstance.on('set-auth-token', (event, token) => {
-    console.log('[main] ← set-auth-token', token);
+    console.log('[main] ← set-auth-token', token ? 'reçu' : 'supprimé');
     authToken = token;
   });
 
@@ -283,6 +301,7 @@ function setupWebCaptureListener(ipcMainInstance) {
 
   ipcMainInstance.on('update-product-description', async (event, { productId, description }) => {
     console.log('[main] ← update-product-description', productId, description);
+    console.log('[main] Token disponible:', authToken ? 'Oui' : 'Non');
 
     try {
       // Import du service API

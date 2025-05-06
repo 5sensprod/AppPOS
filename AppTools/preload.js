@@ -1,7 +1,7 @@
 // preload.js
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Configuration standard des APIs exposées à la fenêtre
+// Exposer des API sécurisées au processus de rendu
 contextBridge.exposeInMainWorld('electronAPI', {
   setAuthToken: (token) => {
     console.log('[preload] → set-auth-token', token);
@@ -28,6 +28,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onDescriptionEnhanced: (callback) => {
     ipcRenderer.on('description-enhanced', (_, data) => callback(data));
   },
+  discoverApiServer: () => ipcRenderer.invoke('discover-api-server'),
+  webServer: {
+    getMdnsServices: () => ipcRenderer.invoke('get-mdns-services'),
+  },
+  checkForUpdates: () => ipcRenderer.send('check-for-updates'),
+  onUpdateMessage: (callback) => {
+    ipcRenderer.on('update-message', (event, data) => callback(data));
+    return () => ipcRenderer.removeListener('update-message', callback);
+  },
+  getWebSocketSupport: () => ({ supported: true }),
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  console.log('DOMContentLoaded - Preload script executed');
 });
 
 // Configurer la communication entre la WebView et l'application principale
