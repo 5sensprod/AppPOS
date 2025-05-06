@@ -100,44 +100,62 @@
       // Trouver le panneau et ajouter le bouton
       const panel = document.getElementById('app-tools-panel');
       if (panel) {
-        // Ajouter le bouton au début du panneau avant le formulaire
-        const formContainer = document.getElementById('form-container');
-        if (formContainer && formContainer.parentNode) {
-          // Créer un div pour le bouton en bas du panneau
-          const buttonContainer = document.createElement('div');
-          Object.assign(buttonContainer.style, {
-            position: 'sticky',
-            bottom: '0',
-            padding: '10px 0',
-            background: '#fff',
-            boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.1)',
-            zIndex: '1',
-          });
-          buttonContainer.appendChild(updateBtn);
-          panel.appendChild(buttonContainer);
+        // Créer un div pour le bouton en bas du panneau
+        const buttonContainer = document.createElement('div');
+        Object.assign(buttonContainer.style, {
+          position: 'sticky',
+          bottom: '0',
+          padding: '10px 0',
+          background: '#fff',
+          boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.1)',
+          zIndex: '1',
+        });
+        buttonContainer.appendChild(updateBtn);
+        panel.appendChild(buttonContainer);
+      }
+
+      // Fonction simple pour activer/désactiver le spinner
+      function setButtonLoading(isLoading) {
+        const spinner = updateBtn.querySelector('.update-spinner');
+        const buttonText = updateBtn.querySelector('span');
+
+        if (spinner && buttonText) {
+          if (isLoading) {
+            spinner.style.display = 'inline-block';
+            buttonText.textContent = 'Mise à jour en cours...';
+            updateBtn.disabled = true;
+            updateBtn.style.opacity = '0.8';
+            updateBtn.style.cursor = 'wait';
+          } else {
+            spinner.style.display = 'none';
+            buttonText.textContent = 'Mettre à jour le produit';
+            updateBtn.disabled = false;
+            updateBtn.style.opacity = '1';
+            updateBtn.style.cursor = 'pointer';
+          }
         }
+      }
+
+      // Écouter l'événement de fin de mise à jour de la description
+      if (window.electronAPI && window.electronAPI.onDescriptionEnhanced) {
+        window.electronAPI.onDescriptionEnhanced(() => {
+          console.log('[webview] Description mise à jour, réinitialisation du bouton');
+          setButtonLoading(false);
+          ui.showFeedback('Produit mis à jour avec succès !');
+        });
       }
 
       // Gestion du bouton de mise à jour
       updateBtn.addEventListener('click', () => {
-        // Code existant
         const prod = products[currentIndex];
         const productId = prod.id || prod._id;
         const newDesc = prod._captured?.description || '';
         const newTitle = prod._captured?.title || '';
 
-        // Afficher le spinner et changer le texte du bouton
-        const spinner = updateBtn.querySelector('.update-spinner');
-        const buttonText = updateBtn.querySelector('span');
-        if (spinner && buttonText) {
-          spinner.style.display = 'inline-block';
-          buttonText.textContent = 'Mise à jour en cours...';
-          updateBtn.disabled = true;
-          updateBtn.style.opacity = '0.8';
-          updateBtn.style.cursor = 'wait';
-        }
+        // Activer le spinner
+        setButtonLoading(true);
 
-        // Récupérer les images avec extractImagesInfo
+        // Récupérer les images
         const imageContainer = document.getElementById('image-container');
         const images = ui.extractImagesInfo(imageContainer) || [];
 
@@ -150,20 +168,11 @@
           images.length
         );
 
-        // Fonction pour réinitialiser le bouton après la mise à jour
-        const resetButton = () => {
-          if (spinner && buttonText) {
-            spinner.style.display = 'none';
-            buttonText.textContent = 'Mettre à jour le produit';
-            updateBtn.disabled = false;
-            updateBtn.style.opacity = '1';
-            updateBtn.style.cursor = 'pointer';
-          }
-          ui.showFeedback('Produit mis à jour avec succès !');
-        };
+        // Effectuer les mises à jour
+        let hasDescriptionUpdate = false;
 
-        // Effectuer les mises à jour sans attendre de promesses
         if (newDesc) {
+          hasDescriptionUpdate = true;
           window.electronAPI.updateProductDescription(productId, newDesc);
         }
 
@@ -175,10 +184,14 @@
           window.electronAPI.updateProductImages(productId, images);
         }
 
-        // Réinitialiser le bouton après un délai raisonnable (3 secondes)
-        setTimeout(() => {
-          resetButton();
-        }, 3000);
+        // Si pas de mise à jour de description, réinitialiser le bouton après un délai
+        if (!hasDescriptionUpdate) {
+          setTimeout(() => {
+            setButtonLoading(false);
+            ui.showFeedback('Produit mis à jour avec succès !');
+          }, 3000);
+        }
+        // Sinon, le bouton sera réinitialisé par l'événement onDescriptionEnhanced
       });
     }
 

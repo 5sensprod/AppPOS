@@ -92,6 +92,9 @@ function createWindow() {
     },
   });
 
+  // Maximiser la fenêtre au démarrage
+  mainWindow.maximize();
+
   // Empêcher la page HTML de remplacer le titre
   mainWindow.on('page-title-updated', (e) => {
     e.preventDefault();

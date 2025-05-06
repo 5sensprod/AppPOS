@@ -13,6 +13,7 @@ export const TableRow = ({
   onDelete,
   onSync,
   baseRoute,
+  showActions = true,
 }) => {
   const navigate = useNavigate();
 
@@ -75,38 +76,40 @@ export const TableRow = ({
         </td>
       ))}
 
-      <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-        <div className="flex justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
-          {actions.includes('edit') && (
-            <button
-              onClick={handleEdit}
-              className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
-            >
-              <Edit className="h-4 w-4" />
-            </button>
-          )}
-          {actions.includes('delete') && (
-            <button
-              onClick={handleDelete}
-              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-            >
-              <Trash className="h-4 w-4" />
-            </button>
-          )}
-          {syncEnabled && actions.includes('sync') && (
-            <button
-              onClick={handleSync}
-              className={`${
-                item.woo_id
-                  ? 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
-                  : 'text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300'
-              }`}
-            >
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </td>
+      {showActions && (
+        <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <div className="flex justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
+            {actions.includes('edit') && (
+              <button
+                onClick={handleEdit}
+                className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+            )}
+            {actions.includes('delete') && (
+              <button
+                onClick={handleDelete}
+                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+              >
+                <Trash className="h-4 w-4" />
+              </button>
+            )}
+            {syncEnabled && actions.includes('sync') && (
+              <button
+                onClick={handleSync}
+                className={`${
+                  item.woo_id
+                    ? 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
+                    : 'text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300'
+                }`}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </td>
+      )}
     </tr>
   );
 };

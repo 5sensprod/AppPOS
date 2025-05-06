@@ -2,7 +2,15 @@
 import React, { useRef, useEffect } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
-export const TableHeader = ({ columns, sort, onSort, selectAll, allSelected, someSelected }) => {
+export const TableHeader = ({
+  columns,
+  sort,
+  onSort,
+  selectAll,
+  allSelected,
+  someSelected,
+  showActions = true,
+}) => {
   // Référence à l'élément input pour définir la propriété indeterminate
   const checkboxRef = useRef(null);
 
@@ -14,9 +22,9 @@ export const TableHeader = ({ columns, sort, onSort, selectAll, allSelected, som
   }, [someSelected, allSelected]);
 
   return (
-    <thead className="bg-gray-50 dark:bg-gray-700">
+    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-md">
       <tr>
-        <th className="px-4 py-3 w-8">
+        <th className="px-4 py-3 w-8 sticky top-0 z-10">
           <input
             ref={checkboxRef}
             type="checkbox"
@@ -28,7 +36,7 @@ export const TableHeader = ({ columns, sort, onSort, selectAll, allSelected, som
         {columns.map((column) => (
           <th
             key={column.key}
-            className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider ${
+            className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sticky top-0 z-10 ${
               column.sortable ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : ''
             }`}
             onClick={column.sortable ? () => onSort(column.key) : undefined}
@@ -47,9 +55,11 @@ export const TableHeader = ({ columns, sort, onSort, selectAll, allSelected, som
             </div>
           </th>
         ))}
-        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-          Actions
-        </th>
+        {showActions && (
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sticky top-0 z-10">
+            Actions
+          </th>
+        )}
       </tr>
     </thead>
   );

@@ -24,6 +24,8 @@ const EntityTable = ({
   defaultSort = { field: 'name', direction: 'asc' },
   actions = ['view', 'edit', 'delete', 'sync'],
   batchActions = ['delete', 'sync', 'export', 'status', 'category', 'createSheet'],
+  showBatchActions = true,
+  showActions = true,
   pagination = {
     enabled: true,
     pageSize: 10,
@@ -204,7 +206,7 @@ const EntityTable = ({
         </div>
       </div>
 
-      {selectedItems.length > 0 && (
+      {showBatchActions && selectedItems.length > 0 && (
         <BatchActions
           selectedItems={selectedItems}
           entityName={entityName}
@@ -220,7 +222,7 @@ const EntityTable = ({
         />
       )}
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <TableHeader
             columns={columns}
@@ -236,13 +238,14 @@ const EntityTable = ({
               paginatedData.some((item) => selectedItems.includes(item._id)) &&
               !paginatedData.every((item) => selectedItems.includes(item._id))
             }
+            showActions={showActions}
           />
 
           <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
             {paginatedData.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length + 2}
+                  colSpan={columns.length + (showActions ? 2 : 1)}
                   className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 text-center"
                 >
                   Aucun élément trouvé
@@ -262,6 +265,7 @@ const EntityTable = ({
                   onSync={hasSync ? onSync : undefined}
                   baseRoute={baseRoute}
                   syncEnabled={hasSync}
+                  showActions={showActions}
                 />
               ))
             )}

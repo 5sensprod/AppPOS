@@ -221,6 +221,8 @@ function ProductTable(props) {
           'category',
           'captureContent',
         ]}
+        showBatchActions={true}
+        showActions={false}
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities}
         onExport={handleProductExport}

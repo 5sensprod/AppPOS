@@ -184,7 +184,7 @@ const UnifiedFilterBar = ({
     <div className="space-y-3 w-full">
       <div className="grid grid-cols-1 gap-3">
         {/* Sélecteur de type de filtre standard */}
-        <div>
+        <div className="relative z-50">
           {!editingType ? (
             <Select
               options={availableTypes}
