@@ -14,17 +14,17 @@ export const STATUS_OPTIONS = [
   {
     value: 'published',
     label: 'Publié',
-    color: 'bg-green-100 text-green-800 hover:bg-green-200',
+    color: 'text-gray-900 dark:text-gray-100', // Style neutre sans couleur de fond
   },
   {
     value: 'draft',
     label: 'Brouillon',
-    color: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+    color: 'text-gray-900 dark:text-gray-100', // Style neutre sans couleur de fond
   },
   {
     value: 'archived',
     label: 'Archivé',
-    color: 'bg-gray-100 text-gray-800 hover:bg-gray-200',
+    color: 'text-gray-900 dark:text-gray-100', // Style neutre sans couleur de fond
   },
 ];
 

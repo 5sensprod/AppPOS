@@ -213,12 +213,12 @@ function ProductTable(props) {
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
         batchActions={[
-          'createSheet',
-          'delete',
-          ...(syncEnabled ? ['sync'] : []),
-          'export',
           'status',
           'category',
+          'createSheet',
+          'export',
+          ...(syncEnabled ? ['sync'] : []),
+          'delete',
           'captureContent',
         ]}
         showBatchActions={true}
