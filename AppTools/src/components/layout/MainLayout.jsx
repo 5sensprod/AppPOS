@@ -1,6 +1,7 @@
 // src/components/layout/MainLayout.jsx
 import React, { useMemo } from 'react';
 import Sidebar from './Sidebar';
+import BottomNavigation from './BottomNavigation';
 import TopNavbar from './TopNavbar';
 import { AccessibilityProvider } from '../../contexts/AccessibilityProvider';
 import ZoneNavigationHandler from '../accessibility/ZoneNavigationHandler';
@@ -19,24 +20,46 @@ const MainLayout = ({ children }) => {
 
   return (
     <AccessibilityProvider>
-      <div className="flex h-screen bg-white dark:bg-gray-900">
-        <ZoneNavigationHandler />
+      <div className="flex flex-col h-screen bg-white dark:bg-gray-900">
         {instructionsA11y}
+        <ZoneNavigationHandler />
 
-        {/* Sidebar */}
-        <Sidebar />
+        {/* Desktop Layout - Seulement pour les grands écrans */}
+        <div className="hidden lg:flex h-full">
+          {/* Sidebar Desktop */}
+          <Sidebar />
 
-        {/* Contenu principal */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Contenu principal Desktop */}
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <TopNavbar />
+            <main
+              id="main-content"
+              className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800 transition-colors duration-200"
+              tabIndex="-1"
+              role="main"
+            >
+              {children}
+            </main>
+          </div>
+        </div>
+
+        {/* Mobile Layout - Pour tablettes et mobiles */}
+        <div className="flex flex-col h-full lg:hidden">
+          {/* TopNavbar Mobile */}
           <TopNavbar />
+
+          {/* Contenu principal Mobile */}
           <main
             id="main-content"
-            className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800 transition-colors duration-200"
+            className="flex-1 overflow-y-auto p-4 pb-20 bg-gray-50 dark:bg-gray-800 transition-colors duration-200"
             tabIndex="-1"
             role="main"
           >
             {children}
           </main>
+
+          {/* Bottom Navigation Mobile */}
+          <BottomNavigation />
         </div>
       </div>
     </AccessibilityProvider>

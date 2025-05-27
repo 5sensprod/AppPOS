@@ -259,7 +259,7 @@ const UnifiedFilterBar = ({
 
   return (
     <div className="space-y-3 w-full">
-      <div className="grid grid-cols-1 gap-3 relative z-50">
+      <div className="grid grid-cols-1 gap-3 relative z-0">
         <div>
           {!editingType ? (
             <Select
