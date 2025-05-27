@@ -1,6 +1,7 @@
 // components/ActionButton.jsx
-import React from 'react';
+import React, { useRef } from 'react';
 import { useButtonPosition } from '../hooks/useButtonPosition';
+import { useClickOutside } from '../hooks/useClickOutside';
 import MenuPortal from './MenuPortal';
 import HierarchicalCategorySelector from './HierarchicalCategorySelector';
 
@@ -8,9 +9,20 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, hierarchical
   const isOpen = openDropdown === action;
   const { buttonRef, buttonRect } = useButtonPosition(isOpen);
 
+  // Référence pour le dropdown (pour tous les types de dropdown)
+  const dropdownRef = useRef(null);
+
+  // Fonction pour fermer le dropdown
+  const closeDropdown = () => setOpenDropdown(null);
+
+  // Fonction pour basculer l'état du dropdown
   const toggleOpen = () => setOpenDropdown(isOpen ? null : action);
 
-  // Action simple (bouton)
+  // Utiliser useClickOutside pour tous les types de dropdown
+  // En excluant le bouton pour éviter les conflits
+  useClickOutside(dropdownRef, isOpen, closeDropdown, buttonRef);
+
+  // Action simple (bouton) - Inclut maintenant l'action stock qui utilise une modal
   if (!cfg.options && !cfg.isHierarchical) {
     return (
       <button
@@ -38,7 +50,7 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, hierarchical
       </button>
 
       <MenuPortal isOpen={isOpen} buttonRect={buttonRect}>
-        <div id={`${action}-dropdown-portal`}>
+        <div id={`${action}-dropdown-portal`} ref={dropdownRef}>
           {cfg.isHierarchical ? (
             <HierarchicalCategorySelector
               hierarchicalData={hierarchicalData}

@@ -114,7 +114,12 @@ export const useProductOperations = ({
       console.log(`Modification du statut pour ${productIds.length} produits: ${newStatus}`);
       const { updateProductsStatus } = useProductDataStore.getState();
       await updateProductsStatus(productIds, newStatus);
-      await fetchProducts();
+
+      // Délai pour éviter la déselection immédiate
+      setTimeout(async () => {
+        await fetchProducts();
+      }, 100);
+
       return true;
     } catch (error) {
       console.error('Erreur lors de la mise à jour du statut:', error);
@@ -134,7 +139,12 @@ export const useProductOperations = ({
 
       if (response.data?.success) {
         console.log(`Catégorie modifiée avec succès: ${response.data.message}`);
-        await fetchProducts();
+
+        // Délai pour éviter la déselection immédiate
+        setTimeout(async () => {
+          await fetchProducts();
+        }, 100);
+
         return true;
       } else {
         const errorMessage =
@@ -142,7 +152,11 @@ export const useProductOperations = ({
         console.warn('Avertissement lors de la mise à jour des catégories:', errorMessage);
         setError(`Avertissement: ${errorMessage}`);
 
-        if (response.data?.success) await fetchProducts();
+        if (response.data?.success) {
+          setTimeout(async () => {
+            await fetchProducts();
+          }, 100);
+        }
         return false;
       }
     } catch (error) {

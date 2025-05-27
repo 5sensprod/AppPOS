@@ -1,4 +1,4 @@
-// BatchActions.jsx - Version refactorisée
+// BatchActions.jsx - Version avec gestion du stock
 import React, { useState, useEffect } from 'react';
 import { useHierarchicalCategories } from '../../../../../features/categories/stores/categoryHierarchyStore';
 import { injectDropdownStyles } from './styles/dropdownStyles';
@@ -9,12 +9,14 @@ export const BatchActions = ({
   selectedItems = [],
   entityName = '',
   entityNamePlural = '',
-  batchActions = ['delete', 'sync', 'export', 'status', 'category', 'createSheet'],
+  // Ordre modifié : status, stock et category en premier
+  batchActions = ['status', 'stock', 'category', 'delete', 'sync', 'export', 'createSheet'],
   onBatchDelete,
   onBatchSync,
   onBatchExport,
   onBatchStatusChange,
   onBatchCategoryChange,
+  onBatchStockChange, // Nouveau callback pour la gestion du stock
   onCreateSheet,
   categoryOptions = [], // Conservé pour compatibilité descendante
 }) => {
@@ -57,6 +59,7 @@ export const BatchActions = ({
     onBatchExport,
     onBatchStatusChange,
     onBatchCategoryChange,
+    onBatchStockChange, // Ajout du nouveau callback
     onCreateSheet,
     setOpenDropdown,
   };

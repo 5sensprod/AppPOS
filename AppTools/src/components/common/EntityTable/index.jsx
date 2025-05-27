@@ -37,6 +37,7 @@ const EntityTable = ({
   onExport,
   onBatchStatusChange,
   onBatchCategoryChange,
+  onBatchStockChange, // Nouvelle prop ajoutée
   onCreateSheet,
   categoryOptions = [],
   onBatchDelete,
@@ -57,6 +58,7 @@ const EntityTable = ({
   const hasBatchDelete = typeof onBatchDelete === 'function';
   const hasBatchSync = typeof onBatchSync === 'function';
   const hasCreateSheet = typeof onCreateSheet === 'function';
+  const hasBatchStockChange = typeof onBatchStockChange === 'function'; // Nouvelle vérification
 
   // Hooks pour la gestion des données
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
@@ -70,10 +72,13 @@ const EntityTable = ({
       searchProcessor,
       paginationEntityId
     );
-  const { selectedItems, setSelectedItems, toggleSelection, selectAll } = useTableSelection(
-    data,
-    filteredData
-  );
+  const {
+    selectedItems,
+    setSelectedItems,
+    toggleSelection,
+    selectAll,
+    preserveSelectionOnNextDataChange,
+  } = useTableSelection(data, filteredData);
   const {
     currentPage,
     pageSize,
@@ -129,6 +134,9 @@ const EntityTable = ({
     }
   }, [selectedItems, hasBatchSync, hasSync, onBatchSync, onSync]);
 
+  // État pour la modal de stock
+  const [stockModalOpen, setStockModalOpen] = useState(false);
+
   const handleBatchExport = () => setExportModalOpen(true);
 
   const handleExportConfirm = async (exportConfig) => {
@@ -158,6 +166,19 @@ const EntityTable = ({
     });
   };
 
+  // Fonction pour gérer le stock - SIMPLE redirection vers ProductTable
+  const handleBatchStockChange = (itemIds, stockAction) => {
+    if (itemIds.length === 0 || typeof onBatchStockChange !== 'function') return;
+
+    // Convertir les IDs en objets complets
+    const selectedObjects = itemIds
+      .map((id) => filteredData.find((item) => item._id === id))
+      .filter(Boolean);
+
+    // Appeler directement la fonction du ProductTable SANS .catch()
+    onBatchStockChange(selectedObjects, stockAction);
+  };
+
   // Filtres à utiliser
   const filtersToUse = externalActiveFilters?.length > 0 ? externalActiveFilters : activeFilters;
 
@@ -183,6 +204,7 @@ const EntityTable = ({
     if (action === 'status') return typeof onBatchStatusChange === 'function';
     if (action === 'category')
       return typeof onBatchCategoryChange === 'function' && categoryOptions.length > 0;
+    if (action === 'stock') return hasBatchStockChange; // Nouvelle condition pour le stock
     if (action === 'createSheet') return hasCreateSheet;
     return true;
   });
@@ -217,6 +239,7 @@ const EntityTable = ({
           onBatchExport={hasExport ? handleBatchExport : undefined}
           onBatchStatusChange={handleBatchStatusChange}
           onBatchCategoryChange={handleBatchCategoryChange}
+          onBatchStockChange={hasBatchStockChange ? handleBatchStockChange : undefined} // Redirection simple
           onCreateSheet={hasCreateSheet ? onCreateSheet : undefined}
           categoryOptions={categoryOptions}
         />

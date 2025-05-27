@@ -8,23 +8,47 @@ import {
   FileOutput,
   FileSearch,
   Check,
+  Package, // Icône pour le stock
 } from 'lucide-react';
 
 export const STATUS_OPTIONS = [
   {
     value: 'published',
     label: 'Publié',
-    color: 'text-gray-900 dark:text-gray-100', // Style neutre sans couleur de fond
+    color: 'text-gray-900 dark:text-gray-100',
   },
   {
     value: 'draft',
     label: 'Brouillon',
-    color: 'text-gray-900 dark:text-gray-100', // Style neutre sans couleur de fond
+    color: 'text-gray-900 dark:text-gray-100',
   },
   {
     value: 'archived',
     label: 'Archivé',
-    color: 'text-gray-900 dark:text-gray-100', // Style neutre sans couleur de fond
+    color: 'text-gray-900 dark:text-gray-100',
+  },
+];
+
+export const STOCK_OPTIONS = [
+  {
+    value: 'set',
+    label: 'Définir le stock',
+    color: 'text-gray-900 dark:text-gray-100',
+  },
+  {
+    value: 'add',
+    label: 'Ajouter au stock',
+    color: 'text-gray-900 dark:text-gray-100',
+  },
+  {
+    value: 'subtract',
+    label: 'Retirer du stock',
+    color: 'text-gray-900 dark:text-gray-100',
+  },
+  {
+    value: 'toggle_manage',
+    label: 'Basculer gestion stock',
+    color: 'text-gray-900 dark:text-gray-100',
   },
 ];
 
@@ -58,6 +82,14 @@ export const createActionsConfig = (callbacks, hierarchicalCategories) => ({
       callbacks.onBatchStatusChange(callbacks.selectedItems, value);
       callbacks.setOpenDropdown(null);
     },
+  },
+  stock: {
+    available: typeof callbacks.onBatchStockChange === 'function',
+    icon: Package,
+    label: 'Stock',
+    buttonClass: 'bg-teal-100 hover:bg-teal-200 text-teal-800',
+    // Pas d'options - utilise une modal au lieu d'un dropdown
+    onAction: () => callbacks.onBatchStockChange(callbacks.selectedItems, 'modal'),
   },
   export: {
     available: typeof callbacks.onBatchExport === 'function',

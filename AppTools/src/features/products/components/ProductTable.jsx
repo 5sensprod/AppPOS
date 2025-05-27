@@ -8,12 +8,14 @@ import UnifiedFilterBar from '../../../components/common/EntityTable/components/
 import { usePaginationStore } from '@/stores/usePaginationStore';
 import { useProductFilters } from '../hooks/useProductFilters';
 import { useProductOperations } from '../hooks/useProductOperations';
+import { useStockOperations } from '../hooks/useStockOperations';
 import { useCategoryOptions } from '../hooks/useCategoryOptions';
 import exportService from '../../../services/exportService';
 import { useWebCapture } from '../hooks/useWebCapture';
+import StockModal from '../../../components/common/EntityTable/components/BatchActions/components/StockModal';
 
 function ProductTable(props) {
-  const { deleteProduct, syncProduct } = useProduct();
+  const { deleteProduct, syncProduct, updateProduct } = useProduct(); // Ajouter updateProduct
   const {
     products,
     loading: productsLoading,
@@ -27,6 +29,10 @@ function ProductTable(props) {
     loading: categoriesLoading,
     fetchHierarchicalCategories,
   } = useHierarchicalCategories();
+
+  // États pour la modal de stock
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [stockModalItems, setStockModalItems] = useState([]);
 
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
   const { getPaginationParams } = usePaginationStore();
@@ -54,8 +60,18 @@ function ProductTable(props) {
     syncEnabled,
   });
 
-  const categorySelectOptions = useCategoryOptions(hierarchicalCategories, products);
+  // Nouveau hook pour les opérations de stock
+  const {
+    handleBatchStockChange,
+    loading: stockLoading,
+    error: stockError,
+    setError: setStockError,
+  } = useStockOperations({
+    updateProduct,
+    fetchProducts,
+  });
 
+  const categorySelectOptions = useCategoryOptions(hierarchicalCategories, products);
   const { handleCreateSheet } = useWebCapture(products);
 
   useEffect(() => {
@@ -73,6 +89,13 @@ function ProductTable(props) {
       // Nettoyage websocket si nécessaire
     };
   }, []);
+
+  // Gérer les erreurs de stock
+  useEffect(() => {
+    if (stockError) {
+      setError(stockError);
+    }
+  }, [stockError, setError]);
 
   // Enrichir les produits avec des informations sur les chemins de catégories
   useEffect(() => {
@@ -170,7 +193,7 @@ function ProductTable(props) {
   }, [products, hierarchicalCategories, productsError]);
 
   const filteredProducts = filterProducts(localProducts);
-  const loading = productsLoading || isLoading || categoriesLoading;
+  const loading = productsLoading || isLoading || categoriesLoading || stockLoading;
 
   const handleProductExport = async (exportConfig) => {
     try {
@@ -178,6 +201,42 @@ function ProductTable(props) {
     } catch (error) {
       setError(`Erreur lors de l'export: ${error.message}`);
       return false;
+    }
+  };
+
+  // Nouvelle fonction pour gérer l'action de stock depuis le dropdown
+  const handleStockAction = async (selectedItems, stockAction) => {
+    console.log('handleStockAction appelé avec selectedItems:', selectedItems);
+    console.log('Structure du premier item:', selectedItems[0]);
+    console.log('Action:', stockAction);
+
+    try {
+      // Sauvegarder les items sélectionnés sans les modifier
+      setStockModalItems([...selectedItems]); // Copie pour éviter les références
+      setShowStockModal(true);
+      return Promise.resolve(); // Retourner une Promise résolue
+    } catch (error) {
+      console.error("Erreur lors de l'ouverture de la modal stock:", error);
+      return Promise.reject(error);
+    }
+  };
+
+  // Fonction pour confirmer l'action de stock depuis la modal
+  const handleConfirmStockChange = async (selectedItems, action, value) => {
+    console.log('handleConfirmStockChange appelé avec:', { selectedItems, action, value });
+    try {
+      await handleBatchStockChange(selectedItems, action, value);
+      console.log('Mise à jour du stock réussie');
+      setShowStockModal(false);
+      setStockModalItems([]);
+
+      // Rafraîchir les données avec un délai pour éviter la déselection
+      setTimeout(async () => {
+        await fetchProducts();
+      }, 200);
+    } catch (error) {
+      // L'erreur est déjà gérée dans le hook
+      console.error('Erreur lors de la mise à jour du stock:', error);
     }
   };
 
@@ -214,6 +273,7 @@ function ProductTable(props) {
         actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
         batchActions={[
           'status',
+          'stock', // Nouveau bouton stock
           'category',
           'createSheet',
           'export',
@@ -228,6 +288,7 @@ function ProductTable(props) {
         onExport={handleProductExport}
         onBatchStatusChange={handleBatchStatusChange}
         onBatchCategoryChange={handleBatchCategoryChange}
+        onBatchStockChange={handleStockAction} // Nouvelle prop
         onCreateSheet={handleCreateSheet}
         categoryOptions={categorySelectOptions}
         pagination={{
@@ -240,6 +301,20 @@ function ProductTable(props) {
         paginationEntityId="product"
         externalActiveFilters={selectedFilters}
         {...props}
+      />
+
+      {/* Modal de gestion du stock */}
+      <StockModal
+        isOpen={showStockModal}
+        onClose={() => {
+          setShowStockModal(false);
+          setStockModalItems([]);
+          setStockError(null); // Nettoyer les erreurs lors de la fermeture
+        }}
+        onConfirm={handleConfirmStockChange}
+        selectedItems={stockModalItems}
+        entityName="produit"
+        entityNamePlural="produits"
       />
     </>
   );

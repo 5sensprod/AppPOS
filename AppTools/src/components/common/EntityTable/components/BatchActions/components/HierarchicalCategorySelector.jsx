@@ -1,7 +1,6 @@
 // components/HierarchicalCategorySelector.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import { useClickOutside } from '../hooks/useClickOutside';
 
 const HierarchicalCategorySelector = ({
   hierarchicalData = [],
@@ -12,9 +11,6 @@ const HierarchicalCategorySelector = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedItems, setExpandedItems] = useState({});
-  const dropdownRef = useRef(null);
-
-  useClickOutside(dropdownRef, isOpen, onToggle);
 
   // Recherche dans les catégories
   const filteredBySearch = React.useMemo(() => {
@@ -122,7 +118,6 @@ const HierarchicalCategorySelector = ({
 
   return (
     <div
-      ref={dropdownRef}
       className="absolute z-[99999] mt-1 w-80 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-96 overflow-hidden"
       style={{ top: '100%', left: 0 }}
     >
