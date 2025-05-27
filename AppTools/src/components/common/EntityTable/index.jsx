@@ -206,7 +206,7 @@ const EntityTable = ({
         </div>
       </div>
 
-      {showBatchActions && selectedItems.length > 0 && (
+      {showBatchActions && (
         <BatchActions
           selectedItems={selectedItems}
           entityName={entityName}
