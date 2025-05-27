@@ -1,28 +1,45 @@
-// components/ActionButton.jsx
-import React, { useRef } from 'react';
-import { useButtonPosition } from '../hooks/useButtonPosition';
+// components/ActionButton.jsx - Version avec hook d'animation centralisé
+import React, { useRef, useCallback, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useClickOutside } from '../hooks/useClickOutside';
-import MenuPortal from './MenuPortal';
+import { useResponsiveDropdown } from '../hooks/useResponsiveDropdown';
+import { useDropdownItemAnimation } from '../hooks/useDropdownItemAnimation';
+import { injectDropdownStyles } from '../styles/dropdownStyles';
 import HierarchicalCategorySelector from './HierarchicalCategorySelector';
 
 const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, hierarchicalData }) => {
   const isOpen = openDropdown === action;
-  const { buttonRef, buttonRect } = useButtonPosition(isOpen);
-
-  // Référence pour le dropdown (pour tous les types de dropdown)
   const dropdownRef = useRef(null);
 
+  // Hook pour gérer le positionnement responsive avec animations
+  const { buttonRef, buttonRect, updateButtonPosition, isVisible, shouldRender } =
+    useResponsiveDropdown(isOpen);
+
+  // Hook pour l'animation des items (seulement pour le dropdown simple)
+  const { getItemAnimation } = useDropdownItemAnimation(isVisible, cfg.options?.length || 0);
+
   // Fonction pour fermer le dropdown
-  const closeDropdown = () => setOpenDropdown(null);
+  const closeDropdown = useCallback(() => {
+    setOpenDropdown(null);
+  }, [setOpenDropdown]);
 
   // Fonction pour basculer l'état du dropdown
-  const toggleOpen = () => setOpenDropdown(isOpen ? null : action);
+  const toggleOpen = () => {
+    if (!isOpen) {
+      updateButtonPosition();
+    }
+    setOpenDropdown(isOpen ? null : action);
+  };
 
-  // Utiliser useClickOutside pour tous les types de dropdown
-  // En excluant le bouton pour éviter les conflits
+  // Utiliser useClickOutside
   useClickOutside(dropdownRef, isOpen, closeDropdown, buttonRef);
 
-  // Action simple (bouton) - Inclut maintenant l'action stock qui utilise une modal
+  // Injecter les styles d'animation au montage du composant
+  useEffect(() => {
+    injectDropdownStyles();
+  }, []);
+
+  // Action simple (bouton)
   if (!cfg.options && !cfg.isHierarchical) {
     return (
       <button
@@ -38,7 +55,7 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, hierarchical
 
   // Action avec dropdown
   return (
-    <div className="relative">
+    <>
       <button
         ref={buttonRef}
         onClick={toggleOpen}
@@ -49,40 +66,57 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, hierarchical
         {cfg.label}
       </button>
 
-      <MenuPortal isOpen={isOpen} buttonRect={buttonRect}>
-        <div id={`${action}-dropdown-portal`} ref={dropdownRef}>
-          {cfg.isHierarchical ? (
-            <HierarchicalCategorySelector
-              hierarchicalData={hierarchicalData}
-              onSelect={cfg.onSelect}
-              isOpen={isOpen}
-              onToggle={toggleOpen}
-              placeholder="Sélectionner une catégorie"
-            />
-          ) : (
-            <div className="rounded-md shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-              <div className="py-1 max-h-64 overflow-y-auto">
-                {cfg.options.map((opt, index) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => cfg.onSelect(opt.value)}
-                    className={`w-full text-left px-4 py-2 text-sm ${opt.color} transition-all hover:bg-gray-50 dark:hover:bg-gray-700`}
-                    style={{
-                      animationDelay: `${index * 30}ms`,
-                      animation: isOpen
-                        ? 'dropdownItemIn 200ms forwards'
-                        : 'dropdownItemOut 200ms forwards',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+      {/* Portal avec animation moderne de fermeture */}
+      {shouldRender &&
+        ReactDOM.createPortal(
+          <div
+            ref={dropdownRef}
+            className={`fixed z-[100000] transition-all duration-200 ease-out origin-top ${
+              isVisible
+                ? 'opacity-100 scale-100 translate-y-0'
+                : 'opacity-0 scale-95 -translate-y-1'
+            }`}
+            style={{
+              top: `${buttonRect.bottom + 4}px`,
+              left: `${buttonRect.left}px`,
+              minWidth: `${Math.max(buttonRect.width, 200)}px`,
+            }}
+          >
+            {cfg.isHierarchical ? (
+              <HierarchicalCategorySelector
+                hierarchicalData={hierarchicalData}
+                onSelect={cfg.onSelect}
+                isOpen={isVisible}
+                onToggle={toggleOpen}
+                placeholder="Sélectionner une catégorie"
+              />
+            ) : (
+              <div className="rounded-md shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <div className="py-1 max-h-64 overflow-y-auto">
+                  {cfg.options.map((opt, index) => {
+                    const animation = getItemAnimation(index, {
+                      baseClasses: `w-full text-left px-4 py-2 text-sm ${opt.color}`,
+                      hoverClasses: 'hover:bg-gray-50 dark:hover:bg-gray-700',
+                    });
+
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => cfg.onSelect(opt.value)}
+                        className={animation.className}
+                        style={animation.style}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </MenuPortal>
-    </div>
+            )}
+          </div>,
+          document.body
+        )}
+    </>
   );
 };
 

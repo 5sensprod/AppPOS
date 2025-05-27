@@ -7,7 +7,7 @@ import { TableHeader } from './components/TableHeader';
 import { TableRow } from './components/TableRow';
 import { Pagination } from './components/Pagination';
 import { LoadingState } from './components/LoadingState';
-import ExportConfigModal from './ExportConfigModal';
+import ExportConfigModal from './components/BatchActions/components/ExportModal';
 import { useTableSelection } from './hooks/useTableSelection';
 import { useTableSort } from './hooks/useTableSort';
 import { useTableFilter } from './hooks/useTableFilter';

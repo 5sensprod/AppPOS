@@ -1,11 +1,12 @@
-// components/HierarchicalCategorySelector.jsx
+// components/HierarchicalCategorySelector.jsx - Version avec hook d'animation centralisé
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
+import { useDropdownItemAnimation } from '../hooks/useDropdownItemAnimation';
 
 const HierarchicalCategorySelector = ({
   hierarchicalData = [],
   onSelect,
-  isOpen,
+  isOpen, // Maintenant isVisible depuis le parent
   onToggle,
   placeholder = 'Sélectionner une catégorie',
 }) => {
@@ -65,22 +66,42 @@ const HierarchicalCategorySelector = ({
     setExpandedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
   };
 
-  const renderItems = (items, level = 0) => {
-    return items.map((item, index) => {
+  // Fonction récursive pour compter tous les items visibles
+  const countAllItems = (items) => {
+    let count = 0;
+    items.forEach((item) => {
+      count++; // Compter l'item actuel
+      if (item.children?.length > 0 && expandedItems[item._id]) {
+        count += countAllItems(item.children); // Compter les enfants s'ils sont expandés
+      }
+    });
+    return count;
+  };
+
+  const totalItemCount = countAllItems(filteredBySearch);
+
+  // Hook d'animation centralisé
+  const { getItemAnimation } = useDropdownItemAnimation(isOpen, totalItemCount);
+
+  const renderItems = (items, level = 0, startIndex = 0) => {
+    let currentIndex = startIndex;
+
+    return items.map((item) => {
+      const itemIndex = currentIndex++;
       const hasChildren = item.children?.length > 0;
       const isExpanded = expandedItems[item._id];
       const childCount = hasChildren ? item.children.length : 0;
 
-      return (
-        <div key={item._id}>
+      const itemElement = (
+        <div key={`${item._id}-${level}`}>
           <div
-            className="flex items-center px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-all"
+            {...getItemAnimation(itemIndex, {
+              baseClasses: 'flex items-center px-3 py-2 cursor-pointer',
+              hoverClasses: 'hover:bg-gray-100 dark:hover:bg-gray-700',
+            })}
             style={{
+              ...getItemAnimation(itemIndex).style,
               paddingLeft: `${12 + level * 20}px`,
-              animationDelay: `${index * 30}ms`,
-              animation: isOpen
-                ? 'dropdownItemIn 200ms forwards'
-                : 'dropdownItemOut 200ms forwards',
             }}
             onClick={() => {
               onSelect(item._id, item.name);
@@ -108,19 +129,21 @@ const HierarchicalCategorySelector = ({
             {hasChildren && <span className="text-xs text-gray-500 ml-2">({childCount})</span>}
           </div>
 
-          {hasChildren && isExpanded && renderItems(item.children, level + 1)}
+          {hasChildren && isExpanded && renderItems(item.children, level + 1, currentIndex)}
         </div>
       );
+
+      // Mettre à jour currentIndex pour les enfants si ils sont expandés
+      if (hasChildren && isExpanded) {
+        currentIndex += countAllItems(item.children);
+      }
+
+      return itemElement;
     });
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="absolute z-[99999] mt-1 w-80 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-96 overflow-hidden"
-      style={{ top: '100%', left: 0 }}
-    >
+    <div className="w-80 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-96 overflow-hidden">
       <div className="p-3 border-b border-gray-200 dark:border-gray-700">
         <input
           type="text"
@@ -136,7 +159,11 @@ const HierarchicalCategorySelector = ({
         {filteredBySearch.length > 0 ? (
           renderItems(filteredBySearch)
         ) : (
-          <div className="p-3 text-center text-gray-500 dark:text-gray-400 text-sm">
+          <div
+            className={`p-3 text-center text-gray-500 dark:text-gray-400 text-sm transition-all duration-150 ${
+              isOpen ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
             Aucune catégorie trouvée
           </div>
         )}
