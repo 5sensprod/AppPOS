@@ -1,0 +1,102 @@
+// BatchActions.jsx - Version refactorisée
+import React, { useState, useEffect } from 'react';
+import { useHierarchicalCategories } from '../../../../../features/categories/stores/categoryHierarchyStore';
+import { injectDropdownStyles } from './styles/dropdownStyles';
+import { createActionsConfig } from './config/batchActionsConfig';
+import ActionButton from './components/ActionButton';
+
+export const BatchActions = ({
+  selectedItems = [],
+  entityName = '',
+  entityNamePlural = '',
+  batchActions = ['delete', 'sync', 'export', 'status', 'category', 'createSheet'],
+  onBatchDelete,
+  onBatchSync,
+  onBatchExport,
+  onBatchStatusChange,
+  onBatchCategoryChange,
+  onCreateSheet,
+  categoryOptions = [], // Conservé pour compatibilité descendante
+}) => {
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  const {
+    hierarchicalCategories,
+    loading: categoriesLoading,
+    fetchHierarchicalCategories,
+  } = useHierarchicalCategories();
+
+  // Injection des styles et chargement des catégories
+  useEffect(() => {
+    injectDropdownStyles();
+
+    if (hierarchicalCategories.length === 0 && !categoriesLoading) {
+      fetchHierarchicalCategories();
+    }
+  }, [hierarchicalCategories, categoriesLoading, fetchHierarchicalCategories]);
+
+  // Animation de visibilité
+  useEffect(() => {
+    if (selectedItems.length > 0) {
+      const timer = setTimeout(() => setIsVisible(true), 50);
+      return () => clearTimeout(timer);
+    } else {
+      setIsVisible(false);
+    }
+  }, [selectedItems.length]);
+
+  const selectedCount = selectedItems.length;
+  const itemLabel = selectedCount === 1 ? entityName : entityNamePlural;
+
+  // Configuration des actions avec callbacks
+  const callbacks = {
+    selectedItems,
+    onBatchDelete,
+    onBatchSync,
+    onBatchExport,
+    onBatchStatusChange,
+    onBatchCategoryChange,
+    onCreateSheet,
+    setOpenDropdown,
+  };
+
+  const actionsConfig = createActionsConfig(callbacks, hierarchicalCategories);
+
+  const availableBatchActions = batchActions.filter((action) => {
+    const cfg = actionsConfig[action];
+    return cfg?.available;
+  });
+
+  return (
+    <div
+      className={`bg-white dark:bg-gray-800 flex flex-col sm:flex-row justify-between items-center border-b border-gray-200 dark:border-gray-700 transform transition-all duration-300 ease-in-out overflow-hidden z-30 ${
+        isVisible ? 'opacity-100 max-h-24 p-4' : 'opacity-0 max-h-0 p-0 border-b-0'
+      }`}
+    >
+      <div className="text-gray-700 dark:text-gray-300 mb-2 sm:mb-0">
+        <span className="font-semibold">{selectedCount}</span> {itemLabel}
+      </div>
+
+      <div className="flex space-x-2">
+        {availableBatchActions.map((action) => {
+          const cfg = actionsConfig[action];
+          if (!cfg) return null;
+
+          return (
+            <ActionButton
+              key={action}
+              action={action}
+              cfg={cfg}
+              openDropdown={openDropdown}
+              setOpenDropdown={setOpenDropdown}
+              hierarchicalData={hierarchicalCategories}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default BatchActions;

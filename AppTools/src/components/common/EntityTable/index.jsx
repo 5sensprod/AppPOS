@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { FilterBar } from './components/FilterBar';
-import { BatchActions } from './components/BatchActions';
+import { BatchActions } from './components/BatchActions/BatchActions';
 import { TableHeader } from './components/TableHeader';
 import { TableRow } from './components/TableRow';
 import { Pagination } from './components/Pagination';
