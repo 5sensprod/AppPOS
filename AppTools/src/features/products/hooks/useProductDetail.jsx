@@ -371,6 +371,7 @@ export default function useProductDetail() {
   const handleSubmit = async (data) => {
     setLoading(true);
     setError(null);
+
     try {
       // Vérifier si le champ name est vide ou non défini
       if (!data.name || data.name.trim() === '') {
@@ -389,11 +390,28 @@ export default function useProductDetail() {
       }
 
       const processed = preprocessData(data);
+
       if (isNew) {
+        // Validation avant envoi
+        const requiredFields = ['name'];
+        const missingFields = requiredFields.filter(
+          (field) => !processed[field] || processed[field].trim() === ''
+        );
+
+        if (missingFields.length > 0) {
+          throw new Error(`Champs requis manquants: ${missingFields.join(', ')}`);
+        }
+
         const created = await createProduct(processed);
         const newId = created?.id || created?._id || created?.data?.id || created?.data?._id;
+
+        if (!newId) {
+          throw new Error('Aucun ID retourné par la création du produit');
+        }
+
         setCurrentId(newId);
         setSuccess('Produit créé');
+
         const newData = await getProductById(newId);
         setProduct(newData);
         navigate(`/products/${newId}`, { replace: true });
@@ -404,7 +422,7 @@ export default function useProductDetail() {
         setSuccess('Produit mis à jour');
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Erreur inconnue');
     } finally {
       setLoading(false);
     }
