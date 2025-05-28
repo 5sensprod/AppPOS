@@ -18,7 +18,8 @@ export const BatchActions = ({
   onBatchCategoryChange,
   onBatchStockChange, // Nouveau callback pour la gestion du stock
   onCreateSheet,
-  categoryOptions = [], // Conservé pour compatibilité descendante
+  categoryOptions = [],
+  syncStats,
 }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -59,12 +60,12 @@ export const BatchActions = ({
     onBatchExport,
     onBatchStatusChange,
     onBatchCategoryChange,
-    onBatchStockChange, // Ajout du nouveau callback
+    onBatchStockChange,
     onCreateSheet,
     setOpenDropdown,
   };
 
-  const actionsConfig = createActionsConfig(callbacks, hierarchicalCategories);
+  const actionsConfig = createActionsConfig(callbacks, hierarchicalCategories, syncStats);
 
   const availableBatchActions = batchActions.filter((action) => {
     const cfg = actionsConfig[action];
@@ -94,6 +95,7 @@ export const BatchActions = ({
               openDropdown={openDropdown}
               setOpenDropdown={setOpenDropdown}
               hierarchicalData={hierarchicalCategories}
+              syncStats={syncStats} // Passer syncStats
             />
           );
         })}

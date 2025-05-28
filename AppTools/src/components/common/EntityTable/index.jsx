@@ -34,6 +34,7 @@ const EntityTable = ({
   },
   onDelete,
   onSync,
+  syncStats,
   onExport,
   onBatchStatusChange,
   onBatchCategoryChange,
@@ -242,6 +243,7 @@ const EntityTable = ({
           onBatchStockChange={hasBatchStockChange ? handleBatchStockChange : undefined} // Redirection simple
           onCreateSheet={hasCreateSheet ? onCreateSheet : undefined}
           categoryOptions={categoryOptions}
+          syncStats={syncStats}
         />
       )}
 

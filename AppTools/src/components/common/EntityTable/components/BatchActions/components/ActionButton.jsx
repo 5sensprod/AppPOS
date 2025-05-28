@@ -1,4 +1,4 @@
-// components/ActionButton.jsx - Version avec hook d'animation centralisé
+// components/ActionButton.jsx
 import React, { useRef, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -7,7 +7,14 @@ import { useDropdownItemAnimation } from '../hooks/useDropdownItemAnimation';
 import { injectDropdownStyles } from '../styles/dropdownStyles';
 import HierarchicalCategorySelector from './HierarchicalCategorySelector';
 
-const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, hierarchicalData }) => {
+const ActionButton = ({
+  action,
+  cfg,
+  openDropdown,
+  setOpenDropdown,
+  hierarchicalData,
+  syncStats,
+}) => {
   const isOpen = openDropdown === action;
   const dropdownRef = useRef(null);
 
@@ -39,7 +46,15 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, hierarchical
     injectDropdownStyles();
   }, []);
 
-  // Action simple (bouton)
+  // Si un composant personnalisé est défini, l'utiliser
+  if (cfg.customComponent) {
+    const CustomComponent = cfg.customComponent;
+    return (
+      <CustomComponent {...cfg.customProps} syncStats={syncStats} className={cfg.buttonClass} />
+    );
+  }
+
+  // Action simple (bouton standard)
   if (!cfg.options && !cfg.isHierarchical) {
     return (
       <button
@@ -53,7 +68,7 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, hierarchical
     );
   }
 
-  // Action avec dropdown
+  // Action avec dropdown (reste inchangé)
   return (
     <>
       <button
@@ -66,7 +81,6 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, hierarchical
         {cfg.label}
       </button>
 
-      {/* Portal avec animation moderne de fermeture */}
       {shouldRender &&
         ReactDOM.createPortal(
           <div

@@ -10,6 +10,7 @@ import {
   Check,
   Package, // Icône pour le stock
 } from 'lucide-react';
+import SyncButton from '../components/SyncButton';
 
 export const STATUS_OPTIONS = [
   {
@@ -52,7 +53,7 @@ export const STOCK_OPTIONS = [
   },
 ];
 
-export const createActionsConfig = (callbacks, hierarchicalCategories) => ({
+export const createActionsConfig = (callbacks, hierarchicalCategories, syncStats) => ({
   createSheet: {
     available: typeof callbacks.onCreateSheet === 'function',
     icon: FileOutput,
@@ -110,6 +111,13 @@ export const createActionsConfig = (callbacks, hierarchicalCategories) => ({
     icon: RefreshCw,
     label: 'Synchroniser',
     buttonClass: 'bg-blue-100 hover:bg-blue-200 text-blue-800',
+    // Composant personnalisé au lieu d'un bouton standard
+    customComponent: SyncButton,
+    customProps: {
+      syncStats: syncStats,
+      isSyncing: syncStats?.isActive || false,
+      onClick: callbacks.onBatchSync,
+    },
     onAction: callbacks.onBatchSync,
   },
 });

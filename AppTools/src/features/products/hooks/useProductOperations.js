@@ -1,5 +1,5 @@
 // src/features/products/hooks/useProductOperations.js
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import apiService from '../../../services/api';
 import { useProductDataStore } from '../stores/productStore';
@@ -72,27 +72,71 @@ export const useProductOperations = ({
       : undefined,
   });
 
-  // Créez des wrappers pour les fonctions de synchronisation
-  const handleSyncEntity = async (id) => {
-    if (!originalHandleSyncEntity) return;
+  // Nouvelle logique pour la file d'attente de synchronisation
+  const [syncQueue, setSyncQueue] = useState([]);
+  const [currentSyncIndex, setCurrentSyncIndex] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-    setSyncLoading(true);
-    try {
-      await originalHandleSyncEntity(id);
-    } finally {
-      setSyncLoading(false);
-    }
-  };
+  const handleBatchSyncEntities = useCallback(
+    async (itemIds) => {
+      if (!syncEnabled || itemIds.length === 0) return;
 
-  const handleBatchSyncEntities = async (ids) => {
-    if (!originalHandleBatchSyncEntities) return;
+      setIsSyncing(true);
+      setSyncQueue(itemIds);
+      setCurrentSyncIndex(0);
+      setError(null);
 
-    setSyncLoading(true);
-    try {
-      await originalHandleBatchSyncEntities(ids);
-    } finally {
-      setSyncLoading(false);
-    }
+      try {
+        for (let i = 0; i < itemIds.length; i++) {
+          setCurrentSyncIndex(i);
+          await syncProduct(itemIds[i]);
+
+          // Petit délai pour permettre à l'UI de se mettre à jour
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        // Rafraîchir les données après synchronisation
+        await fetchProducts();
+      } catch (err) {
+        setError(`Erreur de synchronisation: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+        setSyncQueue([]);
+        setCurrentSyncIndex(0);
+      }
+    },
+    [syncProduct, fetchProducts, syncEnabled]
+  );
+
+  const handleSyncEntity = useCallback(
+    async (itemId) => {
+      if (!syncEnabled) return;
+
+      setIsSyncing(true);
+      setSyncQueue([itemId]);
+      setCurrentSyncIndex(0);
+      setError(null);
+
+      try {
+        await syncProduct(itemId);
+        await fetchProducts();
+      } catch (err) {
+        setError(`Erreur de synchronisation: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+        setSyncQueue([]);
+        setCurrentSyncIndex(0);
+      }
+    },
+    [syncProduct, fetchProducts, syncEnabled]
+  );
+
+  // Calculer les statistiques de la file d'attente
+  const syncStats = {
+    total: syncQueue.length,
+    completed: currentSyncIndex,
+    remaining: Math.max(0, syncQueue.length - currentSyncIndex),
+    isActive: isSyncing && syncQueue.length > 0,
   };
 
   const handleExport = async (exportConfig) => {
@@ -174,6 +218,8 @@ export const useProductOperations = ({
     exportLoading,
     operationLoading,
     syncLoading,
+    syncStats,
+    isSyncing,
     handleDeleteEntity,
     handleSyncEntity,
     handleBatchDeleteEntities,
