@@ -1,24 +1,26 @@
-// src/features/products/hooks/useProductOperations.js
+// hooks/useProductOperations.js - VERSION CORRIGÉE
 import { useState, useCallback } from 'react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import apiService from '../../../services/api';
 import { useProductDataStore } from '../stores/productStore';
+import { useActionToasts } from '../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
 
 export const useProductOperations = ({
   deleteProduct,
   syncProduct,
+  updateProduct,
   fetchProducts,
   syncEnabled = false,
 }) => {
   const [error, setError] = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const {
     loading: operationLoading,
     handleDeleteEntity,
     handleSyncEntity: originalHandleSyncEntity,
-    handleBatchDeleteEntities,
     handleBatchSyncEntities: originalHandleBatchSyncEntities,
     loadEntities,
   } = useEntityTable({
@@ -77,27 +79,61 @@ export const useProductOperations = ({
   const [currentSyncIndex, setCurrentSyncIndex] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // CORRECTION: Utiliser les fonctions du hook useActionToasts
+  const { toastActions, updateToast, removeToast } = useActionToasts();
+
+  const handleBatchDeleteEntities = useCallback(
+    async (itemIds) => {
+      if (itemIds.length === 0) return;
+
+      const toastId = toastActions.deletion.start(itemIds.length, 'produit');
+      setIsLoading(true);
+
+      try {
+        for (let i = 0; i < itemIds.length; i++) {
+          await deleteProduct(itemIds[i]);
+          const progress = { current: i + 1, total: itemIds.length };
+          updateToast(toastId, { progress });
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        removeToast(toastId);
+        toastActions.deletion.success(itemIds.length, 'produit');
+        await fetchProducts();
+      } catch (err) {
+        removeToast(toastId);
+        toastActions.deletion.error(err.message, 'produit');
+        setError(`Erreur de suppression: ${err.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [deleteProduct, fetchProducts, toastActions, updateToast, removeToast]
+  );
+
   const handleBatchSyncEntities = useCallback(
     async (itemIds) => {
       if (!syncEnabled || itemIds.length === 0) return;
 
+      const toastId = toastActions.sync.start(itemIds.length, 'produit');
       setIsSyncing(true);
       setSyncQueue(itemIds);
       setCurrentSyncIndex(0);
-      setError(null);
 
       try {
         for (let i = 0; i < itemIds.length; i++) {
           setCurrentSyncIndex(i);
           await syncProduct(itemIds[i]);
-
-          // Petit délai pour permettre à l'UI de se mettre à jour
+          toastActions.sync.updateProgress(toastId, i + 1, itemIds.length);
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
-        // Rafraîchir les données après synchronisation
+        removeToast(toastId);
+        toastActions.sync.success(itemIds.length, 'produit');
         await fetchProducts();
       } catch (err) {
+        removeToast(toastId);
+        toastActions.sync.error(err.message, 'produit');
         setError(`Erreur de synchronisation: ${err.message}`);
       } finally {
         setIsSyncing(false);
@@ -105,13 +141,14 @@ export const useProductOperations = ({
         setCurrentSyncIndex(0);
       }
     },
-    [syncProduct, fetchProducts, syncEnabled]
+    [syncProduct, fetchProducts, syncEnabled, toastActions, removeToast]
   );
 
   const handleSyncEntity = useCallback(
     async (itemId) => {
       if (!syncEnabled) return;
 
+      const toastId = toastActions.sync.start(1, 'produit');
       setIsSyncing(true);
       setSyncQueue([itemId]);
       setCurrentSyncIndex(0);
@@ -119,8 +156,12 @@ export const useProductOperations = ({
 
       try {
         await syncProduct(itemId);
+        removeToast(toastId);
+        toastActions.sync.success(1, 'produit');
         await fetchProducts();
       } catch (err) {
+        removeToast(toastId);
+        toastActions.sync.error(err.message, 'produit');
         setError(`Erreur de synchronisation: ${err.message}`);
       } finally {
         setIsSyncing(false);
@@ -128,7 +169,7 @@ export const useProductOperations = ({
         setCurrentSyncIndex(0);
       }
     },
-    [syncProduct, fetchProducts, syncEnabled]
+    [syncProduct, fetchProducts, syncEnabled, toastActions, removeToast]
   );
 
   // Calculer les statistiques de la file d'attente
@@ -140,12 +181,29 @@ export const useProductOperations = ({
   };
 
   const handleExport = async (exportConfig) => {
+    const toastId = toastActions.export.start(
+      exportConfig.selectedItems?.length || 0,
+      exportConfig.format || 'pdf',
+      'produit'
+    );
+
     try {
       setExportLoading(true);
+      updateToast(toastId, { progress: { current: 25, total: 100, label: '% complété' } });
+
       await apiService.post('/api/products/export', { ...exportConfig });
+
+      updateToast(toastId, { progress: { current: 100, total: 100, label: '% complété' } });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      removeToast(toastId);
+      toastActions.export.success(exportConfig.format || 'pdf');
+
       return true;
     } catch (error) {
       console.error("Erreur lors de l'export:", error);
+      removeToast(toastId);
+      toastActions.export.error(error.message);
       setError(`Erreur lors de l'export: ${error.message}`);
       return false;
     } finally {
@@ -153,64 +211,42 @@ export const useProductOperations = ({
     }
   };
 
-  const handleBatchStatusChange = async (productIds, newStatus) => {
-    try {
-      console.log(`Modification du statut pour ${productIds.length} produits: ${newStatus}`);
-      const { updateProductsStatus } = useProductDataStore.getState();
-      await updateProductsStatus(productIds, newStatus);
+  const handleBatchStatusChange = useCallback(
+    async (itemIds, newStatus) => {
+      if (itemIds.length === 0) return;
 
-      // Délai pour éviter la déselection immédiate
-      setTimeout(async () => {
+      try {
+        await Promise.all(itemIds.map((id) => updateProduct(id, { status: newStatus })));
+        toastActions.status.success(itemIds.length, newStatus, 'produit');
         await fetchProducts();
-      }, 100);
-
-      return true;
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour du statut:', error);
-      setError(`Erreur lors de la mise à jour du statut: ${error.message}`);
-      return false;
-    }
-  };
-
-  const handleBatchCategoryChange = async (productIds, categoryId) => {
-    try {
-      console.log(`Modification de la catégorie pour ${productIds.length} produits: ${categoryId}`);
-
-      const response = await apiService.post('/api/products/batch-category', {
-        productIds,
-        categoryId,
-      });
-
-      if (response.data?.success) {
-        console.log(`Catégorie modifiée avec succès: ${response.data.message}`);
-
-        // Délai pour éviter la déselection immédiate
-        setTimeout(async () => {
-          await fetchProducts();
-        }, 100);
-
-        return true;
-      } else {
-        const errorMessage =
-          response.data?.message || 'Erreur lors de la mise à jour des catégories';
-        console.warn('Avertissement lors de la mise à jour des catégories:', errorMessage);
-        setError(`Avertissement: ${errorMessage}`);
-
-        if (response.data?.success) {
-          setTimeout(async () => {
-            await fetchProducts();
-          }, 100);
-        }
-        return false;
+      } catch (err) {
+        // CORRECTION: Utiliser err.message au lieu de juste err
+        toastActions.status.error(err.message || String(err));
+        setError(`Erreur de statut: ${err.message}`);
       }
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour de la catégorie:', error);
-      setError(
-        `Erreur lors de la mise à jour de la catégorie: ${error.message || 'Erreur inconnue'}`
-      );
-      return false;
-    }
-  };
+    },
+    [updateProduct, fetchProducts, toastActions]
+  );
+
+  const handleBatchCategoryChange = useCallback(
+    async (itemIds, categoryId, categoryName) => {
+      // categoryName peut être gardé pour la logique métier
+      if (itemIds.length === 0) return;
+
+      try {
+        await Promise.all(itemIds.map((id) => updateProduct(id, { category_id: categoryId })));
+
+        // MODIFICATION: Ne plus passer categoryName, juste le count et entityName
+        toastActions.category.success(itemIds.length, 'produit');
+
+        await fetchProducts();
+      } catch (err) {
+        toastActions.category.error(err.message || String(err));
+        setError(`Erreur de catégorie: ${err.message}`);
+      }
+    },
+    [updateProduct, fetchProducts, toastActions]
+  );
 
   return {
     error,
@@ -228,5 +264,6 @@ export const useProductOperations = ({
     handleBatchStatusChange,
     handleBatchCategoryChange,
     isLoading: operationLoading || exportLoading,
+    toastActions,
   };
 };

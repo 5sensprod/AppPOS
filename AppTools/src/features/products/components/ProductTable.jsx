@@ -13,6 +13,8 @@ import { useCategoryOptions } from '../hooks/useCategoryOptions';
 import exportService from '../../../services/exportService';
 import { useWebCapture } from '../hooks/useWebCapture';
 import StockModal from '../../../components/common/EntityTable/components/BatchActions/components/StockModal';
+import ToastContainer from '../../../components/common/EntityTable/components/BatchActions/components/ToastContainer';
+import { useActionToasts } from '../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct, updateProduct } = useProduct(); // Ajouter updateProduct
@@ -58,6 +60,7 @@ function ProductTable(props) {
   } = useProductOperations({
     deleteProduct,
     syncProduct,
+    updateProduct,
     fetchProducts,
     syncEnabled,
   });
@@ -75,6 +78,7 @@ function ProductTable(props) {
 
   const categorySelectOptions = useCategoryOptions(hierarchicalCategories, products);
   const { handleCreateSheet } = useWebCapture(products);
+  const { toastActions, removeToast, updateToast } = useActionToasts();
 
   useEffect(() => {
     if (syncEnabled) initWebSocket();
@@ -198,10 +202,22 @@ function ProductTable(props) {
   const loading = productsLoading || isLoading || categoriesLoading || stockLoading;
 
   const handleProductExport = async (exportConfig) => {
+    const toastId = toastActions.export.start(
+      exportConfig.selectedItems.length,
+      exportConfig.format,
+      'produit'
+    );
+
     try {
-      return await exportService.exportProducts(exportConfig);
+      const result = await exportService.exportProducts(exportConfig);
+
+      removeToast(toastId);
+      toastActions.export.success(exportConfig.format);
+
+      return result;
     } catch (error) {
-      setError(`Erreur lors de l'export: ${error.message}`);
+      removeToast(toastId);
+      toastActions.export.error(error.message);
       return false;
     }
   };
@@ -225,25 +241,26 @@ function ProductTable(props) {
 
   // Fonction pour confirmer l'action de stock depuis la modal
   const handleConfirmStockChange = async (selectedItems, action, value) => {
-    console.log('handleConfirmStockChange appelé avec:', { selectedItems, action, value });
     try {
       await handleBatchStockChange(selectedItems, action, value);
-      console.log('Mise à jour du stock réussie');
+
+      // Toast de succès
+      toastActions.stock.success(selectedItems.length, action, 'produit');
+
       setShowStockModal(false);
       setStockModalItems([]);
 
-      // Rafraîchir les données avec un délai pour éviter la déselection
       setTimeout(async () => {
         await fetchProducts();
       }, 200);
     } catch (error) {
-      // L'erreur est déjà gérée dans le hook
-      console.error('Erreur lors de la mise à jour du stock:', error);
+      toastActions.stock.error(error.message);
     }
   };
 
   return (
     <>
+      <ToastContainer />
       <UnifiedFilterBar
         filterOptions={filterOptions}
         selectedFilters={selectedFilters}
@@ -302,7 +319,7 @@ function ProductTable(props) {
         onClose={() => {
           setShowStockModal(false);
           setStockModalItems([]);
-          setStockError(null); // Nettoyer les erreurs lors de la fermeture
+          setStockError(null);
         }}
         onConfirm={handleConfirmStockChange}
         selectedItems={stockModalItems}
