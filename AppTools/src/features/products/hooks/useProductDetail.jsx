@@ -179,6 +179,8 @@ export default function useProductDetail() {
   const preprocessData = useCallback(
     (data) => {
       const d = { ...data };
+
+      // Nettoyage des champs de base
       if (!d.category_id) d.category_id = null;
       if (!d.brand_id) d.brand_id = null;
       if (!d.supplier_id) d.supplier_id = null;
@@ -186,30 +188,180 @@ export default function useProductDetail() {
       d.sku ||= '';
       d.stock ||= 0;
 
-      // Relations + catégories imbriquées
-      const catRef = categoryOptions.find((c) => c.value === d.category_id);
-      d.category_info = {
-        refs: d.categories?.map((id) => ({
-          id,
-          name: categoryOptions.find((c) => c.value === id)?.label || '',
-        })),
-        primary: d.category_id
-          ? {
-              id: d.category_id,
-              name: catRef?.label || '',
+      // CORRECTION: Nettoyage et synchronisation des catégories
+      console.log('🔍 PreprocessData - Données reçues:', {
+        category_id: d.category_id,
+        categories: d.categories,
+      });
+
+      // S'assurer que categories est un tableau
+      if (!Array.isArray(d.categories)) {
+        d.categories = [];
+      }
+
+      // Nettoyer le tableau des catégories (supprimer les valeurs vides/null/undefined)
+      d.categories = d.categories.filter((catId) => catId && catId.trim() !== '');
+
+      // Si category_id est défini mais pas dans categories, l'ajouter
+      if (d.category_id && !d.categories.includes(d.category_id)) {
+        d.categories.push(d.category_id);
+      }
+
+      // Si category_id n'est pas défini mais qu'il y a des catégories, prendre la première
+      if (!d.category_id && d.categories.length > 0) {
+        d.category_id = d.categories[0];
+      }
+
+      console.log('✅ PreprocessData - Données synchronisées:', {
+        category_id: d.category_id,
+        categories: d.categories,
+      });
+
+      // Construction de category_info améliorée
+      // Compatible avec votre architecture hierarchicalCategories existante
+      const buildCategoryInfo = () => {
+        if (!d.categories || d.categories.length === 0) {
+          return { refs: [], primary: null };
+        }
+
+        // Fonction pour construire les références de catégories avec leurs chemins
+        const buildCategoryRefs = (categoryIds) => {
+          const refs = [];
+          const processedPaths = new Set();
+
+          categoryIds.forEach((catId) => {
+            const category = categoryOptions.find((c) => c.value === catId);
+            if (category) {
+              // Analyser le label pour déduire la hiérarchie (avec les tirets —)
+              const level = (category.label.match(/—/g) || []).length;
+              const cleanName = category.label.replace(/^—+\s*/, '');
+
+              // Construire le chemin hiérarchique en analysant la position dans categoryOptions
+              let path = [cleanName];
+              let pathIds = [catId];
+
+              if (level > 0) {
+                // Trouver les catégories parentes en remontant dans categoryOptions
+                const currentIndex = categoryOptions.findIndex((c) => c.value === catId);
+                let parentPath = [];
+                let parentIds = [];
+
+                // Remonter pour trouver les parents (catégories avec moins de tirets)
+                for (let i = currentIndex - 1; i >= 0; i--) {
+                  const potentialParent = categoryOptions[i];
+                  const parentLevel = (potentialParent.label.match(/—/g) || []).length;
+
+                  if (parentLevel < level) {
+                    const cleanParentName = potentialParent.label.replace(/^—+\s*/, '');
+                    parentPath.unshift(cleanParentName);
+                    parentIds.unshift(potentialParent.value);
+
+                    // Continuer jusqu'à trouver tous les parents
+                    if (parentLevel === 0) break; // Racine atteinte
+                  }
+                }
+
+                path = [...parentPath, cleanName];
+                pathIds = [...parentIds, catId];
+              }
+
+              // Ajouter toutes les catégories de ce chemin aux refs (parents + enfant)
+              for (let i = 0; i < path.length; i++) {
+                const pathKey = pathIds.slice(0, i + 1).join('->');
+
+                if (!processedPaths.has(pathKey)) {
+                  processedPaths.add(pathKey);
+
+                  refs.push({
+                    id: pathIds[i],
+                    name: path[i],
+                    path: path.slice(0, i + 1),
+                    path_ids: pathIds.slice(0, i + 1),
+                    path_string: path.slice(0, i + 1).join(' > '),
+                    level: i,
+                    woo_id: null,
+                  });
+                }
+              }
             }
-          : null,
+          });
+
+          return refs.sort((a, b) => {
+            // Trier par niveau puis par nom
+            if (a.level !== b.level) return a.level - b.level;
+            return a.name.localeCompare(b.name);
+          });
+        };
+
+        const refs = buildCategoryRefs(d.categories);
+
+        // Déterminer la catégorie principale
+        let primary = null;
+        if (d.category_id) {
+          // Chercher la catégorie principale dans les refs
+          primary = refs.find((ref) => ref.id === d.category_id);
+
+          if (!primary) {
+            // Si pas trouvée, la créer à partir de categoryOptions
+            const category = categoryOptions.find((c) => c.value === d.category_id);
+            if (category) {
+              const cleanName = category.label.replace(/^—+\s*/, '');
+              primary = {
+                id: d.category_id,
+                name: cleanName,
+                path: [cleanName],
+                path_ids: [d.category_id],
+                path_string: cleanName,
+                level: 0,
+                woo_id: null,
+              };
+            }
+          }
+        } else if (refs.length > 0) {
+          // Si pas de catégorie principale définie, prendre la première
+          primary = refs[0];
+          d.category_id = refs[0].id;
+        }
+
+        return { refs, primary };
       };
 
+      d.category_info = buildCategoryInfo();
+
+      // Construction des références de marque et fournisseur
       if (d.brand_id) {
         const brand = relatedData.brands.find((b) => b._id === d.brand_id);
-        if (brand) d.brand_ref = { id: brand._id, name: brand.name };
+        if (brand) {
+          d.brand_ref = { id: brand._id, name: brand.name };
+        } else {
+          // Si la marque n'existe plus, nettoyer
+          d.brand_id = null;
+          d.brand_ref = null;
+        }
+      } else {
+        d.brand_ref = null;
       }
 
       if (d.supplier_id) {
-        const sup = relatedData.suppliers.find((s) => s._id === d.supplier_id);
-        if (sup) d.supplier_ref = { id: sup._id, name: sup.name };
+        const supplier = relatedData.suppliers.find((s) => s._id === d.supplier_id);
+        if (supplier) {
+          d.supplier_ref = { id: supplier._id, name: supplier.name };
+        } else {
+          // Si le fournisseur n'existe plus, nettoyer
+          d.supplier_id = null;
+          d.supplier_ref = null;
+        }
+      } else {
+        d.supplier_ref = null;
       }
+
+      console.log('📦 PreprocessData - Résultat final:', {
+        category_id: d.category_id,
+        categories: d.categories,
+        category_info: d.category_info,
+        brand_ref: d.brand_ref,
+        supplier_ref: d.supplier_ref,
+      });
 
       return d;
     },
