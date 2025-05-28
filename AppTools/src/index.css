@@ -3,7 +3,6 @@
 @tailwind components;
 @tailwind utilities;
 /* Styles CSS supplémentaires pour le mobile */
-/* Styles CSS supplémentaires pour le mobile */
 
 /* Animation pour le sous-menu bottom */
 @keyframes slide-up {
@@ -55,7 +54,7 @@
 }
 
 /* Style pour le contenu principal sur mobile avec bottom nav */
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
   .mobile-main-content {
     padding-bottom: 80px; /* Espace pour le bottom navigation */
   }
@@ -83,7 +82,7 @@
 }
 
 /* Styles pour les états de focus sur mobile et tablettes */
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
   button:focus-visible,
   a:focus-visible {
     outline: 2px solid #3b82f6;
