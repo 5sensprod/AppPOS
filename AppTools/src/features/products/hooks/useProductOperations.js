@@ -4,6 +4,7 @@ import { useEntityTable } from '@/hooks/useEntityTable';
 import apiService from '../../../services/api';
 import { useProductDataStore } from '../stores/productStore';
 import { useActionToasts } from '../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
+import { useConfirmModal } from '../../../components/hooks/useConfirmModal';
 
 export const useProductOperations = ({
   deleteProduct,
@@ -12,6 +13,7 @@ export const useProductOperations = ({
   fetchProducts,
   syncEnabled = false,
 }) => {
+  const { confirm, ConfirmModal } = useConfirmModal();
   const [error, setError] = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
@@ -86,10 +88,25 @@ export const useProductOperations = ({
     async (itemIds) => {
       if (itemIds.length === 0) return;
 
-      const toastId = toastActions.deletion.start(itemIds.length, 'produit');
-      setIsLoading(true);
-
       try {
+        // CORRECTION: Utiliser la modal React au lieu de window.confirm
+        const confirmed = await confirm({
+          title: 'Confirmer la suppression en lot',
+          message: `Êtes-vous sûr de vouloir supprimer ces ${itemIds.length} ${
+            itemIds.length === 1 ? 'produit' : 'produits'
+          } ? Cette action est irréversible.`,
+          confirmText: 'Supprimer tout',
+          cancelText: 'Annuler',
+          variant: 'danger',
+        });
+
+        if (!confirmed) return;
+
+        console.log('🗑️ Début suppression en lot (sans window.confirm)');
+
+        const toastId = toastActions.deletion.start(itemIds.length, 'produit');
+        setIsLoading(true);
+
         for (let i = 0; i < itemIds.length; i++) {
           await deleteProduct(itemIds[i]);
           const progress = { current: i + 1, total: itemIds.length };
@@ -101,14 +118,14 @@ export const useProductOperations = ({
         toastActions.deletion.success(itemIds.length, 'produit');
         await fetchProducts();
       } catch (err) {
-        removeToast(toastId);
+        console.error('Erreur suppression en lot:', err);
         toastActions.deletion.error(err.message, 'produit');
         setError(`Erreur de suppression: ${err.message}`);
       } finally {
         setIsLoading(false);
       }
     },
-    [deleteProduct, fetchProducts, toastActions, updateToast, removeToast]
+    [deleteProduct, fetchProducts, toastActions, updateToast, removeToast, confirm]
   );
 
   const handleBatchSyncEntities = useCallback(
@@ -259,6 +276,7 @@ export const useProductOperations = ({
     handleDeleteEntity,
     handleSyncEntity,
     handleBatchDeleteEntities,
+    ConfirmModal,
     handleBatchSyncEntities,
     handleExport,
     handleBatchStatusChange,

@@ -57,6 +57,7 @@ function ProductTable(props) {
     isSyncing, // Nouvelle propriété
     syncLoading,
     isLoading,
+    ConfirmModal,
   } = useProductOperations({
     deleteProduct,
     syncProduct,

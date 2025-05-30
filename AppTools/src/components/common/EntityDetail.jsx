@@ -5,6 +5,7 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { ArrowLeft, RefreshCw, AlertCircle, Edit, Trash, Save, X } from 'lucide-react';
 import { TabNavigation, ActionButton, InfoCard } from '../ui';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 /**
  * Composant générique bidirectionnel pour afficher ou éditer les détails d'une entité
@@ -39,6 +40,8 @@ const EntityDetail = ({
   success = null,
 }) => {
   const navigate = useNavigate();
+  const { confirm, ConfirmModal } = useConfirmModal();
+
   const [activeTab, setActiveTab] = useState(tabs.length > 0 ? tabs[0].id : 'general');
   const [serverError, setServerError] = useState(error);
   const [successMessage, setSuccessMessage] = useState(success);
@@ -96,21 +99,23 @@ const EntityDetail = ({
 
   // Gérer la suppression de l'entité
   const handleDelete = async () => {
-    if (
-      !window.confirm(
-        `Êtes-vous sûr de vouloir supprimer ${entityName ? `ce ${entityName}` : 'cet élément'} ?`
-      )
-    )
-      return;
-
     try {
+      // Utiliser la modal React au lieu de window.confirm
+      const confirmed = await confirm({
+        title: 'Confirmer la suppression',
+        message: `Êtes-vous sûr de vouloir supprimer ${entityName ? `ce ${entityName}` : 'cet élément'} ? Cette action est irréversible.`,
+        confirmText: 'Supprimer',
+        cancelText: 'Annuler',
+        variant: 'danger',
+      });
+
+      if (!confirmed) return;
+
+      console.log('🗑️ Début de suppression (sans window.confirm)');
       await onDelete(entityId);
       navigate(baseRoute);
     } catch (error) {
-      console.error(
-        `Erreur lors de la suppression ${entityName ? `du ${entityName}` : "de l'élément"}:`,
-        error
-      );
+      console.error('Erreur lors de la suppression:', error);
       setServerError(`Erreur lors de la suppression: ${error.message}`);
     }
   };
@@ -341,6 +346,7 @@ const EntityDetail = ({
             {renderTabContent && renderTabContent(entity, activeTab, { editable: false })}
           </div>
         )}
+        <ConfirmModal />
       </div>
     </div>
   );
