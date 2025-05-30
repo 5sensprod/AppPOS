@@ -1,113 +1,100 @@
 // src/features/suppliers/components/SupplierDetail.jsx - MODIFICATION ALTERNATIVE
-import React, { useEffect } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import EntityDetail from '../../../components/common/EntityDetail';
-import { ENTITY_CONFIG } from '../constants';
+import React, { useCallback } from 'react';
 import useSupplierDetail from '../hooks/useSupplierDetail';
+import EntityDetail from '../../../components/common/EntityDetail';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ContactInfoTab from '../../../components/common/tabs/ContactInfoTab';
 import PaymentInfoTab from '../../../components/common/tabs/PaymentInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
 
 function SupplierDetail() {
-  const { id } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const isNew = location.pathname.endsWith('/new');
-  const isEditMode = isNew || location.pathname.endsWith('/edit');
-
   const {
     supplier,
+    currentId,
+    isNew,
+    editable,
     loading,
     error,
     success,
-    validationSchema,
-    defaultValues,
     handleSubmit,
     handleDelete,
     handleCancel,
-    handleUploadImage,
-    handleDeleteImage,
+    validationSchema,
+    defaultValues,
+    uploadImage,
+    deleteImage,
     specialFields,
-    isDeleted, // RÉCUPÉRER: L'état de suppression
-  } = useSupplierDetail(id, isNew);
+  } = useSupplierDetail();
 
-  // AJOUT: Redirection automatique si supprimé
-  useEffect(() => {
-    if (isDeleted) {
-      console.log('🔄 Entité supprimée, redirection vers la liste');
-      navigate('/products/suppliers', { replace: true });
-    }
-  }, [isDeleted, navigate]);
+  const renderTabContent = useCallback(
+    (entity, activeTab, formProps = {}) => {
+      const { editable, register, control, errors, setValue, watch } = formProps;
 
-  const formDefaultValues = {
-    ...defaultValues,
-    brands: supplier?.brands || [],
-  };
+      switch (activeTab) {
+        case 'general':
+          return (
+            <GeneralInfoTab
+              entity={entity}
+              fields={['name', 'supplier_code', 'customer_code', 'brands']}
+              editable={editable}
+              _specialFields={specialFields}
+            />
+          );
+        case 'contact':
+          return <ContactInfoTab contact={entity?.contact || {}} editable={editable} />;
+        case 'payment':
+          return (
+            <PaymentInfoTab
+              banking={entity?.banking || {}}
+              paymentTerms={entity?.payment_terms || {}}
+              editable={editable}
+            />
+          );
+        case 'images':
+          return (
+            <ImagesTab
+              entity={entity}
+              entityId={currentId}
+              entityType="supplier"
+              galleryMode={false}
+              onUploadImage={uploadImage}
+              onDeleteImage={deleteImage}
+              isLoading={loading}
+              error={error}
+              editable={editable}
+            />
+          );
+        default:
+          return null;
+      }
+    },
+    [specialFields, uploadImage, deleteImage, currentId, loading, error]
+  );
 
-  const renderTabContent = (entity, activeTab, formProps = {}) => {
-    const editable = formProps.editable !== undefined ? formProps.editable : isEditMode;
-    const safeEntity = entity || {};
+  // Définir la liste des onglets visibles en fonction de l'état de création (COPIE du pattern product)
+  let visibleTabs = [];
 
-    switch (activeTab) {
-      case 'general':
-        return (
-          <GeneralInfoTab
-            entity={safeEntity}
-            fields={['name', 'supplier_code', 'customer_code', 'brands']}
-            editable={editable}
-            _specialFields={specialFields}
-          />
-        );
-      case 'contact':
-        return <ContactInfoTab contact={safeEntity.contact || {}} editable={editable} />;
-      case 'payment':
-        return (
-          <PaymentInfoTab
-            banking={safeEntity.banking || {}}
-            paymentTerms={safeEntity.payment_terms || {}}
-            editable={editable}
-          />
-        );
-      case 'images':
-        return (
-          <ImagesTab
-            entity={safeEntity}
-            entityId={id}
-            entityType="supplier"
-            galleryMode={false}
-            onUploadImage={handleUploadImage}
-            onDeleteImage={handleDeleteImage}
-            isLoading={loading}
-            error={error}
-            editable={editable}
-          />
-        );
-      default:
-        return null;
-    }
-  };
-
-  // AJOUT: Ne pas rendre si supprimé
-  if (isDeleted) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Redirection en cours...</p>
-        </div>
-      </div>
-    );
+  if (isNew) {
+    // En mode création, afficher uniquement l'onglet Général
+    visibleTabs = [{ id: 'general', label: 'Général', icon: 'info' }];
+  } else {
+    // En mode édition, afficher tous les onglets
+    visibleTabs = [
+      { id: 'general', label: 'Général', icon: 'info' },
+      { id: 'contact', label: 'Contact', icon: 'user' },
+      { id: 'payment', label: 'Paiement', icon: 'credit-card' },
+      { id: 'images', label: 'Images', icon: 'image' },
+    ];
   }
 
   return (
     <EntityDetail
       entity={supplier}
-      entityId={id}
+      entityId={currentId}
       entityName="fournisseur"
       entityNamePlural="fournisseurs"
       baseRoute="/products/suppliers"
-      tabs={ENTITY_CONFIG.tabs}
+      tabs={visibleTabs}
       renderTabContent={renderTabContent}
       actions={['edit', 'delete']}
       syncEnabled={false}
@@ -117,9 +104,9 @@ function SupplierDetail() {
       isLoading={loading}
       error={error}
       success={success}
-      editable={isEditMode}
+      editable={editable}
       validationSchema={validationSchema}
-      defaultValues={formDefaultValues}
+      defaultValues={defaultValues}
     />
   );
 }

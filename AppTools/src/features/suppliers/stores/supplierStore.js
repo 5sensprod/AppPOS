@@ -1,39 +1,21 @@
-//AppTools\src\features\suppliers\stores\supplierStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import apiService from '../../../services/api';
 import { ENTITY_CONFIG as SUPPLIER_CONFIG } from '../constants';
 
-// Créer le store avec la factory
+// Créer le store avec la factory - PATTERN IDENTIQUE
 const { useSupplier: useSupplierBase, useEntityStore: useSupplierStore } =
   createEntityStore(SUPPLIER_CONFIG);
 
-// Store Zustand dédié pour la gestion des fournisseurs avec WebSocket
+// Store Zustand dédié pour la gestion des fournisseurs avec WebSocket - SIMPLIFIÉ
 export const useSupplierDataStore = createWebSocketStore({
   entityName: SUPPLIER_CONFIG.entityName,
   apiEndpoint: SUPPLIER_CONFIG.apiEndpoint,
   apiService,
-  initialState: {
-    hierarchicalItems: [],
-  },
-  customMethods: (set, get) => ({
-    fetchHierarchicalSuppliers: async () => {
-      try {
-        const response = await apiService.get('/api/suppliers/hierarchical');
-        if (response.data?.success) {
-          set({ hierarchicalItems: response.data.data });
-          console.log('🌲 Arborescence des fournisseurs mise à jour');
-        } else {
-          console.warn('⚠️ Échec de récupération de l’arborescence');
-        }
-      } catch (error) {
-        console.error('❌ fetchHierarchicalSuppliers erreur:', error);
-      }
-    },
-  }),
+  // SUPPRESSION des méthodes customMethods qui causent des problèmes
 });
 
-// Étendre useSupplier avec l'initialisation directe WebSocket
+// Étendre useSupplier avec l'initialisation directe WebSocket - PATTERN IDENTIQUE
 export function useSupplier() {
   const supplierStore = useSupplierBase();
   return {
@@ -48,7 +30,7 @@ export function useSupplier() {
 // Réexporter useSupplierStore pour maintenir la compatibilité
 export { useSupplierStore };
 
-// Fonction pour exposer des méthodes supplémentaires spécifiques aux fournisseurs
+// Fonction pour exposer des méthodes supplémentaires - SIMPLIFIÉ comme products
 export function useSupplierExtras() {
   const supplierStore = useSupplier();
 
@@ -86,36 +68,9 @@ export function useSupplierExtras() {
     }
   };
 
-  const addBrandToSupplier = async (supplierId, brandId) => {
-    try {
-      const response = await apiService.post(
-        `${SUPPLIER_CONFIG.apiEndpoint}/${supplierId}/brands`,
-        { brand_id: brandId }
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Erreur lors de l'ajout de la marque au fournisseur:", error);
-      throw error;
-    }
-  };
-
-  const removeBrandFromSupplier = async (supplierId, brandId) => {
-    try {
-      const response = await apiService.delete(
-        `${SUPPLIER_CONFIG.apiEndpoint}/${supplierId}/brands/${brandId}`
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Erreur lors de la suppression de la marque du fournisseur:', error);
-      throw error;
-    }
-  };
-
   return {
     ...supplierStore,
     uploadImage,
     deleteImage,
-    addBrandToSupplier,
-    removeBrandFromSupplier,
   };
 }
