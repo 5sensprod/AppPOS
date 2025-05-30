@@ -2,7 +2,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useBrand, useBrandDataStore } from '../stores/brandStore';
 import EntityTable from '@/components/common/EntityTable/index';
-import UnifiedFilterBar from '@/components/common/EntityTable/components/UnifiedFilterBar';
 import { ENTITY_CONFIG } from '../constants';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
@@ -88,14 +87,6 @@ function BrandsTable(props) {
 
   return (
     <div className="space-y-4">
-      <UnifiedFilterBar
-        filterOptions={filterOptions}
-        selectedFilters={selectedFilters}
-        onChange={setSelectedFilters}
-        enableCategories={false}
-        enableStatusFilter={false}
-      />
-
       <EntityTable
         data={filteredBrands}
         isLoading={isLoading}
@@ -105,6 +96,13 @@ function BrandsTable(props) {
         entityNamePlural="marques"
         baseRoute="/products/brands"
         searchFields={['name', 'description']}
+        // NOUVELLES PROPS UnifiedFilterBar
+        enableUnifiedFilters={true}
+        unifiedFilterOptions={filterOptions}
+        selectedFilters={selectedFilters}
+        onFiltersChange={setSelectedFilters}
+        enableCategories={false}
+        enableStatusFilter={false}
         onDelete={handleDeleteEntity}
         onSync={handleSyncEntity}
         syncEnabled={syncEnabled}

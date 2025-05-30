@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { FilterBar } from './components/FilterBar';
+import UnifiedFilterBar from './components/UnifiedFilterBar';
 import { BatchActions } from './components/BatchActions/BatchActions';
 import { TableHeader } from './components/TableHeader';
 import { TableRow } from './components/TableRow';
@@ -26,6 +27,15 @@ const EntityTable = ({
   batchActions = ['delete', 'sync', 'export', 'status', 'category', 'createSheet'],
   showBatchActions = true,
   showActions = true,
+
+  // NOUVELLES PROPS pour UnifiedFilterBar
+  enableUnifiedFilters = true, // Activer/désactiver UnifiedFilterBar
+  unifiedFilterOptions = [], // Options de filtres pour UnifiedFilterBar
+  selectedFilters = [], // Filtres sélectionnés (externe)
+  onFiltersChange, // Callback pour changement de filtres
+  enableCategories = true, // Activer filtres de catégories
+  enableStatusFilter = true, // Activer filtre de statut
+
   pagination = {
     enabled: true,
     pageSize: 10,
@@ -46,13 +56,20 @@ const EntityTable = ({
   onSearch,
   onFilter,
   searchFields = ['name'],
-  filters = [],
+  filters = [], // GARDÉ pour rétrocompatibilité mais sera ignoré si enableUnifiedFilters = true
   searchProcessor,
   paginationEntityId = 'default',
   externalActiveFilters = [],
 }) => {
   const [exportModalOpen, setExportModalOpen] = useState(false);
-  const { confirm, ConfirmModal } = useConfirmModal(); // AJOUT: Hook de confirmation
+  const { confirm, ConfirmModal } = useConfirmModal();
+
+  // États pour UnifiedFilterBar (si pas de gestion externe)
+  const [internalSelectedFilters, setInternalSelectedFilters] = useState([]);
+
+  // Déterminer quels filtres utiliser
+  const currentSelectedFilters = onFiltersChange ? selectedFilters : internalSelectedFilters;
+  const handleFiltersChangeInternal = onFiltersChange || setInternalSelectedFilters;
 
   // Fonctionnalités disponibles
   const hasSync = typeof onSync === 'function';
@@ -64,16 +81,22 @@ const EntityTable = ({
 
   // Hooks pour la gestion des données
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
+
+  // MODIFICATION: Utiliser externalActiveFilters si disponible, sinon utiliser currentSelectedFilters
+  const filtersToUse =
+    externalActiveFilters?.length > 0 ? externalActiveFilters : currentSelectedFilters;
+
   const { searchTerm, activeFilters, filteredData, handleSearchChange, handleFilterChange } =
     useTableFilter(
       sortedData,
       searchFields,
-      filters,
+      enableUnifiedFilters ? [] : filters, // Utiliser filters legacy seulement si UnifiedFilterBar désactivé
       onSearch,
       onFilter,
       searchProcessor,
       paginationEntityId
     );
+
   const {
     selectedItems,
     setSelectedItems,
@@ -81,6 +104,7 @@ const EntityTable = ({
     selectAll,
     preserveSelectionOnNextDataChange,
   } = useTableSelection(data, filteredData);
+
   const {
     currentPage,
     pageSize,
@@ -91,14 +115,11 @@ const EntityTable = ({
     paginationInfo,
   } = useTablePagination(filteredData, pagination, paginationEntityId);
 
-  // CORRECTION: Actions par lot avec modal React
+  // Actions par lot avec modal React
   const handleBatchDelete = useCallback(async () => {
     if (selectedItems.length === 0) return;
 
     try {
-      console.log('🗑️ Demande de confirmation de suppression par lot');
-
-      // CORRECTION: Utiliser la modal React au lieu de window.confirm
       const confirmed = await confirm({
         title: 'Confirmer la suppression par lot',
         message: `Êtes-vous sûr de vouloir supprimer ces ${selectedItems.length} ${
@@ -109,12 +130,7 @@ const EntityTable = ({
         variant: 'danger',
       });
 
-      if (!confirmed) {
-        console.log("🚫 Suppression par lot annulée par l'utilisateur");
-        return;
-      }
-
-      console.log('✅ Suppression par lot confirmée, exécution...');
+      if (!confirmed) return;
 
       if (hasBatchDelete) {
         await onBatchDelete(selectedItems);
@@ -190,9 +206,6 @@ const EntityTable = ({
     onBatchStockChange(selectedObjects, stockAction);
   };
 
-  // Filtres à utiliser
-  const filtersToUse = externalActiveFilters?.length > 0 ? externalActiveFilters : activeFilters;
-
   // États du composant
   if (isLoading && data.length === 0) return <LoadingState />;
 
@@ -222,23 +235,47 @@ const EntityTable = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <SearchBar
-            searchTerm={searchTerm}
-            onSearchChange={handleSearchChange}
-            entityNamePlural={entityNamePlural}
-          />
-          {filters.length > 0 && (
-            <FilterBar
-              filters={filters}
-              activeFilters={activeFilters}
-              onFilterChange={handleFilterChange}
+      {/* Section des filtres et recherche */}
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+          {/* SearchBar à gauche */}
+          <div className="flex-shrink-0">
+            <SearchBar
+              searchTerm={searchTerm}
+              onSearchChange={handleSearchChange}
+              entityNamePlural={entityNamePlural}
             />
+          </div>
+
+          {/* UnifiedFilterBar à droite (si activé) */}
+          {enableUnifiedFilters && (
+            <div className="flex-1">
+              <UnifiedFilterBar
+                filterOptions={unifiedFilterOptions}
+                selectedFilters={currentSelectedFilters}
+                onChange={handleFiltersChangeInternal}
+                enableCategories={enableCategories}
+                enableStatusFilter={enableStatusFilter}
+              />
+            </div>
+          )}
+
+          {/* FilterBar legacy (si UnifiedFilterBar désactivé et filters disponibles) */}
+          {!enableUnifiedFilters && filters.length > 0 && (
+            <div className="flex-1 lg:flex-none">
+              {/* 
+                REMARQUE: FilterBar legacy pourrait être gardé ici pour compatibilité
+                mais sera progressivement supprimé
+              */}
+              <div className="text-sm text-gray-500">
+                Legacy filters disabled - Use enableUnifiedFilters={true}
+              </div>
+            </div>
           )}
         </div>
       </div>
 
+      {/* Reste du composant identique */}
       {showBatchActions && (
         <BatchActions
           selectedItems={selectedItems}
@@ -333,7 +370,7 @@ const EntityTable = ({
         activeFilters={filtersToUse}
       />
 
-      {/* AJOUT: Modal de confirmation pour les suppressions par lot */}
+      {/* Modal de confirmation pour les suppressions par lot */}
       <ConfirmModal />
     </div>
   );

@@ -4,7 +4,6 @@ import { useProduct, useProductDataStore } from '../stores/productStore';
 import { useHierarchicalCategories } from '../../../features/categories/stores/categoryHierarchyStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
-import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 import { usePaginationStore } from '@/stores/usePaginationStore';
 import { useProductFilters } from '../hooks/useProductFilters';
 import { useProductOperations } from '../hooks/useProductOperations';
@@ -262,11 +261,6 @@ function ProductTable(props) {
   return (
     <>
       <ToastContainer />
-      <UnifiedFilterBar
-        filterOptions={filterOptions}
-        selectedFilters={selectedFilters}
-        onChange={setSelectedFilters}
-      />
 
       <EntityTable
         data={filteredProducts}
@@ -277,13 +271,21 @@ function ProductTable(props) {
         entityNamePlural="produits"
         baseRoute="/products"
         searchFields={['name', 'sku', 'designation', 'category']}
+        // NOUVELLES PROPS UnifiedFilterBar
+        enableUnifiedFilters={true}
+        unifiedFilterOptions={filterOptions}
+        selectedFilters={selectedFilters}
+        onFiltersChange={setSelectedFilters}
+        enableCategories={true}
+        enableStatusFilter={true}
+        // Reste des props existantes
         onDelete={handleDeleteEntity}
         onBatchDelete={handleBatchDeleteEntities}
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', ...(syncEnabled ? ['sync'] : [])]}
         batchActions={[
           'status',
-          'stock', // Nouveau bouton stock
+          'stock',
           'category',
           'createSheet',
           'export',
@@ -298,7 +300,7 @@ function ProductTable(props) {
         onExport={handleProductExport}
         onBatchStatusChange={handleBatchStatusChange}
         onBatchCategoryChange={handleBatchCategoryChange}
-        onBatchStockChange={handleStockAction} // Nouvelle prop
+        onBatchStockChange={handleStockAction}
         onCreateSheet={handleCreateSheet}
         categoryOptions={categorySelectOptions}
         syncStats={syncStats}

@@ -5,7 +5,6 @@ import EntityTable from '@/components/common/EntityTable/index';
 import { ENTITY_CONFIG } from '../constants';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
-import UnifiedFilterBar from '../../../components/common/EntityTable/components/UnifiedFilterBar';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
 import { usePaginationStore } from '@/stores/usePaginationStore'; // Nouvel import
 
@@ -289,17 +288,6 @@ function CategoriesTable(props) {
 
   return (
     <div className="space-y-4">
-      <UnifiedFilterBar
-        filterOptions={[
-          { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
-          { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
-        ]}
-        selectedFilters={selectedFilters}
-        onChange={setSelectedFilters}
-        enableCategories={true}
-        enableStatusFilter={false} // Désactiver le filtre de statut pour CategoriesTable
-      />
-
       <EntityTable
         data={filteredData}
         isLoading={isLoading}
@@ -312,6 +300,16 @@ function CategoriesTable(props) {
         searchFields={['_originalName', 'description']}
         searchProcessor={searchProcessor}
         onSearch={handleSearch}
+        // NOUVELLES PROPS UnifiedFilterBar
+        enableUnifiedFilters={true}
+        unifiedFilterOptions={[
+          { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
+          { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
+        ]}
+        selectedFilters={selectedFilters}
+        onFiltersChange={setSelectedFilters}
+        enableCategories={true}
+        enableStatusFilter={false}
         onDelete={handleDeleteEntity}
         syncEnabled={sync}
         actions={['view', 'edit', 'delete', 'sync']}
@@ -320,12 +318,12 @@ function CategoriesTable(props) {
         onSync={handleSyncEntity}
         pagination={{
           enabled: true,
-          pageSize: persistedPageSize || 5, // Utiliser la taille persistante ou la valeur par défaut
+          pageSize: persistedPageSize || 5,
           showPageSizeOptions: true,
           pageSizeOptions: [5, 10, 25, 50],
         }}
         defaultSort={ENTITY_CONFIG.defaultSort}
-        paginationEntityId="category" // Identifiant unique pour la pagination
+        paginationEntityId="category"
         {...props}
       />
     </div>
