@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
 import { SearchBar } from './components/SearchBar';
-import { FilterBar } from './components/FilterBar';
 import UnifiedFilterBar from './components/UnifiedFilterBar';
 import { BatchActions } from './components/BatchActions/BatchActions';
 import { TableHeader } from './components/TableHeader';
@@ -235,47 +234,36 @@ const EntityTable = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-      {/* Section des filtres et recherche */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-          {/* SearchBar à gauche */}
-          <div className="flex-shrink-0">
-            <SearchBar
-              searchTerm={searchTerm}
-              onSearchChange={handleSearchChange}
-              entityNamePlural={entityNamePlural}
-            />
-          </div>
-
-          {/* UnifiedFilterBar à droite (si activé) */}
-          {enableUnifiedFilters && (
-            <div className="flex-1">
-              <UnifiedFilterBar
-                filterOptions={unifiedFilterOptions}
-                selectedFilters={currentSelectedFilters}
-                onChange={handleFiltersChangeInternal}
-                enableCategories={enableCategories}
-                enableStatusFilter={enableStatusFilter}
+      {/* Section des filtres et recherche - VERSION MODERNE COMPACTE */}
+      <div className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-4 py-3">
+          <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+            {/* SearchBar à gauche */}
+            <div className="flex-shrink-0 w-full lg:w-auto">
+              <SearchBar
+                searchTerm={searchTerm}
+                onSearchChange={handleSearchChange}
+                entityNamePlural={entityNamePlural}
               />
             </div>
-          )}
 
-          {/* FilterBar legacy (si UnifiedFilterBar désactivé et filters disponibles) */}
-          {!enableUnifiedFilters && filters.length > 0 && (
-            <div className="flex-1 lg:flex-none">
-              {/* 
-                REMARQUE: FilterBar legacy pourrait être gardé ici pour compatibilité
-                mais sera progressivement supprimé
-              */}
-              <div className="text-sm text-gray-500">
-                Legacy filters disabled - Use enableUnifiedFilters={true}
+            {/* UnifiedFilterBar à droite (si activé) */}
+            {enableUnifiedFilters && (
+              <div className="flex-1 w-full lg:w-auto">
+                <UnifiedFilterBar
+                  filterOptions={unifiedFilterOptions}
+                  selectedFilters={currentSelectedFilters}
+                  onChange={handleFiltersChangeInternal}
+                  enableCategories={enableCategories}
+                  enableStatusFilter={enableStatusFilter}
+                />
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Reste du composant identique */}
+      {/* Actions par lot */}
       {showBatchActions && (
         <BatchActions
           selectedItems={selectedItems}
@@ -294,6 +282,7 @@ const EntityTable = ({
         />
       )}
 
+      {/* Tableau */}
       <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <TableHeader
@@ -345,6 +334,7 @@ const EntityTable = ({
         </table>
       </div>
 
+      {/* Pagination */}
       {pagination.enabled && (totalPages > 1 || filteredData.length >= 5) && (
         <Pagination
           currentPage={currentPage}

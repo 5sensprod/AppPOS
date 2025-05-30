@@ -1,147 +1,189 @@
-// UnifiedFilterBar.jsx - version corrigée sans erreurs
+// UnifiedFilterBar.jsx - Version moderne et compacte
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
+import { X, Filter, ChevronDown, Trash2 } from 'lucide-react';
 import { useHierarchicalCategories } from '../../../../features/categories/stores/categoryHierarchyStore';
 
-// Styles personnalisés pour react-select avec z-index très élevé
-const customSelectStyles = {
-  menu: (provided) => ({
-    ...provided,
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-    borderRadius: '0.375rem',
-    zIndex: 99999, // z-index extrêmement élevé
-  }),
-  menuList: (provided) => ({
-    ...provided,
-    padding: '0.25rem 0',
-  }),
-  option: (provided, state) => ({
-    ...provided,
-    backgroundColor: state.isSelected ? '#EBF5FF' : state.isFocused ? '#F3F4F6' : 'white',
-    color: state.isSelected ? '#2563EB' : '#374151',
-    padding: '0.5rem 1rem',
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-    ':hover': {
-      backgroundColor: '#F3F4F6',
-    },
-    // Animation pour les options
-    animation: 'fadeIn 0.2s ease-out forwards',
-    animationDelay: `${Math.min(state.index || 0, 10) * 30}ms`,
-    opacity: 0,
-  }),
+// Styles modernes pour react-select
+const modernSelectStyles = {
   control: (provided, state) => ({
     ...provided,
+    minHeight: '36px',
+    height: '36px',
     borderColor: state.isFocused ? '#3B82F6' : '#D1D5DB',
     boxShadow: state.isFocused ? '0 0 0 1px #3B82F6' : 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
     ':hover': {
       borderColor: '#3B82F6',
     },
     transition: 'all 0.15s ease',
   }),
+  valueContainer: (provided) => ({
+    ...provided,
+    height: '36px',
+    padding: '0 8px',
+  }),
+  input: (provided) => ({
+    ...provided,
+    margin: '0px',
+  }),
+  indicatorSeparator: () => ({
+    display: 'none',
+  }),
+  indicatorsContainer: (provided) => ({
+    ...provided,
+    height: '36px',
+  }),
+  dropdownIndicator: (provided) => ({
+    ...provided,
+    padding: '4px',
+  }),
+  menu: (provided) => ({
+    ...provided,
+    borderRadius: '8px',
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+    border: '1px solid #E5E7EB',
+    zIndex: 50,
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isSelected ? '#EBF5FF' : state.isFocused ? '#F9FAFB' : 'white',
+    color: state.isSelected ? '#1D4ED8' : '#374151',
+    padding: '8px 12px',
+    fontSize: '14px',
+    ':active': {
+      backgroundColor: '#EBF5FF',
+    },
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    color: '#9CA3AF',
+    fontSize: '14px',
+  }),
   menuPortal: (base) => ({
     ...base,
-    zIndex: 99999, // Très important pour que le menu soit au-dessus de tout
+    zIndex: 9999,
   }),
-};
-
-// Style CSS injecté dans le document pour les animations
-const injectAnimationStyles = () => {
-  // Éviter les doublons
-  if (!document.getElementById('filter-bar-animations')) {
-    const style = document.createElement('style');
-    style.id = 'filter-bar-animations';
-    style.textContent = `
-      /* Animation pour l'apparition des tags de filtre */
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-5px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      
-      /* Animation pour la disparition des tags de filtre */
-      @keyframes fadeOut {
-        from { opacity: 1; transform: translateY(0); }
-        to { opacity: 0; transform: translateY(-5px); }
-      }
-      
-      /* Classes d'animation */
-      .animate-fade-in {
-        animation: fadeIn 0.2s ease-out forwards;
-      }
-      
-      /* Option animation */
-      .option-animation {
-        opacity: 0;
-        animation: fadeIn 0.2s ease-out forwards;
-      }
-    `;
-    document.head.appendChild(style);
-  }
 };
 
 const UnifiedFilterBar = ({
   filterOptions = [],
   selectedFilters = [],
   onChange,
-  hierarchicalEnabled = true,
   enableCategories = true,
   enableStatusFilter = true,
 }) => {
-  const [editingType, setEditingType] = useState(null);
-  const [lastEditedType, setLastEditedType] = useState(null);
+  const [isAddingFilter, setIsAddingFilter] = useState(false);
+  const [newFilterType, setNewFilterType] = useState(null);
+  const valueSelectRef = useRef(null); // Ajout de la ref
 
-  // Injecter les styles d'animation une seule fois
-  useEffect(() => {
-    injectAnimationStyles();
-
-    return () => {
-      const styleElement = document.getElementById('filter-bar-animations');
-      if (styleElement) {
-        styleElement.remove();
-      }
-    };
-  }, []);
-
-  // Reste du code inchangé...
   const {
-    hierarchicalCategories: rawHierarchicalCategories,
+    hierarchicalCategories,
     loading: categoriesLoading,
     fetchHierarchicalCategories,
   } = useHierarchicalCategories();
 
-  // Utiliser les valeurs conditionnellement
-  const hierarchicalCategories = enableCategories ? rawHierarchicalCategories : [];
+  // Debug pour voir ce qu'on reçoit
+  console.log('🔍 Debug categories:', {
+    hierarchicalCategories,
+    categoriesLoading,
+    enableCategories,
+    length: hierarchicalCategories?.length,
+  });
 
-  // Charger les catégories au montage du composant seulement si enableCategories est true
+  // Charger les catégories au montage ET quand on clique sur category
   useEffect(() => {
-    if (enableCategories && rawHierarchicalCategories.length === 0 && !categoriesLoading) {
+    if (
+      enableCategories &&
+      (!hierarchicalCategories || hierarchicalCategories.length === 0) &&
+      !categoriesLoading
+    ) {
+      console.log('🔄 Fetching categories...');
       fetchHierarchicalCategories();
     }
-  }, [rawHierarchicalCategories, categoriesLoading, fetchHierarchicalCategories, enableCategories]);
+  }, [hierarchicalCategories, categoriesLoading, fetchHierarchicalCategories, enableCategories]);
 
-  // Générer les options de catégories
+  // AUSSI charger quand on sélectionne le type category
+  useEffect(() => {
+    if (
+      newFilterType === 'category' &&
+      enableCategories &&
+      (!hierarchicalCategories || hierarchicalCategories.length === 0) &&
+      !categoriesLoading
+    ) {
+      console.log('🔄 Fetching categories for dropdown...');
+      fetchHierarchicalCategories();
+    }
+  }, [
+    newFilterType,
+    hierarchicalCategories,
+    categoriesLoading,
+    fetchHierarchicalCategories,
+    enableCategories,
+  ]);
+
+  // Gestion du clic extérieur comme dans l'original
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        isAddingFilter &&
+        valueSelectRef.current &&
+        !valueSelectRef.current.contains(event.target)
+      ) {
+        setIsAddingFilter(false);
+        setNewFilterType(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isAddingFilter]);
+
+  // Options de catégories avec debug
   const categoryOptions = useMemo(() => {
-    if (!enableCategories) return [];
+    if (!enableCategories) {
+      console.log('📝 Categories disabled');
+      return [];
+    }
+
+    if (!hierarchicalCategories || hierarchicalCategories.length === 0) {
+      console.log('📝 No hierarchical categories found');
+      return [];
+    }
 
     const transform = (cats, path = '') => {
-      return cats.flatMap((cat) => [
-        {
+      return cats.flatMap((cat) => {
+        const option = {
           value: `category_${cat._id}`,
           label: `${path}${cat.name}`,
           type: 'category',
-        },
-        ...(cat.children ? transform(cat.children, `${path}${cat.name} > `) : []),
-      ]);
+        };
+
+        const children = cat.children ? transform(cat.children, `${path}${cat.name} > `) : [];
+        return [option, ...children];
+      });
     };
 
-    return transform(hierarchicalCategories);
+    const options = transform(hierarchicalCategories);
+    console.log('📝 Generated category options:', options);
+    return options;
   }, [hierarchicalCategories, enableCategories]);
 
-  // Combiner toutes les options de filtre
+  // Toutes les options disponibles avec debug
   const allFilterOptions = useMemo(() => {
-    return [...filterOptions, ...categoryOptions];
+    const combined = [...filterOptions, ...categoryOptions];
+    console.log('📝 All filter options:', {
+      filterOptions,
+      categoryOptions,
+      combined,
+    });
+    return combined;
   }, [filterOptions, categoryOptions]);
 
+  // Grouper par type
   const filterGroups = useMemo(() => {
     return allFilterOptions.reduce((acc, option) => {
       if (!acc[option.type]) acc[option.type] = [];
@@ -151,7 +193,7 @@ const UnifiedFilterBar = ({
   }, [allFilterOptions]);
 
   const filterTypeLabels = {
-    woo: 'Synchronisation',
+    woo: 'Synchro',
     status: 'Statut',
     image: 'Image',
     supplier: 'Fournisseur',
@@ -160,14 +202,16 @@ const UnifiedFilterBar = ({
     category: 'Catégorie',
   };
 
-  const alreadySelectedValues = new Set(selectedFilters.map((f) => `${f.type}:${f.value}`));
-  const alreadySelectedTypes = new Set(selectedFilters.map((f) => f.type));
+  // Types déjà sélectionnés
+  const selectedTypes = new Set(selectedFilters.map((f) => f.type));
+  const selectedValues = new Set(selectedFilters.map((f) => `${f.type}:${f.value}`));
 
+  // Types disponibles pour ajout
   const availableTypes = useMemo(() => {
     return Object.entries(filterGroups)
       .filter(([type]) => {
         const allowMultiple = ['supplier', 'brand', 'category'].includes(type);
-        return allowMultiple || !alreadySelectedTypes.has(type);
+        return allowMultiple || !selectedTypes.has(type);
       })
       .map(([type]) => ({
         label: filterTypeLabels[type] || type,
@@ -177,43 +221,40 @@ const UnifiedFilterBar = ({
         const order = ['woo', 'status', 'image', 'description', 'category', 'brand', 'supplier'];
         return order.indexOf(a.value) - order.indexOf(b.value);
       });
-  }, [filterGroups, alreadySelectedTypes]);
+  }, [filterGroups, selectedTypes]);
 
   const handleTypeSelect = (selected) => {
-    setEditingType(selected?.value || null);
-    if (selected?.value) {
-      setLastEditedType(selected.value);
-    }
+    setNewFilterType(selected?.value || null);
+    setIsAddingFilter(true);
   };
 
   const handleValueSelect = (selected) => {
-    if (!editingType || !selected) return;
+    if (!newFilterType || !selected) return;
 
-    const isMulti = ['supplier', 'brand', 'category'].includes(editingType);
-    const selectedValues = Array.isArray(selected) ? selected : [selected];
+    const isMulti = ['supplier', 'brand', 'category'].includes(newFilterType);
+    const selectedValuesList = Array.isArray(selected) ? selected : [selected];
 
-    const newFilters = selectedValues
-      .filter((s) => !alreadySelectedValues.has(`${editingType}:${s.value}`))
+    const newFilters = selectedValuesList
+      .filter((s) => !selectedValues.has(`${newFilterType}:${s.value}`))
       .map((s) => ({
-        type: editingType,
+        type: newFilterType,
         value: s.value,
-        label: `${filterTypeLabels[editingType] || editingType}: ${s.label}`,
+        label: s.label, // MODIFICATION: Juste le label sans préfixe
       }));
 
     let updatedFilters;
     if (isMulti) {
       updatedFilters = [...selectedFilters, ...newFilters];
     } else {
-      updatedFilters = [...selectedFilters.filter((f) => f.type !== editingType), ...newFilters];
+      updatedFilters = [...selectedFilters.filter((f) => f.type !== newFilterType), ...newFilters];
     }
 
     onChange(updatedFilters);
-
-    // Réinitialiser le sélecteur après une sélection
-    setEditingType(null);
+    setIsAddingFilter(false);
+    setNewFilterType(null);
   };
 
-  const handleRemove = (filterToRemove) => {
+  const handleRemoveFilter = (filterToRemove) => {
     onChange(
       selectedFilters.filter(
         (f) => !(f.type === filterToRemove.type && f.value === filterToRemove.value)
@@ -221,114 +262,118 @@ const UnifiedFilterBar = ({
     );
   };
 
-  const getOptionsForType = (type) => {
-    const selectedValues = selectedFilters.filter((f) => f.type === type).map((f) => f.value);
+  const handleClearAll = () => {
+    onChange([]);
+    setIsAddingFilter(false);
+    setNewFilterType(null);
+  };
 
+  const getOptionsForType = (type) => {
+    const selectedFilterValues = selectedFilters.filter((f) => f.type === type).map((f) => f.value);
     return (filterGroups[type] || []).map((opt) => ({
       ...opt,
-      isDisabled: selectedValues.includes(opt.value),
+      isDisabled: selectedFilterValues.includes(opt.value),
     }));
   };
 
-  const handleClearAllFilters = () => {
-    onChange([]);
-    setEditingType(null);
-    setLastEditedType(null);
-  };
-
-  const valueSelectRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (editingType && valueSelectRef.current && !valueSelectRef.current.contains(event.target)) {
-        setEditingType(null);
-        setLastEditedType(null);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [editingType]);
-
-  // Afficher un indicateur de chargement pendant le chargement des catégories
-  if (editingType === 'category' && categoriesLoading) {
-    return <div className="p-2 text-center">Chargement des catégories...</div>;
-  }
-
   return (
-    <div className="space-y-3 w-full">
-      <div className="grid grid-cols-1 gap-3 relative z-0">
-        <div>
-          {!editingType ? (
-            <Select
-              options={availableTypes}
-              onChange={handleTypeSelect}
-              placeholder="Ajouter un critère de filtre..."
-              classNamePrefix="react-select"
-              className="w-full"
-              styles={customSelectStyles}
-              menuPortalTarget={document.body}
-              menuPlacement="auto"
-            />
-          ) : (
-            <div ref={valueSelectRef} className="w-full relative z-50">
-              <Select
-                options={getOptionsForType(editingType)}
-                onChange={handleValueSelect}
-                placeholder={`Choisir une valeur pour "${filterTypeLabels[editingType]}"`}
-                isMulti={['supplier', 'brand', 'category'].includes(editingType)}
-                classNamePrefix="react-select"
-                className="w-full"
-                styles={customSelectStyles}
-                autoFocus
-                menuIsOpen={true}
-                menuPortalTarget={document.body}
-                menuPlacement="auto"
-              />
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Indicateur de chargement pour les catégories */}
+      {isAddingFilter && newFilterType === 'category' && categoriesLoading && (
+        <div className="px-3 py-2 text-sm text-gray-500">Chargement des catégories...</div>
+      )}
 
-      {selectedFilters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 transition-all duration-300 ease-in-out">
-          <div className="flex flex-wrap gap-2 flex-grow">
-            {selectedFilters.map((filter, idx) => (
-              <div
-                key={`${filter.type}-${filter.value}-${idx}`}
-                className="flex items-center bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full filter-tag-appear"
-                style={{ animationDelay: `${idx * 50}ms` }}
-              >
-                <span
-                  className="cursor-pointer"
-                  title="Filtre appliqué"
-                  onClick={() => {
-                    setEditingType(filter.type);
-                    setLastEditedType(filter.type);
-                  }}
-                >
-                  {filter.label}
-                </span>
-                <button
-                  onClick={() => handleRemove(filter)}
-                  className="ml-2 text-xs font-bold hover:text-blue-600 transition-colors"
-                  title="Supprimer ce filtre"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={handleClearAllFilters}
-            className="ml-2 text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 bg-red-50 hover:bg-red-100 rounded-md transition-all duration-200 ease-in-out transform hover:scale-105"
-            title="Effacer tous les filtres"
+      {/* Filtres actifs */}
+      {selectedFilters.map((filter, idx) => (
+        <div
+          key={`${filter.type}-${filter.value}-${idx}`}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm rounded-md border border-blue-200 dark:border-blue-700 transition-all hover:bg-blue-100 dark:hover:bg-blue-900/50"
+        >
+          <span
+            className="font-medium text-xs cursor-pointer"
+            title="Cliquer pour modifier ce filtre"
+            onClick={() => {
+              setNewFilterType(filter.type);
+              setIsAddingFilter(true);
+            }}
           >
-            Effacer tous les filtres
+            {filter.label}
+          </span>
+          <button
+            onClick={() => handleRemoveFilter(filter)}
+            className="flex items-center justify-center w-4 h-4 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full transition-colors"
+            title="Supprimer ce filtre"
+          >
+            <X className="w-2.5 h-2.5" />
           </button>
         </div>
+      ))}
+
+      {/* Bouton d'ajout de filtre */}
+      {!isAddingFilter && availableTypes.length > 0 && (
+        <div className="relative">
+          <Select
+            options={availableTypes}
+            onChange={handleTypeSelect}
+            placeholder={
+              <div className="flex items-center gap-1.5 text-gray-500">
+                <Filter className="w-3.5 h-3.5" />
+                <span>Ajouter un filtre</span>
+              </div>
+            }
+            classNamePrefix="react-select"
+            className="min-w-[140px]"
+            styles={modernSelectStyles}
+            menuPortalTarget={document.body}
+            menuPlacement="auto"
+            isSearchable={false}
+            components={{
+              DropdownIndicator: ({ innerProps }) => (
+                <div {...innerProps}>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </div>
+              ),
+            }}
+          />
+        </div>
+      )}
+
+      {/* Sélecteur de valeur (quand un type est sélectionné) */}
+      {isAddingFilter && newFilterType && (
+        <div ref={valueSelectRef} className="relative">
+          <Select
+            options={getOptionsForType(newFilterType)}
+            onChange={handleValueSelect}
+            placeholder={`Choisir ${filterTypeLabels[newFilterType]?.toLowerCase()}`}
+            isMulti={['supplier', 'brand', 'category'].includes(newFilterType)}
+            classNamePrefix="react-select"
+            className="min-w-[180px]"
+            styles={modernSelectStyles}
+            autoFocus
+            menuIsOpen={true}
+            menuPortalTarget={document.body}
+            menuPlacement="auto"
+            onMenuClose={() => {
+              setIsAddingFilter(false);
+              setNewFilterType(null);
+            }}
+            onBlur={() => {
+              setIsAddingFilter(false);
+              setNewFilterType(null);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Bouton tout effacer - Version icône trash harmonisée */}
+      {selectedFilters.length > 0 && (
+        <button
+          onClick={handleClearAll}
+          className="flex items-center justify-center h-9 w-9 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md border border-red-200 dark:border-red-700 transition-colors"
+          title="Effacer tous les filtres"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       )}
     </div>
   );
