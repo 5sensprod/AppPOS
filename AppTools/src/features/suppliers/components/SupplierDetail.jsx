@@ -1,6 +1,6 @@
-// src/features/suppliers/components/SupplierDetail.jsx
-import React from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+// src/features/suppliers/components/SupplierDetail.jsx - MODIFICATION ALTERNATIVE
+import React, { useEffect } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import EntityDetail from '../../../components/common/EntityDetail';
 import { ENTITY_CONFIG } from '../constants';
 import useSupplierDetail from '../hooks/useSupplierDetail';
@@ -12,6 +12,7 @@ import ImagesTab from '../../../components/common/tabs/ImagesTab';
 function SupplierDetail() {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const isNew = location.pathname.endsWith('/new');
   const isEditMode = isNew || location.pathname.endsWith('/edit');
 
@@ -28,7 +29,16 @@ function SupplierDetail() {
     handleUploadImage,
     handleDeleteImage,
     specialFields,
+    isDeleted, // RÉCUPÉRER: L'état de suppression
   } = useSupplierDetail(id, isNew);
+
+  // AJOUT: Redirection automatique si supprimé
+  useEffect(() => {
+    if (isDeleted) {
+      console.log('🔄 Entité supprimée, redirection vers la liste');
+      navigate('/products/suppliers', { replace: true });
+    }
+  }, [isDeleted, navigate]);
 
   const formDefaultValues = {
     ...defaultValues,
@@ -77,6 +87,18 @@ function SupplierDetail() {
         return null;
     }
   };
+
+  // AJOUT: Ne pas rendre si supprimé
+  if (isDeleted) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Redirection en cours...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <EntityDetail

@@ -1,4 +1,3 @@
-// Composant principal EntityTable (index.jsx)
 import React, { useState, useCallback } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { FilterBar } from './components/FilterBar';
@@ -12,6 +11,7 @@ import { useTableSelection } from './hooks/useTableSelection';
 import { useTableSort } from './hooks/useTableSort';
 import { useTableFilter } from './hooks/useTableFilter';
 import { useTablePagination } from './hooks/useTablePagination';
+import { useConfirmModal } from '../../hooks/useConfirmModal';
 
 const EntityTable = ({
   data = [],
@@ -38,7 +38,7 @@ const EntityTable = ({
   onExport,
   onBatchStatusChange,
   onBatchCategoryChange,
-  onBatchStockChange, // Nouvelle prop ajoutée
+  onBatchStockChange,
   onCreateSheet,
   categoryOptions = [],
   onBatchDelete,
@@ -52,6 +52,7 @@ const EntityTable = ({
   externalActiveFilters = [],
 }) => {
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const { confirm, ConfirmModal } = useConfirmModal(); // AJOUT: Hook de confirmation
 
   // Fonctionnalités disponibles
   const hasSync = typeof onSync === 'function';
@@ -59,7 +60,7 @@ const EntityTable = ({
   const hasBatchDelete = typeof onBatchDelete === 'function';
   const hasBatchSync = typeof onBatchSync === 'function';
   const hasCreateSheet = typeof onCreateSheet === 'function';
-  const hasBatchStockChange = typeof onBatchStockChange === 'function'; // Nouvelle vérification
+  const hasBatchStockChange = typeof onBatchStockChange === 'function';
 
   // Hooks pour la gestion des données
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
@@ -90,26 +91,40 @@ const EntityTable = ({
     paginationInfo,
   } = useTablePagination(filteredData, pagination, paginationEntityId);
 
-  // Actions par lot
-  const handleBatchDelete = useCallback(() => {
+  // CORRECTION: Actions par lot avec modal React
+  const handleBatchDelete = useCallback(async () => {
     if (selectedItems.length === 0) return;
 
-    if (
-      window.confirm(
-        `Êtes-vous sûr de vouloir supprimer ces ${selectedItems.length} ${
+    try {
+      console.log('🗑️ Demande de confirmation de suppression par lot');
+
+      // CORRECTION: Utiliser la modal React au lieu de window.confirm
+      const confirmed = await confirm({
+        title: 'Confirmer la suppression par lot',
+        message: `Êtes-vous sûr de vouloir supprimer ces ${selectedItems.length} ${
           selectedItems.length === 1 ? entityName : entityNamePlural
-        } ?`
-      )
-    ) {
-      if (hasBatchDelete) {
-        onBatchDelete(selectedItems)
-          .then(() => setSelectedItems([]))
-          .catch((err) => console.error(`Erreur de suppression par lot:`, err));
-      } else if (typeof onDelete === 'function') {
-        Promise.all(selectedItems.map((id) => onDelete(id)))
-          .then(() => setSelectedItems([]))
-          .catch((err) => console.error(`Erreur de suppression:`, err));
+        } ? Cette action est irréversible.`,
+        confirmText: 'Supprimer tout',
+        cancelText: 'Annuler',
+        variant: 'danger',
+      });
+
+      if (!confirmed) {
+        console.log("🚫 Suppression par lot annulée par l'utilisateur");
+        return;
       }
+
+      console.log('✅ Suppression par lot confirmée, exécution...');
+
+      if (hasBatchDelete) {
+        await onBatchDelete(selectedItems);
+        setSelectedItems([]);
+      } else if (typeof onDelete === 'function') {
+        await Promise.all(selectedItems.map((id) => onDelete(id)));
+        setSelectedItems([]);
+      }
+    } catch (err) {
+      console.error(`❌ Erreur de suppression par lot:`, err);
     }
   }, [
     selectedItems,
@@ -119,6 +134,7 @@ const EntityTable = ({
     onBatchDelete,
     onDelete,
     setSelectedItems,
+    confirm,
   ]);
 
   const handleBatchSync = useCallback(() => {
@@ -134,9 +150,6 @@ const EntityTable = ({
       );
     }
   }, [selectedItems, hasBatchSync, hasSync, onBatchSync, onSync]);
-
-  // État pour la modal de stock
-  const [stockModalOpen, setStockModalOpen] = useState(false);
 
   const handleBatchExport = () => setExportModalOpen(true);
 
@@ -167,16 +180,13 @@ const EntityTable = ({
     });
   };
 
-  // Fonction pour gérer le stock - SIMPLE redirection vers ProductTable
   const handleBatchStockChange = (itemIds, stockAction) => {
     if (itemIds.length === 0 || typeof onBatchStockChange !== 'function') return;
 
-    // Convertir les IDs en objets complets
     const selectedObjects = itemIds
       .map((id) => filteredData.find((item) => item._id === id))
       .filter(Boolean);
 
-    // Appeler directement la fonction du ProductTable SANS .catch()
     onBatchStockChange(selectedObjects, stockAction);
   };
 
@@ -205,7 +215,7 @@ const EntityTable = ({
     if (action === 'status') return typeof onBatchStatusChange === 'function';
     if (action === 'category')
       return typeof onBatchCategoryChange === 'function' && categoryOptions.length > 0;
-    if (action === 'stock') return hasBatchStockChange; // Nouvelle condition pour le stock
+    if (action === 'stock') return hasBatchStockChange;
     if (action === 'createSheet') return hasCreateSheet;
     return true;
   });
@@ -240,7 +250,7 @@ const EntityTable = ({
           onBatchExport={hasExport ? handleBatchExport : undefined}
           onBatchStatusChange={handleBatchStatusChange}
           onBatchCategoryChange={handleBatchCategoryChange}
-          onBatchStockChange={hasBatchStockChange ? handleBatchStockChange : undefined} // Redirection simple
+          onBatchStockChange={hasBatchStockChange ? handleBatchStockChange : undefined}
           onCreateSheet={hasCreateSheet ? onCreateSheet : undefined}
           categoryOptions={categoryOptions}
           syncStats={syncStats}
@@ -312,6 +322,7 @@ const EntityTable = ({
         />
       )}
 
+      {/* Modal d'export */}
       <ExportConfigModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
@@ -321,6 +332,9 @@ const EntityTable = ({
         entityNamePlural={entityNamePlural}
         activeFilters={filtersToUse}
       />
+
+      {/* AJOUT: Modal de confirmation pour les suppressions par lot */}
+      <ConfirmModal />
     </div>
   );
 };

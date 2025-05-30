@@ -1,4 +1,4 @@
-// src/features/suppliers/hooks/useSupplierDetail.js
+// src/features/suppliers/hooks/useSupplierDetail.js - VERSION CORRIGÉE
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSupplier, useSupplierExtras } from '../stores/supplierStore';
@@ -6,6 +6,7 @@ import { useSupplierDataStore } from '../stores/supplierStore';
 import { useBrand } from '../../brands/stores/brandStore';
 import { getSupplierValidationSchema } from '../components/validationSchema/getValidationSchema';
 import imageProxyService from '../../../services/imageProxyService';
+
 export default function useSupplierDetail(id, isNew) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -14,6 +15,7 @@ export default function useSupplierDetail(id, isNew) {
   const [supplier, setSupplier] = useState(null);
   const [brandsLoaded, setBrandsLoaded] = useState(false);
   const [specialFields, setSpecialFields] = useState({ brands: { options: [] } });
+  const [isDeleted, setIsDeleted] = useState(false); // AJOUT: État pour tracking de suppression
 
   const { getSupplierById, deleteSupplier, updateSupplier, createSupplier } = useSupplier();
   const { uploadImage, deleteImage, addBrandToSupplier, removeBrandFromSupplier } =
@@ -52,7 +54,9 @@ export default function useSupplierDetail(id, isNew) {
       return;
     }
 
-    if (!id) return;
+    // CORRECTION: Ne pas récupérer si l'entité a été supprimée
+    if (!id || isDeleted) return;
+
     let cleanup = () => {};
 
     if (supplierWsStore?.initWebSocket) {
@@ -62,16 +66,26 @@ export default function useSupplierDetail(id, isNew) {
     setLoading(true);
     getSupplierById(id)
       .then((data) => {
-        setSupplier({ ...data, brands: Array.isArray(data.brands) ? data.brands : [] });
-        setError(null);
+        // CORRECTION: Vérifier si on n'est pas en cours de suppression
+        if (!isDeleted) {
+          setSupplier({ ...data, brands: Array.isArray(data.brands) ? data.brands : [] });
+          setError(null);
+        }
       })
       .catch((err) => {
-        setError(`Erreur lors de la récupération du fournisseur: ${err.message}`);
+        // CORRECTION: Ne pas afficher l'erreur si c'est parce qu'on a supprimé
+        if (!isDeleted) {
+          setError(`Erreur lors de la récupération du fournisseur: ${err.message}`);
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isDeleted) {
+          setLoading(false);
+        }
+      });
 
     return cleanup;
-  }, [id, isNew, getSupplierById, supplierWsStore]);
+  }, [id, isNew, getSupplierById, supplierWsStore, isDeleted]); // AJOUT: isDeleted dans les dépendances
 
   const handleSubmit = async (data) => {
     setLoading(true);
@@ -89,9 +103,13 @@ export default function useSupplierDetail(id, isNew) {
         }
       } else {
         await updateSupplier(id, formatted);
-        const updated = await getSupplierById(id);
-        setSupplier(updated);
-        setSuccess('Fournisseur mis à jour avec succès');
+
+        // CORRECTION: Ne récupérer les données mises à jour que si pas supprimé
+        if (!isDeleted) {
+          const updated = await getSupplierById(id);
+          setSupplier(updated);
+          setSuccess('Fournisseur mis à jour avec succès');
+        }
       }
     } catch (err) {
       setError(err.message || 'Erreur inconnue');
@@ -100,12 +118,22 @@ export default function useSupplierDetail(id, isNew) {
     }
   };
 
+  // CORRECTION: Gérer la suppression proprement
   const handleDelete = async () => {
     try {
+      console.log('🗑️ Début suppression fournisseur:', id);
       setLoading(true);
+      setIsDeleted(true); // AJOUT: Marquer comme supprimé AVANT la suppression
+
       await deleteSupplier(id);
+
+      console.log('✅ Fournisseur supprimé avec succès');
+
+      // Navigation immédiate sans tentative de récupération
       navigate('/products/suppliers');
     } catch (err) {
+      console.error('❌ Erreur lors de la suppression:', err);
+      setIsDeleted(false); // CORRECTION: Remettre à false en cas d'erreur
       setError(`Erreur lors de la suppression: ${err.message}`);
     } finally {
       setLoading(false);
@@ -116,12 +144,22 @@ export default function useSupplierDetail(id, isNew) {
     navigate(isNew ? '/products/suppliers' : `/products/suppliers/${id}`);
   };
 
+  // CORRECTION: Protéger les opérations d'image contre les suppressions
   const handleUploadImage = async (entityId, file) => {
+    if (isDeleted) {
+      console.warn("⚠️ Tentative d'upload sur entité supprimée");
+      return;
+    }
+
     try {
       setLoading(true);
       await uploadImage(entityId, file);
-      const updated = await getSupplierById(id);
-      setSupplier(updated);
+
+      // Ne récupérer que si pas supprimé
+      if (!isDeleted) {
+        const updated = await getSupplierById(id);
+        setSupplier(updated);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -130,11 +168,20 @@ export default function useSupplierDetail(id, isNew) {
   };
 
   const handleDeleteImage = async (entityId) => {
+    if (isDeleted) {
+      console.warn("⚠️ Tentative de suppression d'image sur entité supprimée");
+      return;
+    }
+
     try {
       setLoading(true);
       await deleteImage(entityId);
-      const updated = await getSupplierById(id);
-      setSupplier(updated);
+
+      // Ne récupérer que si pas supprimé
+      if (!isDeleted) {
+        const updated = await getSupplierById(id);
+        setSupplier(updated);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -155,9 +202,11 @@ export default function useSupplierDetail(id, isNew) {
     handleUploadImage,
     handleDeleteImage,
     specialFields,
+    isDeleted, // EXPOSITION: Pour usage externe si nécessaire
   };
 }
 
+// Fonction formatSupplierData inchangée
 function formatSupplierData(data) {
   const result = { name: data.name || 'Nouveau fournisseur' };
   const addIfNotEmpty = (obj, key, value) => {
