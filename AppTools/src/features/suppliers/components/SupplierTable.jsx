@@ -68,6 +68,7 @@ function SupplierTable(props) {
       syncEnabled={syncEnabled}
       actions={['view', 'edit', 'delete', 'sync']}
       batchActions={['delete', 'sync']}
+      showActions={false}
       onSync={handleSyncEntity}
       pagination={{
         enabled: true,

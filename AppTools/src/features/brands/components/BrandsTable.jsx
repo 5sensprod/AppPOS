@@ -110,6 +110,7 @@ function BrandsTable(props) {
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', 'sync']}
         batchActions={['delete', 'sync']}
+        showActions={false}
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 5,

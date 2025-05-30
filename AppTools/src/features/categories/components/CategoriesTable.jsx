@@ -316,6 +316,7 @@ function CategoriesTable(props) {
         syncEnabled={sync}
         actions={['view', 'edit', 'delete', 'sync']}
         batchActions={['delete', 'sync']}
+        showActions={false}
         onSync={handleSyncEntity}
         pagination={{
           enabled: true,
