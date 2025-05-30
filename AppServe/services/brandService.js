@@ -1,6 +1,7 @@
 //AppServe\services\brandService.js
 const Brand = require('../models/Brand');
 const Supplier = require('../models/Supplier');
+const db = require('../config/database');
 const { getEntityEventService } = require('../services/events/entityEvents');
 
 // ------- VALIDATION EXISTANTE -------
