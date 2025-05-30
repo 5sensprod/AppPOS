@@ -26,7 +26,7 @@ function EntityPageHeader({ icon, title, description, addButtonLabel, addButtonP
   };
 
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
       <div className="flex items-center">
         {icon && <div className="h-8 w-8 text-blue-600 dark:text-blue-400 mr-3">{icon}</div>}
         <div>

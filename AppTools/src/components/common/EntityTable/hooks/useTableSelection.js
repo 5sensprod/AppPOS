@@ -15,16 +15,12 @@ export const useTableSelection = (data, filteredData) => {
 
     // Si c'est une mise à jour récente (moins de 2 secondes), ne pas réinitialiser
     if (timeSinceLastAction < 2000) {
-      console.log('Sélection préservée - mise à jour récente détectée');
       previousDataLength.current = data.length;
 
       // Vérifier que les items sélectionnés existent encore
       const validIds = data.map((item) => item._id);
       setSelectedItems((prev) => {
         const stillValid = prev.filter((id) => validIds.includes(id));
-        if (stillValid.length !== prev.length) {
-          console.log('Nettoyage des sélections invalides:', prev.length - stillValid.length);
-        }
         return stillValid;
       });
       return;
@@ -33,7 +29,6 @@ export const useTableSelection = (data, filteredData) => {
     // Si le nombre d'items a changé significativement, réinitialiser
     const dataLengthChanged = Math.abs(data.length - previousDataLength.current) > 0;
     if (dataLengthChanged) {
-      console.log('Réinitialisation de la sélection - changement de données détecté');
       setSelectedItems([]);
     }
 
@@ -71,7 +66,6 @@ export const useTableSelection = (data, filteredData) => {
   // Fonction pour marquer qu'une action batch vient d'être effectuée
   const markBatchActionPerformed = () => {
     lastActionTime.current = Date.now();
-    console.log('Action batch marquée à:', new Date(lastActionTime.current).toLocaleTimeString());
   };
 
   return {
@@ -79,6 +73,6 @@ export const useTableSelection = (data, filteredData) => {
     setSelectedItems,
     toggleSelection,
     selectAll,
-    markBatchActionPerformed, // Nouvelle fonction exposée
+    markBatchActionPerformed,
   };
 };

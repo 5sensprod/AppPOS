@@ -28,7 +28,7 @@ function EntityPageLayout({
   contentComponent: ContentComponent,
 }) {
   const content = (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 ">
       <EntityPageHeader
         icon={icon}
         title={title}

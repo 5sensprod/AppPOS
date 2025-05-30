@@ -84,14 +84,6 @@ const UnifiedFilterBar = ({
     fetchHierarchicalCategories,
   } = useHierarchicalCategories();
 
-  // Debug pour voir ce qu'on reçoit
-  console.log('🔍 Debug categories:', {
-    hierarchicalCategories,
-    categoriesLoading,
-    enableCategories,
-    length: hierarchicalCategories?.length,
-  });
-
   // Charger les catégories au montage ET quand on clique sur category
   useEffect(() => {
     if (
@@ -99,7 +91,6 @@ const UnifiedFilterBar = ({
       (!hierarchicalCategories || hierarchicalCategories.length === 0) &&
       !categoriesLoading
     ) {
-      console.log('🔄 Fetching categories...');
       fetchHierarchicalCategories();
     }
   }, [hierarchicalCategories, categoriesLoading, fetchHierarchicalCategories, enableCategories]);
@@ -112,7 +103,6 @@ const UnifiedFilterBar = ({
       (!hierarchicalCategories || hierarchicalCategories.length === 0) &&
       !categoriesLoading
     ) {
-      console.log('🔄 Fetching categories for dropdown...');
       fetchHierarchicalCategories();
     }
   }, [
@@ -144,16 +134,6 @@ const UnifiedFilterBar = ({
 
   // Options de catégories avec debug
   const categoryOptions = useMemo(() => {
-    if (!enableCategories) {
-      console.log('📝 Categories disabled');
-      return [];
-    }
-
-    if (!hierarchicalCategories || hierarchicalCategories.length === 0) {
-      console.log('📝 No hierarchical categories found');
-      return [];
-    }
-
     const transform = (cats, path = '') => {
       return cats.flatMap((cat) => {
         const option = {
@@ -168,18 +148,12 @@ const UnifiedFilterBar = ({
     };
 
     const options = transform(hierarchicalCategories);
-    console.log('📝 Generated category options:', options);
     return options;
   }, [hierarchicalCategories, enableCategories]);
 
   // Toutes les options disponibles avec debug
   const allFilterOptions = useMemo(() => {
     const combined = [...filterOptions, ...categoryOptions];
-    console.log('📝 All filter options:', {
-      filterOptions,
-      categoryOptions,
-      combined,
-    });
     return combined;
   }, [filterOptions, categoryOptions]);
 
