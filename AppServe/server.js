@@ -33,6 +33,7 @@ const corsOptions = {
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
+
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -84,6 +85,9 @@ app.get('/', (req, res) => {
 // Initialiser WebSocket avec le serveur HTTP
 websocketManager.initialize(server);
 initializeWebSocketEventBridge();
+
+const lcdRoutes = require('./routes/lcdRoutes');
+app.use('/api/lcd', authMiddleware, lcdRoutes);
 
 // Configuration du CRON pour la sauvegarde à 18h quotidiennement
 cron.schedule('30 18 * * *', async () => {
