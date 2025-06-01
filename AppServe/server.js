@@ -89,6 +89,9 @@ initializeWebSocketEventBridge();
 const lcdRoutes = require('./routes/lcdRoutes');
 app.use('/api/lcd', authMiddleware, lcdRoutes);
 
+const posPrinterRoutes = require('./routes/posPrinterRoutes');
+app.use('/api/printer', posPrinterRoutes);
+
 // Configuration du CRON pour la sauvegarde à 18h quotidiennement
 cron.schedule('30 18 * * *', async () => {
   console.log(`[${new Date().toISOString()}] Sauvegarde planifiée...`);
