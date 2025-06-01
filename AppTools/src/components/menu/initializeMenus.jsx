@@ -7,9 +7,11 @@ import {
   ShoppingCart,
   BarChart2,
   Settings,
-  Folder, // Au lieu de Layers
+  Folder,
   Truck,
   Tag,
+  Monitor,
+  Cog,
 } from 'lucide-react';
 
 export function initializeMenus() {
@@ -67,7 +69,7 @@ export function initializeMenus() {
     id: 'settings',
     icon: <Settings className="h-6 w-6" />,
     label: 'Paramètres',
-    path: '/settings',
+    path: '/config/lcd',
   });
 }
 

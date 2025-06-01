@@ -20,6 +20,7 @@ import CategoriesPage from './features/categories/CategoriesPage';
 import CategorieDetail from './features/categories/components/CategorieDetail';
 import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
+import LCDConfigPage from './pages/LCDConfigPage';
 
 // Loader
 const Loader = ({ message }) => (
@@ -153,6 +154,17 @@ function AppRoutes() {
           )}
         </React.Fragment>
       ))}
+
+      <Route
+        path="/config/lcd"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <LCDConfigPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
