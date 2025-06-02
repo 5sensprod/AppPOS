@@ -1,4 +1,4 @@
-// src/App.jsx
+// src/App.jsx - Mise à jour avec les nouvelles routes
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
@@ -20,7 +20,11 @@ import CategoriesPage from './features/categories/CategoriesPage';
 import CategorieDetail from './features/categories/components/CategorieDetail';
 import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
+
+// Pages de configuration
+import SettingsPage from './pages/SettingsPage';
 import LCDConfigPage from './pages/LCDConfigPage';
+import PrinterConfigPage from './pages/PrinterConfigPage';
 
 // Loader
 const Loader = ({ message }) => (
@@ -51,7 +55,7 @@ const entityRoutes = [
     path: 'products/categories',
     component: CategoriesPage,
     details: CategorieDetail,
-    bidirectional: true, // Changé à true pour utiliser le composant bidirectionnel
+    bidirectional: true,
   },
   {
     path: 'products/suppliers',
@@ -155,12 +159,36 @@ function AppRoutes() {
         </React.Fragment>
       ))}
 
+      {/* Routes de configuration */}
       <Route
-        path="/config/lcd"
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <SettingsPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Routes individuelles pour accès direct (optionnel) */}
+      <Route
+        path="/settings/lcd"
         element={
           <ProtectedRoute>
             <MainLayout>
               <LCDConfigPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/settings/printer"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <PrinterConfigPage />
             </MainLayout>
           </ProtectedRoute>
         }

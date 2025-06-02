@@ -11,6 +11,7 @@ import {
   Truck,
   Tag,
   Monitor,
+  Printer,
   Cog,
 } from 'lucide-react';
 
@@ -69,7 +70,27 @@ export function initializeMenus() {
     id: 'settings',
     icon: <Settings className="h-6 w-6" />,
     label: 'Paramètres',
-    path: '/config/lcd',
+    path: '/settings',
+    children: [
+      {
+        id: 'lcd-config',
+        icon: <Monitor className="h-5 w-5" />,
+        label: 'Écran LCD',
+        path: '/settings/lcd',
+      },
+      {
+        id: 'printer-config',
+        icon: <Printer className="h-5 w-5" />,
+        label: 'Imprimante POS',
+        path: '/settings/printer',
+      },
+      {
+        id: 'general-settings',
+        icon: <Cog className="h-5 w-5" />,
+        label: 'Général',
+        path: '/settings/general',
+      },
+    ],
   });
 }
 
@@ -80,6 +101,15 @@ export function updateActiveMenuItem() {
     menuRegistry.updateSidebarItem(item.id, {
       active: item.path === currentPath,
     });
+
+    // Vérifier aussi les sous-éléments
+    if (item.children) {
+      item.children.forEach((child) => {
+        if (child.path === currentPath) {
+          menuRegistry.updateSidebarItem(item.id, { active: true });
+        }
+      });
+    }
   });
 }
 
