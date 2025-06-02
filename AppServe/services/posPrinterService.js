@@ -1,4 +1,4 @@
-// services/posPrinterService.js - Version Windows Printer
+// services/posPrinterService.js - Version améliorée avec PowerShell .NET
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
@@ -13,6 +13,14 @@ class POSPrinterService {
       charactersPerLine: 48,
       maxLines: 1000,
       printMethod: 'windows',
+      // Nouveaux paramètres pour le contrôle précis
+      fontSize: 10,
+      fontBold: true,
+      fontFamily: 'Courier New',
+      marginLeft: 0,
+      marginTop: 0,
+      marginRight: 0,
+      marginBottom: 0,
     };
 
     this.escCommands = {
@@ -32,6 +40,314 @@ class POSPrinterService {
     };
   }
 
+  // Méthode PowerShell .NET pour impression avec contrôle total
+  async printViaPowerShellDotNet(content, options = {}) {
+    const {
+      fontSize = this.printerConfig.fontSize,
+      fontBold = this.printerConfig.fontBold,
+      fontFamily = this.printerConfig.fontFamily,
+      marginLeft = this.printerConfig.marginLeft,
+      marginTop = this.printerConfig.marginTop,
+      marginRight = this.printerConfig.marginRight,
+      marginBottom = this.printerConfig.marginBottom,
+      align = 'left',
+    } = options;
+
+    // Créer un fichier PowerShell temporaire pour éviter les problèmes d'échappement
+    const tempDir = require('os').tmpdir();
+    const scriptFile = path.join(tempDir, `print_script_${Date.now()}.ps1`);
+
+    const fontStyle = fontBold ? 'Bold' : 'Regular';
+
+    // Position X basée sur l'alignement
+    let positionXLogic = marginLeft;
+    if (align === 'center') {
+      positionXLogic = `[Math]::Max(0, ($e.PageBounds.Width - $textSize.Width) / 2)`;
+    } else if (align === 'right') {
+      positionXLogic = `[Math]::Max(0, $e.PageBounds.Width - $textSize.Width - ${marginRight})`;
+    }
+
+    const powershellScript = `
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+
+$texte = @"
+${content}
+"@
+
+$nomImprimante = "${this.connectedPrinter.name}"
+
+Write-Host "Tentative d'impression sur: $nomImprimante"
+Write-Host "Texte à imprimer: $texte"
+
+try {
+    $printDoc = New-Object System.Drawing.Printing.PrintDocument
+    $printDoc.PrinterSettings.PrinterName = $nomImprimante
+    
+    # Vérifier que l'imprimante existe
+    if (-not $printDoc.PrinterSettings.IsValid) {
+        throw "Imprimante '$nomImprimante' non trouvée ou invalide"
+    }
+    
+    Write-Host "Imprimante validée: $($printDoc.PrinterSettings.PrinterName)"
+    
+    # Définir les marges précises
+    $margins = New-Object System.Drawing.Printing.Margins(${marginLeft}, ${marginRight}, ${marginTop}, ${marginBottom})
+    $printDoc.DefaultPageSettings.Margins = $margins
+    
+    $printDoc.Add_PrintPage({
+        param($sender, $e)
+        
+        Write-Host "Début de l'impression..."
+        
+        # Créer la police avec les paramètres spécifiés
+        $font = New-Object System.Drawing.Font("${fontFamily}", ${fontSize}, [System.Drawing.FontStyle]::${fontStyle})
+        $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::Black)
+        
+        # Calculer la taille du texte pour l'alignement
+        $textSize = $e.Graphics.MeasureString($texte, $font)
+        
+        # Calculer la position X selon l'alignement
+        $posX = ${positionXLogic}
+        $posY = ${marginTop}
+        
+        Write-Host "Position: X=$posX, Y=$posY"
+        
+        # Dessiner le texte
+        $e.Graphics.DrawString($texte, $font, $brush, $posX, $posY)
+        
+        Write-Host "Texte dessiné avec succès"
+        
+        # Nettoyer les ressources
+        $font.Dispose()
+        $brush.Dispose()
+    })
+    
+    Write-Host "Envoi à l'imprimante..."
+    $printDoc.Print()
+    Write-Host "SUCCESS: Impression envoyée avec succès"
+    
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)"
+    Write-Host "StackTrace: $($_.Exception.StackTrace)"
+} finally {
+    if ($printDoc) {
+        $printDoc.Dispose()
+    }
+}
+`;
+
+    // Écrire le script dans un fichier temporaire
+    fs.writeFileSync(scriptFile, powershellScript, 'utf8');
+
+    try {
+      const { stdout, stderr } = await execAsync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptFile}"`,
+        { encoding: 'utf8', timeout: 30000 }
+      );
+
+      console.log('PowerShell stdout:', stdout);
+      console.log('PowerShell stderr:', stderr);
+
+      if (stderr && !stderr.includes('Warning')) {
+        throw new Error(`PowerShell Error: ${stderr}`);
+      }
+
+      if (stdout.includes('ERROR:')) {
+        const errorMsg = stdout.split('ERROR: ')[1]?.split('\n')[0] || 'Erreur inconnue';
+        throw new Error(errorMsg);
+      }
+
+      if (!stdout.includes('SUCCESS:')) {
+        throw new Error('Impression échouée - aucun message de succès reçu');
+      }
+
+      return {
+        success: true,
+        message: 'Impression envoyée via PowerShell .NET',
+        method: 'powershell_dotnet',
+        debug: stdout,
+      };
+    } catch (error) {
+      throw new Error(`Erreur PowerShell: ${error.message}`);
+    } finally {
+      // Nettoyer le fichier temporaire
+      if (fs.existsSync(scriptFile)) {
+        fs.unlinkSync(scriptFile);
+      }
+    }
+  }
+
+  // Version simplifiée pour impression rapide
+  async printTextPowerShell(text, options = {}) {
+    if (!this.connectedPrinter) {
+      throw new Error('Aucune imprimante connectée');
+    }
+
+    const { fontSize = 10, fontBold = true, align = 'left' } = options;
+
+    return await this.printViaPowerShellDotNet(text, {
+      fontSize,
+      fontBold,
+      align,
+      marginLeft: 0,
+      marginTop: 0,
+      marginRight: 0,
+      marginBottom: 0,
+    });
+  }
+
+  // Version simplifiée pour débugger
+  async printTextSimple(text) {
+    const tempDir = require('os').tmpdir();
+    const scriptFile = path.join(tempDir, `simple_print_${Date.now()}.ps1`);
+
+    const simpleScript = `
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+
+Write-Host "=== DEBUT TEST IMPRESSION ==="
+Write-Host "Imprimante cible: ${this.connectedPrinter.name}"
+Write-Host "Texte: ${text}"
+
+# Lister les imprimantes disponibles
+Write-Host "Imprimantes disponibles:"
+Get-Printer | ForEach-Object { Write-Host "- $($_.Name)" }
+
+try {
+    $printDoc = New-Object System.Drawing.Printing.PrintDocument
+    $printDoc.PrinterSettings.PrinterName = "${this.connectedPrinter.name}"
+    
+    Write-Host "PrinterSettings.IsValid: $($printDoc.PrinterSettings.IsValid)"
+    
+    if (-not $printDoc.PrinterSettings.IsValid) {
+        Write-Host "ERROR: Imprimante invalide"
+        exit 1
+    }
+    
+    $printDoc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+    
+    $printDoc.Add_PrintPage({
+        param($sender, $e)
+        Write-Host "Dans Add_PrintPage..."
+        $font = New-Object System.Drawing.Font("Courier New", 10, [System.Drawing.FontStyle]::Bold)
+        $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::Black)
+        $e.Graphics.DrawString("${text}", $font, $brush, 0, 0)
+        Write-Host "DrawString exécuté"
+        $font.Dispose()
+        $brush.Dispose()
+    })
+    
+    Write-Host "Appel Print()..."
+    $printDoc.Print()
+    Write-Host "SUCCESS: Print() terminé"
+    
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)"
+    Write-Host "StackTrace: $($_.Exception.StackTrace)"
+} finally {
+    if ($printDoc) { $printDoc.Dispose() }
+}
+
+Write-Host "=== FIN TEST IMPRESSION ==="
+`;
+
+    fs.writeFileSync(scriptFile, simpleScript, 'utf8');
+
+    try {
+      const { stdout, stderr } = await execAsync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptFile}"`,
+        { encoding: 'utf8', timeout: 30000 }
+      );
+
+      console.log('=== PowerShell Output ===');
+      console.log(stdout);
+      if (stderr) console.log('=== PowerShell Errors ===');
+      if (stderr) console.log(stderr);
+
+      return {
+        success: true,
+        message: 'Test simple exécuté',
+        output: stdout,
+        errors: stderr,
+      };
+    } finally {
+      if (fs.existsSync(scriptFile)) {
+        fs.unlinkSync(scriptFile);
+      }
+    }
+  }
+
+  // Méthode pour impression multi-lignes avec formatage
+  async printFormattedText(lines, options = {}) {
+    if (!Array.isArray(lines)) {
+      lines = [lines];
+    }
+
+    const { fontSize = 10, fontBold = true, fontFamily = 'Courier New', lineSpacing = 2 } = options;
+
+    const escapedLines = lines.map((line) => String(line).replace(/"/g, '""').replace(/\$/g, '`$'));
+
+    const powershellScript = `
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+
+$lignes = @(${escapedLines.map((line) => `"${line}"`).join(', ')})
+$nomImprimante = "${this.connectedPrinter.name}"
+
+$printDoc = New-Object System.Drawing.Printing.PrintDocument
+$printDoc.PrinterSettings.PrinterName = $nomImprimante
+$printDoc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+
+$printDoc.Add_PrintPage({
+    param($sender, $e)
+    
+    $font = New-Object System.Drawing.Font("${fontFamily}", ${fontSize}, [System.Drawing.FontStyle]::${fontBold ? 'Bold' : 'Regular'})
+    $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::Black)
+    
+    $yPosition = 0
+    $lineHeight = $font.Height + ${lineSpacing}
+    
+    foreach ($ligne in $lignes) {
+        $e.Graphics.DrawString($ligne, $font, $brush, 0, $yPosition)
+        $yPosition += $lineHeight
+    }
+    
+    $font.Dispose()
+    $brush.Dispose()
+})
+
+try {
+    $printDoc.Print()
+    Write-Output "SUCCESS"
+} catch {
+    Write-Output "ERROR: $($_.Exception.Message)"
+} finally {
+    $printDoc.Dispose()
+}
+`;
+
+    try {
+      const { stdout, stderr } = await execAsync(
+        `powershell -NoProfile -Command "${powershellScript.replace(/"/g, '`"')}"`,
+        { encoding: 'utf8' }
+      );
+
+      if (stderr || stdout.includes('ERROR:')) {
+        throw new Error(stderr || stdout.replace('ERROR: ', ''));
+      }
+
+      return {
+        success: true,
+        message: `${lines.length} ligne(s) imprimée(s)`,
+        method: 'powershell_dotnet_multiline',
+      };
+    } catch (error) {
+      throw new Error(`Erreur impression multi-lignes: ${error.message}`);
+    }
+  }
+
+  // Conserver les anciennes méthodes pour compatibilité
   async listAvailablePrinters() {
     const printers = [];
 
@@ -52,7 +368,7 @@ class POSPrinterService {
               comment: printer.Comment,
               location: printer.Location,
               type: 'windows_printer',
-              method: 'windows_spooler',
+              method: 'powershell_dotnet', // Nouvelle méthode par défaut
               posProbability: this.calculatePOSProbability(printer),
               available: ['OK', 'Idle', 'Unknown', '', null].includes(printer.Status),
             });
@@ -61,31 +377,6 @@ class POSPrinterService {
       }
     } catch (error) {
       console.warn('Erreur récupération imprimantes Windows:', error.message);
-    }
-
-    try {
-      const { stdout: portsResult } = await execAsync(
-        'powershell "Get-WmiObject -Class Win32_SerialPort | Select-Object DeviceID, Description, Name | ConvertTo-Json"'
-      );
-      if (portsResult.trim()) {
-        const portsData = JSON.parse(portsResult);
-        const serialPorts = Array.isArray(portsData) ? portsData : [portsData];
-        for (const port of serialPorts) {
-          if (port.DeviceID) {
-            printers.push({
-              name: `Port série ${port.DeviceID}`,
-              portName: port.DeviceID,
-              description: port.Description || port.Name,
-              type: 'serial_port',
-              method: 'direct_serial',
-              posProbability: this.calculateSerialPOSProbability(port),
-              available: true,
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('Erreur récupération ports série:', error.message);
     }
 
     return printers.sort((a, b) => (b.posProbability || 0) - (a.posProbability || 0));
@@ -109,16 +400,6 @@ class POSPrinterService {
     return Math.max(0, Math.min(100, score));
   }
 
-  calculateSerialPOSProbability(port) {
-    let score = 10;
-    const text = (port.Description + ' ' + port.Name).toLowerCase();
-
-    if (/prolific|ftdi|ch340/.test(text)) score += 30;
-    if (/usb.*serial|serial.*port/.test(text)) score += 20;
-
-    return Math.max(0, Math.min(50, score));
-  }
-
   async connectToPrinter(printerName, config = {}) {
     const finalConfig = { ...this.printerConfig, ...config };
     const printers = await this.listAvailablePrinters();
@@ -133,7 +414,7 @@ class POSPrinterService {
     this.connectedPrinter = {
       name: printerName,
       type: targetPrinter.type,
-      method: targetPrinter.method || 'windows_spooler', // ← sécurise ici
+      method: 'powershell_dotnet', // Utiliser la nouvelle méthode
       portName: targetPrinter.portName,
       path: targetPrinter.portName,
       config: finalConfig,
@@ -146,45 +427,236 @@ class POSPrinterService {
     return {
       success: true,
       message: `Imprimante "${printerName}" connectée`,
-      method: targetPrinter.method,
+      method: 'powershell_dotnet',
       config: finalConfig,
     };
   }
 
   async testConnection() {
-    if (this.connectedPrinter.method === 'windows_spooler') {
-      await this.printViaWindows('Test connexion POS');
+    await this.printTextPowerShell('Test connexion POS - ' + new Date().toLocaleString('fr-FR'));
+  }
+
+  // Méthode pour découper le texte selon la largeur du papier
+  wrapText(text, options = {}) {
+    const {
+      fontSize = 10,
+      paperWidth = 80,
+      marginLeft = 0,
+      marginRight = 0,
+      charsPerLine = null, // NOUVEAU : permet de forcer le nombre de caractères
+    } = options;
+
+    // Si charsPerLine est spécifié, l'utiliser directement
+    let calculatedCharsPerLine;
+    if (charsPerLine && charsPerLine > 0) {
+      calculatedCharsPerLine = charsPerLine;
+      console.log(`Caractères par ligne FORCÉ: ${calculatedCharsPerLine}`);
+    } else {
+      // Calcul automatique selon la largeur du papier
+      if (paperWidth <= 30) {
+        calculatedCharsPerLine = 20; // Très petit papier
+      } else if (paperWidth <= 58) {
+        calculatedCharsPerLine = 32; // 58mm
+      } else if (paperWidth <= 80) {
+        calculatedCharsPerLine = 48; // 80mm standard
+      } else {
+        calculatedCharsPerLine = 64; // 110mm et plus
+      }
+      console.log(
+        `Largeur papier: ${paperWidth}mm -> ${calculatedCharsPerLine} caractères par ligne (auto)`
+      );
+    }
+
+    const lines = [];
+    const words = text.split(' ');
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+
+      if (testLine.length <= calculatedCharsPerLine) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          // Mot trop long, on le coupe
+          let longWord = word;
+          while (longWord.length > calculatedCharsPerLine) {
+            lines.push(longWord.substring(0, calculatedCharsPerLine));
+            longWord = longWord.substring(calculatedCharsPerLine);
+          }
+          if (longWord.length > 0) {
+            currentLine = longWord;
+          }
+        }
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    console.log(
+      `Texte découpé en ${lines.length} lignes avec ${calculatedCharsPerLine} chars/ligne:`,
+      lines
+    );
+    return lines;
+  }
+
+  // Méthode pour impression avec gestion automatique de la largeur
+  async printTextWithWrapping(text, options = {}) {
+    const {
+      fontSize = 10,
+      fontBold = true,
+      fontFamily = 'Courier New',
+      paperWidth = 80,
+      align = 'left',
+      lineSpacing = 2,
+      charsPerLine = null, // NOUVEAU : transmission du paramètre
+    } = options;
+
+    const lines = this.wrapText(text, {
+      fontSize,
+      paperWidth,
+      charsPerLine, // Passer le paramètre à wrapText
+    });
+
+    const tempDir = require('os').tmpdir();
+    const scriptFile = path.join(tempDir, `print_wrapped_${Date.now()}.ps1`);
+    const fontStyle = fontBold ? 'Bold' : 'Regular';
+
+    // CORRECTIF : Encoder correctement les caractères UTF-8
+    const encodedLines = lines.map((line) => {
+      return line
+        .replace(/"/g, '""') // Échapper les guillemets
+        .replace(/è/g, 'e') // Remplacer les accents problématiques
+        .replace(/é/g, 'e')
+        .replace(/à/g, 'a')
+        .replace(/ù/g, 'u')
+        .replace(/ç/g, 'c')
+        .replace(/ê/g, 'e')
+        .replace(/ô/g, 'o')
+        .replace(/î/g, 'i')
+        .replace(/â/g, 'a');
+    });
+
+    const linesArray = encodedLines.map((line) => `"${line}"`).join(', ');
+
+    const powershellScript = `
+# Forcer l'encodage UTF-8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+
+$lignes = @(${linesArray})
+$nomImprimante = "${this.connectedPrinter.name}"
+
+Write-Host "=== IMPRESSION AVEC RETOUR LIGNE ==="
+Write-Host "Largeur papier: ${paperWidth}mm"
+Write-Host "Caractères par ligne: ${charsPerLine || 'auto'}"
+Write-Host "Nombre de lignes: $($lignes.Count)"
+
+try {
+    $printDoc = New-Object System.Drawing.Printing.PrintDocument
+    $printDoc.PrinterSettings.PrinterName = $nomImprimante
+    
+    if (-not $printDoc.PrinterSettings.IsValid) {
+        throw "Imprimante '$nomImprimante' invalide"
+    }
+    
+    # CORRECTIF : Définir une largeur de papier personnalisée
+    $customWidth = ${paperWidth <= 30 ? 150 : paperWidth <= 58 ? 200 : paperWidth <= 80 ? 280 : 380}
+    Write-Host "Largeur personnalisée: $customWidth pixels"
+    
+    $customPaperSize = New-Object System.Drawing.Printing.PaperSize("Custom", $customWidth, 1000)
+    $printDoc.DefaultPageSettings.PaperSize = $customPaperSize
+    $printDoc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+    
+    $printDoc.Add_PrintPage({
+        param($sender, $e)
+        
+        $font = New-Object System.Drawing.Font("${fontFamily}", ${fontSize}, [System.Drawing.FontStyle]::${fontStyle})
+        $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::Black)
+        
+        $yPosition = 0
+        $lineHeight = $font.Height + ${lineSpacing}
+        
+        foreach ($ligne in $lignes) {
+            Write-Host "Impression ligne: $ligne"
+            $e.Graphics.DrawString($ligne, $font, $brush, 0, $yPosition)
+            $yPosition += $lineHeight
+        }
+        
+        $font.Dispose()
+        $brush.Dispose()
+        Write-Host "Toutes les lignes imprimées avec largeur $customWidth"
+    })
+    
+    $printDoc.Print()
+    Write-Host "SUCCESS: ${lines.length} lignes imprimées"
+    
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)"
+} finally {
+    if ($printDoc) { $printDoc.Dispose() }
+}
+`;
+
+    fs.writeFileSync(scriptFile, powershellScript, 'utf8');
+
+    try {
+      const { stdout, stderr } = await execAsync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptFile}"`,
+        { encoding: 'utf8', timeout: 30000 }
+      );
+
+      console.log('=== PowerShell Wrapping Output ===');
+      console.log(stdout);
+
+      if (stdout.includes('ERROR:')) {
+        const errorMsg = stdout.split('ERROR: ')[1]?.split('\n')[0] || 'Erreur inconnue';
+        throw new Error(errorMsg);
+      }
+
+      return {
+        success: true,
+        message: `${lines.length} ligne(s) imprimée(s) avec retour automatique`,
+        linesCount: lines.length,
+        paperWidth: paperWidth,
+        charsPerLine: charsPerLine || 'auto',
+      };
+    } finally {
+      if (fs.existsSync(scriptFile)) {
+        fs.unlinkSync(scriptFile);
+      }
     }
   }
 
-  async printViaWindows(content) {
-    const tmp = path.join(require('os').tmpdir(), `pos_${Date.now()}.txt`);
-    fs.writeFileSync(tmp, content, 'utf8');
+  // Nouvelle méthode printText qui utilise PowerShell .NET
+  async printText(text, options = {}) {
+    const {
+      align = 'left',
+      bold = true,
+      fontSize = 10,
+      fontFamily = 'Courier New',
+      paperWidth = 80,
+      autoWrap = false,
+      charsPerLine = null, // NOUVEAU : paramètre pour forcer les caractères par ligne
+    } = options;
 
-    try {
-      const ps = [
-        'powershell',
-        '-NoProfile',
-        '-Command',
-        `"Get-Content -Raw -Encoding UTF8 '${tmp}' | Out-Printer -Name '${this.connectedPrinter.name}'"`,
-      ].join(' ');
-      await execAsync(ps);
-      return { success: true, message: 'Impression envoyée' };
-    } finally {
-      fs.existsSync(tmp) && fs.unlinkSync(tmp);
-    }
-  }
-
-  async printViaWindowsRaw(rawData) {
-    const tempFile = path.join(require('os').tmpdir(), `pos_raw_${Date.now()}.prn`);
-    fs.writeFileSync(tempFile, rawData, 'binary');
-
-    try {
-      const printCmd = `copy /B "${tempFile}" "${this.connectedPrinter.portName}"`;
-      await execAsync(printCmd);
-      return { success: true, message: 'Impression raw envoyée' };
-    } finally {
-      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+    if (autoWrap) {
+      return await this.printTextWithWrapping(text, {
+        fontSize,
+        fontBold: bold,
+        fontFamily,
+        paperWidth,
+        align,
+        charsPerLine, // Transmettre le paramètre
+      });
+    } else {
+      return await this.printTextSimple(text);
     }
   }
 
@@ -195,61 +667,6 @@ class POSPrinterService {
       .replace(/[€]/g, 'EUR')
       .replace(/[^\x20-\x7E]/g, '')
       .substring(0, maxLength);
-  }
-
-  async printText(text, options = {}) {
-    const {
-      align = 'left',
-      bold = false,
-      underline = false,
-      doubleHeight = false,
-      doubleWidth = false,
-      feed = true,
-    } = options;
-
-    if (this.connectedPrinter.method === 'windows_spooler') {
-      let content = '';
-      if (bold) content += '**';
-      content += this.formatText(text);
-      if (bold) content += '**';
-      if (feed) content += '\n';
-      return await this.printViaWindows(content);
-    } else {
-      return await this.printTextDirect(text, options);
-    }
-  }
-
-  async printTextDirect(text, options = {}) {
-    const {
-      align = 'left',
-      bold = false,
-      underline = false,
-      doubleHeight = false,
-      doubleWidth = false,
-      feed = true,
-    } = options;
-
-    let command = '';
-    if (align === 'center') command += this.escCommands.alignCenter;
-    else if (align === 'right') command += this.escCommands.alignRight;
-    else command += this.escCommands.alignLeft;
-
-    if (bold) command += this.escCommands.bold;
-    if (underline) command += '\x1B\x2D\x01';
-    if (doubleHeight && doubleWidth) command += '\x1B\x21\x30';
-    else if (doubleHeight) command += this.escCommands.doubleHeight;
-    else if (doubleWidth) command += this.escCommands.doubleWidth;
-
-    const maxLength = doubleWidth ? 24 : 48;
-    command += this.formatText(text, maxLength);
-
-    if (bold) command += this.escCommands.boldOff;
-    if (underline) command += '\x1B\x2D\x00';
-    if (doubleHeight || doubleWidth) command += this.escCommands.normal;
-
-    if (feed) command += this.escCommands.feed;
-
-    return await this.printViaWindowsRaw(command);
   }
 
   async printLine(leftText = '', rightText = '', separator = '.') {
@@ -270,28 +687,17 @@ class POSPrinterService {
   }
 
   async cutPaper(fullCut = false) {
-    if (this.connectedPrinter.method === 'windows_spooler') {
-      return await this.printViaWindows('\n\n\n\n');
-    } else {
-      const command = fullCut ? this.escCommands.cutFull : this.escCommands.cut;
-      return await this.printViaWindowsRaw(command);
-    }
+    // Simuler la coupe avec des sauts de ligne
+    return await this.printText('\n\n\n\n');
   }
 
   async feedPaper(lines = 3) {
     const content = '\n'.repeat(lines);
-    if (this.connectedPrinter.method === 'windows_spooler') {
-      return await this.printViaWindows(content);
-    } else {
-      return await this.printViaWindowsRaw(this.escCommands.feed.repeat(lines));
-    }
+    return await this.printText(content);
   }
 
   async openCashDrawer() {
-    if (this.connectedPrinter.method === 'windows_spooler') {
-      throw new Error('Ouverture tiroir-caisse non supportée via Windows.');
-    }
-    return await this.printViaWindowsRaw(this.escCommands.openCashDrawer);
+    throw new Error('Ouverture tiroir-caisse non supportée via PowerShell .NET');
   }
 
   disconnect() {
@@ -313,26 +719,32 @@ class POSPrinterService {
       cashierName = '',
       transactionId = '',
       paymentMethod = 'ESPECES',
+      fontSize = 10,
+      fontBold = true,
     } = options;
 
-    let receiptContent = '';
-    receiptContent += this.centerText(storeName.toUpperCase()) + '\n';
-    if (storeAddress) {
-      receiptContent += this.centerText(storeAddress) + '\n';
-    }
-    receiptContent += '\n';
+    const receiptLines = [];
 
+    // En-tête
+    receiptLines.push(this.centerText(storeName.toUpperCase()));
+    if (storeAddress) {
+      receiptLines.push(this.centerText(storeAddress));
+    }
+    receiptLines.push('');
+
+    // Informations transaction
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR');
     const timeStr = now.toLocaleTimeString('fr-FR');
 
-    receiptContent += `Date: ${dateStr}  Heure: ${timeStr}\n`;
-    if (transactionId) receiptContent += `Transaction: ${transactionId}\n`;
-    if (cashierName) receiptContent += `Caissier: ${cashierName}\n`;
+    receiptLines.push(`Date: ${dateStr}  Heure: ${timeStr}`);
+    if (transactionId) receiptLines.push(`Transaction: ${transactionId}`);
+    if (cashierName) receiptLines.push(`Caissier: ${cashierName}`);
 
-    receiptContent += '\n';
-    receiptContent += '='.repeat(48) + '\n';
+    receiptLines.push('');
+    receiptLines.push('='.repeat(48));
 
+    // Articles
     let total = 0;
     for (const item of items) {
       const name = this.formatText(item.name || 'Article', 25);
@@ -342,34 +754,33 @@ class POSPrinterService {
       total += lineTotal;
 
       if (qty > 1) {
-        receiptContent += `${name}\n`;
-        receiptContent +=
+        receiptLines.push(name);
+        receiptLines.push(
           this.formatText(`  ${qty} x ${price.toFixed(2)}EUR`, 30) +
-          this.formatText(`${lineTotal.toFixed(2)}EUR`, 18) +
-          '\n';
+            this.formatText(`${lineTotal.toFixed(2)}EUR`, 18)
+        );
       } else {
-        receiptContent +=
-          this.formatText(name, 30) + this.formatText(`${lineTotal.toFixed(2)}EUR`, 18) + '\n';
+        receiptLines.push(
+          this.formatText(name, 30) + this.formatText(`${lineTotal.toFixed(2)}EUR`, 18)
+        );
       }
     }
 
-    receiptContent += '-'.repeat(48) + '\n';
-    receiptContent +=
-      this.formatText('TOTAL', 30) + this.formatText(`${total.toFixed(2)}EUR`, 18) + '\n';
-    receiptContent += '='.repeat(48) + '\n';
+    // Total
+    receiptLines.push('-'.repeat(48));
+    receiptLines.push(this.formatText('TOTAL', 30) + this.formatText(`${total.toFixed(2)}EUR`, 18));
+    receiptLines.push('='.repeat(48));
 
-    receiptContent += '\n';
-    receiptContent += `Paiement: ${paymentMethod}\n`;
+    // Pied de page
+    receiptLines.push('');
+    receiptLines.push(`Paiement: ${paymentMethod}`);
+    receiptLines.push('');
+    receiptLines.push(this.centerText('Merci de votre visite !'));
+    receiptLines.push('');
+    receiptLines.push('');
 
-    receiptContent += '\n';
-    receiptContent += this.centerText('Merci de votre visite !') + '\n';
-    receiptContent += '\n\n\n';
-
-    if (this.connectedPrinter?.method === 'windows_spooler') {
-      await this.printViaWindows(receiptContent);
-    } else {
-      throw new Error("Méthode d'impression non supportée.");
-    }
+    // Imprimer tout le ticket
+    await this.printFormattedText(receiptLines, { fontSize, fontBold });
 
     return {
       success: true,
