@@ -440,20 +440,43 @@ try {
 
   // === UTILITAIRES DE FORMATAGE ===
 
-  formatText(text, maxLength = 48) {
-    return String(text || '')
+  formatText(text, maxLength = 42) {
+    if (!text) return '';
+
+    return String(text)
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\u0300-\u036f]/g, '') // Supprimer les diacritiques
+      .replace(/[àáâãäå]/g, 'a')
+      .replace(/[èéêë]/g, 'e')
+      .replace(/[ìíîï]/g, 'i')
+      .replace(/[òóôõö]/g, 'o')
+      .replace(/[ùúûü]/g, 'u')
+      .replace(/[ç]/g, 'c')
+      .replace(/[ñ]/g, 'n')
       .replace(/[€]/g, 'EUR')
-      .replace(/[^\x20-\x7E]/g, '')
-      .substring(0, maxLength);
+      .replace(/[£]/g, 'GBP')
+      .replace(/[¥]/g, 'YEN')
+      .replace(/[^\x20-\x7E]/g, '') // Garder seulement ASCII imprimable
+      .replace(/\s+/g, ' ') // Normaliser les espaces
+      .trim()
+      .substring(0, Math.max(1, maxLength));
   }
 
-  centerText(text, width = 48) {
-    const len = text.length;
-    if (len >= width) return text.substring(0, width);
+  centerText(text, width = 42) {
+    if (!text) return '';
+
+    // Nettoyer le texte d'abord
+    const cleanText = this.formatText(text, width);
+    const len = cleanText.length;
+
+    if (len >= width) return cleanText;
+
     const padding = Math.floor((width - len) / 2);
-    return ' '.repeat(padding) + text;
+    const leftPadding = ' '.repeat(Math.max(0, padding));
+    const result = leftPadding + cleanText;
+
+    // S'assurer qu'on ne dépasse pas la largeur
+    return result.substring(0, width);
   }
 
   // === IMPRESSION AVANCÉE (OPTIONNEL) ===
@@ -477,71 +500,123 @@ try {
       paymentMethod = 'ESPECES',
       fontSize = 10,
       fontBold = true,
+      paperWidth = 80,
+      charsPerLine = null, // NOUVEAU : Respect du paramètre charsPerLine
     } = options;
+
+    // Calculer la largeur - PRIORITÉ au charsPerLine
+    let maxWidth;
+    if (charsPerLine && charsPerLine > 0) {
+      maxWidth = charsPerLine;
+    } else if (paperWidth <= 58) {
+      maxWidth = 32;
+    } else if (paperWidth <= 80) {
+      maxWidth = 42;
+    } else {
+      maxWidth = 56;
+    }
+
+    console.log(`Ticket avec largeur max: ${maxWidth} caractères`);
 
     const receiptLines = [];
 
-    // En-tête
-    receiptLines.push(this.centerText(storeName.toUpperCase()));
+    // En-tête - TOUT À GAUCHE
+    receiptLines.push(this.formatText(storeName.toUpperCase(), maxWidth));
     if (storeAddress) {
-      receiptLines.push(this.centerText(storeAddress));
+      receiptLines.push(this.formatText(storeAddress, maxWidth));
     }
     receiptLines.push('');
 
-    // Informations transaction
+    // Informations transaction - FORMAT SÉCURISÉ
     const now = new Date();
-    const dateStr = now.toLocaleDateString('fr-FR');
-    const timeStr = now.toLocaleTimeString('fr-FR');
+    const dateStr = now.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    const timeStr = now.toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
 
-    receiptLines.push(`Date: ${dateStr}  Heure: ${timeStr}`);
-    if (transactionId) receiptLines.push(`Transaction: ${transactionId}`);
-    if (cashierName) receiptLines.push(`Caissier: ${cashierName}`);
+    receiptLines.push(`Date: ${dateStr}`.substring(0, maxWidth));
+    receiptLines.push(`Heure: ${timeStr}`.substring(0, maxWidth));
+
+    if (transactionId) {
+      const cleanId = String(transactionId)
+        .replace(/[^\w-]/g, '')
+        .substring(0, maxWidth - 2);
+      receiptLines.push('Transaction:');
+      receiptLines.push(cleanId);
+    }
+
+    if (cashierName) {
+      const cleanCashier = this.formatText(cashierName, maxWidth);
+      receiptLines.push('Caissier:');
+      receiptLines.push(cleanCashier);
+    }
 
     receiptLines.push('');
-    receiptLines.push('='.repeat(48));
+    receiptLines.push('='.repeat(maxWidth));
 
-    // Articles
+    // Articles avec formatage adapté à la largeur
     let total = 0;
     for (const item of items) {
-      const name = this.formatText(item.name || 'Article', 25);
-      const qty = item.quantity || 1;
-      const price = parseFloat(item.price || 0);
+      const qty = Math.max(1, parseInt(item.quantity) || 1);
+      const price = Math.max(0, parseFloat(item.price) || 0);
       const lineTotal = qty * price;
       total += lineTotal;
 
+      // Calculer l'espace disponible pour le nom
+      const priceText = `${lineTotal.toFixed(2)}`;
+      const maxNameLength = Math.max(5, maxWidth - priceText.length - 1); // -1 pour l'espace
+      const name = this.formatText(item.name || 'Article', maxNameLength);
+
       if (qty > 1) {
-        receiptLines.push(name);
+        // Article sur 2 lignes pour petits tickets
+        receiptLines.push(name.substring(0, maxWidth));
+        const qtyPriceText = `${qty}x${price.toFixed(2)}`;
+        const spacesNeeded = Math.max(1, maxWidth - qtyPriceText.length - priceText.length);
         receiptLines.push(
-          this.formatText(`  ${qty} x ${price.toFixed(2)}EUR`, 30) +
-            this.formatText(`${lineTotal.toFixed(2)}EUR`, 18)
+          `${qtyPriceText}${' '.repeat(spacesNeeded)}${priceText}`.substring(0, maxWidth)
         );
       } else {
-        receiptLines.push(
-          this.formatText(name, 30) + this.formatText(`${lineTotal.toFixed(2)}EUR`, 18)
-        );
+        // Article sur 1 ligne avec calcul précis
+        const spacesNeeded = Math.max(1, maxWidth - name.length - priceText.length);
+        const line = `${name}${' '.repeat(spacesNeeded)}${priceText}`;
+        receiptLines.push(line.substring(0, maxWidth));
       }
     }
 
-    // Total
-    receiptLines.push('-'.repeat(48));
-    receiptLines.push(this.formatText('TOTAL', 30) + this.formatText(`${total.toFixed(2)}EUR`, 18));
-    receiptLines.push('='.repeat(48));
+    // Séparateur et total
+    receiptLines.push('-'.repeat(maxWidth));
+    const totalText = 'TOTAL';
+    const totalAmount = `${total.toFixed(2)}`;
+    const spacesTotal = Math.max(1, maxWidth - totalText.length - totalAmount.length);
+    const totalLine = `${totalText}${' '.repeat(spacesTotal)}${totalAmount}`;
+    receiptLines.push(totalLine.substring(0, maxWidth));
+    receiptLines.push('='.repeat(maxWidth));
 
-    // Pied de page
+    // Pied de page - TOUT À GAUCHE
     receiptLines.push('');
-    receiptLines.push(`Paiement: ${paymentMethod}`);
+    receiptLines.push(
+      `Paiement: ${this.formatText(paymentMethod, maxWidth - 10)}`.substring(0, maxWidth)
+    );
     receiptLines.push('');
-    receiptLines.push(this.centerText('Merci de votre visite !'));
+    receiptLines.push('Merci de votre visite !'.substring(0, maxWidth));
     receiptLines.push('');
     receiptLines.push('');
 
-    // Imprimer tout le ticket en une fois
+    // Imprimer tout le ticket en une fois avec options précises
     const fullReceipt = receiptLines.join('\n');
     await this.printText(fullReceipt, {
-      autoWrap: true,
+      autoWrap: false,
       fontSize,
       bold: fontBold,
-      paperWidth: 80,
+      paperWidth,
+      align: 'left',
+      charsPerLine: maxWidth + 2, // Petite marge de sécurité
     });
 
     return {
