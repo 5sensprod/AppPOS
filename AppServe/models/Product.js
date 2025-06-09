@@ -15,6 +15,15 @@ class Product extends BaseModel {
     super(db.products, 'products');
   }
 
+  getDefaultValues() {
+    return {
+      total_sold: 0,
+      sales_count: 0,
+      last_sold_at: null,
+      revenue_total: 0,
+    };
+  }
+
   async findByIdWithCategoryInfo(id) {
     try {
       const product = await this.findById(id);

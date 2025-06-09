@@ -50,6 +50,7 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const wooSyncRoutes = require('./routes/wooSyncRoutes');
 const productDescriptionRoutes = require('./routes/productDescriptionRoutes');
 const productTitleRoutes = require('./routes/productTitleRoutes');
+const saleRoutes = require('./routes/saleRoutes');
 // Routes de sauvegarde
 const backupRoutes = require('./routes/backupRoutes');
 
@@ -61,6 +62,7 @@ app.use('/api/suppliers', authMiddleware, supplierRoutes);
 app.use('/api/sync', authMiddleware, wooSyncRoutes);
 app.use('/api/descriptions', authMiddleware, productDescriptionRoutes);
 app.use('/api/product-title', authMiddleware, productTitleRoutes);
+app.use('/api/sales', authMiddleware, saleRoutes);
 // Ajout des routes de sauvegarde
 app.use('/api/backup', authMiddleware, backupRoutes);
 

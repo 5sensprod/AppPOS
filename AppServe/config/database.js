@@ -11,9 +11,11 @@ if (!fs.existsSync(dataDir)) {
 
 class Database {
   constructor() {
-    this.entities = ['categories', 'products', 'brands', 'suppliers'];
+    // 🆕 Ajouter 'sales' à la liste des entités
+    this.entities = ['categories', 'products', 'brands', 'suppliers', 'sales'];
     this.stores = {};
     this.initializeStores();
+    this.createIndexes();
   }
 
   getDbConfig(filename) {
@@ -27,6 +29,28 @@ class Database {
     this.entities.forEach((entity) => {
       this.stores[entity] = new Datastore(this.getDbConfig(`${entity}.db`));
     });
+  }
+
+  // 🆕 Créer des index pour optimiser les performances
+  createIndexes() {
+    // Index pour les produits
+    this.stores.products.ensureIndex({ fieldName: 'sku', unique: false });
+    this.stores.products.ensureIndex({ fieldName: 'name', unique: false });
+    this.stores.products.ensureIndex({ fieldName: 'status', unique: false });
+
+    // Index pour les catégories
+    this.stores.categories.ensureIndex({ fieldName: 'name', unique: false });
+    this.stores.categories.ensureIndex({ fieldName: 'parent_id', unique: false });
+
+    // Index pour les marques et fournisseurs
+    this.stores.brands.ensureIndex({ fieldName: 'name', unique: false });
+    this.stores.suppliers.ensureIndex({ fieldName: 'name', unique: false });
+
+    // 🆕 Index pour les ventes
+    this.stores.sales.ensureIndex({ fieldName: 'transaction_id', unique: true });
+    this.stores.sales.ensureIndex({ fieldName: 'cashier_id', unique: false });
+    this.stores.sales.ensureIndex({ fieldName: 'created_at', unique: false });
+    this.stores.sales.ensureIndex({ fieldName: 'status', unique: false });
   }
 
   getStore(entity) {

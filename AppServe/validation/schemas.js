@@ -116,6 +116,12 @@ const createProductSchema = Joi.object({
   stock: Joi.number().allow(null).default(0),
   min_stock: Joi.number().allow(null).default(0),
 
+  // Statistiques de vente (nouveaux champs)
+  total_sold: Joi.number().default(0),
+  sales_count: Joi.number().default(0),
+  last_sold_at: Joi.date().allow(null),
+  revenue_total: Joi.number().default(0),
+
   // Prix
   price: Joi.number().allow(null).required(),
   regular_price: Joi.number().allow(null),

@@ -73,6 +73,17 @@ router.post('/export/csv', exportToCsv);
 // POST /api/products/:id/repair-images
 router.post('/:id/repair-images', productController.repairProductImages.bind(productController));
 
+// Recherche par code-barres
+router.get('/barcode/:code', productController.searchByBarcode);
+
+// Ajustement de stock
+router.patch('/:id/stock', productController.updateStock);
+
+// Statistiques produits
+router.get('/stats/best-sellers', productController.getBestSellers);
+router.get('/:id/stats', productController.getProductStats);
+router.post('/stats/recalculate', productController.recalculateProductStats);
+
 router.use('/', productImageRoutes);
 
 module.exports = router;

@@ -8,6 +8,8 @@ const ResponseHandler = require('../handlers/ResponseHandler');
 const { getEntityEventService } = require('../services/events/entityEvents');
 const { createProduct, updateProduct, deleteProduct } = require('../services/productService');
 const Category = require('../models/Category');
+const Sale = require('../models/Sale');
+
 class ProductController extends BaseController {
   constructor() {
     super(Product, productWooCommerceService, {
@@ -413,6 +415,196 @@ class ProductController extends BaseController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  async searchByBarcode(req, res) {
+    try {
+      const { code } = req.params;
+
+      if (!code) {
+        return ResponseHandler.badRequest(res, 'Code-barres requis');
+      }
+
+      // Rechercher par code-barres dans meta_data
+      const products = await this.model.find({
+        meta_data: {
+          $elemMatch: {
+            key: 'barcode',
+            value: code,
+          },
+        },
+      });
+
+      if (products.length === 0) {
+        return ResponseHandler.notFound(res, `Aucun produit trouvé avec le code-barres: ${code}`);
+      }
+
+      // Retourner le premier produit trouvé avec ses infos complètes
+      const productWithCategory = await this.model.findByIdWithCategoryInfo(products[0]._id);
+      return ResponseHandler.success(res, productWithCategory);
+    } catch (error) {
+      console.error('Erreur recherche code-barres:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  async updateStock(req, res) {
+    try {
+      const { id } = req.params;
+      const { stock, reason = 'manual_adjustment' } = req.body;
+
+      if (stock === undefined || stock === null) {
+        return ResponseHandler.badRequest(res, 'Nouvelle quantité de stock requise');
+      }
+
+      if (stock < 0) {
+        return ResponseHandler.badRequest(res, 'Le stock ne peut pas être négatif');
+      }
+
+      const existing = await this.getByIdOr404(id, res);
+      if (!existing) return;
+
+      await this.model.update(id, {
+        stock: parseInt(stock),
+        updated_at: new Date(),
+      });
+
+      const updated = await this.model.findById(id);
+
+      // Log de l'ajustement
+      console.log(`Stock ajusté pour ${updated.name}: ${existing.stock} → ${stock} (${reason})`);
+
+      return ResponseHandler.success(res, {
+        product: updated,
+        message: `Stock mis à jour: ${existing.stock} → ${stock}`,
+        previous_stock: existing.stock,
+        new_stock: stock,
+        reason,
+      });
+    } catch (error) {
+      console.error('Erreur mise à jour stock:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  async getBestSellers(req, res) {
+    try {
+      const { limit = 10 } = req.query;
+
+      const products = await this.model.findAll();
+
+      const bestSellers = products
+        .filter((p) => (p.total_sold || 0) > 0)
+        .sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0))
+        .slice(0, parseInt(limit))
+        .map((p) => ({
+          _id: p._id,
+          name: p.name,
+          sku: p.sku,
+          total_sold: p.total_sold || 0,
+          sales_count: p.sales_count || 0,
+          revenue_total: p.revenue_total || 0,
+          last_sold_at: p.last_sold_at,
+        }));
+
+      return ResponseHandler.success(res, {
+        best_sellers: bestSellers,
+        count: bestSellers.length,
+      });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  // Statistiques d'un produit
+  async getProductStats(req, res) {
+    try {
+      const product = await this.getByIdOr404(req.params.id, res);
+      if (!product) return;
+
+      const stats = {
+        product_id: product._id,
+        product_name: product.name,
+        sku: product.sku,
+
+        // Statistiques brutes (avec arrondis)
+        total_sold: product.total_sold || 0,
+        sales_count: product.sales_count || 0,
+        last_sold_at: product.last_sold_at,
+        revenue_total: Math.round((product.revenue_total || 0) * 100) / 100, // 🆕 ARRONDI
+
+        // Stock actuel
+        current_stock: product.stock || 0,
+
+        // Calculs simples (avec arrondis)
+        avg_quantity_per_sale:
+          product.sales_count > 0
+            ? Math.round(((product.total_sold || 0) / product.sales_count) * 100) / 100
+            : 0,
+        avg_revenue_per_sale:
+          product.sales_count > 0
+            ? Math.round(((product.revenue_total || 0) / product.sales_count) * 100) / 100
+            : 0,
+      };
+
+      return ResponseHandler.success(res, stats);
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  // Recalcul des stats depuis les ventes existantes
+  async recalculateProductStats(req, res) {
+    try {
+      const products = await this.model.findAll();
+      const sales = await Sale.findAll();
+
+      let updated = 0;
+
+      for (const product of products) {
+        let totalSold = 0;
+        let salesCount = 0;
+        let revenueTotal = 0;
+        let lastSoldAt = null;
+
+        // Parcourir toutes les ventes pour ce produit
+        for (const sale of sales) {
+          const productItems = sale.items.filter((item) => item.product_id === product._id);
+
+          if (productItems.length > 0) {
+            salesCount++;
+
+            for (const item of productItems) {
+              totalSold += item.quantity;
+              revenueTotal += item.total_price;
+            }
+
+            if (!lastSoldAt || new Date(sale.created_at) > new Date(lastSoldAt)) {
+              lastSoldAt = sale.created_at;
+            }
+          }
+        }
+
+        // Mettre à jour le produit
+        await this.model.update(product._id, {
+          total_sold: totalSold,
+          sales_count: salesCount,
+          last_sold_at: lastSoldAt,
+          revenue_total: Math.round(revenueTotal * 100) / 100,
+        });
+
+        updated++;
+      }
+
+      return ResponseHandler.success(res, {
+        message: `Statistiques recalculées pour ${updated} produits`,
+        products_updated: updated,
+        sales_analyzed: sales.length,
+      });
+    } catch (error) {
+      console.error('Erreur recalcul stats:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
 }
 
 const productController = new ProductController();
@@ -434,4 +626,9 @@ module.exports = exportController(productController, [
   'recalculateAllCounts',
   'filter',
   'repairProductImages',
+  'searchByBarcode',
+  'updateStock',
+  'getBestSellers',
+  'getProductStats',
+  'recalculateProductStats',
 ]);
