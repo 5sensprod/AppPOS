@@ -20,6 +20,7 @@ import CategoriesPage from './features/categories/CategoriesPage';
 import CategorieDetail from './features/categories/components/CategorieDetail';
 import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
+import CashierPage from './features/pos/CashierPage';
 
 // Pages de configuration
 import SettingsPage from './pages/SettingsPage';
@@ -104,6 +105,17 @@ function AppRoutes() {
           <ProtectedRoute>
             <MainLayout>
               <Dashboard />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/caisse"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <CashierPage />
             </MainLayout>
           </ProtectedRoute>
         }

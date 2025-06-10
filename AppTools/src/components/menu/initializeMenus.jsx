@@ -26,6 +26,13 @@ export function initializeMenus() {
   });
 
   menuRegistry.addSidebarItem({
+    id: 'cashier',
+    icon: <ShoppingCart className="h-6 w-6" />,
+    label: 'Caisse',
+    path: '/caisse',
+  });
+
+  menuRegistry.addSidebarItem({
     id: 'products',
     icon: <Package className="h-6 w-6" />,
     label: 'Produits',

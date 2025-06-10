@@ -1,0 +1,45 @@
+/* Styles spécifiques à la caisse */
+.cashier-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.cart-container {
+  height: calc(100vh - 200px);
+}
+
+.receipt-print {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+/* Animations pour les notifications */
+.cart-item-enter {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.cart-item-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 200ms,
+    transform 200ms;
+}
+
+/* Responsive pour mobile */
+@media (max-width: 1024px) {
+  .cashier-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .search-section {
+    order: 1;
+  }
+
+  .cart-section {
+    order: 2;
+    height: 60vh;
+  }
+}
