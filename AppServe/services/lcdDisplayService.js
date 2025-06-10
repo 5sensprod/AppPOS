@@ -191,7 +191,7 @@ class LCDDisplayService {
 
   // Messages prédéfinis
   async showWelcomeMessage() {
-    return await this.writeToDisplay('Bienvenue', 'POS Ready');
+    return await this.writeToDisplay('AXE Musique', 'Bienvenue');
   }
 
   async showPrice(itemName, price) {
