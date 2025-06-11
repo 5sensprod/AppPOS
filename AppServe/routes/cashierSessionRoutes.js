@@ -1,4 +1,4 @@
-// routes/cashierSessionRoutes.js
+// routes/cashierSessionRoutes.js - AVEC ROUTE CART UPDATE
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../utils/auth');
@@ -36,6 +36,10 @@ router.post(
   cashierSessionController.showLCDThankYou.bind(cashierSessionController)
 );
 router.post('/lcd/clear', cashierSessionController.clearLCDDisplay.bind(cashierSessionController));
+
+// ✅ NOUVEAU : GESTION PANIER
+router.post('/cart/update', cashierSessionController.updateCart.bind(cashierSessionController));
+router.get('/cart/status', cashierSessionController.getCartStatus.bind(cashierSessionController));
 
 // ✅ ADMINISTRATION (optionnel - pour superviser)
 router.get(

@@ -1,10 +1,13 @@
-// services/cashierSessionService.js - Gestion des sessions caissier + LCD
+// services/cashierSessionService.js - API INTELLIGENTE avec gestion auto LCD
 const lcdDisplayService = require('./lcdDisplayService');
 
 class CashierSessionService {
   constructor() {
     this.activeSessions = new Map(); // cashier_id -> session data
     this.lcdOwnership = null; // { cashier_id, username, startTime, port }
+
+    // ✅ NOUVEAU : État du panier par caissier pour gestion auto LCD
+    this.cashierCarts = new Map(); // cashier_id -> { itemCount, total, lastUpdate }
   }
 
   // ✅ OUVRIR UNE SESSION DE CAISSE
@@ -41,12 +44,23 @@ class CashierSessionService {
       },
     };
 
+    // ✅ NOUVEAU : Initialiser l'état panier pour ce caissier
+    this.cashierCarts.set(cashierId, {
+      itemCount: 0,
+      total: 0.0,
+      lastUpdate: new Date(),
+    });
+
     // Tentative de prise de contrôle LCD si demandé
     if (lcdPort) {
       try {
         await this.assignLCDToCashier(cashierId, username, lcdPort, lcdConfig);
         session.lcd.connected = true;
         session.lcd.port = lcdPort;
+
+        // ✅ AFFICHAGE WELCOME INITIAL (API-CONTROLLED)
+        console.info(`👋 [API] Affichage welcome initial pour ${username}`);
+        await lcdDisplayService.showWelcomeMessage();
       } catch (error) {
         session.lcd.error = error.message;
         console.warn(`⚠️ LCD non disponible pour ${username}:`, error.message);
@@ -88,9 +102,7 @@ class CashierSessionService {
 
       console.info(`📺 LCD assigné à ${username} sur ${lcdPort}`);
 
-      // Afficher message de bienvenue personnalisé
-      await lcdDisplayService.writeToDisplay(`Session ${username}`, 'LCD Connecte');
-
+      // ✅ PAS de message de session ici - laissons le welcome normal
       return result;
     } catch (error) {
       throw new Error(`Impossible de connecter LCD: ${error.message}`);
@@ -117,6 +129,9 @@ class CashierSessionService {
         session.lcd.connected = false;
         session.lcd.port = null;
       }
+
+      // ✅ NOUVEAU : Nettoyer l'état panier
+      this.cashierCarts.delete(cashierId);
     }
   }
 
@@ -141,11 +156,55 @@ class CashierSessionService {
     // Retirer de la liste active
     this.activeSessions.delete(cashierId);
 
+    // ✅ NOUVEAU : Nettoyer l'état panier
+    this.cashierCarts.delete(cashierId);
+
     return {
       success: true,
       message: 'Session fermée',
       session,
     };
+  }
+
+  // ✅ NOUVEAU : MISE À JOUR INTELLIGENTE DU PANIER
+  async updateCashierCart(cashierId, itemCount, total) {
+    if (!this.activeSessions.has(cashierId)) {
+      console.debug(`⚠️ [API] Pas de session pour cashier ${cashierId}`);
+      return;
+    }
+
+    if (!this.lcdOwnership || this.lcdOwnership.cashier_id !== cashierId) {
+      console.debug(`⚠️ [API] LCD non contrôlé par cashier ${cashierId}`);
+      return;
+    }
+
+    const currentCart = this.cashierCarts.get(cashierId) || { itemCount: 0, total: 0 };
+
+    // ✅ Vérifier si le panier a vraiment changé
+    if (currentCart.itemCount === itemCount && Math.abs(currentCart.total - total) < 0.01) {
+      console.debug(`⏭️ [API] Panier inchangé pour ${cashierId}`);
+      return;
+    }
+
+    // ✅ Mettre à jour l'état
+    this.cashierCarts.set(cashierId, {
+      itemCount,
+      total,
+      lastUpdate: new Date(),
+    });
+
+    try {
+      // ✅ GESTION INTELLIGENTE SELON L'ÉTAT DU PANIER
+      if (itemCount === 0) {
+        console.info(`👋 [API] Panier vide -> Welcome pour ${this.lcdOwnership.username}`);
+        await lcdDisplayService.showWelcomeMessage();
+      } else {
+        console.info(`📱 [API] Résumé panier -> ${itemCount} articles, ${total.toFixed(2)}€`);
+        await lcdDisplayService.writeToDisplay(`Qte: ${itemCount}`, `${total.toFixed(2)}EUR`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ [API] Erreur mise à jour LCD:`, error.message);
+    }
   }
 
   // ✅ UTILISER LE LCD (avec vérification de propriété)
@@ -219,14 +278,31 @@ class CashierSessionService {
     return Array.from(this.activeSessions.values());
   }
 
-  // ✅ STATS POUR UN CAISSIER
+  // ✅ NOUVEAU : STATS POUR UN CAISSIER AVEC MISE À JOUR AUTO LCD
   updateSaleStats(cashierId, saleAmount) {
     const session = this.activeSessions.get(cashierId);
     if (session) {
       session.sales_count++;
       session.total_sales += saleAmount;
       session.last_sale = new Date();
+
+      // ✅ MISE À JOUR AUTO : Panier vide après vente
+      console.info(`💳 [API] Vente terminée -> Retour panier vide pour ${session.username}`);
+      this.updateCashierCart(cashierId, 0, 0.0);
     }
+  }
+
+  // ✅ NOUVEAU : MÉTHODE POUR SIMULER LA MISE À JOUR PANIER DEPUIS FRONTEND
+  async notifyCartChange(cashierId, itemCount, total) {
+    console.info(
+      `🛒 [API] Notification changement panier: ${itemCount} articles, ${total.toFixed(2)}€`
+    );
+    await this.updateCashierCart(cashierId, itemCount, total);
+  }
+
+  // ✅ NOUVEAU : OBTENIR L'ÉTAT PANIER D'UN CAISSIER
+  getCashierCart(cashierId) {
+    return this.cashierCarts.get(cashierId) || { itemCount: 0, total: 0, lastUpdate: null };
   }
 }
 

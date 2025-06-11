@@ -1,7 +1,7 @@
-// src/features/pos/stores/cashierStore.js
+// src/features/pos/stores/cashierStore.js - Avec sync API automatique
 import { create } from 'zustand';
 import salesService from '../../../services/salesService';
-import { useAuth } from '../../../contexts/AuthContext';
+import cashierSessionService from '../../../services/cashierSessionService';
 
 export const useCashierStore = create((set, get) => ({
   // État du panier
@@ -26,111 +26,107 @@ export const useCashierStore = create((set, get) => ({
   showReceiptModal: false,
   lastReceipt: null,
 
-  // Actions du panier
-  addToCart: (product, quantity = 1) => {
-    set((state) => {
-      const existingItemIndex = state.cart.items.findIndex(
-        (item) => item.product_id === product._id
+  // ✅ NOUVEAU : Fonction pour notifier l'API des changements de panier
+  notifyAPICartChange: async () => {
+    const state = get();
+    try {
+      console.log(
+        `🔄 [STORE] Notification API: ${state.cart.itemCount} articles, ${state.cart.total.toFixed(2)}€`
       );
+      await cashierSessionService.notifyCartChange(state.cart.itemCount, state.cart.total);
+    } catch (error) {
+      console.debug('⚠️ [STORE] Erreur notification API panier:', error.message);
+      // Ne pas faire échouer l'action si la notification API échoue
+    }
+  },
 
-      let newItems;
-      if (existingItemIndex >= 0) {
-        // Produit déjà dans le panier, augmenter la quantité
-        newItems = state.cart.items.map((item, index) =>
-          index === existingItemIndex ? { ...item, quantity: item.quantity + quantity } : item
-        );
-      } else {
-        // Nouveau produit
-        const cartItem = {
-          product_id: product._id,
-          product_name: product.name,
-          sku: product.sku,
-          barcode: product.meta_data?.find((m) => m.key === 'barcode')?.value || '',
-          quantity,
-          unit_price: product.price,
-          total_price: product.price * quantity,
-        };
-        newItems = [...state.cart.items, cartItem];
-      }
+  // ✅ Fonction helper pour recalculer et notifier
+  recalculateCartAndNotify: (newItems) => {
+    const subtotal = newItems.reduce((sum, item) => sum + item.total_price, 0);
+    const tax = subtotal * 0.2; // 20% de TVA
+    const total = subtotal + tax;
+    const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
 
-      // Recalculer les totaux
-      const subtotal = newItems.reduce((sum, item) => sum + item.total_price, 0);
-      const tax = subtotal * 0.2; // 20% de TVA
-      const total = subtotal + tax;
+    const newCart = {
+      items: newItems,
+      subtotal: Math.round(subtotal * 100) / 100,
+      tax: Math.round(tax * 100) / 100,
+      total: Math.round(total * 100) / 100,
+      itemCount,
+    };
 
-      return {
-        ...state,
-        cart: {
-          items: newItems,
-          subtotal: Math.round(subtotal * 100) / 100,
-          tax: Math.round(tax * 100) / 100,
-          total: Math.round(total * 100) / 100,
-          itemCount: newItems.reduce((sum, item) => sum + item.quantity, 0),
-        },
+    set({ cart: newCart });
+
+    // ✅ NOTIFICATION API AUTOMATIQUE
+    setTimeout(() => {
+      get().notifyAPICartChange();
+    }, 100); // Petit délai pour s'assurer que l'état est mis à jour
+
+    return newCart;
+  },
+
+  // Actions du panier MODIFIÉES pour sync API
+  addToCart: (product, quantity = 1) => {
+    const state = get();
+    const existingItemIndex = state.cart.items.findIndex((item) => item.product_id === product._id);
+
+    let newItems;
+    if (existingItemIndex >= 0) {
+      // Produit déjà dans le panier, augmenter la quantité
+      newItems = state.cart.items.map((item, index) =>
+        index === existingItemIndex ? { ...item, quantity: item.quantity + quantity } : item
+      );
+    } else {
+      // Nouveau produit
+      const cartItem = {
+        product_id: product._id,
+        product_name: product.name,
+        sku: product.sku,
+        barcode: product.meta_data?.find((m) => m.key === 'barcode')?.value || '',
+        quantity,
+        unit_price: product.price,
+        total_price: product.price * quantity,
       };
-    });
+      newItems = [...state.cart.items, cartItem];
+    }
+
+    // ✅ RECALCUL + NOTIFICATION API
+    get().recalculateCartAndNotify(newItems);
   },
 
   updateCartItemQuantity: (productId, newQuantity) => {
-    set((state) => {
-      if (newQuantity <= 0) {
-        // Supprimer l'item si quantité = 0
-        return get().removeFromCart(productId);
-      }
+    const state = get();
 
-      const newItems = state.cart.items.map((item) =>
-        item.product_id === productId
-          ? {
-              ...item,
-              quantity: newQuantity,
-              total_price: Math.round(item.unit_price * newQuantity * 100) / 100,
-            }
-          : item
-      );
+    if (newQuantity <= 0) {
+      // Supprimer l'item si quantité = 0
+      return get().removeFromCart(productId);
+    }
 
-      // Recalculer les totaux
-      const subtotal = newItems.reduce((sum, item) => sum + item.total_price, 0);
-      const tax = subtotal * 0.2;
-      const total = subtotal + tax;
+    const newItems = state.cart.items.map((item) =>
+      item.product_id === productId
+        ? {
+            ...item,
+            quantity: newQuantity,
+            total_price: Math.round(item.unit_price * newQuantity * 100) / 100,
+          }
+        : item
+    );
 
-      return {
-        ...state,
-        cart: {
-          items: newItems,
-          subtotal: Math.round(subtotal * 100) / 100,
-          tax: Math.round(tax * 100) / 100,
-          total: Math.round(total * 100) / 100,
-          itemCount: newItems.reduce((sum, item) => sum + item.quantity, 0),
-        },
-      };
-    });
+    // ✅ RECALCUL + NOTIFICATION API
+    get().recalculateCartAndNotify(newItems);
   },
 
   removeFromCart: (productId) => {
-    set((state) => {
-      const newItems = state.cart.items.filter((item) => item.product_id !== productId);
+    const state = get();
+    const newItems = state.cart.items.filter((item) => item.product_id !== productId);
 
-      // Recalculer les totaux
-      const subtotal = newItems.reduce((sum, item) => sum + item.total_price, 0);
-      const tax = subtotal * 0.2;
-      const total = subtotal + tax;
-
-      return {
-        ...state,
-        cart: {
-          items: newItems,
-          subtotal: Math.round(subtotal * 100) / 100,
-          tax: Math.round(tax * 100) / 100,
-          total: Math.round(total * 100) / 100,
-          itemCount: newItems.reduce((sum, item) => sum + item.quantity, 0),
-        },
-      };
-    });
+    // ✅ RECALCUL + NOTIFICATION API
+    get().recalculateCartAndNotify(newItems);
   },
 
   clearCart: () => {
-    set((state) => ({
-      ...state,
+    // ✅ VIDER + NOTIFICATION API
+    set({
       cart: {
         items: [],
         total: 0,
@@ -138,10 +134,15 @@ export const useCashierStore = create((set, get) => ({
         tax: 0,
         itemCount: 0,
       },
-    }));
+    });
+
+    // ✅ NOTIFICATION API PANIER VIDE
+    setTimeout(() => {
+      get().notifyAPICartChange();
+    }, 100);
   },
 
-  // Actions de vente
+  // Actions de vente MODIFIÉES
   processSale: async (paymentMethod = 'cash') => {
     const state = get();
 
@@ -167,7 +168,7 @@ export const useCashierStore = create((set, get) => ({
         currentSale: response.data.sale,
       }));
 
-      // Vider le panier après la vente
+      // ✅ VIDER LE PANIER après la vente (avec notification API automatique)
       get().clearCart();
 
       return response.data;
@@ -180,7 +181,7 @@ export const useCashierStore = create((set, get) => ({
     }
   },
 
-  // Recherche produit
+  // Recherche produit (inchangé)
   searchProduct: async (barcode) => {
     set({ loading: true, error: null });
 
@@ -197,7 +198,7 @@ export const useCashierStore = create((set, get) => ({
     }
   },
 
-  // Gestion UI
+  // Gestion UI (inchangé)
   setShowPaymentModal: (show) => set({ showPaymentModal: show }),
   setShowReceiptModal: (show) => set({ showReceiptModal: show }),
   setError: (error) => set({ error }),

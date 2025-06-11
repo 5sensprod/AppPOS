@@ -1,4 +1,4 @@
-// src/features/pos/hooks/useCashierSession.js
+// src/features/pos/hooks/useCashierSession.js - VERSION PRODUCTION
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import cashierSessionService from '../../../services/cashierSessionService';
@@ -21,7 +21,7 @@ export const useCashierSession = () => {
   const { user } = useAuth();
   const statusCheckInterval = useRef(null);
 
-  // ✅ VÉRIFICATION PÉRIODIQUE DU STATUT
+  // Vérification périodique du statut
   const checkStatus = useCallback(async () => {
     if (!user) return;
 
@@ -40,7 +40,6 @@ export const useCashierSession = () => {
         setLcdError(null);
       }
     } catch (error) {
-      console.debug('Erreur vérification statut:', error.message);
       // Ne pas afficher d'erreur si pas de session (normal)
       if (!error.message.includes('Aucune session')) {
         setSessionError(error.message);
@@ -48,7 +47,7 @@ export const useCashierSession = () => {
     }
   }, [user]);
 
-  // ✅ INITIALISATION ET VÉRIFICATION PÉRIODIQUE
+  // Initialisation et vérification périodique
   useEffect(() => {
     if (user) {
       checkStatus();
@@ -64,7 +63,7 @@ export const useCashierSession = () => {
     };
   }, [user, checkStatus]);
 
-  // ✅ GESTION DE SESSION
+  // Gestion de session
   const openSession = useCallback(async (lcdPort = null, lcdConfig = {}) => {
     setSessionLoading(true);
     setSessionError(null);
@@ -76,7 +75,6 @@ export const useCashierSession = () => {
       setSession(data.session);
       setLcdStatus(data.lcd_status);
 
-      console.info('✅ Session caissier ouverte:', data.session?.username);
       return data;
     } catch (error) {
       setSessionError(error.response?.data?.message || error.message);
@@ -97,7 +95,6 @@ export const useCashierSession = () => {
       setLcdStatus(null);
       setLcdError(null);
 
-      console.info('✅ Session caissier fermée');
       return response.data;
     } catch (error) {
       setSessionError(error.response?.data?.message || error.message);
@@ -107,14 +104,13 @@ export const useCashierSession = () => {
     }
   }, []);
 
-  // ✅ GESTION LCD
+  // Gestion LCD
   const loadLCDPorts = useCallback(async () => {
     try {
       const response = await cashierSessionService.listLCDPorts();
       setLcdPorts(response.data.available_ports || []);
       return response.data;
     } catch (error) {
-      console.error('Erreur chargement ports LCD:', error);
       setLcdError(error.message);
       throw error;
     }
@@ -128,7 +124,6 @@ export const useCashierSession = () => {
       const response = await cashierSessionService.requestLCDControl(port, config);
       setLcdStatus(response.data.lcd_status);
 
-      console.info('✅ Contrôle LCD acquis sur', port);
       return response.data;
     } catch (error) {
       setLcdError(error.response?.data?.message || error.message);
@@ -146,7 +141,6 @@ export const useCashierSession = () => {
       const response = await cashierSessionService.releaseLCDControl();
       setLcdStatus(response.data.lcd_status);
 
-      console.info('✅ Contrôle LCD libéré');
       return response.data;
     } catch (error) {
       setLcdError(error.response?.data?.message || error.message);
@@ -156,7 +150,7 @@ export const useCashierSession = () => {
     }
   }, []);
 
-  // ✅ UTILISATION LCD AVEC GESTION D'ERREUR
+  // Utilisation LCD avec gestion d'erreur
   const safeLCDOperation = useCallback(
     async (operation, operationName) => {
       try {
@@ -171,7 +165,6 @@ export const useCashierSession = () => {
       } catch (error) {
         const errorMessage = error.response?.data?.message || error.message;
 
-        console.warn(`LCD ${operationName} failed:`, errorMessage);
         setLcdError(errorMessage);
 
         // Si erreur de session, rafraîchir le statut
@@ -185,7 +178,7 @@ export const useCashierSession = () => {
     [lcdError, checkStatus]
   );
 
-  // ✅ MÉTHODES LCD
+  // Méthodes LCD
   const lcdOperations = {
     writeMessage: useCallback(
       async (line1, line2) => {
@@ -227,7 +220,7 @@ export const useCashierSession = () => {
     }, [safeLCDOperation]),
   };
 
-  // ✅ UTILITAIRES
+  // Utilitaires
   const hasActiveSession = Boolean(session && session.status === 'active');
   const hasLCDControl = Boolean(lcdStatus?.owned && lcdStatus?.owner?.cashier_id === user?.id);
   const canUseLCD = hasActiveSession && hasLCDControl;

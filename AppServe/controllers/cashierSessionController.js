@@ -1,4 +1,4 @@
-// controllers/cashierSessionController.js
+// controllers/cashierSessionController.js - AVEC ENDPOINT updateCart
 const cashierSessionService = require('../services/cashierSessionService');
 const lcdDisplayService = require('../services/lcdDisplayService');
 const ResponseHandler = require('../handlers/ResponseHandler');
@@ -210,6 +210,42 @@ class CashierSessionController {
     }
   }
 
+  // ✅ NOUVEAU : ENDPOINT POUR MISE À JOUR PANIER
+  async updateCart(req, res) {
+    try {
+      const cashierId = req.user.id;
+      const { item_count, total } = req.body;
+
+      console.info(
+        `🛒 [API] Réception mise à jour panier: cashier=${cashierId}, items=${item_count}, total=${total}€`
+      );
+
+      // Validation des paramètres
+      if (typeof item_count !== 'number' || typeof total !== 'number') {
+        return ResponseHandler.badRequest(res, 'item_count et total doivent être des nombres');
+      }
+
+      if (item_count < 0 || total < 0) {
+        return ResponseHandler.badRequest(res, 'item_count et total ne peuvent pas être négatifs');
+      }
+
+      // ✅ NOTIFICATION AU SERVICE POUR MISE À JOUR LCD AUTOMATIQUE
+      await cashierSessionService.notifyCartChange(cashierId, item_count, total);
+
+      return ResponseHandler.success(res, {
+        message: 'Panier mis à jour avec succès',
+        cart: {
+          item_count,
+          total: parseFloat(total.toFixed(2)),
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(`❌ [API] Erreur mise à jour panier:`, error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   // ✅ LISTER PORTS LCD DISPONIBLES
   async listLCDPorts(req, res) {
     try {
@@ -236,6 +272,22 @@ class CashierSessionController {
       return ResponseHandler.success(res, {
         active_sessions: sessions,
         lcd_status: lcdStatus,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  // ✅ NOUVEAU : DEBUG - OBTENIR L'ÉTAT DU PANIER D'UN CAISSIER
+  async getCartStatus(req, res) {
+    try {
+      const cashierId = req.user.id;
+      const cart = cashierSessionService.getCashierCart(cashierId);
+
+      return ResponseHandler.success(res, {
+        cashier_id: cashierId,
+        cart,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {

@@ -1,4 +1,4 @@
-// src/services/cashierSessionService.js - Service frontend
+// src/services/cashierSessionService.js - Version CLIENT avec notification panier
 import apiService from './api';
 
 class CashierSessionService {
@@ -6,7 +6,7 @@ class CashierSessionService {
     this.baseEndpoint = '/api/cashier';
   }
 
-  // ✅ GESTION DE SESSION
+  // Gestion de session
   async openSession(lcdPort = null, lcdConfig = {}) {
     try {
       const response = await apiService.post(`${this.baseEndpoint}/session/open`, {
@@ -35,12 +35,12 @@ class CashierSessionService {
       const response = await apiService.get(`${this.baseEndpoint}/session/status`);
       return response.data;
     } catch (error) {
-      console.error('Erreur statut session:', error);
+      console.error('Erreur récupération statut session:', error);
       throw error;
     }
   }
 
-  // ✅ GESTION LCD
+  // Gestion LCD
   async listLCDPorts() {
     try {
       const response = await apiService.get(`${this.baseEndpoint}/lcd/ports`);
@@ -69,13 +69,13 @@ class CashierSessionService {
       const response = await apiService.post(`${this.baseEndpoint}/lcd/release`);
       return response.data;
     } catch (error) {
-      console.error('Erreur libération LCD:', error);
+      console.error('Erreur libération contrôle LCD:', error);
       throw error;
     }
   }
 
-  // ✅ UTILISATION LCD
-  async writeLCDMessage(line1 = '', line2 = '') {
+  // Utilisation LCD
+  async writeLCDMessage(line1, line2) {
     try {
       const response = await apiService.post(`${this.baseEndpoint}/lcd/write`, {
         line1,
@@ -118,7 +118,7 @@ class CashierSessionService {
       const response = await apiService.post(`${this.baseEndpoint}/lcd/welcome`);
       return response.data;
     } catch (error) {
-      console.error('Erreur affichage bienvenue LCD:', error);
+      console.error('Erreur affichage welcome LCD:', error);
       throw error;
     }
   }
@@ -128,7 +128,7 @@ class CashierSessionService {
       const response = await apiService.post(`${this.baseEndpoint}/lcd/thankyou`);
       return response.data;
     } catch (error) {
-      console.error('Erreur affichage remerciement LCD:', error);
+      console.error('Erreur affichage thank you LCD:', error);
       throw error;
     }
   }
@@ -138,21 +138,26 @@ class CashierSessionService {
       const response = await apiService.post(`${this.baseEndpoint}/lcd/clear`);
       return response.data;
     } catch (error) {
-      console.error('Erreur effacement LCD:', error);
+      console.error('Erreur clear LCD:', error);
       throw error;
     }
   }
 
-  // ✅ ADMINISTRATION
-  async getActiveSessions() {
+  // ✅ NOUVEAU : Notifier l'API des changements de panier
+  async notifyCartChange(itemCount, total) {
     try {
-      const response = await apiService.get(`${this.baseEndpoint}/sessions/active`);
+      const response = await apiService.post(`${this.baseEndpoint}/cart/update`, {
+        item_count: itemCount,
+        total: parseFloat(total),
+      });
       return response.data;
     } catch (error) {
-      console.error('Erreur récupération sessions actives:', error);
-      throw error;
+      // ✅ Erreur silencieuse pour ne pas bloquer l'interface
+      console.debug('Erreur notification panier API:', error.message);
+      // Ne pas throw l'erreur pour éviter de casser l'UX
     }
   }
 }
 
+// Exporter une instance unique
 export default new CashierSessionService();

@@ -1,4 +1,4 @@
-// src/features/pos/CashierPage.jsx - VERSION AVEC SESSIONS
+// src/features/pos/CashierPage.jsx - VERSION PRODUCTION FINALE
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCashierStore } from './stores/cashierStore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -19,7 +19,6 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
-// Composant de recherche de produits (identique)
 const ProductSearch = ({ onProductFound }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -93,7 +92,6 @@ const ProductSearch = ({ onProductFound }) => {
   );
 };
 
-// Composant item du panier (identique)
 const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
   const handleQuantityChange = (newQuantity) => {
     onUpdateQuantity(item.product_id, newQuantity);
@@ -143,7 +141,6 @@ const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
   );
 };
 
-// Composant panier (identique)
 const Cart = () => {
   const { cart, updateCartItemQuantity, removeFromCart, clearCart, setShowPaymentModal } =
     useCashierStore();
@@ -223,7 +220,6 @@ const Cart = () => {
   );
 };
 
-// Modal de paiement (avec système de session)
 const PaymentModal = () => {
   const { showPaymentModal, setShowPaymentModal, processSale, cart, loading } = useCashierStore();
   const { canUseLCD, lcd } = useCashierSession();
@@ -234,19 +230,12 @@ const PaymentModal = () => {
       await processSale(paymentMethod);
       setShowPaymentModal(false);
 
-      // ✅ NOUVEAU : Utilisation du LCD via le système de session
+      // L'API gère automatiquement le retour à la bienvenue via le store clearCart()
+      // Optionnel : Affichage merci temporaire
       if (canUseLCD) {
         try {
           await lcd.showThankYou();
-
-          // Retour au message de bienvenue après 3 secondes
-          setTimeout(async () => {
-            try {
-              await lcd.showWelcome();
-            } catch (error) {
-              console.debug('Erreur affichage welcome post-paiement:', error.message);
-            }
-          }, 3000);
+          // L'API reprendra le contrôle automatiquement après clearCart()
         } catch (error) {
           console.debug('Erreur affichage thank you:', error.message);
         }
@@ -331,7 +320,6 @@ const PaymentModal = () => {
   );
 };
 
-// Modal de reçu (identique)
 const ReceiptModal = () => {
   const { showReceiptModal, setShowReceiptModal, lastReceipt } = useCashierStore();
 
@@ -410,67 +398,13 @@ const ReceiptModal = () => {
   );
 };
 
-// ✅ COMPOSANT PRINCIPAL AVEC SYSTÈME DE SESSIONS
+// COMPOSANT PRINCIPAL - VERSION PRODUCTION
 const CashierPage = () => {
   const { user } = useAuth();
-  const { addToCart, error, setError, cart } = useCashierStore();
-
-  // ✅ NOUVEAU : Hook de session au lieu de l'ancien hook LCD
+  const { addToCart, error, setError } = useCashierStore();
   const { hasActiveSession, canUseLCD, lcd, sessionError, lcdError } = useCashierSession();
 
-  // Refs pour la gestion LCD
-  const lastCartState = useRef({ itemCount: 0, total: 0 });
-  const updateTimeoutRef = useRef(null);
-
-  // ✅ FONCTION MISE À JOUR LCD via système de session
-  const updateLCDDisplay = useCallback(async () => {
-    if (!canUseLCD) return;
-
-    // Éviter les mises à jour identiques
-    if (
-      lastCartState.current.itemCount === cart.itemCount &&
-      Math.abs(lastCartState.current.total - cart.total) < 0.01
-    ) {
-      return;
-    }
-
-    try {
-      if (cart.itemCount === 0) {
-        await lcd.showWelcome();
-      } else {
-        // Format minimal pour le panier
-        await lcd.writeMessage(`Qte: ${cart.itemCount}`, `${cart.total.toFixed(2)}EUR`);
-      }
-
-      lastCartState.current = {
-        itemCount: cart.itemCount,
-        total: cart.total,
-      };
-    } catch (error) {
-      console.debug('LCD update failed:', error.message);
-    }
-  }, [canUseLCD, cart.itemCount, cart.total, lcd]);
-
-  // ✅ EFFET POUR MISE À JOUR LCD avec debounce
-  useEffect(() => {
-    if (!canUseLCD) return;
-
-    // Clear timeout précédent
-    if (updateTimeoutRef.current) {
-      clearTimeout(updateTimeoutRef.current);
-    }
-
-    // Délai pour éviter les appels trop fréquents
-    updateTimeoutRef.current = setTimeout(updateLCDDisplay, 800);
-
-    return () => {
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-    };
-  }, [cart.itemCount, cart.total, canUseLCD, updateLCDDisplay]);
-
-  // ✅ GESTION AJOUT PRODUIT avec LCD via session
+  // Gestion ajout produit - Affichage prix seulement
   const handleProductFound = useCallback(
     async (product) => {
       if (product.manage_stock && product.stock <= 0) {
@@ -481,28 +415,12 @@ const CashierPage = () => {
       addToCart(product, 1);
       setError(null);
 
-      // Affichage produit sur LCD si possible
+      // Affichage prix produit (l'API gère le résumé panier automatiquement)
       if (canUseLCD) {
         try {
           const productName =
             product.name.length > 20 ? product.name.substring(0, 17) + '...' : product.name;
-
           await lcd.showPrice(productName, product.price);
-
-          // Retour au résumé panier après 2 secondes
-          setTimeout(() => {
-            if (canUseLCD) {
-              const currentCart = useCashierStore.getState().cart;
-              if (currentCart.itemCount > 0) {
-                lcd
-                  .writeMessage(
-                    `Qte: ${currentCart.itemCount}`,
-                    `${currentCart.total.toFixed(2)}EUR`
-                  )
-                  .catch(() => {});
-              }
-            }
-          }, 2000);
         } catch (error) {
           console.debug('Erreur affichage produit LCD:', error.message);
         }
@@ -511,27 +429,11 @@ const CashierPage = () => {
     [addToCart, setError, canUseLCD, lcd]
   );
 
-  // Nettoyage
-  useEffect(() => {
-    return () => {
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-    };
-  }, []);
-
   // Raccourcis clavier
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.target.tagName === 'INPUT') return;
-
-      switch (e.key) {
-        case 'Escape':
-          setError(null);
-          break;
-        default:
-          break;
-      }
+      if (e.key === 'Escape') setError(null);
     };
 
     window.addEventListener('keydown', handleKeyPress);
@@ -540,12 +442,10 @@ const CashierPage = () => {
 
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-900 p-4">
-      {/* ✅ NOUVEAU : Gestionnaire de session en premier */}
       <div className="mb-4">
         <SessionManager />
       </div>
 
-      {/* Header simplifié */}
       <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-md">
         <div className="flex items-center justify-between">
           <div>
@@ -577,7 +477,6 @@ const CashierPage = () => {
         </div>
       </div>
 
-      {/* Messages d'erreur */}
       {error && (
         <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
           <div className="flex justify-between items-center">
@@ -592,7 +491,6 @@ const CashierPage = () => {
         </div>
       )}
 
-      {/* Messages de session/LCD */}
       {(sessionError || lcdError) && (
         <div className="mb-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 text-yellow-700 dark:text-yellow-300 px-4 py-3 rounded-lg">
           <div className="flex items-center">
@@ -602,7 +500,6 @@ const CashierPage = () => {
         </div>
       )}
 
-      {/* Corps principal - désactivé si pas de session */}
       <div
         className={`grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-280px)] ${
           !hasActiveSession ? 'opacity-50 pointer-events-none' : ''
@@ -616,7 +513,6 @@ const CashierPage = () => {
         </div>
       </div>
 
-      {/* Message si pas de session - SEULEMENT sur le corps principal */}
       {!hasActiveSession && (
         <div className="absolute top-80 left-0 right-0 bottom-0 flex items-center justify-center bg-black bg-opacity-20 z-10">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 text-center shadow-lg">
@@ -631,7 +527,6 @@ const CashierPage = () => {
         </div>
       )}
 
-      {/* Modals */}
       <PaymentModal />
       <ReceiptModal />
     </div>
