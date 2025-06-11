@@ -1,4 +1,4 @@
-// src/features/pos/CashierPage.jsx - VERSION PRODUCTION FINALE
+// src/features/pos/CashierPage.jsx - VERSION SANS MODAL GENANTE
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCashierStore } from './stores/cashierStore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -398,11 +398,14 @@ const ReceiptModal = () => {
   );
 };
 
-// COMPOSANT PRINCIPAL - VERSION PRODUCTION
+// COMPOSANT PRINCIPAL - VERSION SIMPLE QUI MARCHE
 const CashierPage = () => {
   const { user } = useAuth();
   const { addToCart, error, setError } = useCashierStore();
   const { hasActiveSession, canUseLCD, lcd, sessionError, lcdError } = useCashierSession();
+
+  // ✅ DEBUG : Voir ce que reçoit CashierPage
+  console.log(`🖥️ [CASHIER PAGE] hasActiveSession: ${hasActiveSession}`);
 
   // Gestion ajout produit - Affichage prix seulement
   const handleProductFound = useCallback(
@@ -500,11 +503,8 @@ const CashierPage = () => {
         </div>
       )}
 
-      <div
-        className={`grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-280px)] ${
-          !hasActiveSession ? 'opacity-50 pointer-events-none' : ''
-        }`}
-      >
+      {/* Interface normale - Plus de grisage ! */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-280px)]">
         <div className="lg:col-span-1">
           <ProductSearch onProductFound={handleProductFound} />
         </div>
@@ -512,20 +512,6 @@ const CashierPage = () => {
           <Cart />
         </div>
       </div>
-
-      {!hasActiveSession && (
-        <div className="absolute top-80 left-0 right-0 bottom-0 flex items-center justify-center bg-black bg-opacity-20 z-10">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 text-center shadow-lg">
-            <User className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Session requise
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Ouvrez une session de caisse ci-dessus pour utiliser cette interface
-            </p>
-          </div>
-        </div>
-      )}
 
       <PaymentModal />
       <ReceiptModal />
