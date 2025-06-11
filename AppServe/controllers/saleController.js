@@ -83,6 +83,14 @@ class SaleController extends BaseController {
 
       const newSale = await Sale.create(saleData);
 
+      const cashierSessionService = require('../services/cashierSessionService');
+      try {
+        cashierSessionService.updateSaleStats(cashier.id, totalAmount);
+      } catch (error) {
+        // Erreur silencieuse - ne pas faire échouer la vente
+        console.debug('Erreur mise à jour stats session:', error.message);
+      }
+
       // 4. Décrémenter les stocks
       for (const item of enrichedItems) {
         const product = await Product.findById(item.product_id);

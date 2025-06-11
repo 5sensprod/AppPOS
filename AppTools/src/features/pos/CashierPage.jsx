@@ -1,7 +1,9 @@
+// src/features/pos/CashierPage.jsx - VERSION AVEC SESSIONS
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCashierStore } from './stores/cashierStore';
 import { useAuth } from '../../contexts/AuthContext';
-import { useLCDIntegration } from './hooks/useLCDIntegration';
+import { useCashierSession } from './hooks/useCashierSession';
+import SessionManager from './components/SessionManager';
 import {
   Search,
   ShoppingCart,
@@ -14,10 +16,10 @@ import {
   Clock,
   Euro,
   Monitor,
-  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 
-// Composant de recherche de produits
+// Composant de recherche de produits (identique)
 const ProductSearch = ({ onProductFound }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -91,7 +93,7 @@ const ProductSearch = ({ onProductFound }) => {
   );
 };
 
-// Composant item du panier
+// Composant item du panier (identique)
 const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
   const handleQuantityChange = (newQuantity) => {
     onUpdateQuantity(item.product_id, newQuantity);
@@ -141,7 +143,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
   );
 };
 
-// Composant panier
+// Composant panier (identique)
 const Cart = () => {
   const { cart, updateCartItemQuantity, removeFromCart, clearCart, setShowPaymentModal } =
     useCashierStore();
@@ -221,10 +223,10 @@ const Cart = () => {
   );
 };
 
-// Modal de paiement
+// Modal de paiement (avec système de session)
 const PaymentModal = () => {
   const { showPaymentModal, setShowPaymentModal, processSale, cart, loading } = useCashierStore();
-  const { lcdConnected, displayThankYou, displayWelcome } = useLCDIntegration();
+  const { canUseLCD, lcd } = useCashierSession();
   const [paymentMethod, setPaymentMethod] = useState('cash');
 
   const handlePayment = async () => {
@@ -232,19 +234,22 @@ const PaymentModal = () => {
       await processSale(paymentMethod);
       setShowPaymentModal(false);
 
-      // Affichage LCD post-paiement
-      if (lcdConnected) {
-        displayThankYou()
-          .then(() => {
-            setTimeout(() => {
-              displayWelcome().catch(() => {
-                // Erreur silencieuse
-              });
-            }, 3000);
-          })
-          .catch(() => {
-            // Erreur silencieuse
-          });
+      // ✅ NOUVEAU : Utilisation du LCD via le système de session
+      if (canUseLCD) {
+        try {
+          await lcd.showThankYou();
+
+          // Retour au message de bienvenue après 3 secondes
+          setTimeout(async () => {
+            try {
+              await lcd.showWelcome();
+            } catch (error) {
+              console.debug('Erreur affichage welcome post-paiement:', error.message);
+            }
+          }, 3000);
+        } catch (error) {
+          console.debug('Erreur affichage thank you:', error.message);
+        }
       }
     } catch (error) {
       console.error('Erreur paiement:', error);
@@ -326,7 +331,7 @@ const PaymentModal = () => {
   );
 };
 
-// Modal de reçu
+// Modal de reçu (identique)
 const ReceiptModal = () => {
   const { showReceiptModal, setShowReceiptModal, lastReceipt } = useCashierStore();
 
@@ -405,88 +410,69 @@ const ReceiptModal = () => {
   );
 };
 
-// Composant principal de la page de caisse
+// ✅ COMPOSANT PRINCIPAL AVEC SYSTÈME DE SESSIONS
 const CashierPage = () => {
   const { user } = useAuth();
   const { addToCart, error, setError, cart } = useCashierStore();
-  const {
-    lcdConnected,
-    lcdError,
-    lcdLoading,
-    diagnosticInfo,
-    displayProductAdded,
-    displayCartSummary,
-    displayWelcome,
-    reconnectLCD,
-    checkLCDStatus,
-    resetCircuitBreaker,
-    isTemporarilyDisabled,
-    consecutiveErrors,
-  } = useLCDIntegration();
 
-  // Fonction quickStatusCheck intégrée
-  const quickStatusCheck = useCallback(async () => {
-    console.info('⚡ Vérification rapide du statut LCD...');
-    await checkLCDStatus();
-  }, [checkLCDStatus]);
+  // ✅ NOUVEAU : Hook de session au lieu de l'ancien hook LCD
+  const { hasActiveSession, canUseLCD, lcd, sessionError, lcdError } = useCashierSession();
 
-  // 🔧 REFS OPTIMISÉES
-  const lcdUpdateTimeoutRef = useRef(null);
-  const productDisplayTimeoutRef = useRef(null);
-  const lastCartStateRef = useRef({ itemCount: 0, total: 0, lastUpdate: 0 });
+  // Refs pour la gestion LCD
+  const lastCartState = useRef({ itemCount: 0, total: 0 });
+  const updateTimeoutRef = useRef(null);
 
-  // 🔧 DEBOUNCED LCD UPDATE
-  const scheduleNextLCDUpdate = useCallback(
-    (itemCount, total) => {
-      const now = Date.now();
-      const lastState = lastCartStateRef.current;
+  // ✅ FONCTION MISE À JOUR LCD via système de session
+  const updateLCDDisplay = useCallback(async () => {
+    if (!canUseLCD) return;
 
-      if (now - lastState.lastUpdate < 1000) {
-        console.debug('LCD update too frequent, debouncing...');
-        return;
+    // Éviter les mises à jour identiques
+    if (
+      lastCartState.current.itemCount === cart.itemCount &&
+      Math.abs(lastCartState.current.total - cart.total) < 0.01
+    ) {
+      return;
+    }
+
+    try {
+      if (cart.itemCount === 0) {
+        await lcd.showWelcome();
+      } else {
+        // Format minimal pour le panier
+        await lcd.writeMessage(`Qte: ${cart.itemCount}`, `${cart.total.toFixed(2)}EUR`);
       }
 
-      if (lastState.itemCount === itemCount && lastState.total === total) {
-        console.debug('No significant cart change for LCD');
-        return;
-      }
+      lastCartState.current = {
+        itemCount: cart.itemCount,
+        total: cart.total,
+      };
+    } catch (error) {
+      console.debug('LCD update failed:', error.message);
+    }
+  }, [canUseLCD, cart.itemCount, cart.total, lcd]);
 
-      if (lcdUpdateTimeoutRef.current) {
-        clearTimeout(lcdUpdateTimeoutRef.current);
-      }
-
-      lcdUpdateTimeoutRef.current = setTimeout(async () => {
-        if (!lcdConnected || isTemporarilyDisabled) return;
-
-        try {
-          if (itemCount === 0) {
-            await displayWelcome();
-          } else {
-            await displayCartSummary(itemCount, total);
-          }
-          lastCartStateRef.current = { itemCount, total, lastUpdate: Date.now() };
-        } catch (error) {
-          console.debug('LCD update failed but handled:', error.message);
-        }
-      }, 300);
-    },
-    [lcdConnected, isTemporarilyDisabled, displayWelcome, displayCartSummary]
-  );
-
-  // 🔧 EFFET LCD OPTIMISÉ
+  // ✅ EFFET POUR MISE À JOUR LCD avec debounce
   useEffect(() => {
-    if (!lcdConnected || isTemporarilyDisabled) return;
-    scheduleNextLCDUpdate(cart.itemCount, cart.total);
+    if (!canUseLCD) return;
+
+    // Clear timeout précédent
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    // Délai pour éviter les appels trop fréquents
+    updateTimeoutRef.current = setTimeout(updateLCDDisplay, 800);
+
     return () => {
-      if (lcdUpdateTimeoutRef.current) {
-        clearTimeout(lcdUpdateTimeoutRef.current);
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
       }
     };
-  }, [cart.itemCount, cart.total, lcdConnected, isTemporarilyDisabled, scheduleNextLCDUpdate]);
+  }, [cart.itemCount, cart.total, canUseLCD, updateLCDDisplay]);
 
-  // 🔧 GESTION AJOUT PRODUIT
+  // ✅ GESTION AJOUT PRODUIT avec LCD via session
   const handleProductFound = useCallback(
-    (product) => {
+    async (product) => {
       if (product.manage_stock && product.stock <= 0) {
         setError(`Produit "${product.name}" en rupture de stock`);
         return;
@@ -495,41 +481,41 @@ const CashierPage = () => {
       addToCart(product, 1);
       setError(null);
 
-      if (lcdConnected && !isTemporarilyDisabled) {
-        if (productDisplayTimeoutRef.current) {
-          clearTimeout(productDisplayTimeoutRef.current);
-        }
+      // Affichage produit sur LCD si possible
+      if (canUseLCD) {
+        try {
+          const productName =
+            product.name.length > 20 ? product.name.substring(0, 17) + '...' : product.name;
 
-        displayProductAdded(product.name, 1, product.price)
-          .then(() => {
-            productDisplayTimeoutRef.current = setTimeout(() => {
-              if (lcdConnected && !isTemporarilyDisabled) {
-                const currentCart = useCashierStore.getState().cart;
-                displayCartSummary(currentCart.itemCount, currentCart.total).catch(() => {});
+          await lcd.showPrice(productName, product.price);
+
+          // Retour au résumé panier après 2 secondes
+          setTimeout(() => {
+            if (canUseLCD) {
+              const currentCart = useCashierStore.getState().cart;
+              if (currentCart.itemCount > 0) {
+                lcd
+                  .writeMessage(
+                    `Qte: ${currentCart.itemCount}`,
+                    `${currentCart.total.toFixed(2)}EUR`
+                  )
+                  .catch(() => {});
               }
-            }, 50);
-          })
-          .catch(() => {});
+            }
+          }, 2000);
+        } catch (error) {
+          console.debug('Erreur affichage produit LCD:', error.message);
+        }
       }
     },
-    [
-      addToCart,
-      setError,
-      lcdConnected,
-      isTemporarilyDisabled,
-      displayProductAdded,
-      displayCartSummary,
-    ]
+    [addToCart, setError, canUseLCD, lcd]
   );
 
   // Nettoyage
   useEffect(() => {
     return () => {
-      if (lcdUpdateTimeoutRef.current) {
-        clearTimeout(lcdUpdateTimeoutRef.current);
-      }
-      if (productDisplayTimeoutRef.current) {
-        clearTimeout(productDisplayTimeoutRef.current);
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
       }
     };
   }, []);
@@ -538,14 +524,10 @@ const CashierPage = () => {
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.target.tagName === 'INPUT') return;
+
       switch (e.key) {
         case 'Escape':
           setError(null);
-          break;
-        case 'F5':
-          e.preventDefault();
-          console.log('F5 pressed - reconnecting LCD...');
-          reconnectLCD();
           break;
         default:
           break;
@@ -554,11 +536,16 @@ const CashierPage = () => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [setError, reconnectLCD]);
+  }, [setError]);
 
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-900 p-4">
-      {/* Header */}
+      {/* ✅ NOUVEAU : Gestionnaire de session en premier */}
+      <div className="mb-4">
+        <SessionManager />
+      </div>
+
+      {/* Header simplifié */}
       <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-md">
         <div className="flex items-center justify-between">
           <div>
@@ -566,7 +553,9 @@ const CashierPage = () => {
               <Euro className="h-6 w-6 mr-2" />
               Caisse POS
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">Session de {user?.username}</p>
+            <p className="text-gray-600 dark:text-gray-400">
+              {hasActiveSession ? 'Session active' : 'Aucune session'} - {user?.username}
+            </p>
           </div>
 
           <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
@@ -578,21 +567,12 @@ const CashierPage = () => {
               <Clock className="h-4 w-4 mr-1" />
               {new Date().toLocaleTimeString('fr-FR')}
             </div>
-            <div className="flex items-center">
-              <div
-                className={`h-2 w-2 rounded-full mr-2 ${
-                  isTemporarilyDisabled
-                    ? 'bg-orange-400'
-                    : lcdConnected
-                      ? 'bg-green-400'
-                      : 'bg-red-400'
-                }`}
-              ></div>
-              <span className="text-xs">
-                LCD {isTemporarilyDisabled ? 'Suspendu' : lcdConnected ? 'Connecté' : 'Déconnecté'}
-                {consecutiveErrors > 0 && ` (${consecutiveErrors}/3)`}
-              </span>
-            </div>
+            {canUseLCD && (
+              <div className="flex items-center text-green-600">
+                <Monitor className="h-4 w-4 mr-1" />
+                <span className="text-xs">LCD Actif</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -612,45 +592,22 @@ const CashierPage = () => {
         </div>
       )}
 
-      {/* Message LCD simple */}
-      {lcdError && (
+      {/* Messages de session/LCD */}
+      {(sessionError || lcdError) && (
         <div className="mb-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 text-yellow-700 dark:text-yellow-300 px-4 py-3 rounded-lg">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center">
-              <Monitor className="h-4 w-4 mr-2" />
-              <span>{lcdError}</span>
-            </div>
-            <div className="flex space-x-2">
-              {isTemporarilyDisabled && (
-                <button
-                  onClick={resetCircuitBreaker}
-                  className="text-yellow-700 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-100 text-sm underline flex items-center"
-                >
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Réactiver
-                </button>
-              )}
-              <button
-                onClick={quickStatusCheck}
-                disabled={lcdLoading}
-                className="text-yellow-700 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-100 text-sm underline"
-              >
-                Vérifier
-              </button>
-              <button
-                onClick={reconnectLCD}
-                disabled={lcdLoading}
-                className="text-yellow-700 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-100 text-sm underline"
-              >
-                Reconnecter
-              </button>
-            </div>
+          <div className="flex items-center">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            <span>{sessionError || lcdError}</span>
           </div>
         </div>
       )}
 
-      {/* Corps principal */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
+      {/* Corps principal - désactivé si pas de session */}
+      <div
+        className={`grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-280px)] ${
+          !hasActiveSession ? 'opacity-50 pointer-events-none' : ''
+        }`}
+      >
         <div className="lg:col-span-1">
           <ProductSearch onProductFound={handleProductFound} />
         </div>
@@ -658,6 +615,21 @@ const CashierPage = () => {
           <Cart />
         </div>
       </div>
+
+      {/* Message si pas de session - SEULEMENT sur le corps principal */}
+      {!hasActiveSession && (
+        <div className="absolute top-80 left-0 right-0 bottom-0 flex items-center justify-center bg-black bg-opacity-20 z-10">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 text-center shadow-lg">
+            <User className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              Session requise
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Ouvrez une session de caisse ci-dessus pour utiliser cette interface
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <PaymentModal />

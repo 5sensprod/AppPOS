@@ -63,6 +63,7 @@ app.use('/api/sync', authMiddleware, wooSyncRoutes);
 app.use('/api/descriptions', authMiddleware, productDescriptionRoutes);
 app.use('/api/product-title', authMiddleware, productTitleRoutes);
 app.use('/api/sales', authMiddleware, saleRoutes);
+app.use('/api/cashier', require('./routes/cashierSessionRoutes'));
 // Ajout des routes de sauvegarde
 app.use('/api/backup', authMiddleware, backupRoutes);
 
