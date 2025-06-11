@@ -230,16 +230,7 @@ const PaymentModal = () => {
       await processSale(paymentMethod);
       setShowPaymentModal(false);
 
-      // L'API gère automatiquement le retour à la bienvenue via le store clearCart()
-      // Optionnel : Affichage merci temporaire
-      if (canUseLCD) {
-        try {
-          await lcd.showThankYou();
-          // L'API reprendra le contrôle automatiquement après clearCart()
-        } catch (error) {
-          console.debug('Erreur affichage thank you:', error.message);
-        }
-      }
+      // Panier vidé, LCD géré par l'API
     } catch (error) {
       console.error('Erreur paiement:', error);
     }

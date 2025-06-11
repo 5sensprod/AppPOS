@@ -193,6 +193,11 @@ class CashierSessionService {
       lastUpdate: new Date(),
     });
 
+    if (itemCount === 0 && !options.skipWelcome) {
+      console.info(`👋 [API] Panier vide -> Welcome pour ${this.lcdOwnership.username}`);
+      await lcdDisplayService.showWelcomeMessage();
+    }
+
     try {
       // ✅ GESTION INTELLIGENTE SELON L'ÉTAT DU PANIER
       if (itemCount === 0) {
@@ -259,6 +264,31 @@ class CashierSessionService {
     return await this.useLCD(cashierId, () => lcdDisplayService.clearDisplay());
   }
 
+  async processSaleComplete(cashierId) {
+    if (!this.lcdOwnership || this.lcdOwnership.cashier_id !== cashierId) return;
+
+    try {
+      // 1. Merci
+      await lcdDisplayService.showThankYou();
+      console.info(`🙏 [API] Message remerciement affiché`);
+
+      // 2. Pause puis bienvenue
+      setTimeout(async () => {
+        try {
+          await lcdDisplayService.showWelcomeMessage();
+          console.info(`👋 [API] Retour message bienvenue après vente`);
+        } catch (error) {
+          console.warn('Erreur welcome après vente:', error.message);
+        }
+      }, 3000);
+
+      // 3. Panier vide (immédiat)
+      this.updateCashierCart(cashierId, 0, 0.0, { skipWelcome: true });
+    } catch (error) {
+      console.warn('Erreur séquence vente:', error.message);
+    }
+  }
+
   // ✅ OBTENIR INFO SESSION
   getCashierSession(cashierId) {
     return this.activeSessions.get(cashierId) || null;
@@ -286,9 +316,9 @@ class CashierSessionService {
       session.total_sales += saleAmount;
       session.last_sale = new Date();
 
-      // ✅ MISE À JOUR AUTO : Panier vide après vente
-      console.info(`💳 [API] Vente terminée -> Retour panier vide pour ${session.username}`);
-      this.updateCashierCart(cashierId, 0, 0.0);
+      // ✅ APPELER LA SÉQUENCE COMPLÈTE
+      console.info(`💳 [API] Vente terminée -> Séquence remerciement pour ${session.username}`);
+      this.processSaleComplete(cashierId);
     }
   }
 
