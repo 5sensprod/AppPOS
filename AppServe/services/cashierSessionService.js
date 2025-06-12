@@ -1,4 +1,4 @@
-// services/cashierSessionService.js - API INTELLIGENTE avec gestion auto LCD
+// services/cashierSessionService.js - CORRECTION - API INTELLIGENTE avec gestion auto LCD
 const lcdDisplayService = require('./lcdDisplayService');
 
 class CashierSessionService {
@@ -166,8 +166,8 @@ class CashierSessionService {
     };
   }
 
-  // ✅ NOUVEAU : MISE À JOUR INTELLIGENTE DU PANIER
-  async updateCashierCart(cashierId, itemCount, total) {
+  // ✅ CORRIGÉ : MISE À JOUR INTELLIGENTE DU PANIER avec options
+  async updateCashierCart(cashierId, itemCount, total, options = {}) {
     if (!this.activeSessions.has(cashierId)) {
       console.debug(`⚠️ [API] Pas de session pour cashier ${cashierId}`);
       return;
@@ -193,17 +193,12 @@ class CashierSessionService {
       lastUpdate: new Date(),
     });
 
-    if (itemCount === 0 && !options.skipWelcome) {
-      console.info(`👋 [API] Panier vide -> Welcome pour ${this.lcdOwnership.username}`);
-      await lcdDisplayService.showWelcomeMessage();
-    }
-
     try {
       // ✅ GESTION INTELLIGENTE SELON L'ÉTAT DU PANIER
-      if (itemCount === 0) {
+      if (itemCount === 0 && !options.skipWelcome) {
         console.info(`👋 [API] Panier vide -> Welcome pour ${this.lcdOwnership.username}`);
         await lcdDisplayService.showWelcomeMessage();
-      } else {
+      } else if (itemCount > 0) {
         console.info(`📱 [API] Résumé panier -> ${itemCount} articles, ${total.toFixed(2)}€`);
         await lcdDisplayService.writeToDisplay(`Qte: ${itemCount}`, `${total.toFixed(2)}EUR`);
       }
@@ -264,6 +259,7 @@ class CashierSessionService {
     return await this.useLCD(cashierId, () => lcdDisplayService.clearDisplay());
   }
 
+  // ✅ CORRIGÉ : TRAITEMENT VENTE COMPLÈTE
   async processSaleComplete(cashierId) {
     if (!this.lcdOwnership || this.lcdOwnership.cashier_id !== cashierId) return;
 
@@ -282,7 +278,7 @@ class CashierSessionService {
         }
       }, 3000);
 
-      // 3. Panier vide (immédiat)
+      // 3. Panier vide (immédiat avec option skipWelcome)
       this.updateCashierCart(cashierId, 0, 0.0, { skipWelcome: true });
     } catch (error) {
       console.warn('Erreur séquence vente:', error.message);
