@@ -395,8 +395,14 @@ const CashierPage = () => {
   const { addToCart, error, setError } = useCashierStore();
   const { hasActiveSession, canUseLCD, lcd, sessionError, lcdError } = useCashierSession();
 
-  // ✅ DEBUG : Voir ce que reçoit CashierPage
-  console.log(`🖥️ [CASHIER PAGE] hasActiveSession: ${hasActiveSession}`);
+  // ✅ DEBUG SEULEMENT LORS DES CHANGEMENTS RÉELS
+  useEffect(() => {
+    console.log(`🖥️ [CASHIER PAGE] Session changed: ${hasActiveSession}`);
+  }, [hasActiveSession]);
+
+  useEffect(() => {
+    console.log(`📺 [CASHIER PAGE] LCD changed: ${canUseLCD}`);
+  }, [canUseLCD]);
 
   // Gestion ajout produit - Affichage prix seulement
   const handleProductFound = useCallback(
@@ -494,7 +500,7 @@ const CashierPage = () => {
         </div>
       )}
 
-      {/* Interface normale - Plus de grisage ! */}
+      {/* Interface principale */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-280px)]">
         <div className="lg:col-span-1">
           <ProductSearch onProductFound={handleProductFound} />

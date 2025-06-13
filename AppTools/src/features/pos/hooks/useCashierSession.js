@@ -1,4 +1,4 @@
-// src/features/pos/hooks/useCashierSession.js - VERSION PRODUCTION
+// src/features/pos/hooks/useCashierSession.js - FIX DÉLAI SYNCHRONISATION
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import cashierSessionService from '../../../services/cashierSessionService';
@@ -21,7 +21,7 @@ export const useCashierSession = () => {
   const { user } = useAuth();
   const statusCheckInterval = useRef(null);
 
-  // Vérification périodique du statut
+  // ✅ VÉRIFICATION PÉRIODIQUE - FONCTION STABLE
   const checkStatus = useCallback(async () => {
     if (!user) return;
 
@@ -52,8 +52,8 @@ export const useCashierSession = () => {
     if (user) {
       checkStatus();
 
-      // Vérification toutes les 30 secondes
-      statusCheckInterval.current = setInterval(checkStatus, 30000);
+      // ✅ RÉDUIRE L'INTERVALLE pour plus de réactivité
+      statusCheckInterval.current = setInterval(checkStatus, 10000); // 10s au lieu de 30s
     }
 
     return () => {
@@ -63,26 +63,35 @@ export const useCashierSession = () => {
     };
   }, [user, checkStatus]);
 
-  // Gestion de session
-  const openSession = useCallback(async (lcdPort = null, lcdConfig = {}) => {
-    setSessionLoading(true);
-    setSessionError(null);
+  // ✅ GESTION DE SESSION AVEC SYNC IMMÉDIATE
+  const openSession = useCallback(
+    async (lcdPort = null, lcdConfig = {}) => {
+      setSessionLoading(true);
+      setSessionError(null);
 
-    try {
-      const response = await cashierSessionService.openSession(lcdPort, lcdConfig);
-      const data = response.data;
+      try {
+        const response = await cashierSessionService.openSession(lcdPort, lcdConfig);
+        const data = response.data;
 
-      setSession(data.session);
-      setLcdStatus(data.lcd_status);
+        // ✅ MISE À JOUR IMMÉDIATE de l'état local
+        setSession(data.session);
+        setLcdStatus(data.lcd_status);
 
-      return data;
-    } catch (error) {
-      setSessionError(error.response?.data?.message || error.message);
-      throw error;
-    } finally {
-      setSessionLoading(false);
-    }
-  }, []);
+        // ✅ FORCER UNE VÉRIFICATION pour synchroniser avec le serveur
+        setTimeout(() => {
+          checkStatus();
+        }, 500); // Petit délai pour laisser le serveur se stabiliser
+
+        return data;
+      } catch (error) {
+        setSessionError(error.response?.data?.message || error.message);
+        throw error;
+      } finally {
+        setSessionLoading(false);
+      }
+    },
+    [checkStatus]
+  );
 
   const closeSession = useCallback(async () => {
     setSessionLoading(true);
@@ -91,9 +100,15 @@ export const useCashierSession = () => {
     try {
       const response = await cashierSessionService.closeSession();
 
+      // ✅ MISE À JOUR IMMÉDIATE de l'état local
       setSession(null);
       setLcdStatus(null);
       setLcdError(null);
+
+      // ✅ FORCER UNE VÉRIFICATION pour synchroniser avec le serveur
+      setTimeout(() => {
+        checkStatus();
+      }, 500);
 
       return response.data;
     } catch (error) {
@@ -102,7 +117,7 @@ export const useCashierSession = () => {
     } finally {
       setSessionLoading(false);
     }
-  }, []);
+  }, [checkStatus]);
 
   // Gestion LCD
   const loadLCDPorts = useCallback(async () => {
@@ -116,22 +131,32 @@ export const useCashierSession = () => {
     }
   }, []);
 
-  const requestLCDControl = useCallback(async (port, config = {}) => {
-    setLcdLoading(true);
-    setLcdError(null);
+  const requestLCDControl = useCallback(
+    async (port, config = {}) => {
+      setLcdLoading(true);
+      setLcdError(null);
 
-    try {
-      const response = await cashierSessionService.requestLCDControl(port, config);
-      setLcdStatus(response.data.lcd_status);
+      try {
+        const response = await cashierSessionService.requestLCDControl(port, config);
 
-      return response.data;
-    } catch (error) {
-      setLcdError(error.response?.data?.message || error.message);
-      throw error;
-    } finally {
-      setLcdLoading(false);
-    }
-  }, []);
+        // ✅ MISE À JOUR IMMÉDIATE
+        setLcdStatus(response.data.lcd_status);
+
+        // ✅ FORCER UNE VÉRIFICATION
+        setTimeout(() => {
+          checkStatus();
+        }, 500);
+
+        return response.data;
+      } catch (error) {
+        setLcdError(error.response?.data?.message || error.message);
+        throw error;
+      } finally {
+        setLcdLoading(false);
+      }
+    },
+    [checkStatus]
+  );
 
   const releaseLCDControl = useCallback(async () => {
     setLcdLoading(true);
@@ -139,7 +164,14 @@ export const useCashierSession = () => {
 
     try {
       const response = await cashierSessionService.releaseLCDControl();
+
+      // ✅ MISE À JOUR IMMÉDIATE
       setLcdStatus(response.data.lcd_status);
+
+      // ✅ FORCER UNE VÉRIFICATION
+      setTimeout(() => {
+        checkStatus();
+      }, 500);
 
       return response.data;
     } catch (error) {
@@ -148,7 +180,7 @@ export const useCashierSession = () => {
     } finally {
       setLcdLoading(false);
     }
-  }, []);
+  }, [checkStatus]);
 
   // Utilisation LCD avec gestion d'erreur
   const safeLCDOperation = useCallback(
@@ -167,7 +199,7 @@ export const useCashierSession = () => {
 
         setLcdError(errorMessage);
 
-        // Si erreur de session, rafraîchir le statut
+        // Si erreur de session, rafraîchir le statut IMMÉDIATEMENT
         if (errorMessage.includes('non assigné') || errorMessage.includes('session')) {
           checkStatus();
         }
@@ -178,7 +210,7 @@ export const useCashierSession = () => {
     [lcdError, checkStatus]
   );
 
-  // Méthodes LCD
+  // Méthodes LCD (identiques)
   const lcdOperations = {
     writeMessage: useCallback(
       async (line1, line2) => {
