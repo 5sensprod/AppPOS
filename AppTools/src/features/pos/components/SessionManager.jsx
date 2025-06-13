@@ -1,114 +1,124 @@
-// src/features/pos/components/SessionManager.jsx
+// src/features/pos/components/SessionManager.jsx - VERSION ZUSTAND
 import React, { useState, useEffect } from 'react';
-import { useCashierSession } from '../hooks/useCashierSession';
+import { useSessionCashier, useSessionLCD } from '../../../stores/sessionStore';
 import {
   LogIn,
   LogOut,
   Monitor,
   MonitorOff,
-  Scan,
   User,
-  Clock,
   CheckCircle,
-  XCircle,
   AlertTriangle,
   RefreshCw,
 } from 'lucide-react';
 
 const SessionManager = () => {
+  // ✅ HOOKS ZUSTAND SÉLECTIFS (re-render optimisé)
   const {
-    session,
+    cashierSession,
+    hasActiveCashierSession,
     sessionLoading,
     sessionError,
-    hasActiveSession,
+    startSession,
+    stopSession,
+  } = useSessionCashier();
+
+  const {
     lcdStatus,
-    lcdLoading,
-    lcdError,
     lcdPorts,
     hasLCDControl,
-    canUseLCD,
-    openSession,
-    closeSession,
+    lcdLoading,
+    lcdError,
+    requestLCD,
+    releaseLCD,
     loadLCDPorts,
-    requestLCDControl,
-    releaseLCDControl,
-    setSessionError,
-    setLcdError,
-  } = useCashierSession();
+  } = useSessionLCD();
 
+  // ✅ ÉTATS LOCAUX POUR UI
   const [showLCDSetup, setShowLCDSetup] = useState(false);
   const [selectedPort, setSelectedPort] = useState('');
 
-  // Charger les ports LCD au montage
+  // ✅ CHARGER PORTS LCD AU MONTAGE
   useEffect(() => {
     loadLCDPorts().catch(() => {});
   }, [loadLCDPorts]);
 
-  // Sélectionner automatiquement le premier port disponible
+  // ✅ SÉLECTION AUTO DU PREMIER PORT
   useEffect(() => {
     if (lcdPorts.length > 0 && !selectedPort) {
       setSelectedPort(lcdPorts[0].path);
     }
   }, [lcdPorts, selectedPort]);
 
+  // ✅ HANDLERS SIMPLIFIÉS
   const handleOpenSession = async () => {
     try {
-      await openSession();
+      await startSession();
+      console.log('✅ [SESSION MANAGER] Session ouverte');
     } catch (error) {
-      console.error('Erreur ouverture session:', error);
+      console.error('❌ [SESSION MANAGER] Erreur ouverture session:', error);
     }
   };
 
   const handleOpenSessionWithLCD = async () => {
     if (!selectedPort) {
-      setLcdError('Veuillez sélectionner un port LCD');
+      console.warn('⚠️ [SESSION MANAGER] Aucun port sélectionné');
       return;
     }
 
     try {
-      await openSession(selectedPort, {
+      await startSession(selectedPort, {
         baudRate: 9600,
         dataBits: 8,
         parity: 'none',
         stopBits: 1,
       });
       setShowLCDSetup(false);
+      console.log('✅ [SESSION MANAGER] Session + LCD ouverte');
     } catch (error) {
-      console.error('Erreur ouverture session avec LCD:', error);
+      console.error('❌ [SESSION MANAGER] Erreur ouverture session avec LCD:', error);
     }
   };
 
   const handleCloseSession = async () => {
     try {
-      await closeSession();
+      await stopSession();
+      console.log('✅ [SESSION MANAGER] Session fermée');
     } catch (error) {
-      console.error('Erreur fermeture session:', error);
+      console.error('❌ [SESSION MANAGER] Erreur fermeture session:', error);
     }
   };
 
   const handleRequestLCD = async () => {
     if (!selectedPort) {
-      setLcdError('Veuillez sélectionner un port LCD');
+      console.warn('⚠️ [SESSION MANAGER] Aucun port sélectionné pour LCD');
       return;
     }
 
     try {
-      await requestLCDControl(selectedPort);
+      await requestLCD(selectedPort, {
+        baudRate: 9600,
+        dataBits: 8,
+        parity: 'none',
+        stopBits: 1,
+      });
       setShowLCDSetup(false);
+      console.log('✅ [SESSION MANAGER] LCD connecté');
     } catch (error) {
-      console.error('Erreur demande LCD:', error);
+      console.error('❌ [SESSION MANAGER] Erreur connexion LCD:', error);
     }
   };
 
   const handleReleaseLCD = async () => {
     try {
-      await releaseLCDControl();
+      await releaseLCD();
+      console.log('✅ [SESSION MANAGER] LCD libéré');
     } catch (error) {
-      console.error('Erreur libération LCD:', error);
+      console.error('❌ [SESSION MANAGER] Erreur libération LCD:', error);
     }
   };
 
-  // Composant de statut LCD
+  // ✅ COMPOSANT STATUT LCD
   const LCDStatusIndicator = () => {
     if (hasLCDControl) {
       return (
@@ -136,8 +146,8 @@ const SessionManager = () => {
     );
   };
 
-  // Interface session active
-  if (hasActiveSession) {
+  // ✅ INTERFACE SESSION ACTIVE
+  if (hasActiveCashierSession) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-md">
         <div className="flex items-center justify-between">
@@ -147,14 +157,14 @@ const SessionManager = () => {
               <div>
                 <p className="font-medium">Session Active</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Depuis {new Date(session.startTime).toLocaleTimeString()}
+                  Depuis {new Date(cashierSession.startTime).toLocaleTimeString()}
                 </p>
               </div>
             </div>
 
             <div className="text-sm text-gray-600 dark:text-gray-300">
-              <p>{session.sales_count} vente(s)</p>
-              <p>{session.total_sales.toFixed(2)}€</p>
+              <p>{cashierSession.sales_count} vente(s)</p>
+              <p>{cashierSession.total_sales.toFixed(2)}€</p>
             </div>
 
             <LCDStatusIndicator />
@@ -165,7 +175,7 @@ const SessionManager = () => {
               <button
                 onClick={() => setShowLCDSetup(true)}
                 disabled={lcdLoading}
-                className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200"
+                className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 disabled:opacity-50"
               >
                 <Monitor className="h-4 w-4 mr-1 inline" />
                 Connecter LCD
@@ -176,7 +186,7 @@ const SessionManager = () => {
               <button
                 onClick={handleReleaseLCD}
                 disabled={lcdLoading}
-                className="text-sm bg-yellow-100 text-yellow-700 px-3 py-1 rounded hover:bg-yellow-200"
+                className="text-sm bg-yellow-100 text-yellow-700 px-3 py-1 rounded hover:bg-yellow-200 disabled:opacity-50"
               >
                 <MonitorOff className="h-4 w-4 mr-1 inline" />
                 Libérer LCD
@@ -186,7 +196,7 @@ const SessionManager = () => {
             <button
               onClick={handleCloseSession}
               disabled={sessionLoading}
-              className="text-sm bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
+              className="text-sm bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 disabled:opacity-50"
             >
               <LogOut className="h-4 w-4 mr-1 inline" />
               Fermer Session
@@ -194,7 +204,7 @@ const SessionManager = () => {
           </div>
         </div>
 
-        {/* Erreurs */}
+        {/* ✅ ERREURS UNIFIÉES */}
         {(sessionError || lcdError) && (
           <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded">
             <div className="flex items-center justify-between">
@@ -204,8 +214,9 @@ const SessionManager = () => {
               </div>
               <button
                 onClick={() => {
-                  setSessionError(null);
-                  setLcdError(null);
+                  // Clear erreurs via store
+                  if (sessionError) useSessionStore.getState().setSessionError(null);
+                  if (lcdError) useSessionStore.getState().setLcdError(null);
                 }}
                 className="text-yellow-700 dark:text-yellow-300 hover:text-yellow-900"
               >
@@ -218,7 +229,7 @@ const SessionManager = () => {
     );
   }
 
-  // Interface pas de session
+  // ✅ INTERFACE PAS DE SESSION
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-md">
       <div className="text-center">
@@ -261,7 +272,7 @@ const SessionManager = () => {
             <div className="flex items-center justify-between">
               <span className="text-sm text-red-700 dark:text-red-300">{sessionError}</span>
               <button
-                onClick={() => setSessionError(null)}
+                onClick={() => useSessionStore.getState().setSessionError(null)}
                 className="text-red-700 dark:text-red-300 hover:text-red-900"
               >
                 ×
@@ -271,7 +282,7 @@ const SessionManager = () => {
         )}
       </div>
 
-      {/* Modal setup LCD */}
+      {/* ✅ MODAL SETUP LCD */}
       {showLCDSetup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96">
@@ -307,7 +318,7 @@ const SessionManager = () => {
               <button
                 onClick={() => {
                   setShowLCDSetup(false);
-                  setLcdError(null);
+                  useSessionStore.getState().setLcdError(null);
                 }}
                 className="flex-1 bg-gray-500 text-white py-2 rounded hover:bg-gray-600"
               >
@@ -315,12 +326,15 @@ const SessionManager = () => {
               </button>
 
               <button
-                onClick={hasActiveSession ? handleRequestLCD : handleOpenSessionWithLCD}
+                onClick={hasActiveCashierSession ? handleRequestLCD : handleOpenSessionWithLCD}
                 disabled={!selectedPort || lcdLoading}
-                className="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 
-                           disabled:opacity-50"
+                className="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50"
               >
-                {lcdLoading ? 'Connexion...' : hasActiveSession ? 'Connecter LCD' : 'Session + LCD'}
+                {lcdLoading
+                  ? 'Connexion...'
+                  : hasActiveCashierSession
+                    ? 'Connecter LCD'
+                    : 'Session + LCD'}
               </button>
             </div>
           </div>

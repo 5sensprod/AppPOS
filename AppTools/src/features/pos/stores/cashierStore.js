@@ -1,10 +1,10 @@
-// src/features/pos/stores/cashierStore.js - Avec sync API automatique
+// src/features/pos/stores/cashierStore.js - RESTAURÉ AVEC NOTIFICATION ZUSTAND SIMPLE
 import { create } from 'zustand';
 import salesService from '../../../services/salesService';
 import cashierSessionService from '../../../services/cashierSessionService';
 
 export const useCashierStore = create((set, get) => ({
-  // État du panier
+  // ✅ ÉTAT DU PANIER (inchangé)
   cart: {
     items: [],
     total: 0,
@@ -13,20 +13,20 @@ export const useCashierStore = create((set, get) => ({
     itemCount: 0,
   },
 
-  // État des ventes
+  // ✅ ÉTAT DES VENTES
   sales: [],
   currentSale: null,
   salesLoading: false,
   salesError: null,
 
-  // État UI
+  // ✅ ÉTAT UI
   loading: false,
   error: null,
   showPaymentModal: false,
   showReceiptModal: false,
   lastReceipt: null,
 
-  // ✅ NOUVEAU : Fonction pour notifier l'API des changements de panier
+  // ✅ NOTIFICATION API SIMPLIFIÉE (comme avant)
   notifyAPICartChange: async () => {
     const state = get();
     try {
@@ -40,7 +40,7 @@ export const useCashierStore = create((set, get) => ({
     }
   },
 
-  // ✅ Fonction helper pour recalculer et notifier
+  // ✅ FONCTION HELPER POUR RECALCULER ET NOTIFIER (restaurée)
   recalculateCartAndNotify: (newItems) => {
     const subtotal = newItems.reduce((sum, item) => sum + item.total_price, 0);
     const tax = subtotal * 0.2; // 20% de TVA
@@ -57,15 +57,15 @@ export const useCashierStore = create((set, get) => ({
 
     set({ cart: newCart });
 
-    // ✅ NOTIFICATION API AUTOMATIQUE
+    // ✅ NOTIFICATION API AUTOMATIQUE (comme avant)
     setTimeout(() => {
       get().notifyAPICartChange();
-    }, 100); // Petit délai pour s'assurer que l'état est mis à jour
+    }, 100);
 
     return newCart;
   },
 
-  // Actions du panier MODIFIÉES pour sync API
+  // ✅ ACTIONS DU PANIER MODIFIÉES (restaurées)
   addToCart: (product, quantity = 1) => {
     const state = get();
     const existingItemIndex = state.cart.items.findIndex((item) => item.product_id === product._id);
@@ -142,7 +142,7 @@ export const useCashierStore = create((set, get) => ({
     }, 100);
   },
 
-  // Actions de vente MODIFIÉES
+  // ✅ ACTIONS DE VENTE MODIFIÉES (restaurées)
   processSale: async (paymentMethod = 'cash') => {
     const state = get();
 
@@ -181,7 +181,7 @@ export const useCashierStore = create((set, get) => ({
     }
   },
 
-  // Recherche produit (inchangé)
+  // ✅ RECHERCHE PRODUIT (inchangé)
   searchProduct: async (barcode) => {
     set({ loading: true, error: null });
 
@@ -198,7 +198,7 @@ export const useCashierStore = create((set, get) => ({
     }
   },
 
-  // Gestion UI (inchangé)
+  // ✅ GESTION UI (inchangé)
   setShowPaymentModal: (show) => set({ showPaymentModal: show }),
   setShowReceiptModal: (show) => set({ showReceiptModal: show }),
   setError: (error) => set({ error }),

@@ -1,7 +1,8 @@
-// src/App.jsx - Mise à jour avec les nouvelles routes
+// src/App.jsx - Mise à jour avec les nouvelles routes + SESSION ZUSTAND
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
+import { SessionProvider } from './components/SessionSync'; // ✅ NOUVEAU : Provider Zustand
 import { initializeServices } from './services/initServices';
 import MainLayout from './components/layout/MainLayout';
 import NetworkAccess from './components/NetworkAccess';
@@ -85,8 +86,9 @@ function AppRoutes() {
     (async () => {
       try {
         await initializeServices();
+        console.log('✅ [APP] Services initialisés avec succès');
       } catch (error) {
-        console.error("Erreur lors de l'initialisation des services:", error);
+        console.error("❌ [APP] Erreur lors de l'initialisation des services:", error);
       } finally {
         setInitializing(false);
       }
@@ -96,133 +98,146 @@ function AppRoutes() {
   if (isAuthenticated && initializing) return <Loader message="Initialisation des services..." />;
 
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
+    // ✅ WRAPPER AVEC SESSION ZUSTAND
+    <SessionProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
 
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <Dashboard />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/caisse"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <CashierPage />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+        {/* ✅ ROUTE CAISSE AVEC SESSION ZUSTAND */}
+        <Route
+          path="/caisse"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <CashierPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      {entityRoutes.map(({ path, component: Component, details: Details, bidirectional }) => (
-        <React.Fragment key={path}>
-          <Route
-            path={`/${path}`}
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Component />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+        {entityRoutes.map(({ path, component: Component, details: Details, bidirectional }) => (
+          <React.Fragment key={path}>
+            <Route
+              path={`/${path}`}
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Component />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {bidirectional && (
-            <>
-              <Route
-                path={`/${path}/new`}
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <Details />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path={`/${path}/:id`}
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <Details />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path={`/${path}/:id/edit`}
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <Details />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-            </>
-          )}
-        </React.Fragment>
-      ))}
+            {bidirectional && (
+              <>
+                <Route
+                  path={`/${path}/new`}
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <Details />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path={`/${path}/:id`}
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <Details />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path={`/${path}/:id/edit`}
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <Details />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+              </>
+            )}
+          </React.Fragment>
+        ))}
 
-      {/* Routes de configuration */}
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <SettingsPage />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+        {/* Routes de configuration */}
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <SettingsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Routes individuelles pour accès direct (optionnel) */}
-      <Route
-        path="/settings/lcd"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <LCDConfigPage />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+        {/* Routes individuelles pour accès direct (optionnel) */}
+        <Route
+          path="/settings/lcd"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <LCDConfigPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/settings/printer"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <PrinterConfigPage />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/settings/printer"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <PrinterConfigPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </SessionProvider>
   );
 }
 
-const Dashboard = () => (
-  <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-    <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Tableau de bord</h1>
-    <UpdateChecker />
-    <NetworkAccess />
-    <div className="mt-6">
-      <ApiTest />
-    </div>
-  </div>
-);
+// ✅ DASHBOARD AVEC LOGS POUR DEBUG
+const Dashboard = () => {
+  useEffect(() => {
+    console.log('📊 [DASHBOARD] Rendu du tableau de bord');
+  }, []);
 
+  return (
+    <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Tableau de bord</h1>
+      <UpdateChecker />
+      <NetworkAccess />
+      <div className="mt-6">
+        <ApiTest />
+      </div>
+    </div>
+  );
+};
+
+// ✅ COMPOSANT PRINCIPAL AVEC SESSION PROVIDER
 function App() {
+  console.log("🚀 [APP] Démarrage de l'application avec Zustand Session");
   return <AppRoutes />;
 }
 

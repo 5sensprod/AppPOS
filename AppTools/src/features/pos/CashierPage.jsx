@@ -1,9 +1,9 @@
-// src/features/pos/CashierPage.jsx - VERSION SANS MODAL GENANTE
+// src/features/pos/CashierPage.jsx - VERSION ZUSTAND OPTIMISÉE
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCashierStore } from './stores/cashierStore';
-import { useAuth } from '../../contexts/AuthContext';
-import { useCashierSession } from './hooks/useCashierSession';
+import { useSessionAuth, useSessionCashier, useSessionLCD } from '../../stores/sessionStore';
 import SessionManager from './components/SessionManager';
+import { useSessionStore } from '../../stores/sessionStore';
 import {
   Search,
   ShoppingCart,
@@ -222,15 +222,12 @@ const Cart = () => {
 
 const PaymentModal = () => {
   const { showPaymentModal, setShowPaymentModal, processSale, cart, loading } = useCashierStore();
-  const { canUseLCD, lcd } = useCashierSession();
   const [paymentMethod, setPaymentMethod] = useState('cash');
 
   const handlePayment = async () => {
     try {
       await processSale(paymentMethod);
       setShowPaymentModal(false);
-
-      // Panier vidé, LCD géré par l'API
     } catch (error) {
       console.error('Erreur paiement:', error);
     }
@@ -389,22 +386,36 @@ const ReceiptModal = () => {
   );
 };
 
-// COMPOSANT PRINCIPAL - VERSION SIMPLE QUI MARCHE
+// ✅ COMPOSANT PRINCIPAL - VERSION ZUSTAND STABLE
 const CashierPage = () => {
-  const { user } = useAuth();
+  // ✅ SÉLECTEURS STABLES (pas d'objets créés)
+  const user = useSessionStore((state) => state.user);
+  const hasActiveCashierSession = useSessionStore((state) =>
+    Boolean(state.cashierSession?.status === 'active')
+  );
+  const canUseLCD = useSessionStore((state) =>
+    Boolean(
+      state.lcdStatus?.owned &&
+        state.lcdStatus?.owner?.cashier_id === state.user?.id &&
+        state.cashierSession?.status === 'active'
+    )
+  );
+  const lcdError = useSessionStore((state) => state.lcdError);
+  const lcd = useSessionStore((state) => state.lcd);
+
+  // ✅ STORE PANIER (inchangé)
   const { addToCart, error, setError } = useCashierStore();
-  const { hasActiveSession, canUseLCD, lcd, sessionError, lcdError } = useCashierSession();
 
   // ✅ DEBUG SEULEMENT LORS DES CHANGEMENTS RÉELS
   useEffect(() => {
-    console.log(`🖥️ [CASHIER PAGE] Session changed: ${hasActiveSession}`);
-  }, [hasActiveSession]);
+    console.log(`🖥️ [CASHIER PAGE ZUSTAND] Session changed: ${hasActiveCashierSession}`);
+  }, [hasActiveCashierSession]);
 
   useEffect(() => {
-    console.log(`📺 [CASHIER PAGE] LCD changed: ${canUseLCD}`);
+    console.log(`📺 [CASHIER PAGE ZUSTAND] LCD changed: ${canUseLCD}`);
   }, [canUseLCD]);
 
-  // Gestion ajout produit - Affichage prix seulement
+  // ✅ GESTION AJOUT PRODUIT AVEC LCD ZUSTAND
   const handleProductFound = useCallback(
     async (product) => {
       if (product.manage_stock && product.stock <= 0) {
@@ -415,12 +426,13 @@ const CashierPage = () => {
       addToCart(product, 1);
       setError(null);
 
-      // Affichage prix produit (l'API gère le résumé panier automatiquement)
+      // ✅ AFFICHAGE PRIX VIA ZUSTAND LCD
       if (canUseLCD) {
         try {
           const productName =
             product.name.length > 20 ? product.name.substring(0, 17) + '...' : product.name;
           await lcd.showPrice(productName, product.price);
+          console.log(`💰 [CASHIER PAGE] Prix affiché: ${productName} - ${product.price}€`);
         } catch (error) {
           console.debug('Erreur affichage produit LCD:', error.message);
         }
@@ -429,7 +441,7 @@ const CashierPage = () => {
     [addToCart, setError, canUseLCD, lcd]
   );
 
-  // Raccourcis clavier
+  // ✅ RACCOURCIS CLAVIER
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.target.tagName === 'INPUT') return;
@@ -442,21 +454,18 @@ const CashierPage = () => {
 
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-900 p-4">
+      {/* ✅ SESSION MANAGER ZUSTAND */}
       <div className="mb-4">
         <SessionManager />
       </div>
 
+      {/* ✅ HEADER SIMPLIFIÉ (pas de doublon avec SessionManager) */}
       <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-md">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-              <Euro className="h-6 w-6 mr-2" />
-              Caisse POS
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              {hasActiveSession ? 'Session active' : 'Aucune session'} - {user?.username}
-            </p>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
+            <Euro className="h-6 w-6 mr-2" />
+            Caisse POS
+          </h1>
 
           <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
             <div className="flex items-center">
@@ -477,6 +486,7 @@ const CashierPage = () => {
         </div>
       </div>
 
+      {/* ✅ ERREURS PANIER */}
       {error && (
         <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
           <div className="flex justify-between items-center">
@@ -491,16 +501,17 @@ const CashierPage = () => {
         </div>
       )}
 
-      {(sessionError || lcdError) && (
+      {/* ✅ ERREURS LCD (du store Zustand) */}
+      {lcdError && (
         <div className="mb-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 text-yellow-700 dark:text-yellow-300 px-4 py-3 rounded-lg">
           <div className="flex items-center">
             <AlertTriangle className="h-4 w-4 mr-2" />
-            <span>{sessionError || lcdError}</span>
+            <span>{lcdError}</span>
           </div>
         </div>
       )}
 
-      {/* Interface principale */}
+      {/* ✅ INTERFACE PRINCIPALE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-280px)]">
         <div className="lg:col-span-1">
           <ProductSearch onProductFound={handleProductFound} />
@@ -510,6 +521,7 @@ const CashierPage = () => {
         </div>
       </div>
 
+      {/* ✅ MODALES */}
       <PaymentModal />
       <ReceiptModal />
     </div>
