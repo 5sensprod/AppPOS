@@ -1,9 +1,8 @@
-// src/features/pos/CashierPage.jsx - VERSION ZUSTAND OPTIMISÉE
+// src/features/pos/CashierPage.jsx - VERSION AVEC HEADER UNIFIÉ
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCashierStore } from './stores/cashierStore';
-import { useSessionAuth, useSessionCashier, useSessionLCD } from '../../stores/sessionStore';
-import SessionManager from './components/SessionManager';
 import { useSessionStore } from '../../stores/sessionStore';
+import SessionHeader from './components/SessionHeader'; // ✅ NOUVEAU HEADER UNIFIÉ
 import {
   Search,
   ShoppingCart,
@@ -12,10 +11,6 @@ import {
   Plus,
   Minus,
   Scan,
-  User,
-  Clock,
-  Euro,
-  Monitor,
   AlertTriangle,
 } from 'lucide-react';
 
@@ -454,37 +449,8 @@ const CashierPage = () => {
 
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-900 p-4">
-      {/* ✅ SESSION MANAGER ZUSTAND */}
-      <div className="mb-4">
-        <SessionManager />
-      </div>
-
-      {/* ✅ HEADER SIMPLIFIÉ (pas de doublon avec SessionManager) */}
-      <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-md">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-            <Euro className="h-6 w-6 mr-2" />
-            Caisse POS
-          </h1>
-
-          <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-            <div className="flex items-center">
-              <User className="h-4 w-4 mr-1" />
-              {user?.username}
-            </div>
-            <div className="flex items-center">
-              <Clock className="h-4 w-4 mr-1" />
-              {new Date().toLocaleTimeString('fr-FR')}
-            </div>
-            {canUseLCD && (
-              <div className="flex items-center text-green-600">
-                <Monitor className="h-4 w-4 mr-1" />
-                <span className="text-xs">LCD Actif</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* ✅ HEADER UNIFIÉ (remplace SessionManager + header séparé) */}
+      <SessionHeader />
 
       {/* ✅ ERREURS PANIER */}
       {error && (
@@ -512,7 +478,7 @@ const CashierPage = () => {
       )}
 
       {/* ✅ INTERFACE PRINCIPALE */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-280px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
         <div className="lg:col-span-1">
           <ProductSearch onProductFound={handleProductFound} />
         </div>
