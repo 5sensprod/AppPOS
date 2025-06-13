@@ -76,6 +76,12 @@ router.post('/:id/repair-images', productController.repairProductImages.bind(pro
 // Recherche par code-barres
 router.get('/barcode/:code', productController.searchByBarcode);
 
+// 🆕 Recherche par SKU
+router.get('/sku/:sku', productController.searchBySku);
+
+// 🆕 Recherche unifiée (auto-détection SKU ou barcode)
+router.get('/search/:code', productController.searchByCode);
+
 // Ajustement de stock
 router.patch('/:id/stock', productController.updateStock);
 

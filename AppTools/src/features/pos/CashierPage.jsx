@@ -1,91 +1,10 @@
-// src/features/pos/CashierPage.jsx - VERSION AVEC HEADER UNIFIÉ
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// src/features/pos/CashierPage.jsx - VERSION AVEC NOUVEAU COMPOSANT ProductSearch
+import React, { useState, useEffect, useCallback } from 'react';
 import { useCashierStore } from './stores/cashierStore';
 import { useSessionStore } from '../../stores/sessionStore';
-import SessionHeader from './components/SessionHeader'; // ✅ NOUVEAU HEADER UNIFIÉ
-import {
-  Search,
-  ShoppingCart,
-  CreditCard,
-  Trash2,
-  Plus,
-  Minus,
-  Scan,
-  AlertTriangle,
-} from 'lucide-react';
-
-const ProductSearch = ({ onProductFound }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const { searchProduct } = useCashierStore();
-  const searchInputRef = useRef(null);
-
-  const handleSearch = async (term) => {
-    if (!term.trim()) return;
-
-    setIsSearching(true);
-    try {
-      const product = await searchProduct(term);
-      onProductFound(product);
-      setSearchTerm('');
-    } catch (error) {
-      console.error('Produit non trouvé:', error);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch(searchTerm);
-    }
-  };
-
-  useEffect(() => {
-    searchInputRef.current?.focus();
-  }, []);
-
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-md">
-      <h3 className="text-lg font-semibold mb-3 text-gray-800 dark:text-white flex items-center">
-        <Scan className="h-5 w-5 mr-2" />
-        Recherche produit
-      </h3>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input
-          ref={searchInputRef}
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Scanner ou saisir code-barres / nom produit..."
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg 
-                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                     focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                     text-lg"
-          disabled={isSearching}
-        />
-
-        {isSearching && (
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-          </div>
-        )}
-      </div>
-
-      <button
-        onClick={() => handleSearch(searchTerm)}
-        disabled={!searchTerm.trim() || isSearching}
-        className="mt-3 w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 
-                   text-white font-medium py-2 px-4 rounded-lg transition-colors"
-      >
-        {isSearching ? 'Recherche...' : 'Rechercher'}
-      </button>
-    </div>
-  );
-};
+import SessionHeader from './components/SessionHeader';
+import ProductSearch from './components/ProductSearch'; // ✅ NOUVEAU COMPOSANT EXTRAIT
+import { ShoppingCart, CreditCard, Trash2, Plus, Minus, AlertTriangle } from 'lucide-react';
 
 const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
   const handleQuantityChange = (newQuantity) => {
@@ -98,6 +17,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
         <h4 className="font-medium text-gray-900 dark:text-white">{item.product_name}</h4>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           SKU: {item.sku} | {item.unit_price.toFixed(2)}€/unité
+          {item.barcode && <span> | CB: {item.barcode}</span>}
         </p>
       </div>
 
@@ -167,7 +87,7 @@ const Cart = () => {
             <div className="text-center">
               <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
               <p>Panier vide</p>
-              <p className="text-sm">Scannez un produit pour commencer</p>
+              <p className="text-sm">Recherchez un produit pour commencer</p>
             </div>
           </div>
         ) : (
@@ -381,9 +301,9 @@ const ReceiptModal = () => {
   );
 };
 
-// ✅ COMPOSANT PRINCIPAL - VERSION ZUSTAND STABLE
+// ✅ COMPOSANT PRINCIPAL
 const CashierPage = () => {
-  // ✅ SÉLECTEURS STABLES (pas d'objets créés)
+  // ✅ SÉLECTEURS STABLES
   const user = useSessionStore((state) => state.user);
   const hasActiveCashierSession = useSessionStore((state) =>
     Boolean(state.cashierSession?.status === 'active')
@@ -398,26 +318,25 @@ const CashierPage = () => {
   const lcdError = useSessionStore((state) => state.lcdError);
   const lcd = useSessionStore((state) => state.lcd);
 
-  // ✅ STORE PANIER (inchangé)
+  // ✅ STORE PANIER
   const { addToCart, error, setError } = useCashierStore();
-
-  // ✅ DEBUG SEULEMENT LORS DES CHANGEMENTS RÉELS
-  useEffect(() => {
-    console.log(`🖥️ [CASHIER PAGE ZUSTAND] Session changed: ${hasActiveCashierSession}`);
-  }, [hasActiveCashierSession]);
-
-  useEffect(() => {
-    console.log(`📺 [CASHIER PAGE ZUSTAND] LCD changed: ${canUseLCD}`);
-  }, [canUseLCD]);
 
   // ✅ GESTION AJOUT PRODUIT AVEC LCD ZUSTAND
   const handleProductFound = useCallback(
     async (product) => {
+      // Vérifications de stock
       if (product.manage_stock && product.stock <= 0) {
         setError(`Produit "${product.name}" en rupture de stock`);
         return;
       }
 
+      // Vérifications de statut
+      // if (product.status !== 'published') {
+      //   setError(`Produit "${product.name}" non publié (statut: ${product.status})`);
+      //   return;
+      // }
+
+      // Ajouter au panier
       addToCart(product, 1);
       setError(null);
 
@@ -449,7 +368,7 @@ const CashierPage = () => {
 
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-900 p-4">
-      {/* ✅ HEADER UNIFIÉ (remplace SessionManager + header séparé) */}
+      {/* ✅ HEADER UNIFIÉ */}
       <SessionHeader />
 
       {/* ✅ ERREURS PANIER */}
@@ -467,7 +386,7 @@ const CashierPage = () => {
         </div>
       )}
 
-      {/* ✅ ERREURS LCD (du store Zustand) */}
+      {/* ✅ ERREURS LCD */}
       {lcdError && (
         <div className="mb-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 text-yellow-700 dark:text-yellow-300 px-4 py-3 rounded-lg">
           <div className="flex items-center">
@@ -480,7 +399,8 @@ const CashierPage = () => {
       {/* ✅ INTERFACE PRINCIPALE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
         <div className="lg:col-span-1">
-          <ProductSearch onProductFound={handleProductFound} />
+          {/* ✅ NOUVEAU COMPOSANT ProductSearch AVEC LES NOUVELLES ROUTES */}
+          <ProductSearch onProductFound={handleProductFound} disabled={!hasActiveCashierSession} />
         </div>
         <div className="lg:col-span-2">
           <Cart />

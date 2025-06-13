@@ -447,6 +447,152 @@ class ProductController extends BaseController {
     }
   }
 
+  async searchBySku(req, res) {
+    try {
+      const { sku } = req.params;
+      const { partial = 'false' } = req.query;
+
+      if (!sku) {
+        return ResponseHandler.badRequest(res, 'SKU requis');
+      }
+
+      let searchQuery;
+
+      if (partial === 'true') {
+        // ✅ CORRECTION NEDB: Utiliser un objet RegExp JavaScript
+        const regex = new RegExp(sku.trim(), 'i'); // 'i' = insensible à la casse
+        searchQuery = {
+          sku: regex,
+        };
+      } else {
+        // Recherche exacte
+        searchQuery = {
+          sku: sku.trim(),
+        };
+      }
+
+      const products = await this.model.find(searchQuery);
+
+      if (products.length === 0) {
+        return ResponseHandler.notFound(res, `Aucun produit trouvé avec le SKU: ${sku}`);
+      }
+
+      // Retourner le premier produit trouvé
+      const productWithCategory = await this.model.findByIdWithCategoryInfo(products[0]._id);
+      return ResponseHandler.success(res, productWithCategory);
+    } catch (error) {
+      console.error('Erreur recherche SKU:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  async searchBySku(req, res) {
+    try {
+      const { sku } = req.params;
+      const { partial = 'false' } = req.query;
+
+      if (!sku) {
+        return ResponseHandler.badRequest(res, 'SKU requis');
+      }
+
+      let searchQuery;
+
+      if (partial === 'true') {
+        // ✅ CORRECTION NEDB: Utiliser un objet RegExp JavaScript
+        const regex = new RegExp(sku.trim(), 'i'); // 'i' = insensible à la casse
+        searchQuery = {
+          sku: regex,
+        };
+      } else {
+        // Recherche exacte
+        searchQuery = {
+          sku: sku.trim(),
+        };
+      }
+
+      const products = await this.model.find(searchQuery);
+
+      if (products.length === 0) {
+        return ResponseHandler.notFound(res, `Aucun produit trouvé avec le SKU: ${sku}`);
+      }
+
+      // Retourner le premier produit trouvé
+      const productWithCategory = await this.model.findByIdWithCategoryInfo(products[0]._id);
+      return ResponseHandler.success(res, productWithCategory);
+    } catch (error) {
+      console.error('Erreur recherche SKU:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
+  // Et aussi corrige searchByCode :
+
+  async searchByCode(req, res) {
+    try {
+      const { code } = req.params;
+      const { type = 'auto' } = req.query;
+
+      if (!code) {
+        return ResponseHandler.badRequest(res, 'Code requis');
+      }
+
+      let products = [];
+      let searchType = type;
+
+      // Créer la regex pour NeDB
+      const regex = new RegExp(code.trim(), 'i');
+
+      // Si type = auto, essayer d'abord SKU puis barcode
+      if (type === 'auto') {
+        // Essayer d'abord par SKU avec regex NeDB
+        products = await this.model.find({ sku: regex });
+        searchType = 'sku';
+
+        // Si pas trouvé par SKU, essayer par code-barres
+        if (products.length === 0) {
+          products = await this.model.find({
+            meta_data: {
+              $elemMatch: {
+                key: 'barcode',
+                value: regex,
+              },
+            },
+          });
+          searchType = 'barcode';
+        }
+      } else if (type === 'sku') {
+        products = await this.model.find({ sku: regex });
+      } else if (type === 'barcode') {
+        products = await this.model.find({
+          meta_data: {
+            $elemMatch: {
+              key: 'barcode',
+              value: regex,
+            },
+          },
+        });
+      }
+
+      if (products.length === 0) {
+        return ResponseHandler.notFound(res, `Aucun produit trouvé avec le code: ${code}`);
+      }
+
+      // Retourner le premier produit trouvé avec ses infos complètes
+      const productWithCategory = await this.model.findByIdWithCategoryInfo(products[0]._id);
+
+      return ResponseHandler.success(res, {
+        ...productWithCategory,
+        search_info: {
+          searched_code: code,
+          found_by: searchType,
+          total_found: products.length,
+        },
+      });
+    } catch (error) {
+      console.error('Erreur recherche code:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
   async updateStock(req, res) {
     try {
       const { id } = req.params;
@@ -627,6 +773,8 @@ module.exports = exportController(productController, [
   'filter',
   'repairProductImages',
   'searchByBarcode',
+  'searchBySku',
+  'searchByCode',
   'updateStock',
   'getBestSellers',
   'getProductStats',

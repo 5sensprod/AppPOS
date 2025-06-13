@@ -62,6 +62,31 @@ class SalesService {
     }
   }
 
+  async searchProduct(code, searchType = 'auto') {
+    try {
+      let endpoint;
+
+      switch (searchType) {
+        case 'sku':
+          endpoint = `/api/products/sku/${encodeURIComponent(code)}?partial=true`;
+          break;
+        case 'barcode':
+          endpoint = `/api/products/barcode/${encodeURIComponent(code)}`;
+          break;
+        case 'auto':
+        default:
+          endpoint = `/api/products/search/${encodeURIComponent(code)}?type=auto`;
+          break;
+      }
+
+      const response = await apiService.get(endpoint);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur recherche produit:', error);
+      throw error;
+    }
+  }
+
   // Obtenir les statistiques des meilleures ventes
   async getBestSellers(limit = 10) {
     try {

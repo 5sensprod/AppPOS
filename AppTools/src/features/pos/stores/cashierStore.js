@@ -182,17 +182,18 @@ export const useCashierStore = create((set, get) => ({
   },
 
   // ✅ RECHERCHE PRODUIT (inchangé)
-  searchProduct: async (barcode) => {
+  searchProduct: async (code, searchType = 'auto') => {
     set({ loading: true, error: null });
 
     try {
-      const response = await salesService.searchProductByBarcode(barcode);
+      const response = await salesService.searchProduct(code, searchType);
       set({ loading: false });
       return response.data;
     } catch (error) {
+      const errorMessage = error.response?.data?.message || `Produit non trouvé: ${code}`;
       set({
         loading: false,
-        error: `Produit non trouvé: ${barcode}`,
+        error: errorMessage,
       });
       throw error;
     }
