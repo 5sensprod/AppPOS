@@ -78,6 +78,8 @@ function ProductDetail() {
               register={register}
               control={control}
               errors={errors}
+              setValue={setValue}
+              watch={watch}
               specialFields={{
                 category_id: {
                   type: 'select',

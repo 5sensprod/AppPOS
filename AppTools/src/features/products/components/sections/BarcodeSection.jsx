@@ -2,22 +2,63 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import BarcodeSelector from '../../../../components/common/BarcodeSelector';
 
-const BarcodeSection = ({ product, editable, register, control, errors }) => {
+const BarcodeSection = ({ product, editable, register, control, errors, setValue, watch }) => {
   // Extraction du code-barres des métadonnées
   const getBarcodeValue = () => {
-    if (!product?.meta_data) return null;
+    if (!product?.meta_data) return '';
     const barcodeData = product.meta_data.find((item) => item.key === 'barcode');
-    return barcodeData ? barcodeData.value : null;
+    return barcodeData ? barcodeData.value : '';
   };
 
   const barcodeValue = getBarcodeValue();
   const [localBarcode, setLocalBarcode] = useState(barcodeValue || '');
   const [showBarcodes, setShowBarcodes] = useState(false);
 
+  // Fonction pour mettre à jour les meta_data
+  const updateBarcodeInMetaData = (newValue) => {
+    const currentMetaData = watch('meta_data') || [];
+
+    // Trouver l'index du barcode existant
+    const barcodeIndex = currentMetaData.findIndex((item) => item.key === 'barcode');
+
+    if (barcodeIndex >= 0) {
+      // Mettre à jour l'existant
+      if (newValue && newValue.trim()) {
+        currentMetaData[barcodeIndex].value = newValue.trim();
+      } else {
+        // Supprimer si vide
+        currentMetaData.splice(barcodeIndex, 1);
+      }
+    } else if (newValue && newValue.trim()) {
+      // Ajouter nouveau
+      currentMetaData.push({
+        key: 'barcode',
+        value: newValue.trim(),
+      });
+    }
+
+    // Mettre à jour le formulaire
+    setValue('meta_data', currentMetaData, { shouldDirty: true, shouldTouch: true });
+  };
+
   // Mise à jour du state local quand les props changent
   useEffect(() => {
     setLocalBarcode(barcodeValue || '');
   }, [barcodeValue]);
+
+  // Handler pour les changements de code-barres
+  const handleBarcodeChange = (e) => {
+    const newValue = e.target.value;
+    console.log('🔧 Changement code-barres:', newValue);
+    setLocalBarcode(newValue);
+    updateBarcodeInMetaData(newValue);
+
+    // Debug: vérifier les meta_data après mise à jour
+    setTimeout(() => {
+      const currentMetaData = watch('meta_data');
+      console.log('📊 Meta_data après changement:', currentMetaData);
+    }, 100);
+  };
 
   if (!editable) {
     return (
@@ -124,11 +165,10 @@ const BarcodeSection = ({ product, editable, register, control, errors }) => {
             </label>
             <input
               type="text"
-              {...register('meta_data.barcode')}
-              defaultValue={barcodeValue}
+              value={localBarcode}
+              onChange={handleBarcodeChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               placeholder="Ex: 3760010255333"
-              onChange={(e) => setLocalBarcode(e.target.value)}
             />
             {errors?.meta_data?.barcode && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-500">
@@ -167,6 +207,7 @@ const BarcodeSection = ({ product, editable, register, control, errors }) => {
                   <QRCodeSVG value={localBarcode} size={128} level="M" />
                   <div className="flex space-x-2 mt-3">
                     <button
+                      type="button"
                       className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
                       onClick={() => {
                         // Export SVG
@@ -190,6 +231,7 @@ const BarcodeSection = ({ product, editable, register, control, errors }) => {
                       SVG
                     </button>
                     <button
+                      type="button"
                       className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
                       onClick={() => {
                         // Export PNG
