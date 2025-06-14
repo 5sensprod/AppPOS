@@ -1,4 +1,4 @@
-// src/features/pos/components/SessionHeader.jsx - VERSION FINALE NETTOYÉE
+// src/features/pos/components/SessionHeader.jsx - AVEC WEBSOCKET POUR STATS
 import React, { useState, useEffect } from 'react';
 import { useSessionStore } from '../../../stores/sessionStore';
 import {
@@ -24,6 +24,7 @@ const SessionHeader = () => {
   const sessionError = useSessionStore((state) => state.sessionError);
   const startSession = useSessionStore((state) => state.startSession);
   const stopSession = useSessionStore((state) => state.stopSession);
+  const syncSessionState = useSessionStore((state) => state.syncSessionState);
 
   const lcdStatus = useSessionStore((state) => state.lcdStatus);
   const lcdPorts = useSessionStore((state) => state.lcdPorts);
@@ -42,72 +43,105 @@ const SessionHeader = () => {
   const [selectedPort, setSelectedPort] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // ✅ CONFIGURATION CAISSE (en dur pour l'instant, BDD plus tard)
+  // ✅ CONFIGURATION CAISSE
   const CAISSE_CONFIG = {
-    numero: '001', // ✅ TODO: Récupérer depuis BDD
-    nom: 'Caisse Principale', // ✅ TODO: Récupérer depuis BDD
+    numero: '001',
+    nom: 'Caisse Principale',
   };
 
-  // ✅ HORLOGE SYNCHRONISÉE AVEC LE SYSTÈME
+  // ✅ WEBSOCKET POUR MISE À JOUR STATS SESSION
   useEffect(() => {
-    // ✅ Fonction pour synchroniser avec le changement de minute système
+    if (!hasActiveCashierSession || !user?.id) return;
+
+    import('../../../services/websocketService')
+      .then((module) => {
+        const websocketService = module.default;
+
+        if (!websocketService) {
+          console.error('[SESSION HEADER] Service WebSocket non trouvé');
+          return;
+        }
+
+        console.log(`🔔 [SESSION HEADER] Écoute WebSocket pour caissier ${user.id}`);
+
+        // ✅ ÉCOUTER LES MISES À JOUR DE SESSION
+        const handleSessionUpdate = (payload) => {
+          console.log('📊 [SESSION HEADER] Mise à jour stats reçue:', payload);
+
+          if (payload?.entityId === user.id || payload?.data?.cashier_id === user.id) {
+            console.log('🔄 [SESSION HEADER] Synchronisation des stats de session');
+            // Forcer une synchronisation de l'état de session
+            syncSessionState();
+          }
+        };
+
+        // ✅ ÉCOUTER LES NOUVELLES VENTES
+        const handleSaleCreated = (payload) => {
+          console.log('💰 [SESSION HEADER] Nouvelle vente créée:', payload);
+
+          if (payload?.cashier_id === user.id) {
+            console.log('🔄 [SESSION HEADER] Vente de ce caissier, sync des stats');
+            // Synchroniser les stats après une vente
+            syncSessionState();
+          }
+        };
+
+        // S'abonner aux événements
+        websocketService.on('cashier_sessions.updated', handleSessionUpdate);
+        websocketService.on('sales.created', handleSaleCreated);
+        websocketService.subscribe('cashier_sessions');
+        websocketService.subscribe('sales');
+
+        return () => {
+          websocketService.off('cashier_sessions.updated', handleSessionUpdate);
+          websocketService.off('sales.created', handleSaleCreated);
+        };
+      })
+      .catch((err) => {
+        console.error('[SESSION HEADER] Erreur import WebSocket:', err);
+      });
+  }, [hasActiveCashierSession, user?.id, syncSessionState]);
+
+  // ✅ HORLOGE TEMPS RÉEL
+  useEffect(() => {
     const syncWithSystemTime = () => {
       const now = new Date();
       setCurrentTime(now);
 
-      // ✅ Calculer le délai jusqu'à la prochaine minute système
       const secondsUntilNextMinute = 60 - now.getSeconds();
       const millisecondsUntilNextMinute = secondsUntilNextMinute * 1000 - now.getMilliseconds();
 
-      console.log(
-        `🕐 [SESSION HEADER] Sync système: ${now.toLocaleTimeString()}, prochaine sync dans ${secondsUntilNextMinute}s`
-      );
-
-      // ✅ Programmer le prochain timer exactement au changement de minute
       return setTimeout(() => {
         setCurrentTime(new Date());
-        console.log('🕐 [SESSION HEADER] Horloge synchronisée:', new Date().toLocaleTimeString());
 
-        // ✅ Maintenant on peut utiliser un timer régulier de 60s
         const regularTimer = setInterval(() => {
           setCurrentTime(new Date());
-          console.log('🕐 [SESSION HEADER] Horloge mise à jour:', new Date().toLocaleTimeString());
         }, 60000);
 
-        // Retourner le timer pour le nettoyage
         return regularTimer;
       }, millisecondsUntilNextMinute);
     };
 
-    // ✅ Démarrer la synchronisation
     const syncTimeout = syncWithSystemTime();
     let regularTimer = null;
-
-    // ✅ Mise à jour immédiate
     setCurrentTime(new Date());
-    console.log('🕐 [SESSION HEADER] Horloge initialisée (avec sync système)');
 
     return () => {
       if (syncTimeout) clearTimeout(syncTimeout);
       if (regularTimer) clearInterval(regularTimer);
-      console.log('🕐 [SESSION HEADER] Timers nettoyés');
     };
   }, []);
 
-  // ✅ TIMER SPÉCIAL POUR DURÉE SESSION (plus fréquent pour tests)
+  // ✅ TIMER DURÉE SESSION (uniquement pour affichage, pas pour stats)
   useEffect(() => {
     if (!hasActiveCashierSession) return;
 
-    console.log('⏱️ [SESSION HEADER] Timer durée session démarré');
     const durationTimer = setInterval(() => {
-      // Force un re-render pour mettre à jour la durée
       setCurrentTime(new Date());
-      console.log('⏱️ [SESSION HEADER] Durée session mise à jour');
-    }, 30000); // Toutes les 30 secondes pour voir les changements
+    }, 30000);
 
     return () => {
       clearInterval(durationTimer);
-      console.log('⏱️ [SESSION HEADER] Timer durée session nettoyé');
     };
   }, [hasActiveCashierSession]);
 
@@ -179,22 +213,13 @@ const SessionHeader = () => {
     }
   };
 
-  // ✅ CALCUL DURÉE SESSION AVEC DEBUG
+  // ✅ CALCUL DURÉE SESSION
   const getSessionDuration = () => {
-    if (!cashierSession?.startTime) {
-      console.log('⚠️ [SESSION HEADER] Pas de startTime pour calculer la durée');
-      return '';
-    }
+    if (!cashierSession?.startTime) return '';
 
     const start = new Date(cashierSession.startTime);
     const now = currentTime;
-    const duration = Math.floor((now - start) / 1000 / 60); // minutes
-
-    console.log('⏱️ [SESSION HEADER] Calcul durée:', {
-      start: start.toLocaleTimeString(),
-      now: now.toLocaleTimeString(),
-      durationMinutes: duration,
-    });
+    const duration = Math.floor((now - start) / 1000 / 60);
 
     if (duration < 60) return `${duration}min`;
     const hours = Math.floor(duration / 60);
@@ -234,10 +259,8 @@ const SessionHeader = () => {
   if (hasActiveCashierSession) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
-        {/* ✅ LIGNE PRINCIPALE - DESIGN PROFESSIONNEL */}
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center justify-between">
-            {/* ✅ SECTION GAUCHE - IDENTITÉ CAISSE */}
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 <div className="bg-blue-100 dark:bg-blue-900 rounded-lg px-3 py-2">
@@ -254,7 +277,6 @@ const SessionHeader = () => {
                 </div>
               </div>
 
-              {/* ✅ BADGE SESSION ACTIVE */}
               <div className="bg-green-100 dark:bg-green-900 rounded-lg px-3 py-2">
                 <div className="flex items-center text-green-700 dark:text-green-300">
                   <CheckCircle className="h-4 w-4 mr-2" />
@@ -272,7 +294,6 @@ const SessionHeader = () => {
               </div>
             </div>
 
-            {/* ✅ SECTION DROITE - HEURE */}
             <div className="flex items-center text-gray-600 dark:text-gray-300">
               <Clock className="h-4 w-4 mr-2" />
               <span className="font-mono text-lg">
@@ -285,15 +306,14 @@ const SessionHeader = () => {
           </div>
         </div>
 
-        {/* ✅ LIGNE INFÉRIEURE - STATISTIQUES ET CONTRÔLES */}
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
-            {/* ✅ STATISTIQUES ET LCD */}
             <div className="flex items-center space-x-6">
               <div className="flex items-center text-gray-600 dark:text-gray-300">
                 <ShoppingBag className="h-4 w-4 mr-2" />
                 <span className="font-medium">
-                  {cashierSession.sales_count} vente(s) • {cashierSession.total_sales.toFixed(2)}€
+                  {cashierSession.sales_count || 0} vente(s) •{' '}
+                  {(cashierSession.total_sales || 0).toFixed(2)}€
                 </span>
               </div>
 
@@ -302,7 +322,6 @@ const SessionHeader = () => {
               <LCDIndicator />
             </div>
 
-            {/* ✅ BOUTONS D'ACTION */}
             <div className="flex items-center space-x-2">
               {!hasLCDControl && !lcdStatus?.owned && (
                 <button
@@ -338,7 +357,6 @@ const SessionHeader = () => {
           </div>
         </div>
 
-        {/* ✅ ERREURS (SI PRÉSENTES) */}
         {(sessionError || lcdError) && (
           <div className="mx-6 mb-4">
             <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
@@ -369,7 +387,6 @@ const SessionHeader = () => {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* ✅ SECTION GAUCHE - IDENTITÉ CAISSE */}
           <div className="flex items-center space-x-4">
             <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2">
               <div className="flex items-center text-gray-600 dark:text-gray-300">
@@ -385,7 +402,6 @@ const SessionHeader = () => {
             </div>
           </div>
 
-          {/* ✅ SECTION DROITE - HEURE + ACTIONS */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center text-gray-600 dark:text-gray-300">
               <Clock className="h-4 w-4 mr-2" />
@@ -425,7 +441,6 @@ const SessionHeader = () => {
           </div>
         </div>
 
-        {/* ✅ ERREUR SESSION */}
         {sessionError && (
           <div className="mt-4">
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
@@ -445,7 +460,6 @@ const SessionHeader = () => {
         )}
       </div>
 
-      {/* ✅ MODAL SETUP LCD */}
       {showLCDSetup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-6 w-96 max-w-full">

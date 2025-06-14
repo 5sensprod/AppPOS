@@ -91,9 +91,21 @@ class SaleController extends BaseController {
 
       const cashierSessionService = require('../services/cashierSessionService');
       try {
-        cashierSessionService.updateSaleStats(cashier.id, totalAmount);
+        const updatedStats = cashierSessionService.updateSaleStats(cashier.id, totalAmount);
+
+        // ✅ ÉMETTRE ÉVÉNEMENT SESSION MISE À JOUR
+        const sessionEventService = getEntityEventService('cashier_sessions');
+        sessionEventService.updated(cashier.id, {
+          cashier_id: cashier.id,
+          sales_count: updatedStats.sales_count,
+          total_sales: updatedStats.total_sales,
+          last_sale_at: new Date(),
+        });
+
+        console.log(
+          `💰 Stats session mises à jour via WebSocket: ${updatedStats.sales_count} ventes, ${updatedStats.total_sales}€`
+        );
       } catch (error) {
-        // Erreur silencieuse - ne pas faire échouer la vente
         console.debug('Erreur mise à jour stats session:', error.message);
       }
 
