@@ -20,20 +20,28 @@ const ProductSearch = ({ onProductFound, disabled = false }) => {
     }
 
     try {
-      const product = await searchProduct(term.trim(), type);
-      if (product) {
+      const response = await searchProduct(term.trim(), type);
+
+      // ✅ NOUVEAU : Gérer les résultats multiples
+      if (response.multiple && response.results) {
+        // Plusieurs résultats → afficher tous en suggestions
+        setSuggestions(response.results);
+      } else if (response._id) {
+        // Un seul résultat
         if (
           type === 'barcode' ||
-          (type === 'auto' && product.search_info?.found_by === 'barcode')
+          (type === 'auto' && response.search_info?.found_by === 'barcode')
         ) {
-          const barcode = product.meta_data?.find((m) => m.key === 'barcode')?.value;
+          const barcode = response.meta_data?.find((m) => m.key === 'barcode')?.value;
           if (barcode && barcode === term.trim()) {
-            selectProduct(product);
+            // Match exact de code-barres → ajout direct
+            selectProduct(response);
             return;
           }
         }
 
-        setSuggestions([product]);
+        // Sinon, afficher en suggestion
+        setSuggestions([response]);
       } else {
         setSuggestions([]);
       }
@@ -152,6 +160,11 @@ const ProductSearch = ({ onProductFound, disabled = false }) => {
 
       {suggestions.length > 0 && (
         <div className="mb-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 shadow-lg">
+          {suggestions.length > 1 && (
+            <div className="px-3 py-2 bg-gray-50 dark:bg-gray-600 text-xs text-gray-600 dark:text-gray-300 border-b">
+              {suggestions.length} résultats trouvés
+            </div>
+          )}
           {suggestions.map((product, index) => (
             <button
               key={product._id || index}
@@ -162,7 +175,8 @@ const ProductSearch = ({ onProductFound, disabled = false }) => {
             >
               <div className="font-medium text-gray-900 dark:text-white">{product.name}</div>
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                SKU: {product.sku} • {product.price}€ • Stock: {product.stock}
+                SKU: {product.sku} • {product.designation} • {product.price}€ • Stock:{' '}
+                {product.stock}
               </div>
             </button>
           ))}

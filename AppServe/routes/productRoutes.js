@@ -79,6 +79,8 @@ router.get('/barcode/:code', productController.searchByBarcode);
 // 🆕 Recherche par SKU
 router.get('/sku/:sku', productController.searchBySku);
 
+router.get('/designation/:designation', productController.searchByDesignation);
+
 // 🆕 Recherche unifiée (auto-détection SKU ou barcode)
 router.get('/search/:code', productController.searchByCode);
 

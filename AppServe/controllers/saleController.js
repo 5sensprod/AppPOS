@@ -3,10 +3,13 @@ const BaseController = require('./base/BaseController');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const ResponseHandler = require('../handlers/ResponseHandler');
+const { getEntityEventService } = require('../services/events/entityEvents');
 
 class SaleController extends BaseController {
   constructor() {
     super(Sale);
+    this.eventService = getEntityEventService('sales');
+    this.productEventService = getEntityEventService('products');
   }
 
   async createSale(req, res) {
@@ -83,6 +86,9 @@ class SaleController extends BaseController {
 
       const newSale = await Sale.create(saleData);
 
+      // ✅ ÉMETTRE ÉVÉNEMENT CRÉATION DE VENTE
+      this.eventService.created(newSale);
+
       const cashierSessionService = require('../services/cashierSessionService');
       try {
         cashierSessionService.updateSaleStats(cashier.id, totalAmount);
@@ -91,13 +97,12 @@ class SaleController extends BaseController {
         console.debug('Erreur mise à jour stats session:', error.message);
       }
 
-      // 4. Décrémenter les stocks
+      // 4. Décrémenter les stocks et émettre événements produits
       for (const item of enrichedItems) {
         const product = await Product.findById(item.product_id);
 
         const updateData = {};
 
-        // 🔍 CETTE PARTIE DOIT ÊTRE PRÉSENTE :
         if (product.manage_stock) {
           updateData.stock = Math.max(0, product.stock - item.quantity);
         }
@@ -111,7 +116,16 @@ class SaleController extends BaseController {
         updateData.updated_at = new Date();
 
         await Product.update(item.product_id, updateData);
+
+        // ✅ ÉMETTRE ÉVÉNEMENT MISE À JOUR PRODUIT (STOCK)
+        const updatedProduct = await Product.findById(item.product_id);
+        this.productEventService.updated(item.product_id, updatedProduct);
+
+        console.log(
+          `📦 Stock mis à jour via WebSocket: ${product.name} → ${updateData.stock || 'non géré'}`
+        );
       }
+
       return ResponseHandler.created(res, {
         sale: newSale,
         message: 'Vente créée avec succès',

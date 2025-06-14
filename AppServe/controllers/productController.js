@@ -525,12 +525,10 @@ class ProductController extends BaseController {
     }
   }
 
-  // Et aussi corrige searchByCode :
-
   async searchByCode(req, res) {
     try {
       const { code } = req.params;
-      const { type = 'auto' } = req.query;
+      const { type = 'auto', limit = 5 } = req.query; // Ajouter limite de résultats
 
       if (!code) {
         return ResponseHandler.badRequest(res, 'Code requis');
@@ -542,26 +540,34 @@ class ProductController extends BaseController {
       // Créer la regex pour NeDB
       const regex = new RegExp(code.trim(), 'i');
 
-      // Si type = auto, essayer d'abord SKU puis barcode
+      // Si type = auto, essayer dans cet ordre : SKU, designation, puis barcode
       if (type === 'auto') {
-        // Essayer d'abord par SKU avec regex NeDB
+        // 1. Essayer d'abord par SKU
         products = await this.model.find({ sku: regex });
-        searchType = 'sku';
-
-        // Si pas trouvé par SKU, essayer par code-barres
-        if (products.length === 0) {
-          products = await this.model.find({
-            meta_data: {
-              $elemMatch: {
-                key: 'barcode',
-                value: regex,
+        if (products.length > 0) {
+          searchType = 'sku';
+        } else {
+          // 2. Puis par designation
+          products = await this.model.find({ designation: regex });
+          if (products.length > 0) {
+            searchType = 'designation';
+          } else {
+            // 3. Enfin par code-barres
+            products = await this.model.find({
+              meta_data: {
+                $elemMatch: {
+                  key: 'barcode',
+                  value: regex,
+                },
               },
-            },
-          });
-          searchType = 'barcode';
+            });
+            searchType = 'barcode';
+          }
         }
       } else if (type === 'sku') {
         products = await this.model.find({ sku: regex });
+      } else if (type === 'designation') {
+        products = await this.model.find({ designation: regex });
       } else if (type === 'barcode') {
         products = await this.model.find({
           meta_data: {
@@ -577,8 +583,32 @@ class ProductController extends BaseController {
         return ResponseHandler.notFound(res, `Aucun produit trouvé avec le code: ${code}`);
       }
 
-      // Retourner le premier produit trouvé avec ses infos complètes
-      const productWithCategory = await this.model.findByIdWithCategoryInfo(products[0]._id);
+      // Limiter le nombre de résultats
+      const limitedProducts = products.slice(0, parseInt(limit));
+
+      // ✅ NOUVEAU : Si plusieurs résultats, les retourner tous
+      if (limitedProducts.length > 1) {
+        // Retourner tous les produits avec leurs infos complètes
+        const productsWithCategory = await Promise.all(
+          limitedProducts.map((product) => this.model.findByIdWithCategoryInfo(product._id))
+        );
+
+        return ResponseHandler.success(res, {
+          multiple: true,
+          total_found: products.length,
+          results: productsWithCategory.map((product) => ({
+            ...product,
+            search_info: {
+              searched_code: code,
+              found_by: searchType,
+              total_found: products.length,
+            },
+          })),
+        });
+      }
+
+      // ✅ Si un seul résultat, format actuel (pour code-barres exact)
+      const productWithCategory = await this.model.findByIdWithCategoryInfo(limitedProducts[0]._id);
 
       return ResponseHandler.success(res, {
         ...productWithCategory,
@@ -593,6 +623,41 @@ class ProductController extends BaseController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  async searchByDesignation(req, res) {
+    try {
+      const { designation } = req.params;
+      const { partial = 'true' } = req.query; // Par défaut partielle pour designation
+
+      if (!designation) {
+        return ResponseHandler.badRequest(res, 'Designation requise');
+      }
+
+      let searchQuery;
+      if (partial === 'true') {
+        const regex = new RegExp(designation.trim(), 'i');
+        searchQuery = { designation: regex };
+      } else {
+        searchQuery = { designation: designation.trim() };
+      }
+
+      const products = await this.model.find(searchQuery);
+
+      if (products.length === 0) {
+        return ResponseHandler.notFound(
+          res,
+          `Aucun produit trouvé avec la designation: ${designation}`
+        );
+      }
+
+      const productWithCategory = await this.model.findByIdWithCategoryInfo(products[0]._id);
+      return ResponseHandler.success(res, productWithCategory);
+    } catch (error) {
+      console.error('Erreur recherche designation:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   async updateStock(req, res) {
     try {
       const { id } = req.params;
@@ -775,6 +840,7 @@ module.exports = exportController(productController, [
   'searchByBarcode',
   'searchBySku',
   'searchByCode',
+  'searchByDesignation',
   'updateStock',
   'getBestSellers',
   'getProductStats',
