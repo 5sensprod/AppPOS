@@ -51,6 +51,7 @@ const wooSyncRoutes = require('./routes/wooSyncRoutes');
 const productDescriptionRoutes = require('./routes/productDescriptionRoutes');
 const productTitleRoutes = require('./routes/productTitleRoutes');
 const saleRoutes = require('./routes/saleRoutes');
+const timeRoutes = require('./routes/timeRoutes');
 // Routes de sauvegarde
 const backupRoutes = require('./routes/backupRoutes');
 
@@ -64,6 +65,7 @@ app.use('/api/descriptions', authMiddleware, productDescriptionRoutes);
 app.use('/api/product-title', authMiddleware, productTitleRoutes);
 app.use('/api/sales', authMiddleware, saleRoutes);
 app.use('/api/cashier', require('./routes/cashierSessionRoutes'));
+app.use('/api/time', timeRoutes);
 // Ajout des routes de sauvegarde
 app.use('/api/backup', authMiddleware, backupRoutes);
 

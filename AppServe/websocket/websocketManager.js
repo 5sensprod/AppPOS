@@ -6,6 +6,7 @@ class WebSocketManager {
   constructor() {
     this.wss = null;
     this.clients = new Map();
+    this.timeInterval = null;
   }
 
   initialize(server) {
@@ -32,7 +33,34 @@ class WebSocketManager {
       this.sendToClient(ws, 'welcome', { message: 'Connecté au serveur WebSocket' });
     });
 
+    // ✅ BROADCAST TEMPS SERVEUR TOUTES LES MINUTES
+    this.timeInterval = setInterval(() => {
+      this.broadcastServerTime();
+    }, 60000); // Toutes les minutes pile
+
+    // ✅ BROADCAST INITIAL
+    setTimeout(() => this.broadcastServerTime(), 1000);
+
     logger.info('Serveur WebSocket initialisé');
+  }
+
+  broadcastServerTime() {
+    const serverTime = {
+      timestamp: Date.now(),
+      iso: new Date().toISOString(),
+      minute_changed: true, // Signal pour recalculer les durées
+    };
+
+    this.broadcast('server.time.update', serverTime);
+    console.log(`⏰ [WS] Temps serveur diffusé: ${new Date().toLocaleTimeString()}`);
+  }
+
+  // ✅ CLEANUP
+  destroy() {
+    if (this.timeInterval) {
+      clearInterval(this.timeInterval);
+      this.timeInterval = null;
+    }
   }
 
   handleMessage(client, message) {

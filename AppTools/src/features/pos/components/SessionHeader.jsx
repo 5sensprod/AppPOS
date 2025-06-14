@@ -1,4 +1,4 @@
-// src/features/pos/components/SessionHeader.jsx - AVEC WEBSOCKET POUR STATS
+// src/features/pos/components/SessionHeader.jsx - VERSION NETTOYÉE TEMPS SERVEUR
 import React, { useState, useEffect } from 'react';
 import { useSessionStore } from '../../../stores/sessionStore';
 import {
@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 
 const SessionHeader = () => {
-  // ✅ HOOKS ZUSTAND SÉLECTIFS
   const cashierSession = useSessionStore((state) => state.cashierSession);
   const hasActiveCashierSession = useSessionStore((state) =>
     Boolean(state.cashierSession?.status === 'active')
@@ -35,21 +34,20 @@ const SessionHeader = () => {
   const loadLCDPorts = useSessionStore((state) => state.loadLCDPorts);
   const user = useSessionStore((state) => state.user);
 
-  // ✅ CALCULER STATUTS LCD
   const hasLCDControl = Boolean(lcdStatus?.owned && lcdStatus?.owner?.cashier_id === user?.id);
 
-  // ✅ ÉTATS LOCAUX POUR UI
   const [showLCDSetup, setShowLCDSetup] = useState(false);
   const [selectedPort, setSelectedPort] = useState('');
-  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // ✅ CONFIGURATION CAISSE
+  const [serverTime, setServerTime] = useState(new Date());
+  const [timeOffset, setTimeOffset] = useState(0);
+  const [lastServerSync, setLastServerSync] = useState(Date.now());
+
   const CAISSE_CONFIG = {
     numero: '001',
     nom: 'Caisse Principale',
   };
 
-  // ✅ WEBSOCKET POUR MISE À JOUR STATS SESSION
   useEffect(() => {
     if (!hasActiveCashierSession || !user?.id) return;
 
@@ -64,29 +62,24 @@ const SessionHeader = () => {
 
         console.log(`🔔 [SESSION HEADER] Écoute WebSocket pour caissier ${user.id}`);
 
-        // ✅ ÉCOUTER LES MISES À JOUR DE SESSION
         const handleSessionUpdate = (payload) => {
           console.log('📊 [SESSION HEADER] Mise à jour stats reçue:', payload);
 
           if (payload?.entityId === user.id || payload?.data?.cashier_id === user.id) {
             console.log('🔄 [SESSION HEADER] Synchronisation des stats de session');
-            // Forcer une synchronisation de l'état de session
             syncSessionState();
           }
         };
 
-        // ✅ ÉCOUTER LES NOUVELLES VENTES
         const handleSaleCreated = (payload) => {
           console.log('💰 [SESSION HEADER] Nouvelle vente créée:', payload);
 
           if (payload?.cashier_id === user.id) {
             console.log('🔄 [SESSION HEADER] Vente de ce caissier, sync des stats');
-            // Synchroniser les stats après une vente
             syncSessionState();
           }
         };
 
-        // S'abonner aux événements
         websocketService.on('cashier_sessions.updated', handleSessionUpdate);
         websocketService.on('sales.created', handleSaleCreated);
         websocketService.subscribe('cashier_sessions');
@@ -102,50 +95,53 @@ const SessionHeader = () => {
       });
   }, [hasActiveCashierSession, user?.id, syncSessionState]);
 
-  // ✅ HORLOGE TEMPS RÉEL
   useEffect(() => {
-    const syncWithSystemTime = () => {
-      const now = new Date();
-      setCurrentTime(now);
+    import('../../../services/websocketService').then((module) => {
+      const websocketService = module.default;
 
-      const secondsUntilNextMinute = 60 - now.getSeconds();
-      const millisecondsUntilNextMinute = secondsUntilNextMinute * 1000 - now.getMilliseconds();
+      if (!websocketService) return;
 
-      return setTimeout(() => {
-        setCurrentTime(new Date());
+      const handleServerTimeUpdate = (payload) => {
+        const serverTimestamp = payload.timestamp;
+        const clientTimestamp = Date.now();
 
-        const regularTimer = setInterval(() => {
-          setCurrentTime(new Date());
-        }, 60000);
+        const offset = serverTimestamp - clientTimestamp;
+        setTimeOffset(offset);
+        setServerTime(new Date(serverTimestamp));
+        setLastServerSync(clientTimestamp);
 
-        return regularTimer;
-      }, millisecondsUntilNextMinute);
-    };
+        console.log(
+          `⏰ [SESSION HEADER] Temps serveur reçu: ${new Date(serverTimestamp).toLocaleTimeString()}`
+        );
+        console.log(`📏 [SESSION HEADER] Décalage: ${offset}ms`);
+      };
 
-    const syncTimeout = syncWithSystemTime();
-    let regularTimer = null;
-    setCurrentTime(new Date());
+      websocketService.on('server.time.update', handleServerTimeUpdate);
 
-    return () => {
-      if (syncTimeout) clearTimeout(syncTimeout);
-      if (regularTimer) clearInterval(regularTimer);
-    };
+      fetch('/api/time/current')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            handleServerTimeUpdate(data.data);
+          }
+        })
+        .catch((err) => console.error('Erreur sync temps initial:', err));
+
+      return () => {
+        websocketService.off('server.time.update', handleServerTimeUpdate);
+      };
+    });
   }, []);
 
-  // ✅ TIMER DURÉE SESSION (uniquement pour affichage, pas pour stats)
   useEffect(() => {
-    if (!hasActiveCashierSession) return;
+    const clientTimer = setInterval(() => {
+      const adjustedTime = new Date(Date.now() + timeOffset);
+      setServerTime(adjustedTime);
+    }, 1000);
 
-    const durationTimer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 30000);
+    return () => clearInterval(clientTimer);
+  }, [timeOffset]);
 
-    return () => {
-      clearInterval(durationTimer);
-    };
-  }, [hasActiveCashierSession]);
-
-  // ✅ CHARGER PORTS LCD
   useEffect(() => {
     loadLCDPorts().catch(() => {});
   }, [loadLCDPorts]);
@@ -156,7 +152,6 @@ const SessionHeader = () => {
     }
   }, [lcdPorts, selectedPort]);
 
-  // ✅ HANDLERS
   const handleOpenSession = async () => {
     try {
       await startSession();
@@ -213,12 +208,11 @@ const SessionHeader = () => {
     }
   };
 
-  // ✅ CALCUL DURÉE SESSION
   const getSessionDuration = () => {
     if (!cashierSession?.startTime) return '';
 
     const start = new Date(cashierSession.startTime);
-    const now = currentTime;
+    const now = serverTime;
     const duration = Math.floor((now - start) / 1000 / 60);
 
     if (duration < 60) return `${duration}min`;
@@ -227,7 +221,6 @@ const SessionHeader = () => {
     return `${hours}h${mins.toString().padStart(2, '0')}`;
   };
 
-  // ✅ COMPOSANT LCD STATUS
   const LCDIndicator = () => {
     if (hasLCDControl) {
       return (
@@ -255,7 +248,6 @@ const SessionHeader = () => {
     );
   };
 
-  // ✅ SESSION ACTIVE - HEADER PROFESSIONNEL
   if (hasActiveCashierSession) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
@@ -297,7 +289,7 @@ const SessionHeader = () => {
             <div className="flex items-center text-gray-600 dark:text-gray-300">
               <Clock className="h-4 w-4 mr-2" />
               <span className="font-mono text-lg">
-                {currentTime.toLocaleTimeString('fr-FR', {
+                {serverTime.toLocaleTimeString('fr-FR', {
                   hour: '2-digit',
                   minute: '2-digit',
                 })}
@@ -382,7 +374,6 @@ const SessionHeader = () => {
     );
   }
 
-  // ✅ PAS DE SESSION - HEADER PROFESSIONNEL
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
       <div className="px-6 py-4">
@@ -406,7 +397,7 @@ const SessionHeader = () => {
             <div className="flex items-center text-gray-600 dark:text-gray-300">
               <Clock className="h-4 w-4 mr-2" />
               <span className="font-mono text-lg">
-                {currentTime.toLocaleTimeString('fr-FR', {
+                {serverTime.toLocaleTimeString('fr-FR', {
                   hour: '2-digit',
                   minute: '2-digit',
                 })}
