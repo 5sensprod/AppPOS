@@ -58,9 +58,15 @@ class CashierSessionService {
         session.lcd.connected = true;
         session.lcd.port = lcdPort;
 
-        // ✅ AFFICHAGE WELCOME INITIAL (API-CONTROLLED)
-        console.info(`👋 [API] Affichage welcome initial pour ${username}`);
-        await lcdDisplayService.showWelcomeMessage();
+        // ✅ WELCOME APRÈS UNE PAUSE (pour laisser lire "Bonjour [nom]")
+        setTimeout(async () => {
+          try {
+            console.info(`👋 [API] Affichage welcome après connexion pour ${username}`);
+            await lcdDisplayService.showWelcomeMessage();
+          } catch (error) {
+            console.warn('Erreur welcome:', error.message);
+          }
+        }, 3000); // 3s pour lire le message de connexion
       } catch (error) {
         session.lcd.error = error.message;
         console.warn(`⚠️ LCD non disponible pour ${username}:`, error.message);
@@ -120,7 +126,18 @@ class CashierSessionService {
 
       console.info(`📺 LCD assigné à ${username} sur ${lcdPort}`);
 
-      // ✅ NOUVEAU : ÉMETTRE ÉVÉNEMENT LCD ASSIGNÉ
+      // ✅ SÉQUENCE PERSONNALISÉE DE CONNEXION (SANS WELCOME)
+      try {
+        // Message de connexion personnalisé avec pause pour lecture
+        console.info(`👋 Affichage message connexion pour ${username}`);
+        await lcdDisplayService.writeToDisplay(`Bonjour ${username}`, 'LCD connecte');
+
+        // ✅ PAS DE WELCOME ICI - laissé à openCashierSession
+      } catch (error) {
+        console.warn('Erreur affichage message connexion:', error.message);
+      }
+
+      // ✅ ÉMETTRE ÉVÉNEMENT LCD ASSIGNÉ
       console.info(`📡 [WS-EVENT] Émission lcd.ownership.changed - assigné à ${username}`);
       apiEventEmitter.emit('lcd.ownership.changed', {
         owned: true,
@@ -150,13 +167,49 @@ class CashierSessionService {
       const owner = this.lcdOwnership;
 
       try {
-        lcdDisplayService.disconnect();
-        console.info(`📺 LCD libéré de ${owner.username}`);
+        // ✅ 1. AFFICHER MESSAGE DE DÉCONNEXION
+        console.info(`📺 Affichage message déconnexion LCD pour ${owner.username}`);
+        lcdDisplayService.writeToDisplay('Deconnexion LCD', 'Ecran disponible');
+
+        // ✅ 2. SÉQUENCE TEMPORISÉE
+        setTimeout(() => {
+          try {
+            // 2a. Déconnexion physique
+            lcdDisplayService.disconnect();
+            console.info(`📺 LCD libéré de ${owner.username}`);
+
+            // ✅ 2b. RECONNEXION + WELCOME (après 2s supplémentaires)
+            setTimeout(async () => {
+              try {
+                // Reconnexion pour afficher le welcome
+                await lcdDisplayService.connectToDisplay(owner.port, owner.config);
+                await lcdDisplayService.showWelcomeMessage();
+                console.info(`👋 Message welcome affiché après libération LCD`);
+
+                // Puis déconnexion finale
+                setTimeout(() => {
+                  lcdDisplayService.disconnect();
+                  console.info(`📺 LCD déconnecté définitivement`);
+                }, 5000); // Welcome visible 5 secondes
+              } catch (error) {
+                console.warn('Erreur affichage welcome après libération:', error.message);
+              }
+            }, 2000);
+          } catch (error) {
+            console.warn('Erreur lors de la libération LCD:', error.message);
+          }
+        }, 3000); // 3 secondes pour lire "Déconnexion LCD"
       } catch (error) {
-        console.warn('Erreur lors de la libération LCD:', error.message);
+        console.warn('Erreur affichage message déconnexion:', error.message);
+        // Fallback : déconnexion directe
+        try {
+          lcdDisplayService.disconnect();
+        } catch (disconnectError) {
+          console.warn('Erreur lors de la libération LCD:', disconnectError.message);
+        }
       }
 
-      // ✅ NOUVEAU : ÉMETTRE ÉVÉNEMENT LCD LIBÉRÉ
+      // ✅ ÉMETTRE ÉVÉNEMENT LCD LIBÉRÉ (immédiat pour l'UI)
       console.info(`📡 [WS-EVENT] Émission lcd.ownership.changed - libéré de ${owner.username}`);
       apiEventEmitter.emit('lcd.ownership.changed', {
         owned: false,
@@ -176,7 +229,6 @@ class CashierSessionService {
         session.lcd.port = null;
       }
 
-      // ✅ NOUVEAU : Nettoyer l'état panier
       this.cashierCarts.delete(cashierId);
     }
   }
