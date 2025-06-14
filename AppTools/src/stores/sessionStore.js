@@ -1,4 +1,4 @@
-// src/stores/sessionStore.js - ZUSTAND UNIFIÉ POUR TOUTES LES SESSIONS
+// src/stores/sessionStore.js - ZUSTAND UNIFIÉ AVEC WEBSOCKET (SANS POLLING)
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import cashierSessionService from '../services/cashierSessionService';
@@ -23,10 +23,15 @@ export const useSessionStore = create(
     lcdLoading: false,
     lcdError: null,
 
-    // ✅ SYNCHRONISATION CENTRALE
-    syncSessionState: async () => {
+    // ✅ ÉTAT WEBSOCKET
+    wsListenersInitialized: false,
+
+    // ✅ NOUVELLE : SYNCHRONISATION INITIALE UNIQUEMENT (PLUS DE POLLING)
+    syncInitialState: async () => {
       const state = get();
       if (!state.isAuthenticated || !state.user) return;
+
+      console.log("🔄 [SESSION STORE] Synchronisation initiale de l'état");
 
       try {
         const response = await cashierSessionService.getSessionStatus();
@@ -42,7 +47,7 @@ export const useSessionStore = create(
           lcdError: data.can_use_lcd ? null : state.lcdError,
         }));
 
-        console.log('🔄 [SESSION STORE] État synchronisé', {
+        console.log('✅ [SESSION STORE] État initial synchronisé', {
           hasSession: !!data.session,
           hasLCD: data.can_use_lcd,
         });
@@ -56,7 +61,158 @@ export const useSessionStore = create(
       }
     },
 
-    // ✅ ACTIONS SESSION CAISSE
+    // ✅ NOUVELLE : INITIALISATION DES LISTENERS WEBSOCKET
+    initWebSocketListeners: async () => {
+      const state = get();
+
+      if (state.wsListenersInitialized) {
+        console.log('⏭️ [SESSION STORE] Listeners WebSocket déjà initialisés');
+        return;
+      }
+
+      if (!state.isAuthenticated || !state.user) {
+        console.log(
+          '⚠️ [SESSION STORE] Utilisateur non authentifié, listeners WebSocket non initialisés'
+        );
+        return;
+      }
+
+      try {
+        const websocketModule = await import('../services/websocketService');
+        const websocketService = websocketModule.default;
+
+        if (!websocketService) {
+          console.error('[SESSION STORE] Service WebSocket non trouvé');
+          return;
+        }
+
+        const userId = state.user.id;
+        console.log(`🔔 [SESSION STORE] Initialisation listeners WebSocket pour user ${userId}`);
+
+        // ✅ LISTENER : CHANGEMENT STATUS SESSION
+        const handleSessionStatusChanged = (payload) => {
+          console.log('📊 [SESSION STORE] Session status changé reçu:', payload);
+
+          // Filtrer par utilisateur connecté
+          if (payload.cashier_id === userId) {
+            console.log(
+              `🔄 [SESSION STORE] Session ${payload.session.status} pour utilisateur connecté`
+            );
+
+            set((state) => ({
+              ...state,
+              cashierSession:
+                payload.session.status === 'closed'
+                  ? null
+                  : {
+                      cashier_id: payload.cashier_id,
+                      username: payload.username,
+                      status: payload.session.status,
+                      startTime: payload.session.startTime,
+                      endTime: payload.session.endTime,
+                      duration: payload.session.duration,
+                      sales_count: payload.session.sales_count,
+                      total_sales: payload.session.total_sales,
+                      lcd: {
+                        connected: payload.session.lcd_connected || false,
+                        port: payload.session.lcd_port || null,
+                      },
+                    },
+              sessionError: null, // Clear erreur si succès
+            }));
+          }
+        };
+
+        // ✅ LISTENER : MISE À JOUR STATS SESSION
+        const handleSessionStatsUpdated = (payload) => {
+          console.log('📈 [SESSION STORE] Stats session mises à jour:', payload);
+
+          // Filtrer par utilisateur connecté
+          if (payload.cashier_id === userId) {
+            console.log(
+              `💰 [SESSION STORE] Stats mises à jour pour utilisateur connecté: ${payload.stats.sales_count} ventes, ${payload.stats.total_sales}€`
+            );
+
+            set((state) => ({
+              ...state,
+              cashierSession: state.cashierSession
+                ? {
+                    ...state.cashierSession,
+                    sales_count: payload.stats.sales_count,
+                    total_sales: payload.stats.total_sales,
+                    last_sale: payload.stats.last_sale_at,
+                  }
+                : state.cashierSession,
+            }));
+          }
+        };
+
+        // ✅ LISTENER : CHANGEMENT PROPRIÉTÉ LCD
+        const handleLCDOwnershipChanged = (payload) => {
+          console.log('📺 [SESSION STORE] Propriété LCD changée:', payload);
+
+          set((state) => ({
+            ...state,
+            lcdStatus: {
+              owned: payload.owned,
+              owner: payload.owner,
+              display_status: state.lcdStatus?.display_status || null,
+            },
+            lcdError: null, // Clear erreur si changement réussi
+            // Mettre à jour la session si c'est notre utilisateur
+            cashierSession:
+              state.cashierSession &&
+              (payload.owner?.cashier_id === userId ||
+                payload.previous_owner?.cashier_id === userId)
+                ? {
+                    ...state.cashierSession,
+                    lcd: {
+                      connected: payload.owned && payload.owner?.cashier_id === userId,
+                      port:
+                        payload.owned && payload.owner?.cashier_id === userId
+                          ? payload.owner.port
+                          : null,
+                    },
+                  }
+                : state.cashierSession,
+          }));
+        };
+
+        // ✅ ENREGISTREMENT DES LISTENERS
+        websocketService.on('cashier_session.status.changed', handleSessionStatusChanged);
+        websocketService.on('cashier_session.stats.updated', handleSessionStatsUpdated);
+        websocketService.on('lcd.ownership.changed', handleLCDOwnershipChanged);
+
+        // ✅ ABONNEMENTS (pas besoin de subscribe car ces événements sont globaux)
+        // Note: Les événements session/LCD sont broadcastés à tous les clients
+
+        // ✅ MARQUER COMME INITIALISÉ
+        set((state) => ({
+          ...state,
+          wsListenersInitialized: true,
+        }));
+
+        console.log('✅ [SESSION STORE] Listeners WebSocket initialisés avec succès');
+
+        // ✅ FONCTION DE NETTOYAGE
+        return () => {
+          console.log('🧹 [SESSION STORE] Nettoyage listeners WebSocket');
+          websocketService.off('cashier_session.status.changed', handleSessionStatusChanged);
+          websocketService.off('cashier_session.stats.updated', handleSessionStatsUpdated);
+          websocketService.off('lcd.ownership.changed', handleLCDOwnershipChanged);
+
+          set((state) => ({
+            ...state,
+            wsListenersInitialized: false,
+          }));
+        };
+      } catch (error) {
+        console.error('[SESSION STORE] Erreur initialisation listeners WebSocket:', error);
+        return null;
+      }
+    },
+
+    // ✅ ACTIONS SESSION CAISSE (MISES À JOUR SANS SYNC)
     startSession: async (lcdPort = null, lcdConfig = {}) => {
       const state = get();
       if (!state.isAuthenticated) {
@@ -74,20 +230,15 @@ export const useSessionStore = create(
         const response = await cashierSessionService.openSession(lcdPort, lcdConfig);
         const data = response.data;
 
-        // ✅ MISE À JOUR IMMÉDIATE
+        // ✅ MISE À JOUR IMMÉDIATE - SANS TOUCHER AU LCDSTATUS (WebSocket s'en charge)
         set((state) => ({
           ...state,
           sessionLoading: false,
           cashierSession: data.session,
-          lcdStatus: data.lcd_status,
+          // ✅ PAS DE lcdStatus ici - WebSocket seul maître !
         }));
 
-        // ✅ SYNC CONFIRMÉE
-        setTimeout(() => {
-          get().syncSessionState();
-        }, 500);
-
-        console.log('✅ [SESSION STORE] Session démarrée', data);
+        console.log('✅ [SESSION STORE] Session démarrée via WebSocket', data);
         return data;
       } catch (error) {
         const message = error.response?.data?.message || error.message;
@@ -112,7 +263,7 @@ export const useSessionStore = create(
       try {
         const response = await cashierSessionService.closeSession();
 
-        // ✅ RESET IMMÉDIAT
+        // ✅ RESET IMMÉDIAT (WebSocket confirmera)
         set((state) => ({
           ...state,
           sessionLoading: false,
@@ -121,11 +272,7 @@ export const useSessionStore = create(
           lcdError: null,
         }));
 
-        setTimeout(() => {
-          get().syncSessionState();
-        }, 500);
-
-        console.log('🛑 [SESSION STORE] Session fermée');
+        console.log('🛑 [SESSION STORE] Session fermée (WebSocket confirmera)');
         return response.data;
       } catch (error) {
         set((state) => ({
@@ -137,20 +284,21 @@ export const useSessionStore = create(
       }
     },
 
-    // ✅ ACTIONS LCD
+    // ✅ ACTIONS LCD (WEBSOCKET SEUL MAÎTRE)
     requestLCD: async (port, config = {}) => {
       set((state) => ({ ...state, lcdLoading: true, lcdError: null }));
 
       try {
         const response = await cashierSessionService.requestLCDControl(port, config);
 
+        // ✅ NE PAS METTRE À JOUR LCDSTATUS - WebSocket s'en charge !
         set((state) => ({
           ...state,
           lcdLoading: false,
-          lcdStatus: response.data.lcd_status,
+          // ✅ PAS DE lcdStatus ici !
         }));
 
-        setTimeout(() => get().syncSessionState(), 500);
+        console.log('✅ [SESSION STORE] LCD demandé via WebSocket');
         return response.data;
       } catch (error) {
         set((state) => ({
@@ -168,13 +316,14 @@ export const useSessionStore = create(
       try {
         const response = await cashierSessionService.releaseLCDControl();
 
+        // ✅ NE PAS METTRE À JOUR LCDSTATUS - WebSocket s'en charge !
         set((state) => ({
           ...state,
           lcdLoading: false,
-          lcdStatus: response.data.lcd_status,
+          // ✅ PAS DE lcdStatus ici !
         }));
 
-        setTimeout(() => get().syncSessionState(), 500);
+        console.log('✅ [SESSION STORE] LCD libéré via WebSocket');
         return response.data;
       } catch (error) {
         set((state) => ({
@@ -205,7 +354,7 @@ export const useSessionStore = create(
       }
     },
 
-    // ✅ OPÉRATIONS LCD AVEC GESTION D'ERREUR
+    // ✅ OPÉRATIONS LCD AVEC GESTION D'ERREUR (INCHANGÉES)
     safeLCDOperation: async (operation) => {
       try {
         const result = await operation();
@@ -225,16 +374,17 @@ export const useSessionStore = create(
           lcdError: message,
         }));
 
-        // Sync si erreur de session
+        // Sync initial si erreur de session (fallback)
         if (message.includes('non assigné') || message.includes('session')) {
-          get().syncSessionState();
+          console.log('⚠️ [SESSION STORE] Erreur session, sync initiale de fallback');
+          get().syncInitialState();
         }
 
         throw error;
       }
     },
 
-    // ✅ MÉTHODES LCD RACCOURCIES
+    // ✅ MÉTHODES LCD RACCOURCIES (INCHANGÉES)
     lcd: {
       showPrice: async (itemName, price) => {
         return get().safeLCDOperation(() => cashierSessionService.showLCDPrice(itemName, price));
@@ -287,11 +437,12 @@ export const useSessionStore = create(
         lcdPorts: [],
         lcdLoading: false,
         lcdError: null,
+        wsListenersInitialized: false,
       })),
   }))
 );
 
-// ✅ HOOKS SÉLECTEURS STABLES POUR OPTIMISER LES RE-RENDERS
+// ✅ HOOKS SÉLECTEURS STABLES POUR OPTIMISER LES RE-RENDERS (INCHANGÉS)
 export const useSessionAuth = () => {
   const user = useSessionStore((state) => state.user);
   const isAuthenticated = useSessionStore((state) => state.isAuthenticated);
@@ -350,25 +501,3 @@ export const useSessionLCD = () => {
     lcd,
   };
 };
-
-// ✅ USAGE DANS LES COMPOSANTS
-/*
-
-// Sélection fine pour éviter re-renders inutiles
-const SessionManager = () => {
-  const { hasActiveCashierSession, startSession, stopSession } = useSessionCashier();
-  const { canUseLCD, requestLCD, releaseLCD } = useSessionLCD();
-  
-  // Seulement re-render si ces valeurs changent
-};
-
-const CashierPage = () => {
-  const { isFullyReady } = useSessionStore((state) => ({ 
-    isFullyReady: state.isFullyReady() 
-  }));
-  const { lcd } = useSessionLCD();
-  
-  // Optimal: seulement les changements pertinents
-};
-
-*/

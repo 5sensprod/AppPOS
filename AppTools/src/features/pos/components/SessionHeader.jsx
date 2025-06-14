@@ -1,4 +1,4 @@
-// src/features/pos/components/SessionHeader.jsx - VERSION NETTOYÉE TEMPS SERVEUR
+// src/features/pos/components/SessionHeader.jsx - VERSION OPTIMISÉE WEBSOCKET
 import React, { useState, useEffect } from 'react';
 import { useSessionStore } from '../../../stores/sessionStore';
 import {
@@ -23,7 +23,8 @@ const SessionHeader = () => {
   const sessionError = useSessionStore((state) => state.sessionError);
   const startSession = useSessionStore((state) => state.startSession);
   const stopSession = useSessionStore((state) => state.stopSession);
-  const syncSessionState = useSessionStore((state) => state.syncSessionState);
+  const syncInitialState = useSessionStore((state) => state.syncInitialState);
+  const initWebSocketListeners = useSessionStore((state) => state.initWebSocketListeners);
 
   const lcdStatus = useSessionStore((state) => state.lcdStatus);
   const lcdPorts = useSessionStore((state) => state.lcdPorts);
@@ -41,60 +42,47 @@ const SessionHeader = () => {
 
   const [serverTime, setServerTime] = useState(new Date());
   const [timeOffset, setTimeOffset] = useState(0);
-  const [lastServerSync, setLastServerSync] = useState(Date.now());
 
   const CAISSE_CONFIG = {
     numero: '001',
     nom: 'Caisse Principale',
   };
 
+  // ✅ INITIALISATION WEBSOCKET + SYNC INITIALE (UNE SEULE FOIS)
   useEffect(() => {
-    if (!hasActiveCashierSession || !user?.id) return;
+    if (!user?.id) return;
 
-    import('../../../services/websocketService')
-      .then((module) => {
-        const websocketService = module.default;
+    console.log(`🔄 [SESSION HEADER] Initialisation pour user ${user.id}`);
 
-        if (!websocketService) {
-          console.error('[SESSION HEADER] Service WebSocket non trouvé');
-          return;
+    // ✅ 1. SYNC INITIALE (remplace le polling répétitif)
+    syncInitialState().catch((error) => {
+      console.warn('[SESSION HEADER] Erreur sync initiale:', error.message);
+    });
+
+    // ✅ 2. INITIALISER LES LISTENERS WEBSOCKET
+    let cleanupWebSocket = null;
+
+    initWebSocketListeners()
+      .then((cleanup) => {
+        if (cleanup && typeof cleanup === 'function') {
+          cleanupWebSocket = cleanup;
+          console.log('✅ [SESSION HEADER] Listeners WebSocket initialisés');
         }
-
-        console.log(`🔔 [SESSION HEADER] Écoute WebSocket pour caissier ${user.id}`);
-
-        const handleSessionUpdate = (payload) => {
-          console.log('📊 [SESSION HEADER] Mise à jour stats reçue:', payload);
-
-          if (payload?.entityId === user.id || payload?.data?.cashier_id === user.id) {
-            console.log('🔄 [SESSION HEADER] Synchronisation des stats de session');
-            syncSessionState();
-          }
-        };
-
-        const handleSaleCreated = (payload) => {
-          console.log('💰 [SESSION HEADER] Nouvelle vente créée:', payload);
-
-          if (payload?.cashier_id === user.id) {
-            console.log('🔄 [SESSION HEADER] Vente de ce caissier, sync des stats');
-            syncSessionState();
-          }
-        };
-
-        websocketService.on('cashier_sessions.updated', handleSessionUpdate);
-        websocketService.on('sales.created', handleSaleCreated);
-        websocketService.subscribe('cashier_sessions');
-        websocketService.subscribe('sales');
-
-        return () => {
-          websocketService.off('cashier_sessions.updated', handleSessionUpdate);
-          websocketService.off('sales.created', handleSaleCreated);
-        };
       })
-      .catch((err) => {
-        console.error('[SESSION HEADER] Erreur import WebSocket:', err);
+      .catch((error) => {
+        console.warn('[SESSION HEADER] Erreur initialisation WebSocket:', error);
       });
-  }, [hasActiveCashierSession, user?.id, syncSessionState]);
 
+    // ✅ CLEANUP
+    return () => {
+      console.log('🧹 [SESSION HEADER] Nettoyage pour user', user.id);
+      if (cleanupWebSocket) {
+        cleanupWebSocket();
+      }
+    };
+  }, [user?.id, syncInitialState, initWebSocketListeners]);
+
+  // ✅ TEMPS SERVEUR WEBSOCKET (INCHANGÉ)
   useEffect(() => {
     import('../../../services/websocketService').then((module) => {
       const websocketService = module.default;
@@ -108,12 +96,10 @@ const SessionHeader = () => {
         const offset = serverTimestamp - clientTimestamp;
         setTimeOffset(offset);
         setServerTime(new Date(serverTimestamp));
-        setLastServerSync(clientTimestamp);
 
         console.log(
           `⏰ [SESSION HEADER] Temps serveur reçu: ${new Date(serverTimestamp).toLocaleTimeString()}`
         );
-        console.log(`📏 [SESSION HEADER] Décalage: ${offset}ms`);
       };
 
       websocketService.on('server.time.update', handleServerTimeUpdate);
@@ -133,6 +119,7 @@ const SessionHeader = () => {
     });
   }, []);
 
+  // ✅ TIMER CLIENT POUR TEMPS SERVEUR (INCHANGÉ)
   useEffect(() => {
     const clientTimer = setInterval(() => {
       const adjustedTime = new Date(Date.now() + timeOffset);
@@ -142,6 +129,7 @@ const SessionHeader = () => {
     return () => clearInterval(clientTimer);
   }, [timeOffset]);
 
+  // ✅ CHARGEMENT PORTS LCD (INCHANGÉ)
   useEffect(() => {
     loadLCDPorts().catch(() => {});
   }, [loadLCDPorts]);
@@ -152,9 +140,11 @@ const SessionHeader = () => {
     }
   }, [lcdPorts, selectedPort]);
 
+  // ✅ HANDLERS POUR ACTIONS (INCHANGÉS)
   const handleOpenSession = async () => {
     try {
       await startSession();
+      console.log('✅ [SESSION HEADER] Session ouverte (WebSocket confirmera)');
     } catch (error) {
       console.error('Erreur ouverture session:', error);
     }
@@ -171,6 +161,7 @@ const SessionHeader = () => {
         stopBits: 1,
       });
       setShowLCDSetup(false);
+      console.log('✅ [SESSION HEADER] Session + LCD ouverte (WebSocket confirmera)');
     } catch (error) {
       console.error('Erreur ouverture session avec LCD:', error);
     }
@@ -179,6 +170,7 @@ const SessionHeader = () => {
   const handleCloseSession = async () => {
     try {
       await stopSession();
+      console.log('✅ [SESSION HEADER] Session fermée (WebSocket confirmera)');
     } catch (error) {
       console.error('Erreur fermeture session:', error);
     }
@@ -195,6 +187,7 @@ const SessionHeader = () => {
         stopBits: 1,
       });
       setShowLCDSetup(false);
+      console.log('✅ [SESSION HEADER] LCD demandé (WebSocket confirmera)');
     } catch (error) {
       console.error('Erreur connexion LCD:', error);
     }
@@ -203,6 +196,7 @@ const SessionHeader = () => {
   const handleReleaseLCD = async () => {
     try {
       await releaseLCD();
+      console.log('✅ [SESSION HEADER] LCD libéré (WebSocket confirmera)');
     } catch (error) {
       console.error('Erreur libération LCD:', error);
     }
@@ -248,6 +242,7 @@ const SessionHeader = () => {
     );
   };
 
+  // ✅ AFFICHAGE SESSION ACTIVE (DONNÉES WEBSOCKET TEMPS RÉEL)
   if (hasActiveCashierSession) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
@@ -301,6 +296,7 @@ const SessionHeader = () => {
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
+              {/* ✅ STATS TEMPS RÉEL VIA WEBSOCKET */}
               <div className="flex items-center text-gray-600 dark:text-gray-300">
                 <ShoppingBag className="h-4 w-4 mr-2" />
                 <span className="font-medium">
@@ -311,6 +307,7 @@ const SessionHeader = () => {
 
               <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
 
+              {/* ✅ STATUS LCD TEMPS RÉEL VIA WEBSOCKET */}
               <LCDIndicator />
             </div>
 
@@ -374,6 +371,7 @@ const SessionHeader = () => {
     );
   }
 
+  // ✅ AFFICHAGE AUCUNE SESSION (INCHANGÉ)
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
       <div className="px-6 py-4">
@@ -451,6 +449,7 @@ const SessionHeader = () => {
         )}
       </div>
 
+      {/* ✅ MODAL LCD SETUP (INCHANGÉ) */}
       {showLCDSetup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-6 w-96 max-w-full">

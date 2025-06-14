@@ -1,12 +1,12 @@
-// services/cashierSessionService.js - CORRECTION - API INTELLIGENTE avec gestion auto LCD
+// services/cashierSessionService.js - AVEC ÉVÉNEMENTS WEBSOCKET
 const lcdDisplayService = require('./lcdDisplayService');
+// ✅ NOUVEAU : Import pour émettre des événements
+const apiEventEmitter = require('./apiEventEmitter');
 
 class CashierSessionService {
   constructor() {
     this.activeSessions = new Map(); // cashier_id -> session data
     this.lcdOwnership = null; // { cashier_id, username, startTime, port }
-
-    // ✅ NOUVEAU : État du panier par caissier pour gestion auto LCD
     this.cashierCarts = new Map(); // cashier_id -> { itemCount, total, lastUpdate }
   }
 
@@ -69,6 +69,21 @@ class CashierSessionService {
 
     this.activeSessions.set(cashierId, session);
 
+    // ✅ NOUVEAU : ÉMETTRE ÉVÉNEMENT SESSION OUVERTE
+    console.info(`📡 [WS-EVENT] Émission cashier_session.status.changed pour ${username}`);
+    apiEventEmitter.emit('cashier_session.status.changed', {
+      cashier_id: cashierId,
+      username: username,
+      session: {
+        status: session.status,
+        startTime: session.startTime,
+        sales_count: session.sales_count,
+        total_sales: session.total_sales,
+        lcd_connected: session.lcd.connected,
+        lcd_port: session.lcd.port,
+      },
+    });
+
     return {
       success: true,
       message: 'Session caissier ouverte',
@@ -79,6 +94,9 @@ class CashierSessionService {
 
   // ✅ ASSIGNER LE LCD À UN CAISSIER
   async assignLCDToCashier(cashierId, username, lcdPort, lcdConfig = {}) {
+    // Capturer l'ancien propriétaire pour l'événement
+    const previousOwner = this.lcdOwnership ? { ...this.lcdOwnership } : null;
+
     // Vérifier si LCD déjà utilisé par un autre caissier
     if (this.lcdOwnership && this.lcdOwnership.cashier_id !== cashierId) {
       const currentOwner = this.lcdOwnership;
@@ -102,7 +120,24 @@ class CashierSessionService {
 
       console.info(`📺 LCD assigné à ${username} sur ${lcdPort}`);
 
-      // ✅ PAS de message de session ici - laissons le welcome normal
+      // ✅ NOUVEAU : ÉMETTRE ÉVÉNEMENT LCD ASSIGNÉ
+      console.info(`📡 [WS-EVENT] Émission lcd.ownership.changed - assigné à ${username}`);
+      apiEventEmitter.emit('lcd.ownership.changed', {
+        owned: true,
+        owner: {
+          cashier_id: this.lcdOwnership.cashier_id,
+          username: this.lcdOwnership.username,
+          port: this.lcdOwnership.port,
+          startTime: this.lcdOwnership.startTime,
+        },
+        previous_owner: previousOwner
+          ? {
+              cashier_id: previousOwner.cashier_id,
+              username: previousOwner.username,
+            }
+          : null,
+      });
+
       return result;
     } catch (error) {
       throw new Error(`Impossible de connecter LCD: ${error.message}`);
@@ -120,6 +155,17 @@ class CashierSessionService {
       } catch (error) {
         console.warn('Erreur lors de la libération LCD:', error.message);
       }
+
+      // ✅ NOUVEAU : ÉMETTRE ÉVÉNEMENT LCD LIBÉRÉ
+      console.info(`📡 [WS-EVENT] Émission lcd.ownership.changed - libéré de ${owner.username}`);
+      apiEventEmitter.emit('lcd.ownership.changed', {
+        owned: false,
+        owner: null,
+        previous_owner: {
+          cashier_id: owner.cashier_id,
+          username: owner.username,
+        },
+      });
 
       this.lcdOwnership = null;
 
@@ -152,6 +198,23 @@ class CashierSessionService {
     session.status = 'closed';
     session.endTime = new Date();
     session.duration = session.endTime - session.startTime;
+
+    // ✅ NOUVEAU : ÉMETTRE ÉVÉNEMENT SESSION FERMÉE
+    console.info(
+      `📡 [WS-EVENT] Émission cashier_session.status.changed - session fermée pour ${session.username}`
+    );
+    apiEventEmitter.emit('cashier_session.status.changed', {
+      cashier_id: cashierId,
+      username: session.username,
+      session: {
+        status: 'closed',
+        startTime: session.startTime,
+        endTime: session.endTime,
+        duration: session.duration,
+        sales_count: session.sales_count,
+        total_sales: session.total_sales,
+      },
+    });
 
     // Retirer de la liste active
     this.activeSessions.delete(cashierId);
@@ -271,8 +334,12 @@ class CashierSessionService {
       // 2. Pause puis bienvenue
       setTimeout(async () => {
         try {
+          // ✅ WELCOME DIRECT (sans passer par updateCashierCart)
           await lcdDisplayService.showWelcomeMessage();
           console.info(`👋 [API] Retour message bienvenue après vente`);
+
+          // ✅ PUIS reset panier SANS welcome
+          this.updateCashierCart(cashierId, 0, 0.0, { skipWelcome: true });
         } catch (error) {
           console.warn('Erreur welcome après vente:', error.message);
         }
@@ -304,17 +371,37 @@ class CashierSessionService {
     return Array.from(this.activeSessions.values());
   }
 
-  // ✅ NOUVEAU : STATS POUR UN CAISSIER AVEC MISE À JOUR AUTO LCD
+  // ✅ NOUVEAU : STATS POUR UN CAISSIER AVEC MISE À JOUR AUTO LCD + ÉVÉNEMENT WS
   updateSaleStats(cashierId, saleAmount) {
     const session = this.activeSessions.get(cashierId);
     if (session) {
+      // Mettre à jour les stats
       session.sales_count++;
       session.total_sales += saleAmount;
       session.last_sale = new Date();
 
-      // ✅ APPELER LA SÉQUENCE COMPLÈTE
+      // ✅ NOUVEAU : ÉMETTRE ÉVÉNEMENT STATS MISES À JOUR
+      console.info(`📡 [WS-EVENT] Émission cashier_session.stats.updated pour ${session.username}`);
+      apiEventEmitter.emit('cashier_session.stats.updated', {
+        cashier_id: cashierId,
+        username: session.username,
+        stats: {
+          sales_count: session.sales_count,
+          total_sales: Math.round(session.total_sales * 100) / 100,
+          last_sale_at: session.last_sale,
+        },
+      });
+
+      // ✅ APPELER LA SÉQUENCE COMPLÈTE LCD
       console.info(`💳 [API] Vente terminée -> Séquence remerciement pour ${session.username}`);
       this.processSaleComplete(cashierId);
+
+      // ✅ RETOURNER LES STATS MISES À JOUR
+      return {
+        sales_count: session.sales_count,
+        total_sales: session.total_sales,
+        last_sale: session.last_sale,
+      };
     }
   }
 

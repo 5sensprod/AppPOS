@@ -82,6 +82,7 @@ class WebSocketManager {
     }
   }
 
+  // ✅ MÉTHODES EXISTANTES POUR ENTITÉS
   notifyEntityCreated(entityType, entityData) {
     const entityPlural = standardizeEntityType(entityType);
     this.broadcast(`${entityPlural}.created`, entityData, [entityPlural]);
@@ -114,6 +115,86 @@ class WebSocketManager {
     this.broadcast(`${entityPlural}.count.updated`, { entityId, count }, [entityPlural]);
   }
 
+  // ✅ NOUVELLES MÉTHODES POUR SESSIONS CAISSE
+  notifyCashierSessionStatusChanged(payload) {
+    const { cashier_id, username, session } = payload;
+    const eventData = {
+      cashier_id,
+      username,
+      session: {
+        status: session.status,
+        startTime: session.startTime,
+        endTime: session.endTime || null,
+        duration: session.duration || null,
+        sales_count: session.sales_count,
+        total_sales: session.total_sales,
+        lcd_connected: session.lcd_connected || false,
+        lcd_port: session.lcd_port || null,
+      },
+      timestamp: Date.now(),
+    };
+
+    this.broadcast('cashier_session.status.changed', eventData);
+    console.log(`[WS-CASHIER] Session ${session.status} diffusée pour ${username} (${cashier_id})`);
+  }
+
+  notifyCashierSessionStatsUpdated(payload) {
+    const { cashier_id, username, stats } = payload;
+    const eventData = {
+      cashier_id,
+      username,
+      stats: {
+        sales_count: stats.sales_count,
+        total_sales: stats.total_sales,
+        last_sale_at: stats.last_sale_at,
+      },
+      timestamp: Date.now(),
+    };
+
+    this.broadcast('cashier_session.stats.updated', eventData);
+    console.log(
+      `[WS-CASHIER] Stats mises à jour diffusées pour ${username}: ${stats.sales_count} ventes, ${stats.total_sales}€`
+    );
+  }
+
+  // ✅ NOUVELLES MÉTHODES POUR LCD
+  notifyLCDOwnershipChanged(payload) {
+    const { owned, owner, previous_owner } = payload;
+    const eventData = {
+      owned,
+      owner: owner
+        ? {
+            cashier_id: owner.cashier_id,
+            username: owner.username,
+            port: owner.port,
+            startTime: owner.startTime,
+          }
+        : null,
+      previous_owner: previous_owner
+        ? {
+            cashier_id: previous_owner.cashier_id,
+            username: previous_owner.username,
+          }
+        : null,
+      timestamp: Date.now(),
+    };
+
+    this.broadcast('lcd.ownership.changed', eventData);
+
+    if (owned && owner) {
+      console.log(
+        `[WS-LCD] Propriété LCD attribuée à ${owner.username} (${owner.cashier_id}) sur ${owner.port}`
+      );
+    } else if (previous_owner) {
+      console.log(
+        `[WS-LCD] Propriété LCD libérée de ${previous_owner.username} (${previous_owner.cashier_id})`
+      );
+    } else {
+      console.log(`[WS-LCD] Propriété LCD libérée`);
+    }
+  }
+
+  // ✅ MÉTHODES UTILITAIRES EXISTANTES
   sendToClient(client, type, payload) {
     if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify({ type, payload }));
