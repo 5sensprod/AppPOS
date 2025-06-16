@@ -12,10 +12,11 @@ import {
   AlertTriangle,
   RefreshCw,
   ShoppingBag,
+  FileText,
 } from 'lucide-react';
 import SessionOpeningModal from './SessionOpeningModal';
 
-const SessionHeader = () => {
+const SessionHeader = ({ onShowClosing, onShowReport }) => {
   const cashierSession = useSessionStore((state) => state.cashierSession);
   const hasActiveCashierSession = useSessionStore((state) =>
     Boolean(state.cashierSession?.status === 'active')
@@ -346,13 +347,22 @@ const SessionHeader = () => {
               )}
 
               <button
-                onClick={handleCloseSession}
+                onClick={() => onShowClosing?.()} // Au lieu de handleCloseSession
                 disabled={sessionLoading}
                 className="flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md disabled:opacity-50 transition-colors"
               >
                 <LogOut className="h-4 w-4 mr-1" />
                 Fermer Session
               </button>
+              {hasActiveCashierSession && (
+                <button
+                  onClick={() => onShowReport?.()}
+                  className="flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Rapport
+                </button>
+              )}
             </div>
           </div>
         </div>

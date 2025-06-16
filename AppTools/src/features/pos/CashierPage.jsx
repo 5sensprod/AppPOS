@@ -1,5 +1,5 @@
 // src/features/pos/CashierPage.jsx - Version complète avec fond de caisse
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { useCashierStore } from './stores/cashierStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import SessionHeader from './components/SessionHeader';
@@ -9,10 +9,18 @@ import PaymentModal from './components/PaymentModal';
 import ReceiptModal from './components/ReceiptModal';
 import ErrorDisplay from './components/ErrorDisplay';
 import DrawerIndicator from './components/DrawerIndicator';
+import DrawerMovementModal from './components/DrawerMovementModal';
+import DrawerClosingModal from './components/DrawerClosingModal';
+import DrawerReportModal from './components/DrawerReportModal';
 
 const CashierPage = () => {
   // ✅ SÉLECTEURS STABLES
   const user = useSessionStore((state) => state.user);
+  const stopSession = useSessionStore((state) => state.stopSession); // 🆕 Ajouter cette ligne
+
+  const [showClosingModal, setShowClosingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+
   const hasActiveCashierSession = useSessionStore((state) =>
     Boolean(state.cashierSession?.status === 'active')
   );
@@ -38,12 +46,6 @@ const CashierPage = () => {
         return;
       }
 
-      // Vérifications de statut
-      // if (product.status !== 'published') {
-      //   setError(`Produit "${product.name}" non publié (statut: ${product.status})`);
-      //   return;
-      // }
-
       // Ajouter au panier
       addToCart(product, 1);
       setError(null);
@@ -63,6 +65,15 @@ const CashierPage = () => {
     [addToCart, setError, canUseLCD, lcd]
   );
 
+  const handleCloseSession = async (closingData) => {
+    try {
+      await stopSession(closingData);
+      setShowClosingModal(false);
+    } catch (error) {
+      console.error('Erreur fermeture session:', error);
+    }
+  };
+
   // ✅ RACCOURCIS CLAVIER
   useEffect(() => {
     const handleKeyPress = (e) => {
@@ -77,7 +88,10 @@ const CashierPage = () => {
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-900 p-4">
       {/* ✅ HEADER UNIFIÉ */}
-      <SessionHeader />
+      <SessionHeader
+        onShowClosing={() => setShowClosingModal(true)}
+        onShowReport={() => setShowReportModal(true)}
+      />
 
       {/* ✅ NOUVEAU : Indicateur fond de caisse */}
       <DrawerIndicator />
@@ -99,6 +113,14 @@ const CashierPage = () => {
       {/* ✅ MODALES */}
       <PaymentModal />
       <ReceiptModal />
+      <DrawerMovementModal />
+      <DrawerClosingModal
+        isOpen={showClosingModal}
+        onClose={() => setShowClosingModal(false)}
+        onConfirm={handleCloseSession}
+      />
+
+      <DrawerReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} />
     </div>
   );
 };
