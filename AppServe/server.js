@@ -11,6 +11,7 @@ const { authMiddleware } = require('./utils/auth');
 // WebSocket Manager
 const websocketManager = require('./websocket/websocketManager');
 const { initializeWebSocketEventBridge } = require('./websocket/websocketEventBridge');
+// ✅ NOUVEAU : Import du service de restauration
 
 // Import du système de sauvegarde
 const { performBackup } = require('./backup');
@@ -22,6 +23,7 @@ const app = express();
 const defaultPort = process.env.PORT || 3000;
 // Créer un serveur HTTP pour à la fois Express et WebSocket
 const server = http.createServer(app);
+
 // Configuration CORS améliorée
 const corsOptions = {
   origin: function (origin, callback) {
@@ -34,14 +36,39 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
+// ✅ NOUVEAU : Fonction d'initialisation du serveur
+async function initializeServer() {
+  try {
+    console.log('🚀 [SERVER] Initialisation du serveur...');
+    console.log('✅ [SERVER] WebSocket déjà initialisé');
+
+    // ✅ AJOUTER : Import local dans la fonction
+    const sessionRestoration = require('./services/sessionRestoration');
+
+    // 2. ✅ NOUVEAU : Restaurer les sessions actives
+    await sessionRestoration.restoreActiveSessions();
+    console.log('✅ [SERVER] Sessions restaurées');
+
+    // 3. ✅ NOUVEAU : Nettoyer les sessions orphelines
+    await sessionRestoration.cleanupOrphanedSessions(24);
+    console.log('✅ [SERVER] Sessions orphelines nettoyées');
+
+    console.log('🎉 [SERVER] Initialisation complète');
+  } catch (error) {
+    console.error('❌ [SERVER] Erreur initialisation:', error);
+  }
+}
+
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 // Fichiers statiques
 app.use('/public', express.static(path.resolve(__dirname, 'public')));
+
 // Routes...
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
+
 // Routes API (protégées par authentification)
 const categoryRoutes = require('./routes/categoryRoutes');
 const productRoutes = require('./routes/productRoutes');
@@ -81,13 +108,16 @@ app.get('/api/server-info', (req, res) => {
     websocket: `ws://${ipAddress}:${port}/ws`,
   });
 });
+
 // Routes de test et principale (non protégées)
 app.get('/test', (req, res) => {
   res.json({ message: 'Le serveur fonctionne correctement !' });
 });
+
 app.get('/', (req, res) => {
   res.json({ message: "Bienvenue sur l'API POS" });
 });
+
 // Initialiser WebSocket avec le serveur HTTP
 websocketManager.initialize(server);
 initializeWebSocketEventBridge();
@@ -118,34 +148,74 @@ cron.schedule('30 18 * * *', async () => {
 
 console.log('Sauvegarde automatique configurée pour 18h quotidiennement');
 
-// Démarrer le serveur avec notre setupServer modifié
-setupServerWithHttp(server, app, defaultPort).catch((error) => {
-  console.error('Impossible de démarrer le serveur:', error.message);
+// ✅ NOUVEAU : Démarrer le serveur avec restauration
+const startServer = async () => {
+  try {
+    // Démarrer le serveur HTTP/WebSocket
+    const configuredServer = await setupServerWithHttp(server, app, defaultPort);
+
+    // ✅ NOUVEAU : Initialiser complètement le serveur (restauration sessions)
+    await initializeServer();
+
+    console.log('🎉 [SERVER] Serveur complètement démarré avec restauration');
+
+    return configuredServer;
+  } catch (error) {
+    console.error('❌ Erreur démarrage serveur:', error);
+    process.exit(1);
+  }
+};
+
+// Lancer le démarrage
+startServer().catch((error) => {
+  console.error('❌ Impossible de démarrer le serveur:', error);
   process.exit(1);
 });
 
-// Gestion de l'arrêt propre
+// ✅ MODIFIÉ : Gestion de l'arrêt propre avec préservation des sessions
 process.on('SIGINT', () => {
   console.log("Signal d'interruption reçu. Arrêt propre du serveur...");
   shutdownGracefully();
 });
+
 process.on('SIGTERM', () => {
   console.log('Signal de terminaison reçu. Arrêt propre du serveur...');
   shutdownGracefully();
 });
+
 process.on('exit', () => {
   console.log('Processus en cours de sortie.');
 });
+
+// ✅ MODIFIÉ : Fonction de fermeture avec préservation des sessions
 function shutdownGracefully() {
+  console.log('🛑 [SERVER] Arrêt du serveur...');
+
+  // ✅ NOUVEAU : Préserver les sessions actives pour restauration
+  try {
+    const cashierSessionService = require('./services/cashierSessionService');
+    const activeSessions = Array.from(cashierSessionService.activeSessions.keys());
+    if (activeSessions.length > 0) {
+      console.log(
+        `🔄 [SERVER] Préservation de ${activeSessions.length} session(s) active(s) pour restauration`
+      );
+      // Les sessions restent ouvertes en DB pour restauration ultérieure
+    }
+  } catch (error) {
+    console.error('⚠️ [SERVER] Erreur lors de la préservation des sessions:', error);
+  }
+
   const { shutdownServer } = require('./utils/server-setup');
   // Nettoyer les services mDNS
   shutdownServer();
   // Fermer la connexion WebSocket
-  websocketManager.close();
+  if (websocketManager && websocketManager.destroy) {
+    websocketManager.destroy();
+  }
   // Fermer le serveur HTTP
   server.close(() => {
-    console.log('Serveur HTTP fermé.');
+    console.log('✅ [SERVER] Serveur HTTP fermé proprement.');
   });
-  // Autres nettoyages...
+
   process.exit(0);
 }

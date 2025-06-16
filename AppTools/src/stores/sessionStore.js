@@ -3,6 +3,23 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import cashierSessionService from '../services/cashierSessionService';
 
+const getAuthToken = () => {
+  return (
+    localStorage.getItem('authToken') ||
+    localStorage.getItem('token') ||
+    sessionStorage.getItem('authToken') ||
+    sessionStorage.getItem('token')
+  );
+};
+
+const getAuthHeaders = () => {
+  const token = getAuthToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+};
+
 // ✅ STORE UNIFIÉ AVEC ZUSTAND
 export const useSessionStore = create(
   subscribeWithSelector((set, get) => ({
@@ -295,7 +312,7 @@ export const useSessionStore = create(
         throw new Error('Utilisateur non authentifié');
       }
 
-      // ✅ NOUVEAU : Validation drawer obligatoire
+      // Validation drawer obligatoire
       if (!drawerData || !drawerData.opening_amount || drawerData.opening_amount <= 0) {
         throw new Error('Données du fond de caisse obligatoires');
       }
@@ -310,32 +327,123 @@ export const useSessionStore = create(
 
       try {
         const response = await cashierSessionService.openSession(lcdPort, lcdConfig, drawerData);
-        const data = response.data;
 
-        // ✅ MISE À JOUR IMMÉDIATE - AVEC DRAWER
+        // ✅ DEBUG : Vérifier la structure de réponse
+        console.log('🔍 [SESSION STORE] Structure de réponse reçue:', response);
+
+        // ✅ FIX : Gérer la structure {success: true, data: {...}}
+        let sessionData;
+
+        if (response.success && response.data) {
+          // Structure {success: true, data: {session: ...}}
+          if (response.data.session) {
+            sessionData = response.data;
+            console.log('📍 [SESSION STORE] Structure: response.data avec session');
+          } else if (response.data.data && response.data.data.session) {
+            // Structure {success: true, data: {data: {session: ...}}}
+            sessionData = response.data.data;
+            console.log('📍 [SESSION STORE] Structure: response.data.data avec session');
+          } else {
+            // La réponse data contient directement les infos de session
+            console.log(
+              '📍 [SESSION STORE] Structure: response.data contient les données de session'
+            );
+            console.log('🔍 [SESSION STORE] Contenu data:', response.data);
+
+            // Si response.data a les propriétés de session directement
+            if (response.data.success !== undefined) {
+              // C'est probablement une réponse du service qui a déjà le bon format
+              sessionData = {
+                session: response.data.session || {
+                  // Construire la session à partir des données disponibles
+                  cashier_id: response.data.cashier_id,
+                  username: response.data.username,
+                  status: 'active',
+                  startTime: new Date().toISOString(),
+                  drawer: {
+                    opening_amount: drawerData.opening_amount,
+                    current_amount: drawerData.opening_amount,
+                    expected_amount: drawerData.opening_amount,
+                    denominations: drawerData.denominations || {},
+                    method: drawerData.method || 'custom',
+                    notes: drawerData.notes || null,
+                    opened_at: new Date().toISOString(),
+                    movements: [],
+                  },
+                },
+              };
+              console.log('📍 [SESSION STORE] Session construite à partir des données API');
+            } else {
+              throw new Error('Structure de réponse API non reconnue');
+            }
+          }
+        } else if (response.data && response.data.session) {
+          // Structure directe response.data.session
+          sessionData = response.data;
+          console.log('📍 [SESSION STORE] Structure: response.data directe');
+        } else if (response.session) {
+          // Structure directe response.session
+          sessionData = response;
+          console.log('📍 [SESSION STORE] Structure: response directe');
+        } else {
+          console.error('❌ [SESSION STORE] Aucune structure connue trouvée');
+          console.error('🔍 [SESSION STORE] Response complète:', JSON.stringify(response, null, 2));
+          throw new Error('Structure de réponse API invalide - aucun format reconnu');
+        }
+
+        console.log('✅ [SESSION STORE] Données session extraites:', sessionData);
+
+        // ✅ FIX : Vérifier la présence de drawer avec fallback
+        if (!sessionData.session) {
+          throw new Error('Session manquante dans les données extraites');
+        }
+
+        if (!sessionData.session.drawer) {
+          console.warn('⚠️ [SESSION STORE] Drawer manquant dans session, création de fallback');
+          sessionData.session.drawer = {
+            opening_amount: drawerData.opening_amount,
+            current_amount: drawerData.opening_amount,
+            expected_amount: drawerData.opening_amount,
+            denominations: drawerData.denominations || {},
+            method: drawerData.method || 'custom',
+            notes: drawerData.notes || null,
+            opened_at: new Date().toISOString(),
+            movements: [],
+          };
+        }
+
+        // ✅ MISE À JOUR AVEC VÉRIFICATIONS
         set((state) => ({
           ...state,
           sessionLoading: false,
-          cashierSession: data.session,
-          // ✅ NOUVEAU : Fond de caisse
+          cashierSession: sessionData.session,
           drawer: {
             isOpen: true,
-            openingAmount: data.session.drawer.opening_amount,
-            currentAmount: data.session.drawer.current_amount,
-            expectedAmount: data.session.drawer.expected_amount,
-            variance: data.session.drawer.current_amount - data.session.drawer.expected_amount,
-            openedAt: data.session.drawer.opened_at,
-            openedBy: data.session.username,
-            denominations: data.session.drawer.denominations,
-            movements: data.session.drawer.movements || [],
-            notes: data.session.drawer.notes,
+            openingAmount: sessionData.session.drawer.opening_amount || drawerData.opening_amount,
+            currentAmount: sessionData.session.drawer.current_amount || drawerData.opening_amount,
+            expectedAmount: sessionData.session.drawer.expected_amount || drawerData.opening_amount,
+            variance:
+              (sessionData.session.drawer.current_amount || drawerData.opening_amount) -
+              (sessionData.session.drawer.expected_amount || drawerData.opening_amount),
+            openedAt: sessionData.session.drawer.opened_at || new Date().toISOString(),
+            openedBy: sessionData.session.username || 'Utilisateur',
+            denominations:
+              sessionData.session.drawer.denominations || drawerData.denominations || {},
+            movements: sessionData.session.drawer.movements || [],
+            notes: sessionData.session.drawer.notes || drawerData.notes,
           },
         }));
 
-        console.log('✅ [SESSION STORE] Session + fond démarrés via WebSocket', data);
-        return data;
+        console.log('✅ [SESSION STORE] Session + fond démarrés avec succès');
+        return sessionData;
       } catch (error) {
         const message = error.response?.data?.message || error.message;
+
+        console.error('❌ [SESSION STORE] Erreur ouverture session:', {
+          error: error,
+          message: message,
+          response: error.response?.data,
+        });
 
         set((state) => ({
           ...state,
@@ -350,7 +458,6 @@ export const useSessionStore = create(
         throw error;
       }
     },
-
     stopSession: async (closingData = null) => {
       set((state) => ({
         ...state,
@@ -362,14 +469,10 @@ export const useSessionStore = create(
       try {
         let response;
 
-        // ✅ NOUVEAU : Fermer avec données drawer si fournies
         if (closingData) {
           const res = await fetch('/api/cashier/drawer/close', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('token')}`, // Si vous utilisez des tokens
-            },
+            headers: getAuthHeaders(), // ✅ UTILISER LA FONCTION HELPER
             body: JSON.stringify(closingData),
           });
           response = await res.json();
@@ -377,14 +480,13 @@ export const useSessionStore = create(
           response = await cashierSessionService.closeSession();
         }
 
-        // ✅ RESET IMMÉDIAT (WebSocket confirmera)
+        // Reset immédiat (WebSocket confirmera)
         set((state) => ({
           ...state,
           sessionLoading: false,
           cashierSession: null,
           lcdStatus: null,
           lcdError: null,
-          // ✅ NOUVEAU : Reset drawer
           drawer: {
             isOpen: false,
             openingAmount: 0,
@@ -487,10 +589,7 @@ export const useSessionStore = create(
       try {
         const response = await fetch('/api/cashier/drawer/movement', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`, // Si vous utilisez des tokens
-          },
+          headers: getAuthHeaders(), // ✅ UTILISER LA FONCTION HELPER
           body: JSON.stringify(movementData),
         });
 
@@ -529,11 +628,15 @@ export const useSessionStore = create(
     syncDrawerState: async () => {
       try {
         const response = await fetch('/api/cashier/drawer/status', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`, // Si vous utilisez des tokens
-          },
+          headers: getAuthHeaders(), // ✅ UTILISER LA FONCTION HELPER
         });
-        if (!response.ok) return;
+
+        if (!response.ok) {
+          if (response.status === 403) {
+            console.warn('⚠️ [SESSION STORE] Token expiré ou invalide pour sync drawer');
+          }
+          return;
+        }
 
         const result = await response.json();
 
@@ -553,9 +656,9 @@ export const useSessionStore = create(
               notes: result.data.drawer.notes,
             },
           }));
-        }
 
-        console.log('✅ [SESSION STORE] État fond synchronisé');
+          console.log('✅ [SESSION STORE] État fond synchronisé');
+        }
       } catch (error) {
         console.debug('⚠️ [SESSION STORE] Erreur sync fond de caisse:', error.message);
       }

@@ -23,12 +23,53 @@ class CashierSessionService {
     // Vérifier si une session existe déjà pour ce caissier (EXISTANT)
     if (this.activeSessions.has(cashierId)) {
       const existingSession = this.activeSessions.get(cashierId);
+
+      // Si session restaurée, la marquer comme active et retourner
+      if (existingSession.restored) {
+        this.markAsActive(cashierId);
+        console.info(`🔄 [SESSION] Session restaurée réactivée pour ${username}`);
+
+        // Émettre événement de réactivation
+        apiEventEmitter.emit('cashier_session.status.changed', {
+          cashier_id: cashierId,
+          username: username,
+          session: {
+            status: 'active',
+            startTime: existingSession.startTime,
+            sales_count: existingSession.sales_count,
+            total_sales: existingSession.total_sales,
+            lcd_connected: existingSession.lcd.connected,
+            lcd_port: existingSession.lcd.port,
+            drawer_opened: true,
+            drawer_amount: existingSession.drawer.current_amount,
+            reactivated: true,
+          },
+        });
+      }
+
       return {
         success: true,
-        message: 'Session déjà active',
+        message: existingSession.restored ? 'Session restaurée réactivée' : 'Session déjà active',
         session: existingSession,
         resumed: true,
+        restored: !!existingSession.restored,
       };
+    }
+
+    try {
+      const existingDBSession = await DrawerSession.findOpenSession(cashierId);
+      if (existingDBSession) {
+        console.warn(
+          `⚠️ [SESSION] Session DB ouverte trouvée pour ${username}, elle devrait être restaurée au démarrage`
+        );
+        return {
+          success: false,
+          error: 'Session en base non restaurée. Redémarrez le serveur.',
+          needs_server_restart: true,
+        };
+      }
+    } catch (error) {
+      console.warn('⚠️ [SESSION] Erreur vérification session DB:', error);
     }
 
     // ✅ NOUVEAU : Validation fond de caisse obligatoire
@@ -622,6 +663,33 @@ class CashierSessionService {
   // ✅ NOUVEAU : OBTENIR L'ÉTAT PANIER D'UN CAISSIER
   getCashierCart(cashierId) {
     return this.cashierCarts.get(cashierId) || { itemCount: 0, total: 0, lastUpdate: null };
+  }
+
+  isRestoredSession(cashierId) {
+    const session = this.activeSessions.get(cashierId);
+    return session && session.restored === true;
+  }
+
+  getRestorationInfo(cashierId) {
+    const session = this.activeSessions.get(cashierId);
+    if (!session || !session.restored) {
+      return null;
+    }
+
+    return {
+      restored: true,
+      restored_at: session.restored_at,
+      session_duration: session.restored_at - session.startTime,
+    };
+  }
+
+  markAsActive(cashierId) {
+    const session = this.activeSessions.get(cashierId);
+    if (session && session.restored) {
+      delete session.restored;
+      delete session.restored_at;
+      console.log(`🔄 [SESSION] Session ${session.username} marquée comme active`);
+    }
   }
 }
 
