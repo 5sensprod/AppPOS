@@ -1,4 +1,4 @@
-// src/stores/sessionStore.js - ZUSTAND UNIFIÉ AVEC WEBSOCKET (SANS POLLING)
+// src/stores/sessionStore.js - ZUSTAND UNIFIÉ AVEC WEBSOCKET + FOND DE CAISSE
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import cashierSessionService from '../services/cashierSessionService';
@@ -23,10 +23,30 @@ export const useSessionStore = create(
     lcdLoading: false,
     lcdError: null,
 
+    // ✅ NOUVEAUX ÉTATS FOND DE CAISSE
+    drawer: {
+      isOpen: false,
+      openingAmount: 0,
+      currentAmount: 0,
+      expectedAmount: 0,
+      variance: 0,
+      openedAt: null,
+      openedBy: null,
+      denominations: {},
+      movements: [],
+      notes: null,
+    },
+
+    drawerLoading: false,
+    drawerError: null,
+
+    // États UI pour modales
+    showDrawerMovementModal: false,
+
     // ✅ ÉTAT WEBSOCKET
     wsListenersInitialized: false,
 
-    // ✅ NOUVELLE : SYNCHRONISATION INITIALE UNIQUEMENT (PLUS DE POLLING)
+    // ✅ SYNCHRONISATION INITIALE UNIQUEMENT (PLUS DE POLLING)
     syncInitialState: async () => {
       const state = get();
       if (!state.isAuthenticated || !state.user) return;
@@ -47,6 +67,11 @@ export const useSessionStore = create(
           lcdError: data.can_use_lcd ? null : state.lcdError,
         }));
 
+        // ✅ NOUVEAU : Sync drawer si session active
+        if (data.session) {
+          get().syncDrawerState();
+        }
+
         console.log('✅ [SESSION STORE] État initial synchronisé', {
           hasSession: !!data.session,
           hasLCD: data.can_use_lcd,
@@ -61,7 +86,7 @@ export const useSessionStore = create(
       }
     },
 
-    // ✅ NOUVELLE : INITIALISATION DES LISTENERS WEBSOCKET
+    // ✅ INITIALISATION DES LISTENERS WEBSOCKET
     initWebSocketListeners: async () => {
       const state = get();
 
@@ -119,6 +144,21 @@ export const useSessionStore = create(
                       },
                     },
               sessionError: null, // Clear erreur si succès
+              // ✅ NOUVEAU : Reset drawer si session fermée
+              ...(payload.session.status === 'closed' && {
+                drawer: {
+                  isOpen: false,
+                  openingAmount: 0,
+                  currentAmount: 0,
+                  expectedAmount: 0,
+                  variance: 0,
+                  openedAt: null,
+                  openedBy: null,
+                  denominations: {},
+                  movements: [],
+                  notes: null,
+                },
+              }),
             }));
           }
         };
@@ -178,13 +218,47 @@ export const useSessionStore = create(
           }));
         };
 
+        // ✅ NOUVEAU : LISTENER MOUVEMENT CAISSE
+        const handleDrawerMovement = (payload) => {
+          console.log('💸 [SESSION STORE] Mouvement caisse reçu:', payload);
+
+          // Filtrer par utilisateur connecté
+          if (payload.cashier_id === userId) {
+            set((state) => ({
+              ...state,
+              drawer: {
+                ...state.drawer,
+                currentAmount: payload.new_balance,
+                variance: payload.new_balance - state.drawer.expectedAmount,
+                movements: [payload.movement, ...state.drawer.movements.slice(0, 49)],
+              },
+            }));
+          }
+        };
+
+        // ✅ NOUVEAU : LISTENER STATUT CAISSE
+        const handleDrawerStatus = (payload) => {
+          console.log('💰 [SESSION STORE] Statut caisse changé:', payload);
+
+          if (payload.cashier_id === userId) {
+            set((state) => ({
+              ...state,
+              drawer: {
+                ...state.drawer,
+                currentAmount: payload.current_amount,
+                expectedAmount: payload.expected_amount,
+                variance: payload.variance,
+              },
+            }));
+          }
+        };
+
         // ✅ ENREGISTREMENT DES LISTENERS
         websocketService.on('cashier_session.status.changed', handleSessionStatusChanged);
         websocketService.on('cashier_session.stats.updated', handleSessionStatsUpdated);
         websocketService.on('lcd.ownership.changed', handleLCDOwnershipChanged);
-
-        // ✅ ABONNEMENTS (pas besoin de subscribe car ces événements sont globaux)
-        // Note: Les événements session/LCD sont broadcastés à tous les clients
+        websocketService.on('cashier_drawer.movement.added', handleDrawerMovement);
+        websocketService.on('cashier_drawer.status.changed', handleDrawerStatus);
 
         // ✅ MARQUER COMME INITIALISÉ
         set((state) => ({
@@ -200,6 +274,8 @@ export const useSessionStore = create(
           websocketService.off('cashier_session.status.changed', handleSessionStatusChanged);
           websocketService.off('cashier_session.stats.updated', handleSessionStatsUpdated);
           websocketService.off('lcd.ownership.changed', handleLCDOwnershipChanged);
+          websocketService.off('cashier_drawer.movement.added', handleDrawerMovement);
+          websocketService.off('cashier_drawer.status.changed', handleDrawerStatus);
 
           set((state) => ({
             ...state,
@@ -212,11 +288,16 @@ export const useSessionStore = create(
       }
     },
 
-    // ✅ ACTIONS SESSION CAISSE (MISES À JOUR SANS SYNC)
-    startSession: async (lcdPort = null, lcdConfig = {}) => {
+    // ✅ ACTIONS SESSION CAISSE MODIFIÉES
+    startSession: async (lcdPort = null, lcdConfig = {}, drawerData = null) => {
       const state = get();
       if (!state.isAuthenticated) {
         throw new Error('Utilisateur non authentifié');
+      }
+
+      // ✅ NOUVEAU : Validation drawer obligatoire
+      if (!drawerData || !drawerData.opening_amount || drawerData.opening_amount <= 0) {
+        throw new Error('Données du fond de caisse obligatoires');
       }
 
       set((state) => ({
@@ -224,21 +305,34 @@ export const useSessionStore = create(
         sessionLoading: true,
         sessionError: null,
         lcdError: null,
+        drawerError: null,
       }));
 
       try {
-        const response = await cashierSessionService.openSession(lcdPort, lcdConfig);
+        const response = await cashierSessionService.openSession(lcdPort, lcdConfig, drawerData);
         const data = response.data;
 
-        // ✅ MISE À JOUR IMMÉDIATE - SANS TOUCHER AU LCDSTATUS (WebSocket s'en charge)
+        // ✅ MISE À JOUR IMMÉDIATE - AVEC DRAWER
         set((state) => ({
           ...state,
           sessionLoading: false,
           cashierSession: data.session,
-          // ✅ PAS DE lcdStatus ici - WebSocket seul maître !
+          // ✅ NOUVEAU : Fond de caisse
+          drawer: {
+            isOpen: true,
+            openingAmount: data.session.drawer.opening_amount,
+            currentAmount: data.session.drawer.current_amount,
+            expectedAmount: data.session.drawer.expected_amount,
+            variance: data.session.drawer.current_amount - data.session.drawer.expected_amount,
+            openedAt: data.session.drawer.opened_at,
+            openedBy: data.session.username,
+            denominations: data.session.drawer.denominations,
+            movements: data.session.drawer.movements || [],
+            notes: data.session.drawer.notes,
+          },
         }));
 
-        console.log('✅ [SESSION STORE] Session démarrée via WebSocket', data);
+        console.log('✅ [SESSION STORE] Session + fond démarrés via WebSocket', data);
         return data;
       } catch (error) {
         const message = error.response?.data?.message || error.message;
@@ -246,22 +340,42 @@ export const useSessionStore = create(
         set((state) => ({
           ...state,
           sessionLoading: false,
-          ...(message.includes('LCD') ? { lcdError: message } : { sessionError: message }),
+          ...(message.includes('LCD')
+            ? { lcdError: message }
+            : message.includes('fond') || message.includes('caisse')
+              ? { drawerError: message }
+              : { sessionError: message }),
         }));
 
         throw error;
       }
     },
 
-    stopSession: async () => {
+    stopSession: async (closingData = null) => {
       set((state) => ({
         ...state,
         sessionLoading: true,
         sessionError: null,
+        drawerError: null,
       }));
 
       try {
-        const response = await cashierSessionService.closeSession();
+        let response;
+
+        // ✅ NOUVEAU : Fermer avec données drawer si fournies
+        if (closingData) {
+          const res = await fetch('/api/cashier/drawer/close', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('token')}`, // Si vous utilisez des tokens
+            },
+            body: JSON.stringify(closingData),
+          });
+          response = await res.json();
+        } else {
+          response = await cashierSessionService.closeSession();
+        }
 
         // ✅ RESET IMMÉDIAT (WebSocket confirmera)
         set((state) => ({
@@ -270,10 +384,24 @@ export const useSessionStore = create(
           cashierSession: null,
           lcdStatus: null,
           lcdError: null,
+          // ✅ NOUVEAU : Reset drawer
+          drawer: {
+            isOpen: false,
+            openingAmount: 0,
+            currentAmount: 0,
+            expectedAmount: 0,
+            variance: 0,
+            openedAt: null,
+            openedBy: null,
+            denominations: {},
+            movements: [],
+            notes: null,
+          },
+          drawerError: null,
         }));
 
-        console.log('🛑 [SESSION STORE] Session fermée (WebSocket confirmera)');
-        return response.data;
+        console.log('🛑 [SESSION STORE] Session + fond fermés (WebSocket confirmera)');
+        return response.data || response;
       } catch (error) {
         set((state) => ({
           ...state,
@@ -295,7 +423,6 @@ export const useSessionStore = create(
         set((state) => ({
           ...state,
           lcdLoading: false,
-          // ✅ PAS DE lcdStatus ici !
         }));
 
         console.log('✅ [SESSION STORE] LCD demandé via WebSocket');
@@ -320,7 +447,6 @@ export const useSessionStore = create(
         set((state) => ({
           ...state,
           lcdLoading: false,
-          // ✅ PAS DE lcdStatus ici !
         }));
 
         console.log('✅ [SESSION STORE] LCD libéré via WebSocket');
@@ -351,6 +477,87 @@ export const useSessionStore = create(
           lcdError: error.message,
         }));
         throw error;
+      }
+    },
+
+    // ✅ NOUVEAU : ACTIONS FOND DE CAISSE
+    addCashMovement: async (movementData) => {
+      set((state) => ({ ...state, drawerLoading: true, drawerError: null }));
+
+      try {
+        const response = await fetch('/api/cashier/drawer/movement', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`, // Si vous utilisez des tokens
+          },
+          body: JSON.stringify(movementData),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message);
+        }
+
+        const result = await response.json();
+
+        set((state) => ({
+          ...state,
+          drawerLoading: false,
+          drawer: {
+            ...state.drawer,
+            currentAmount: result.data.new_balance,
+            variance: result.data.new_balance - state.drawer.expectedAmount,
+            movements: [result.data.movement, ...state.drawer.movements.slice(0, 49)],
+          },
+          showDrawerMovementModal: false,
+        }));
+
+        console.log('✅ [SESSION STORE] Mouvement ajouté', result.data);
+        return result.data;
+      } catch (error) {
+        set((state) => ({
+          ...state,
+          drawerLoading: false,
+          drawerError: error.message,
+        }));
+        throw error;
+      }
+    },
+
+    // ✅ NOUVEAU : Synchroniser fond de caisse
+    syncDrawerState: async () => {
+      try {
+        const response = await fetch('/api/cashier/drawer/status', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`, // Si vous utilisez des tokens
+          },
+        });
+        if (!response.ok) return;
+
+        const result = await response.json();
+
+        if (result.success && result.data.drawer) {
+          set((state) => ({
+            ...state,
+            drawer: {
+              isOpen: true,
+              openingAmount: result.data.drawer.opening_amount,
+              currentAmount: result.data.drawer.current_amount,
+              expectedAmount: result.data.drawer.expected_amount,
+              variance: result.data.drawer.variance || 0,
+              openedAt: result.data.drawer.opened_at,
+              openedBy: result.data.drawer.opened_by,
+              denominations: result.data.drawer.denominations || {},
+              movements: result.data.drawer.movements || [],
+              notes: result.data.drawer.notes,
+            },
+          }));
+        }
+
+        console.log('✅ [SESSION STORE] État fond synchronisé');
+      } catch (error) {
+        console.debug('⚠️ [SESSION STORE] Erreur sync fond de caisse:', error.message);
       }
     },
 
@@ -415,12 +622,16 @@ export const useSessionStore = create(
     setUser: (user) => set((state) => ({ ...state, user, isAuthenticated: !!user })),
     setSessionError: (error) => set((state) => ({ ...state, sessionError: error })),
     setLcdError: (error) => set((state) => ({ ...state, lcdError: error })),
+    setDrawerError: (error) => set((state) => ({ ...state, drawerError: error })),
+    setShowDrawerMovementModal: (show) =>
+      set((state) => ({ ...state, showDrawerMovementModal: show })),
     clearErrors: () =>
       set((state) => ({
         ...state,
         sessionError: null,
         lcdError: null,
         authError: null,
+        drawerError: null,
       })),
 
     // ✅ RESET COMPLET
@@ -438,6 +649,21 @@ export const useSessionStore = create(
         lcdLoading: false,
         lcdError: null,
         wsListenersInitialized: false,
+        drawer: {
+          isOpen: false,
+          openingAmount: 0,
+          currentAmount: 0,
+          expectedAmount: 0,
+          variance: 0,
+          openedAt: null,
+          openedBy: null,
+          denominations: {},
+          movements: [],
+          notes: null,
+        },
+        drawerLoading: false,
+        drawerError: null,
+        showDrawerMovementModal: false,
       })),
   }))
 );
@@ -499,5 +725,40 @@ export const useSessionLCD = () => {
     releaseLCD,
     loadLCDPorts,
     lcd,
+  };
+};
+
+// ✅ NOUVEAU : HOOK SÉLECTEUR POUR LE FOND DE CAISSE
+export const useDrawer = () => {
+  const drawer = useSessionStore((state) => state.drawer);
+  const drawerLoading = useSessionStore((state) => state.drawerLoading);
+  const drawerError = useSessionStore((state) => state.drawerError);
+  const showDrawerMovementModal = useSessionStore((state) => state.showDrawerMovementModal);
+
+  const addCashMovement = useSessionStore((state) => state.addCashMovement);
+  const syncDrawerState = useSessionStore((state) => state.syncDrawerState);
+
+  const setShowDrawerMovementModal = useSessionStore((state) => state.setShowDrawerMovementModal);
+  const setDrawerError = useSessionStore((state) => state.setDrawerError);
+
+  // ✅ CALCULÉS STABLES
+  const hasOpenDrawer = Boolean(drawer?.isOpen);
+  const drawerBalance = drawer?.currentAmount || 0;
+  const expectedBalance = drawer?.expectedAmount || 0;
+  const variance = drawerBalance - expectedBalance;
+
+  return {
+    drawer,
+    hasOpenDrawer,
+    drawerBalance,
+    expectedBalance,
+    variance,
+    drawerLoading,
+    drawerError,
+    showDrawerMovementModal,
+    addCashMovement,
+    syncDrawerState,
+    setShowDrawerMovementModal,
+    setDrawerError,
   };
 };

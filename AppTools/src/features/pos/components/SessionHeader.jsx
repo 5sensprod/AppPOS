@@ -1,4 +1,4 @@
-// src/features/pos/components/SessionHeader.jsx - VERSION OPTIMISÉE WEBSOCKET
+// src/features/pos/components/SessionHeader.jsx - VERSION CORRIGÉE
 import React, { useState, useEffect } from 'react';
 import { useSessionStore } from '../../../stores/sessionStore';
 import {
@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ShoppingBag,
 } from 'lucide-react';
+import SessionOpeningModal from './SessionOpeningModal';
 
 const SessionHeader = () => {
   const cashierSession = useSessionStore((state) => state.cashierSession);
@@ -35,13 +36,15 @@ const SessionHeader = () => {
   const loadLCDPorts = useSessionStore((state) => state.loadLCDPorts);
   const user = useSessionStore((state) => state.user);
 
-  const hasLCDControl = Boolean(lcdStatus?.owned && lcdStatus?.owner?.cashier_id === user?.id);
-
+  // ✅ ÉTATS LOCAUX - ORDRE CORRIGÉ
+  const [showSessionOpenModal, setShowSessionOpenModal] = useState(false);
+  const [lcdPreselected, setLcdPreselected] = useState(false); // ✅ CORRIGÉ: setLcdPreselected au lieu de setLCDPreselected
   const [showLCDSetup, setShowLCDSetup] = useState(false);
   const [selectedPort, setSelectedPort] = useState('');
-
   const [serverTime, setServerTime] = useState(new Date());
   const [timeOffset, setTimeOffset] = useState(0);
+
+  const hasLCDControl = Boolean(lcdStatus?.owned && lcdStatus?.owner?.cashier_id === user?.id);
 
   const CAISSE_CONFIG = {
     numero: '001',
@@ -140,30 +143,38 @@ const SessionHeader = () => {
     }
   }, [lcdPorts, selectedPort]);
 
-  // ✅ HANDLERS POUR ACTIONS (INCHANGÉS)
+  // ✅ HANDLERS POUR ACTIONS - VERSION UNIFIÉE
   const handleOpenSession = async () => {
     try {
-      await startSession();
-      console.log('✅ [SESSION HEADER] Session ouverte (WebSocket confirmera)');
+      // ✅ Ouvrir modal unifiée
+      setShowSessionOpenModal(true);
     } catch (error) {
       console.error('Erreur ouverture session:', error);
     }
   };
 
   const handleOpenSessionWithLCD = async () => {
-    if (!selectedPort) return;
-
     try {
-      await startSession(selectedPort, {
-        baudRate: 9600,
-        dataBits: 8,
-        parity: 'none',
-        stopBits: 1,
-      });
-      setShowLCDSetup(false);
-      console.log('✅ [SESSION HEADER] Session + LCD ouverte (WebSocket confirmera)');
+      // ✅ Ouvrir modal unifiée avec LCD pré-sélectionné
+      setLcdPreselected(true); // ✅ CORRIGÉ
+      setShowSessionOpenModal(true);
     } catch (error) {
       console.error('Erreur ouverture session avec LCD:', error);
+    }
+  };
+
+  // ✅ NOUVEAU HANDLER UNIFIÉ
+  const handleUnifiedSessionOpen = async (sessionData) => {
+    try {
+      const { useLCD, lcdPort, lcdConfig, drawer } = sessionData;
+
+      await startSession(useLCD ? lcdPort : null, useLCD ? lcdConfig : {}, drawer);
+
+      setShowSessionOpenModal(false);
+      setLcdPreselected(false); // ✅ CORRIGÉ
+      console.log('✅ Session + fond ouverts');
+    } catch (error) {
+      console.error('Erreur ouverture session unifiée:', error);
     }
   };
 
@@ -371,7 +382,7 @@ const SessionHeader = () => {
     );
   }
 
-  // ✅ AFFICHAGE AUCUNE SESSION (INCHANGÉ)
+  // ✅ AFFICHAGE AUCUNE SESSION - MODIFIÉ
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
       <div className="px-6 py-4">
@@ -404,6 +415,7 @@ const SessionHeader = () => {
 
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
 
+            {/* ✅ BOUTON UNIFIÉ */}
             <div className="flex space-x-2">
               <button
                 onClick={handleOpenSession}
@@ -415,16 +427,7 @@ const SessionHeader = () => {
                 ) : (
                   <LogIn className="h-4 w-4 mr-2" />
                 )}
-                Ouvrir Session
-              </button>
-
-              <button
-                onClick={() => setShowLCDSetup(true)}
-                disabled={sessionLoading}
-                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50 transition-colors"
-              >
-                <Monitor className="h-4 w-4 mr-2" />
-                Session + LCD
+                Démarrer la journée
               </button>
             </div>
           </div>
@@ -449,7 +452,22 @@ const SessionHeader = () => {
         )}
       </div>
 
-      {/* ✅ MODAL LCD SETUP (INCHANGÉ) */}
+      {/* ✅ MODAL UNIFIÉE */}
+      {showSessionOpenModal && (
+        <SessionOpeningModal
+          isOpen={showSessionOpenModal}
+          onClose={() => {
+            setShowSessionOpenModal(false);
+            setLcdPreselected(false); // ✅ CORRIGÉ
+          }}
+          onConfirm={handleUnifiedSessionOpen}
+          loading={sessionLoading}
+          lcdPorts={lcdPorts}
+          lcdPreselected={lcdPreselected} // ✅ CORRIGÉ
+        />
+      )}
+
+      {/* ✅ MODAL LCD SETUP (POUR SESSION ACTIVE) */}
       {showLCDSetup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-6 w-96 max-w-full">
@@ -493,15 +511,11 @@ const SessionHeader = () => {
               </button>
 
               <button
-                onClick={hasActiveCashierSession ? handleRequestLCD : handleOpenSessionWithLCD}
+                onClick={handleRequestLCD}
                 disabled={!selectedPort || lcdLoading}
                 className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50 transition-colors"
               >
-                {lcdLoading
-                  ? 'Connexion...'
-                  : hasActiveCashierSession
-                    ? 'Connecter LCD'
-                    : 'Session + LCD'}
+                {lcdLoading ? 'Connexion...' : 'Connecter LCD'}
               </button>
             </div>
           </div>

@@ -194,6 +194,47 @@ class WebSocketManager {
     }
   }
 
+  // ✅ NOUVEAU : Notification mouvement de caisse
+  notifyCashierDrawerMovement(payload) {
+    const { cashier_id, movement, new_balance } = payload;
+    const eventData = {
+      cashier_id,
+      movement: {
+        id: movement.id,
+        type: movement.type,
+        amount: movement.amount,
+        reason: movement.reason,
+        notes: movement.notes,
+        created_at: movement.created_at,
+        created_by: movement.created_by,
+      },
+      new_balance,
+      timestamp: Date.now(),
+    };
+
+    this.broadcast('cashier_drawer.movement.added', eventData);
+
+    const action = movement.type === 'in' ? 'Entrée' : 'Sortie';
+    console.log(
+      `[WS-DRAWER] ${action} ${movement.amount}€ diffusée pour cashier ${cashier_id} (${movement.reason})`
+    );
+  }
+
+  // ✅ NOUVEAU : Notification statut fond de caisse
+  notifyCashierDrawerStatus(payload) {
+    const eventData = {
+      cashier_id: payload.cashier_id,
+      drawer_status: payload.drawer_status,
+      current_amount: payload.current_amount,
+      expected_amount: payload.expected_amount,
+      variance: payload.variance,
+      timestamp: Date.now(),
+    };
+
+    this.broadcast('cashier_drawer.status.changed', eventData);
+    console.log(`[WS-DRAWER] Statut fond diffusé pour cashier ${payload.cashier_id}`);
+  }
+
   // ✅ MÉTHODES UTILITAIRES EXISTANTES
   sendToClient(client, type, payload) {
     if (client.readyState === WebSocket.OPEN) {

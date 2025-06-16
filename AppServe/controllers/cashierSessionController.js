@@ -8,9 +8,19 @@ class CashierSessionController {
   async openSession(req, res) {
     try {
       const cashier = req.user; // Depuis le middleware auth
-      const { lcd_port, lcd_config = {} } = req.body;
+      const { lcd_port, lcd_config = {}, drawer } = req.body; // ✅ NOUVEAU : drawer
 
-      const result = await cashierSessionService.openCashierSession(cashier, lcd_port, lcd_config);
+      // ✅ NOUVEAU : Validation drawer obligatoire
+      if (!drawer || !drawer.opening_amount || drawer.opening_amount <= 0) {
+        return ResponseHandler.badRequest(res, 'Données du fond de caisse obligatoires');
+      }
+
+      const result = await cashierSessionService.openCashierSession(
+        cashier,
+        lcd_port,
+        lcd_config,
+        drawer
+      );
 
       return ResponseHandler.success(res, {
         ...result,
@@ -292,6 +302,87 @@ class CashierSessionController {
       });
     } catch (error) {
       return ResponseHandler.error(res, error);
+    }
+  }
+
+  async addCashMovement(cashierId, movementData) {
+    try {
+      // Validation des données
+      if (!movementData.type || !['in', 'out'].includes(movementData.type)) {
+        throw new Error('Type de mouvement invalide (in/out requis)');
+      }
+
+      if (!movementData.amount || movementData.amount <= 0) {
+        throw new Error('Montant invalide');
+      }
+
+      if (!movementData.reason || movementData.reason.trim() === '') {
+        throw new Error('Raison du mouvement requise');
+      }
+
+      const result = await cashierSessionService.addCashMovement(cashierId, {
+        type: movementData.type,
+        amount: parseFloat(movementData.amount),
+        reason: movementData.reason.trim(),
+        notes: movementData.notes ? movementData.notes.trim() : null,
+      });
+
+      return {
+        message: `Mouvement ${movementData.type === 'in' ? 'entrée' : 'sortie'} enregistré`,
+        movement: result.movement,
+        new_balance: result.new_balance,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error(`❌ [CONTROLLER] Erreur mouvement caisse:`, error);
+      throw error;
+    }
+  }
+
+  // ✅ NOUVEAU : Obtenir fond de caisse
+  getCashierDrawer(cashierId) {
+    try {
+      const drawer = cashierSessionService.getCashierDrawer(cashierId);
+
+      if (!drawer) {
+        return null;
+      }
+
+      return {
+        ...drawer,
+        variance: drawer.current_amount - drawer.expected_amount,
+        is_balanced: Math.abs(drawer.current_amount - drawer.expected_amount) < 0.01,
+      };
+    } catch (error) {
+      console.error(`❌ [CONTROLLER] Erreur récupération fond:`, error);
+      throw error;
+    }
+  }
+
+  // ✅ NOUVEAU : Fermer session avec fond de caisse
+  async closeCashierSessionWithDrawer(cashierId, closingData) {
+    try {
+      // Validation données fermeture
+      if (closingData.counted_amount !== undefined && closingData.counted_amount < 0) {
+        throw new Error('Montant compté invalide');
+      }
+
+      const result = await cashierSessionService.closeCashierSession(cashierId, {
+        counted_amount: closingData.counted_amount,
+        expected_amount: closingData.expected_amount,
+        method: closingData.method || 'custom',
+        notes: closingData.notes ? closingData.notes.trim() : null,
+        variance_accepted: closingData.variance_accepted || false,
+      });
+
+      return {
+        message: 'Session et fond de caisse fermés',
+        session: result.session,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error(`❌ [CONTROLLER] Erreur fermeture session+fond:`, error);
+      throw error;
     }
   }
 }

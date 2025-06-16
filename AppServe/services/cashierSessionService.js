@@ -8,16 +8,17 @@ class CashierSessionService {
     this.activeSessions = new Map(); // cashier_id -> session data
     this.lcdOwnership = null; // { cashier_id, username, startTime, port }
     this.cashierCarts = new Map(); // cashier_id -> { itemCount, total, lastUpdate }
+    this.cashierDrawers = new Map(); // cashier_id -> drawer data
   }
 
   // ✅ OUVRIR UNE SESSION DE CAISSE
-  async openCashierSession(cashier, lcdPort = null, lcdConfig = {}) {
+  async openCashierSession(cashier, lcdPort = null, lcdConfig = {}, drawerData = null) {
     const cashierId = cashier.id;
     const username = cashier.username;
 
     console.info(`🏪 Ouverture session caisse pour ${username}`);
 
-    // Vérifier si une session existe déjà pour ce caissier
+    // Vérifier si une session existe déjà pour ce caissier (EXISTANT)
     if (this.activeSessions.has(cashierId)) {
       const existingSession = this.activeSessions.get(cashierId);
       return {
@@ -28,7 +29,12 @@ class CashierSessionService {
       };
     }
 
-    // Créer la session
+    // ✅ NOUVEAU : Validation fond de caisse obligatoire
+    if (!drawerData || !drawerData.opening_amount || drawerData.opening_amount <= 0) {
+      throw new Error('Fond de caisse obligatoire pour ouvrir une session');
+    }
+
+    // Créer la session (MODIFIER votre structure existante)
     const session = {
       cashier_id: cashierId,
       username,
@@ -42,16 +48,30 @@ class CashierSessionService {
         port: null,
         error: null,
       },
+      // ✅ NOUVEAU : Fond de caisse dans la session
+      drawer: {
+        opening_amount: drawerData.opening_amount,
+        current_amount: drawerData.opening_amount,
+        expected_amount: drawerData.opening_amount,
+        denominations: drawerData.denominations || {},
+        method: drawerData.method || 'custom',
+        notes: drawerData.notes || null,
+        opened_at: new Date(),
+        movements: [],
+      },
     };
 
-    // ✅ NOUVEAU : Initialiser l'état panier pour ce caissier
+    // ✅ NOUVEAU : Stocker fond de caisse séparément
+    this.cashierDrawers.set(cashierId, session.drawer);
+
+    // ✅ NOUVEAU : Initialiser l'état panier pour ce caissier (DÉPLACER DE L'EXISTANT)
     this.cashierCarts.set(cashierId, {
       itemCount: 0,
       total: 0.0,
       lastUpdate: new Date(),
     });
 
-    // Tentative de prise de contrôle LCD si demandé
+    // Tentative de prise de contrôle LCD si demandé (EXISTANT - GARDER TEL QUEL)
     if (lcdPort) {
       try {
         await this.assignLCDToCashier(cashierId, username, lcdPort, lcdConfig);
@@ -75,7 +95,7 @@ class CashierSessionService {
 
     this.activeSessions.set(cashierId, session);
 
-    // ✅ NOUVEAU : ÉMETTRE ÉVÉNEMENT SESSION OUVERTE
+    // ✅ MODIFIER : ÉMETTRE ÉVÉNEMENT SESSION OUVERTE avec données drawer
     console.info(`📡 [WS-EVENT] Émission cashier_session.status.changed pour ${username}`);
     apiEventEmitter.emit('cashier_session.status.changed', {
       cashier_id: cashierId,
@@ -87,6 +107,9 @@ class CashierSessionService {
         total_sales: session.total_sales,
         lcd_connected: session.lcd.connected,
         lcd_port: session.lcd.port,
+        // ✅ NOUVEAU : Données fond de caisse
+        drawer_opened: true,
+        drawer_amount: session.drawer.opening_amount,
       },
     });
 
@@ -233,9 +256,89 @@ class CashierSessionService {
     }
   }
 
-  // ✅ FERMER SESSION CAISSIER
-  async closeCashierSession(cashierId) {
+  async addCashMovement(cashierId, movementData) {
     const session = this.activeSessions.get(cashierId);
+    const drawer = this.cashierDrawers.get(cashierId);
+
+    if (!session || !drawer) {
+      throw new Error('Aucune session active avec fond de caisse');
+    }
+
+    const movement = {
+      id: `mov_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      type: movementData.type, // 'in' ou 'out'
+      amount: parseFloat(movementData.amount),
+      reason: movementData.reason,
+      notes: movementData.notes || null,
+      created_at: new Date(),
+      created_by: session.username,
+    };
+
+    // Calculer nouveau solde
+    const newAmount =
+      movementData.type === 'in'
+        ? drawer.current_amount + movement.amount
+        : drawer.current_amount - movement.amount;
+
+    if (newAmount < 0) {
+      throw new Error('Solde de caisse insuffisant');
+    }
+
+    // Mettre à jour fond de caisse
+    drawer.current_amount = newAmount;
+    drawer.movements.unshift(movement); // Plus récent en premier
+    if (drawer.movements.length > 50) drawer.movements = drawer.movements.slice(0, 50);
+
+    // Mettre à jour session
+    session.drawer = drawer;
+
+    // ✅ Émettre événement mouvement
+    apiEventEmitter.emit('cashier_drawer.movement.added', {
+      cashier_id: cashierId,
+      movement,
+      new_balance: newAmount,
+    });
+
+    return { movement, new_balance: newAmount };
+  }
+
+  // ✅ NOUVEAU : Calculer totaux théoriques
+  calculateExpectedCashAmount(cashierId) {
+    const session = this.activeSessions.get(cashierId);
+    const drawer = this.cashierDrawers.get(cashierId);
+
+    if (!session || !drawer) return 0;
+
+    // Calcul : Ouverture + Ventes cash + Mouvements
+    let expected = drawer.opening_amount;
+
+    // TODO: Ajouter ventes en espèces depuis les sales
+    // expected += session.cash_sales_amount || 0;
+
+    // Ajouter mouvements
+    drawer.movements.forEach((movement) => {
+      if (movement.type === 'in') expected += movement.amount;
+      else expected -= movement.amount;
+    });
+
+    return Math.round(expected * 100) / 100;
+  }
+
+  // ✅ NOUVEAU : Obtenir données fond de caisse
+  getCashierDrawer(cashierId) {
+    const drawer = this.cashierDrawers.get(cashierId);
+    if (!drawer) return null;
+
+    return {
+      ...drawer,
+      expected_amount: this.calculateExpectedCashAmount(cashierId),
+    };
+  }
+
+  // ✅ FERMER SESSION CAISSIER
+  async closeCashierSession(cashierId, closingData = null) {
+    const session = this.activeSessions.get(cashierId);
+    const drawer = this.cashierDrawers.get(cashierId);
 
     if (!session) {
       throw new Error('Aucune session active trouvée');
@@ -243,15 +346,30 @@ class CashierSessionService {
 
     console.info(`🏪 Fermeture session caisse pour ${session.username}`);
 
-    // Libérer le LCD si possédé
+    // ✅ NOUVEAU : Validation fermeture fond
+    if (closingData && drawer) {
+      drawer.closing = {
+        counted_amount: closingData.counted_amount || drawer.current_amount,
+        expected_amount: closingData.expected_amount || drawer.expected_amount,
+        variance:
+          (closingData.counted_amount || drawer.current_amount) -
+          (closingData.expected_amount || drawer.expected_amount),
+        closing_method: closingData.method || 'custom',
+        notes: closingData.notes || null,
+        closed_at: new Date(),
+        variance_accepted: closingData.variance_accepted || false,
+      };
+    }
+
+    // Libérer le LCD si possédé (EXISTANT - GARDER)
     this.releaseLCDFromCashier(cashierId);
 
-    // Marquer la session comme fermée
+    // Marquer la session comme fermée (EXISTANT - MODIFIER)
     session.status = 'closed';
     session.endTime = new Date();
     session.duration = session.endTime - session.startTime;
 
-    // ✅ NOUVEAU : ÉMETTRE ÉVÉNEMENT SESSION FERMÉE
+    // ✅ MODIFIER : ÉMETTRE ÉVÉNEMENT SESSION FERMÉE avec données drawer
     console.info(
       `📡 [WS-EVENT] Émission cashier_session.status.changed - session fermée pour ${session.username}`
     );
@@ -265,13 +383,19 @@ class CashierSessionService {
         duration: session.duration,
         sales_count: session.sales_count,
         total_sales: session.total_sales,
+        // ✅ NOUVEAU : Données fermeture fond
+        drawer_closed: true,
+        drawer_variance: drawer?.closing?.variance || 0,
       },
     });
 
-    // Retirer de la liste active
+    // Retirer de la liste active (EXISTANT)
     this.activeSessions.delete(cashierId);
 
-    // ✅ NOUVEAU : Nettoyer l'état panier
+    // ✅ NOUVEAU : Nettoyer le fond de caisse
+    this.cashierDrawers.delete(cashierId);
+
+    // ✅ NOUVEAU : Nettoyer l'état panier (DÉPLACER DE L'EXISTANT)
     this.cashierCarts.delete(cashierId);
 
     return {
@@ -406,7 +530,14 @@ class CashierSessionService {
 
   // ✅ OBTENIR INFO SESSION
   getCashierSession(cashierId) {
-    return this.activeSessions.get(cashierId) || null;
+    const session = this.activeSessions.get(cashierId);
+    if (!session) return null;
+
+    // ✅ NOUVEAU : Enrichir avec données fond de caisse
+    return {
+      ...session,
+      drawer: this.getCashierDrawer(cashierId),
+    };
   }
 
   // ✅ OBTENIR INFO LCD

@@ -71,6 +71,23 @@ function initializeWebSocketEventBridge() {
     websocketManager.notifyLCDOwnershipChanged(payload);
   });
 
+  // ✅ NOUVEAU : Événement mouvement de caisse
+  apiEventEmitter.on('cashier_drawer.movement.added', (payload) => {
+    const action = payload.movement.type === 'in' ? 'Entrée' : 'Sortie';
+    console.log(
+      `[EVENT-WS] ${action} caisse ${payload.movement.amount}€ pour cashier ${payload.cashier_id} relayé vers WebSocket`
+    );
+    websocketManager.notifyCashierDrawerMovement(payload);
+  });
+
+  // ✅ NOUVEAU : Événement statut fond de caisse
+  apiEventEmitter.on('cashier_drawer.status.changed', (payload) => {
+    console.log(
+      `[EVENT-WS] Statut fond de caisse changé pour cashier ${payload.cashier_id} relayé vers WebSocket`
+    );
+    websocketManager.notifyCashierDrawerStatus(payload);
+  });
+
   console.log('[EVENT-WS] Bridge initialisé entre Event Emitter et WebSocket Manager');
   console.log('[EVENT-WS] ✅ Événements sessions caisse et LCD ajoutés');
 }

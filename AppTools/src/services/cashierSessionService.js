@@ -7,15 +7,23 @@ class CashierSessionService {
   }
 
   // Gestion de session
-  async openSession(lcdPort = null, lcdConfig = {}) {
+  async openSession(lcdPort = null, lcdConfig = {}, drawerData = null) {
     try {
-      const response = await apiService.post(`${this.baseEndpoint}/session/open`, {
+      // ✅ NOUVEAU : Structure de données complète
+      const requestData = {
         lcd_port: lcdPort,
         lcd_config: lcdConfig,
-      });
+        // ✅ NOUVEAU : Ajouter drawer
+        drawer: drawerData,
+      };
+
+      console.log('📤 [CASHIER SERVICE] Envoi données session:', requestData);
+
+      const response = await apiService.post(`${this.baseEndpoint}/session/open`, requestData);
       return response.data;
     } catch (error) {
       console.error('Erreur ouverture session:', error);
+      console.error('📤 [CASHIER SERVICE] Détails erreur:', error.response?.data);
       throw error;
     }
   }
