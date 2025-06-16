@@ -8,6 +8,23 @@ const Cart = () => {
   const { cart, updateCartItemQuantity, removeFromCart, clearCart, setShowPaymentModal } =
     useCashierStore();
 
+  // Calculer les détails de TVA par taux
+  const getTaxBreakdown = () => {
+    const taxBreakdown = {};
+
+    cart.items.forEach((item) => {
+      const taxRate = item.tax_rate || 20;
+      if (!taxBreakdown[taxRate]) {
+        taxBreakdown[taxRate] = 0;
+      }
+      taxBreakdown[taxRate] += item.tax_amount || 0;
+    });
+
+    return taxBreakdown;
+  };
+
+  const taxBreakdown = getTaxBreakdown();
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md h-[60vh] flex flex-col">
       <div className="p-4 border-b border-gray-200 dark:border-gray-600">
@@ -56,15 +73,23 @@ const Cart = () => {
         <div className="p-4 border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
           <div className="space-y-2 mb-4">
             <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-              <span>Sous-total</span>
+              <span>Sous-total HT</span>
               <span>{cart.subtotal.toFixed(2)}€</span>
             </div>
-            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-              <span>TVA (20%)</span>
-              <span>{cart.tax.toFixed(2)}€</span>
-            </div>
+
+            {/* Affichage détaillé de la TVA par taux */}
+            {Object.entries(taxBreakdown).map(([taxRate, taxAmount]) => (
+              <div
+                key={taxRate}
+                className="flex justify-between text-sm text-gray-600 dark:text-gray-300"
+              >
+                <span>TVA ({taxRate}%)</span>
+                <span>{taxAmount.toFixed(2)}€</span>
+              </div>
+            ))}
+
             <div className="flex justify-between text-lg font-bold text-gray-900 dark:text-white border-t pt-2">
-              <span>Total</span>
+              <span>Total TTC</span>
               <span>{cart.total.toFixed(2)}€</span>
             </div>
           </div>

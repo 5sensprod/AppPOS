@@ -1,4 +1,4 @@
-// src/features/pos/stores/cashierStore.js - RESTAURÉ AVEC NOTIFICATION ZUSTAND SIMPLE
+// src/features/pos/stores/cashierStore.js - AVEC LOGIQUE TVA CORRIGÉE
 import { create } from 'zustand';
 import salesService from '../../../services/salesService';
 import cashierSessionService from '../../../services/cashierSessionService';
@@ -40,18 +40,59 @@ export const useCashierStore = create((set, get) => ({
     }
   },
 
-  // ✅ FONCTION HELPER POUR RECALCULER ET NOTIFIER (restaurée)
+  // 🆕 FONCTION HELPER POUR CALCULER LA TVA D'UN PRODUIT
+  calculateProductTax: (product, quantity) => {
+    const taxRate = product.tax_rate || 20; // Utiliser le tax_rate du produit ou 20% par défaut
+    const priceTTC = product.price; // Le prix est déjà TTC
+    const priceHT = priceTTC / (1 + taxRate / 100); // Calculer le prix HT
+    const taxAmount = (priceTTC - priceHT) * quantity; // TVA pour cette quantité
+
+    return {
+      priceHT: Math.round(priceHT * 100) / 100,
+      priceTTC: priceTTC,
+      taxAmount: Math.round(taxAmount * 100) / 100,
+      taxRate: taxRate,
+    };
+  },
+
+  // ✅ FONCTION HELPER POUR RECALCULER CORRECTEMENT (modifiée)
   recalculateCartAndNotify: (newItems) => {
-    const subtotal = newItems.reduce((sum, item) => sum + item.total_price, 0);
-    const tax = subtotal * 0.2; // 20% de TVA
-    const total = subtotal + tax;
+    let totalHT = 0;
+    let totalTVA = 0;
+    let totalTTC = 0;
+
+    // Calculer pour chaque item avec son propre taux de TVA
+    const itemsWithTax = newItems.map((item) => {
+      // Retrouver le produit pour avoir ses infos de TVA
+      // Pour l'instant, on utilise un taux par défaut de 20%
+      // TODO: Il faudrait stocker tax_rate dans l'item du panier
+      const taxRate = item.tax_rate || 20;
+      const priceTTC = item.unit_price;
+      const priceHT = priceTTC / (1 + taxRate / 100);
+      const taxAmountForItem = (priceTTC - priceHT) * item.quantity;
+
+      totalHT += priceHT * item.quantity;
+      totalTVA += taxAmountForItem;
+      totalTTC += priceTTC * item.quantity;
+
+      return {
+        ...item,
+        tax_rate: taxRate,
+        unit_price_ht: Math.round(priceHT * 100) / 100,
+        unit_price_ttc: priceTTC,
+        total_price_ht: Math.round(priceHT * item.quantity * 100) / 100,
+        total_price_ttc: Math.round(priceTTC * item.quantity * 100) / 100,
+        tax_amount: Math.round(taxAmountForItem * 100) / 100,
+      };
+    });
+
     const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
 
     const newCart = {
-      items: newItems,
-      subtotal: Math.round(subtotal * 100) / 100,
-      tax: Math.round(tax * 100) / 100,
-      total: Math.round(total * 100) / 100,
+      items: itemsWithTax,
+      subtotal: Math.round(totalHT * 100) / 100, // Sous-total HT
+      tax: Math.round(totalTVA * 100) / 100, // Total TVA
+      total: Math.round(totalTTC * 100) / 100, // Total TTC
       itemCount,
     };
 
@@ -65,7 +106,7 @@ export const useCashierStore = create((set, get) => ({
     return newCart;
   },
 
-  // ✅ ACTIONS DU PANIER MODIFIÉES (restaurées)
+  // ✅ ACTIONS DU PANIER MODIFIÉES (tax_rate ajouté)
   addToCart: (product, quantity = 1) => {
     const state = get();
     const existingItemIndex = state.cart.items.findIndex((item) => item.product_id === product._id);
@@ -84,8 +125,9 @@ export const useCashierStore = create((set, get) => ({
         sku: product.sku,
         barcode: product.meta_data?.find((m) => m.key === 'barcode')?.value || '',
         quantity,
-        unit_price: product.price,
-        total_price: product.price * quantity,
+        unit_price: product.price, // Prix TTC
+        total_price: product.price * quantity, // Total TTC
+        tax_rate: product.tax_rate || 20, // 🆕 Stocker le taux de TVA du produit
       };
       newItems = [...state.cart.items, cartItem];
     }
