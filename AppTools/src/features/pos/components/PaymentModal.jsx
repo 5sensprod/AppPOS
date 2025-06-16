@@ -16,11 +16,43 @@ const PaymentModal = () => {
         return;
       }
 
-      await processSale(paymentMethod, cashPaymentData);
+      // ✅ NOUVEAU : Préparer les données selon le type de paiement
+      let paymentData = { payment_method: paymentMethod };
+
+      if (paymentMethod === 'cash') {
+        paymentData.cash_payment_data = {
+          amount_received: cashPaymentData.amountReceived,
+          change: cashPaymentData.change,
+          exact_amount: cashPaymentData.change === 0,
+        };
+      }
+
+      // TODO: Ajouter support paiement mixte
+      // if (paymentMethod === 'mixed') {
+      //   paymentData.mixed_payment_data = {
+      //     cash_amount: mixedPaymentData.cashAmount,
+      //     card_amount: mixedPaymentData.cardAmount,
+      //   };
+      // }
+
+      console.log('💳 [PAYMENT] Données envoyées:', paymentData);
+
+      // ✅ MODIFIER : Passer les données complètes au lieu du seul payment_method
+      await processSale(paymentData);
       setShowPaymentModal(false);
+
+      // ✅ NOUVEAU : Reset des données après paiement réussi
+      setCashPaymentData({ amountReceived: 0, change: 0 });
     } catch (error) {
       console.error('Erreur paiement:', error);
+      // Afficher une meilleure erreur à l'utilisateur
+      alert('Erreur lors du paiement: ' + (error.message || 'Erreur inconnue'));
     }
+  };
+
+  const handlePaymentMethodChange = (method) => {
+    setPaymentMethod(method);
+    setCashPaymentData({ amountReceived: 0, change: 0 });
   };
 
   const handleCashAmountChange = (amountReceived, change) => {
@@ -43,7 +75,7 @@ const PaymentModal = () => {
                 type="radio"
                 value="cash"
                 checked={paymentMethod === 'cash'}
-                onChange={(e) => setPaymentMethod(e.target.value)}
+                onChange={(e) => handlePaymentMethodChange(e.target.value)}
                 className="form-radio"
               />
               <span className="text-gray-700 dark:text-gray-300">Espèces</span>
@@ -54,7 +86,7 @@ const PaymentModal = () => {
                 type="radio"
                 value="card"
                 checked={paymentMethod === 'card'}
-                onChange={(e) => setPaymentMethod(e.target.value)}
+                onChange={(e) => handlePaymentMethodChange(e.target.value)}
                 className="form-radio"
               />
               <span className="text-gray-700 dark:text-gray-300">Carte bancaire</span>
@@ -65,7 +97,7 @@ const PaymentModal = () => {
                 type="radio"
                 value="mixed"
                 checked={paymentMethod === 'mixed'}
-                onChange={(e) => setPaymentMethod(e.target.value)}
+                onChange={(e) => handlePaymentMethodChange(e.target.value)}
                 className="form-radio"
               />
               <span className="text-gray-700 dark:text-gray-300">Mixte</span>

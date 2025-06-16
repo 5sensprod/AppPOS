@@ -143,7 +143,7 @@ export const useCashierStore = create((set, get) => ({
   },
 
   // ✅ ACTIONS DE VENTE MODIFIÉES (restaurées)
-  processSale: async (paymentMethod = 'cash') => {
+  processSale: async (paymentData = {}) => {
     const state = get();
 
     if (state.cart.items.length === 0) {
@@ -153,10 +153,21 @@ export const useCashierStore = create((set, get) => ({
     set({ loading: true, error: null });
 
     try {
+      // ✅ NOUVEAU : Construire les données de vente complètes
       const saleData = {
         items: state.cart.items,
-        payment_method: paymentMethod,
+        // Support ancien format (rétrocompatibilité)
+        payment_method: paymentData.payment_method || paymentData || 'cash',
+        // ✅ NOUVEAU : Données de paiement détaillées
+        ...(paymentData.cash_payment_data && {
+          cash_payment_data: paymentData.cash_payment_data,
+        }),
+        ...(paymentData.mixed_payment_data && {
+          mixed_payment_data: paymentData.mixed_payment_data,
+        }),
       };
+
+      console.log('🛒 [STORE] Données vente envoyées:', saleData);
 
       const response = await salesService.createSale(saleData);
 
@@ -168,16 +179,22 @@ export const useCashierStore = create((set, get) => ({
         currentSale: response.data.sale,
       }));
 
-      // ✅ VIDER LE PANIER après la vente (avec notification API automatique)
+      // Vider le panier après la vente (avec notification API automatique)
       get().clearCart();
 
+      console.log('✅ [STORE] Vente créée avec succès:', response.data);
       return response.data;
     } catch (error) {
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Erreur lors de la vente';
+
       set({
         loading: false,
-        error: error.message || 'Erreur lors de la vente',
+        error: errorMessage,
       });
-      throw error;
+
+      console.error('❌ [STORE] Erreur vente:', error);
+      throw new Error(errorMessage);
     }
   },
 

@@ -86,6 +86,74 @@ class SaleController extends BaseController {
 
       const newSale = await Sale.create(saleData);
 
+      if (payment_method === 'cash' || payment_method === 'mixed') {
+        try {
+          const cashierSessionService = require('../services/cashierSessionService');
+
+          // 1. Ajouter le montant de la vente au fond (argent reçu)
+          let cashAmount = totalAmount;
+          let changeAmount = 0;
+
+          // Si des données de paiement cash sont fournies (avec monnaie)
+          if (req.body.cash_payment_data) {
+            const { amount_received, change } = req.body.cash_payment_data;
+            cashAmount = amount_received;
+            changeAmount = change;
+
+            console.log(
+              `💰 [SALE] Vente cash: ${totalAmount}€ - Reçu: ${amount_received}€ - Monnaie: ${change}€`
+            );
+          }
+
+          // 2. Ajouter l'argent reçu au fond de caisse
+          if (cashAmount > 0) {
+            await cashierSessionService.addCashMovement(cashier.id, {
+              type: 'in',
+              amount: cashAmount,
+              reason: `Vente ${newSale.transaction_id}`,
+              notes: `Paiement client - Total vente: ${totalAmount}€`,
+            });
+
+            console.log(`✅ [SALE] +${cashAmount}€ ajoutés au fond de caisse`);
+          }
+
+          // 3. Déduire la monnaie rendue du fond de caisse
+          if (changeAmount > 0) {
+            await cashierSessionService.addCashMovement(cashier.id, {
+              type: 'out',
+              amount: changeAmount,
+              reason: `Monnaie rendue ${newSale.transaction_id}`,
+              notes: `Monnaie client - Reçu: ${cashAmount}€, Vente: ${totalAmount}€`,
+            });
+
+            console.log(`✅ [SALE] -${changeAmount}€ déduits du fond de caisse (monnaie)`);
+          }
+        } catch (drawerError) {
+          console.warn('⚠️ [SALE] Erreur mise à jour fond de caisse:', drawerError.message);
+          // Ne pas faire échouer la vente si erreur fond de caisse
+        }
+      }
+
+      // Pour les paiements mixtes, ajouter seulement la partie cash
+      if (payment_method === 'mixed' && req.body.mixed_payment_data) {
+        try {
+          const { cash_amount, card_amount } = req.body.mixed_payment_data;
+
+          if (cash_amount > 0) {
+            await cashierSessionService.addCashMovement(cashier.id, {
+              type: 'in',
+              amount: cash_amount,
+              reason: `Vente mixte ${newSale.transaction_id}`,
+              notes: `Partie cash - Total: ${totalAmount}€ (Cash: ${cash_amount}€, Carte: ${card_amount}€)`,
+            });
+
+            console.log(`✅ [SALE] Paiement mixte: +${cash_amount}€ en espèces ajoutés au fond`);
+          }
+        } catch (mixedError) {
+          console.warn('⚠️ [SALE] Erreur paiement mixte fond de caisse:', mixedError.message);
+        }
+      }
+
       // ✅ ÉMETTRE ÉVÉNEMENT CRÉATION DE VENTE
       this.eventService.created(newSale);
 

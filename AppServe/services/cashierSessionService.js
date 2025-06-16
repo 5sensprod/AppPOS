@@ -330,7 +330,7 @@ class CashierSessionService {
 
     const movement = {
       id: `mov_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      type: movementData.type, // 'in' ou 'out'
+      type: movementData.type,
       amount: parseFloat(movementData.amount),
       reason: movementData.reason,
       notes: movementData.notes || null,
@@ -348,15 +348,32 @@ class CashierSessionService {
       throw new Error('Solde de caisse insuffisant');
     }
 
-    // Mettre à jour fond de caisse
+    // ✅ AJOUTER CETTE PARTIE MANQUANTE :
+    try {
+      if (session.drawer_session_db_id) {
+        await DrawerMovement.create({
+          drawer_session_id: session.drawer_session_db_id,
+          cashier_id: cashierId,
+          type: movement.type,
+          amount: movement.amount,
+          reason: movement.reason,
+          notes: movement.notes,
+          created_by: movement.created_by,
+        });
+        console.log(`💾 [DB] Mouvement persisté: ${movement.type} ${movement.amount}€`);
+      }
+    } catch (error) {
+      console.error('❌ [DB] Erreur sauvegarde mouvement:', error);
+      // Ne pas faire échouer l'opération si erreur DB
+    }
+
+    // Mettre à jour fond de caisse (code existant)
     drawer.current_amount = newAmount;
-    drawer.movements.unshift(movement); // Plus récent en premier
+    drawer.movements.unshift(movement);
     if (drawer.movements.length > 50) drawer.movements = drawer.movements.slice(0, 50);
 
-    // Mettre à jour session
     session.drawer = drawer;
 
-    // ✅ Émettre événement mouvement
     apiEventEmitter.emit('cashier_drawer.movement.added', {
       cashier_id: cashierId,
       movement,
