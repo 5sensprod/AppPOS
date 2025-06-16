@@ -607,5 +607,7 @@ const defaultValues = {
   supplier_id: null,
   brand_ref: null,
   supplier_ref: null,
+  margin_rate: null,
+  margin_amount: null,
   tax_rate: 20,
 };

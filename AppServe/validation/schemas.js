@@ -123,10 +123,10 @@ const createProductSchema = Joi.object({
   revenue_total: Joi.number().default(0),
 
   // Prix
-  price: Joi.number().allow(null).required(),
-  regular_price: Joi.number().allow(null),
-  sale_price: Joi.number().allow(null),
-  purchase_price: Joi.number().allow(null),
+  price: Joi.number().allow(null).required(), //prix vente ttc
+  regular_price: Joi.number().allow(null), // prix vente ht
+  sale_price: Joi.number().allow(null), //prix promo ttc
+  purchase_price: Joi.number().allow(null), // prix achat ht
 
   // IDs standards (acceptant chaînes vides et null)
   brand_id: Joi.string().allow(null, ''),
@@ -153,6 +153,7 @@ const createProductSchema = Joi.object({
   designation: Joi.string().allow(null, '').default(''),
   description_short: Joi.string().allow(null, '').default(''),
   margin_rate: Joi.number().allow(null),
+  margin_amount: Joi.number().allow(null),
   tax_rate: Joi.number().allow(null),
 
   specifications: Joi.object({

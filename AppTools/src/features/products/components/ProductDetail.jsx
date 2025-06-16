@@ -49,6 +49,8 @@ function ProductDetail() {
                   editable={editable}
                   register={register}
                   errors={errors}
+                  setValue={setValue} // 🆕 AJOUT
+                  watch={watch} // 🆕 AJOUT
                 />
               }
             />
