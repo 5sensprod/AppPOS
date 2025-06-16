@@ -441,7 +441,13 @@ export default function useProductDetail() {
   };
 
   const handleCancel = () => {
-    navigate(isNew ? '/products' : `/products/${paramId}`);
+    if (isNew) {
+      // Si c'est une création, retourner à la liste
+      navigate('/products');
+    } else {
+      // Si c'est une modification, retourner au mode lecture
+      navigate(`/products/${paramId}`);
+    }
   };
 
   const handleSync = async () => {

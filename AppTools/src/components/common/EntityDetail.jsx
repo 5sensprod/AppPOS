@@ -297,16 +297,20 @@ const EntityDetail = ({
               )}
             </>
           ) : (
-            // Actions en mode édition - seulement le bouton d'enregistrement
-            <ActionButton
-              onClick={formMethods.handleSubmit(handleFormSubmit)}
-              icon={Save}
-              label="Enregistrer"
-              variant="primary"
-              isLoading={isLoading}
-              disabled={!formDirty}
-              className={!formDirty ? 'opacity-50 cursor-not-allowed' : ''}
-            />
+            // Actions en mode édition
+            <>
+              <ActionButton onClick={handleCancel} icon={X} label="Annuler" variant="secondary" />
+
+              <ActionButton
+                onClick={formMethods.handleSubmit(handleFormSubmit)}
+                icon={Save}
+                label="Enregistrer"
+                variant="primary"
+                isLoading={isLoading}
+                disabled={!formDirty}
+                className={!formDirty ? 'opacity-50 cursor-not-allowed' : ''}
+              />
+            </>
           )}
         </div>
       </div>
