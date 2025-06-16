@@ -610,4 +610,6 @@ const defaultValues = {
   margin_rate: null,
   margin_amount: null,
   tax_rate: 20,
+  promo_rate: null, // 🆕 NOUVEAU CHAMP
+  promo_amount: null,
 };
