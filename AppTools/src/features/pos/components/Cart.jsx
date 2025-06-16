@@ -9,7 +9,7 @@ const Cart = () => {
     useCashierStore();
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md h-[70vh] flex flex-col">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md h-[60vh] flex flex-col">
       <div className="p-4 border-b border-gray-200 dark:border-gray-600">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center">
