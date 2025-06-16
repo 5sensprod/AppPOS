@@ -155,6 +155,8 @@ const createProductSchema = Joi.object({
   margin_rate: Joi.number().allow(null),
   margin_amount: Joi.number().allow(null),
   tax_rate: Joi.number().allow(null),
+  promo_rate: Joi.number().allow(null), // 🆕 NOUVEAU CHAMP
+  promo_amount: Joi.number().allow(null), // 🆕 NOUVEAU CHAMP
 
   specifications: Joi.object({
     content: Joi.string().allow(null, ''),
