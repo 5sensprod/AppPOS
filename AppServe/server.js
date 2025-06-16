@@ -66,6 +66,7 @@ app.use('/api/product-title', authMiddleware, productTitleRoutes);
 app.use('/api/sales', authMiddleware, saleRoutes);
 app.use('/api/cashier', require('./routes/cashierSessionRoutes'));
 app.use('/api/time', timeRoutes);
+app.use('/api/cashier/drawer', authMiddleware, require('./routes/drawerRoutes'));
 // Ajout des routes de sauvegarde
 app.use('/api/backup', authMiddleware, backupRoutes);
 

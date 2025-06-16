@@ -1,4 +1,4 @@
-// src/features/pos/CashierPage.jsx
+// src/features/pos/CashierPage.jsx - Version complète avec fond de caisse
 import React, { useEffect, useCallback } from 'react';
 import { useCashierStore } from './stores/cashierStore';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -8,6 +8,7 @@ import Cart from './components/Cart';
 import PaymentModal from './components/PaymentModal';
 import ReceiptModal from './components/ReceiptModal';
 import ErrorDisplay from './components/ErrorDisplay';
+import DrawerIndicator from './components/DrawerIndicator';
 
 const CashierPage = () => {
   // ✅ SÉLECTEURS STABLES
@@ -78,13 +79,16 @@ const CashierPage = () => {
       {/* ✅ HEADER UNIFIÉ */}
       <SessionHeader />
 
+      {/* ✅ NOUVEAU : Indicateur fond de caisse */}
+      <DrawerIndicator />
+
       {/* ✅ AFFICHAGE DES ERREURS */}
       <ErrorDisplay cartError={error} lcdError={lcdError} onClearCartError={() => setError(null)} />
 
       {/* ✅ INTERFACE PRINCIPALE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
         <div className="lg:col-span-1">
-          {/* ✅ NOUVEAU COMPOSANT ProductSearch AVEC LES NOUVELLES ROUTES */}
+          {/* ✅ COMPOSANT ProductSearch AVEC LES NOUVELLES ROUTES */}
           <ProductSearch onProductFound={handleProductFound} disabled={!hasActiveCashierSession} />
         </div>
         <div className="lg:col-span-2">

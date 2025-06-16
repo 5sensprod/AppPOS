@@ -2,6 +2,8 @@
 const lcdDisplayService = require('./lcdDisplayService');
 // ✅ NOUVEAU : Import pour émettre des événements
 const apiEventEmitter = require('./apiEventEmitter');
+const DrawerSession = require('../models/DrawerSession');
+const DrawerMovement = require('../models/DrawerMovement');
 
 class CashierSessionService {
   constructor() {
@@ -34,6 +36,25 @@ class CashierSessionService {
       throw new Error('Fond de caisse obligatoire pour ouvrir une session');
     }
 
+    // ✅ NOUVEAU : Persister la session drawer en base AVANT de créer la session en mémoire
+    let drawerSessionDB = null;
+    try {
+      drawerSessionDB = await DrawerSession.create({
+        cashier_id: cashierId,
+        cashier_name: username,
+        opening_amount: drawerData.opening_amount,
+        expected_amount: drawerData.opening_amount,
+        denominations: drawerData.denominations || {},
+        method: drawerData.method || 'custom',
+        notes: drawerData.notes || null,
+        status: 'open',
+      });
+      console.log(`💾 [DB] Session drawer persistée: ${drawerSessionDB._id}`);
+    } catch (error) {
+      console.error('❌ [DB] Erreur création session drawer:', error);
+      throw new Error('Erreur de sauvegarde de la session');
+    }
+
     // Créer la session (MODIFIER votre structure existante)
     const session = {
       cashier_id: cashierId,
@@ -42,13 +63,14 @@ class CashierSessionService {
       status: 'active',
       sales_count: 0,
       total_sales: 0,
+      // ✅ AJOUTER référence DB
+      drawer_session_db_id: drawerSessionDB._id,
       lcd: {
         requested: !!lcdPort,
         connected: false,
         port: null,
         error: null,
       },
-      // ✅ NOUVEAU : Fond de caisse dans la session
       drawer: {
         opening_amount: drawerData.opening_amount,
         current_amount: drawerData.opening_amount,
@@ -94,6 +116,7 @@ class CashierSessionService {
     }
 
     this.activeSessions.set(cashierId, session);
+    this.cashierDrawers.set(cashierId, session.drawer);
 
     // ✅ MODIFIER : ÉMETTRE ÉVÉNEMENT SESSION OUVERTE avec données drawer
     console.info(`📡 [WS-EVENT] Émission cashier_session.status.changed pour ${username}`);
