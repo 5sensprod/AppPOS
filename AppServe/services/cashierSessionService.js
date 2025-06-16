@@ -55,21 +55,19 @@ class CashierSessionService {
         restored: !!existingSession.restored,
       };
     }
-
+    let hasDBSessionWarning = false;
     try {
       const existingDBSession = await DrawerSession.findOpenSession(cashierId);
       if (existingDBSession) {
+        hasDBSessionWarning = true;
         console.warn(
-          `⚠️ [SESSION] Session DB ouverte trouvée pour ${username}, elle devrait être restaurée au démarrage`
+          `⚠️ [SESSION] Session DB ouverte trouvée pour ${username} (ID: ${existingDBSession._id}), mais on continue l'ouverture`
         );
-        return {
-          success: false,
-          error: 'Session en base non restaurée. Redémarrez le serveur.',
-          needs_server_restart: true,
-        };
+        // ✅ NE PAS FAIRE DE RETURN ICI - on continue !
       }
     } catch (error) {
-      console.warn('⚠️ [SESSION] Erreur vérification session DB:', error);
+      console.warn('⚠️ [SESSION] Erreur vérification session DB (non bloquant):', error.message);
+      // ✅ NE PAS FAIRE DE RETURN ICI NON PLUS - on continue !
     }
 
     // ✅ NOUVEAU : Validation fond de caisse obligatoire
@@ -182,6 +180,8 @@ class CashierSessionService {
       message: 'Session caissier ouverte',
       session,
       lcd_status: session.lcd,
+      // ✅ AJOUTER l'info sur la session DB en doublon (sans bloquer)
+      db_warning: hasDBSessionWarning ? 'Session en base détectée - à surveiller' : null,
     };
   }
 
