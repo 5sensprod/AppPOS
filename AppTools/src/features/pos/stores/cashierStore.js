@@ -63,9 +63,6 @@ export const useCashierStore = create((set, get) => ({
 
     // Calculer pour chaque item avec son propre taux de TVA
     const itemsWithTax = newItems.map((item) => {
-      // Retrouver le produit pour avoir ses infos de TVA
-      // Pour l'instant, on utilise un taux par défaut de 20%
-      // TODO: Il faudrait stocker tax_rate dans l'item du panier
       const taxRate = item.tax_rate || 20;
       const priceTTC = item.unit_price;
       const priceHT = priceTTC / (1 + taxRate / 100);
