@@ -23,6 +23,9 @@ class DrawerSession extends BaseModel {
       status: 'open', // 'open', 'closed'
       created_at: new Date(),
       updated_at: new Date(),
+      lcd_port: null,
+      lcd_connected: false,
+      lcd_config: {},
     };
   }
 

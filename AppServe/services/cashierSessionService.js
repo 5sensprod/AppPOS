@@ -75,10 +75,10 @@ class CashierSessionService {
       throw new Error('Fond de caisse obligatoire pour ouvrir une session');
     }
 
-    // ✅ NOUVEAU : Persister la session drawer en base AVANT de créer la session en mémoire
     let drawerSessionDB = null;
     try {
-      drawerSessionDB = await DrawerSession.create({
+      // ✅ DONNÉES MINIMALES - laisser BaseModel appliquer les defaults pour LCD
+      const sessionData = {
         cashier_id: cashierId,
         cashier_name: username,
         opening_amount: drawerData.opening_amount,
@@ -87,13 +87,20 @@ class CashierSessionService {
         method: drawerData.method || 'custom',
         notes: drawerData.notes || null,
         status: 'open',
-      });
+        // ✅ SEULEMENT si lcdPort est fourni, sinon laisser les defaults du modèle
+        ...(lcdPort && {
+          lcd_port: lcdPort,
+          lcd_config: lcdConfig || {},
+          // lcd_connected reste false par défaut
+        }),
+      };
+
+      drawerSessionDB = await DrawerSession.create(sessionData);
       console.log(`💾 [DB] Session drawer persistée: ${drawerSessionDB._id}`);
     } catch (error) {
       console.error('❌ [DB] Erreur création session drawer:', error);
       throw new Error('Erreur de sauvegarde de la session');
     }
-
     // Créer la session (MODIFIER votre structure existante)
     const session = {
       cashier_id: cashierId,
@@ -139,7 +146,16 @@ class CashierSessionService {
         session.lcd.connected = true;
         session.lcd.port = lcdPort;
 
-        // ✅ WELCOME APRÈS UNE PAUSE (pour laisser lire "Bonjour [nom]")
+        // ✅ Mettre à jour en base
+        try {
+          await DrawerSession.update(drawerSessionDB._id, {
+            lcd_connected: true,
+          });
+        } catch (updateError) {
+          console.warn('⚠️ Erreur mise à jour LCD en base:', updateError);
+        }
+
+        // ✅ WELCOME APRÈS UNE PAUSE...
         setTimeout(async () => {
           try {
             console.info(`👋 [API] Affichage welcome après connexion pour ${username}`);
