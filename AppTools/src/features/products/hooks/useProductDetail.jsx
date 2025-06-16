@@ -607,4 +607,5 @@ const defaultValues = {
   supplier_id: null,
   brand_ref: null,
   supplier_ref: null,
+  tax_rate: 20,
 };
