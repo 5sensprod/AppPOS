@@ -50,7 +50,9 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
           total_movements_in: totalIn,
           total_movements_out: totalOut,
           movements_count: movements.length,
-          total_sales: cashierSession.total_sales || 0,
+          total_sales: movements
+            .filter((m) => m.reason?.includes('Vente'))
+            .reduce((sum, m) => sum + m.amount, 0),
           sales_count: cashierSession.sales_count || 0,
         },
         movements: movements.map((m) => ({

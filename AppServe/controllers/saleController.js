@@ -68,9 +68,11 @@ class SaleController extends BaseController {
       }
 
       // 2. Calculer les taxes (20% par défaut si pas spécifié)
-      const taxRate = 0.2; // À adapter selon votre logique
-      const taxAmount = subtotal * taxRate;
-      const totalAmount = subtotal + taxAmount;
+      const taxAmount =
+        Math.round(enrichedItems.reduce((sum, item) => sum + (item.tax_amount || 0), 0) * 100) /
+        100;
+      const totalAmount =
+        Math.round(enrichedItems.reduce((sum, item) => sum + item.total_price, 0) * 100) / 100;
 
       // 3. Créer la vente
       const saleData = {
