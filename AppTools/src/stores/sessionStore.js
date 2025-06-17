@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import cashierSessionService from '../services/cashierSessionService';
+import apiService from '../services/api';
 
 const getAuthToken = () => {
   return (
@@ -543,12 +544,8 @@ export const useSessionStore = create(
         let response;
 
         if (closingData) {
-          const res = await fetch('/api/cashier/drawer/close', {
-            method: 'POST',
-            headers: getAuthHeaders(), // ✅ UTILISER LA FONCTION HELPER
-            body: JSON.stringify(closingData),
-          });
-          response = await res.json();
+          // ✅ CORRECTION : Utiliser apiService au lieu de fetch direct
+          response = await apiService.post('/api/cashier/drawer/close', closingData);
         } else {
           response = await cashierSessionService.closeSession();
         }
@@ -660,18 +657,10 @@ export const useSessionStore = create(
       set((state) => ({ ...state, drawerLoading: true, drawerError: null }));
 
       try {
-        const response = await fetch('/api/cashier/drawer/movement', {
-          method: 'POST',
-          headers: getAuthHeaders(), // ✅ UTILISER LA FONCTION HELPER
-          body: JSON.stringify(movementData),
-        });
+        // ✅ CORRECTION : Utiliser apiService au lieu de fetch direct
+        const response = await apiService.post('/api/cashier/drawer/movement', movementData);
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message);
-        }
-
-        const result = await response.json();
+        const result = response.data;
 
         set((state) => ({
           ...state,
@@ -691,7 +680,7 @@ export const useSessionStore = create(
         set((state) => ({
           ...state,
           drawerLoading: false,
-          drawerError: error.message,
+          drawerError: error.response?.data?.message || error.message,
         }));
         throw error;
       }
@@ -700,18 +689,10 @@ export const useSessionStore = create(
     // ✅ NOUVEAU : Synchroniser fond de caisse
     syncDrawerState: async () => {
       try {
-        const response = await fetch('/api/cashier/drawer/status', {
-          headers: getAuthHeaders(), // ✅ UTILISER LA FONCTION HELPER
-        });
+        // ✅ CORRECTION : Utiliser apiService au lieu de fetch direct
+        const response = await apiService.get('/api/cashier/drawer/status');
 
-        if (!response.ok) {
-          if (response.status === 403) {
-            console.warn('⚠️ [SESSION STORE] Token expiré ou invalide pour sync drawer');
-          }
-          return;
-        }
-
-        const result = await response.json();
+        const result = response.data;
 
         if (result.success && result.data.drawer) {
           set((state) => ({
