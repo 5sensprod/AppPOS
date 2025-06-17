@@ -36,6 +36,9 @@ class CashierSessionController {
     try {
       const cashierId = req.user.id;
 
+      console.log(`🔄 [CONTROLLER] Fermeture session simple pour cashier ${cashierId}`);
+
+      // ✅ Utiliser la même méthode mais sans données de fermeture
       const result = await cashierSessionService.closeCashierSession(cashierId);
 
       return ResponseHandler.success(res, {
@@ -43,6 +46,7 @@ class CashierSessionController {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
+      console.error(`❌ [CONTROLLER] Erreur fermeture session simple:`, error);
       return ResponseHandler.error(res, error);
     }
   }
@@ -360,29 +364,41 @@ class CashierSessionController {
   }
 
   // ✅ NOUVEAU : Fermer session avec fond de caisse
-  async closeCashierSessionWithDrawer(cashierId, closingData) {
+  async closeCashierSessionWithDrawer(req, res) {
     try {
+      const cashierId = req.user.id;
+      const closingData = req.body;
+
+      console.log(
+        `🔄 [CONTROLLER] Fermeture session avec fond pour cashier ${cashierId}:`,
+        closingData
+      );
+
       // Validation données fermeture
       if (closingData.counted_amount !== undefined && closingData.counted_amount < 0) {
-        throw new Error('Montant compté invalide');
+        return ResponseHandler.badRequest(res, 'Montant compté invalide');
       }
 
+      // ✅ IMPORTANT : Appeler la méthode du service avec les bonnes données
       const result = await cashierSessionService.closeCashierSession(cashierId, {
         counted_amount: closingData.counted_amount,
         expected_amount: closingData.expected_amount,
         method: closingData.method || 'custom',
         notes: closingData.notes ? closingData.notes.trim() : null,
         variance_accepted: closingData.variance_accepted || false,
+        variance: closingData.variance || 0,
       });
 
-      return {
+      console.log(`✅ [CONTROLLER] Session fermée avec succès pour cashier ${cashierId}`);
+
+      return ResponseHandler.success(res, {
         message: 'Session et fond de caisse fermés',
         session: result.session,
         timestamp: new Date().toISOString(),
-      };
+      });
     } catch (error) {
       console.error(`❌ [CONTROLLER] Erreur fermeture session+fond:`, error);
-      throw error;
+      return ResponseHandler.error(res, error);
     }
   }
 }

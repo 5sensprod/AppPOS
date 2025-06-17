@@ -443,7 +443,7 @@ class CashierSessionService {
 
     console.info(`🏪 Fermeture session caisse pour ${session.username}`);
 
-    // ✅ NOUVEAU : Validation fermeture fond
+    // ✅ Validation fermeture fond
     if (closingData && drawer) {
       drawer.closing = {
         counted_amount: closingData.counted_amount || drawer.current_amount,
@@ -458,15 +458,91 @@ class CashierSessionService {
       };
     }
 
-    // Libérer le LCD si possédé (EXISTANT - GARDER)
+    // ✅ PERSISTANCE EN BASE DE DONNÉES - CORRIGÉE
+    try {
+      if (session.drawer_session_db_id) {
+        console.info(`💾 [DB] Tentative fermeture session ID: ${session.drawer_session_db_id}`);
+
+        const DrawerSession = require('../models/DrawerSession');
+
+        // Préparer les données de mise à jour
+        const updateData = {
+          status: 'closed',
+          closed_at: new Date(),
+          updated_at: new Date(), // ✅ Important pour BaseModel
+        };
+
+        // Ajouter les données de fermeture si disponibles
+        if (closingData) {
+          updateData.closing_amount = closingData.counted_amount;
+          updateData.expected_amount =
+            closingData.expected_amount || drawer?.expected_amount || drawer?.opening_amount;
+          updateData.variance = closingData.variance || 0;
+          updateData.method = closingData.method || 'custom';
+          updateData.notes = closingData.notes || null;
+        }
+
+        console.info(`💾 [DB] Données à mettre à jour:`, updateData);
+
+        // ✅ UTILISER LA MÉTHODE UPDATE DU MODÈLE
+        const result = await DrawerSession.update(session.drawer_session_db_id, updateData);
+
+        if (result) {
+          console.log(
+            `✅ [DB] Session fermée en base avec succès: ${session.drawer_session_db_id}`
+          );
+        } else {
+          console.warn(`⚠️ [DB] Aucun résultat de la mise à jour, mais pas d'erreur`);
+
+          // ✅ VÉRIFICATION: Essayer de récupérer la session mise à jour
+          const updatedSession = await DrawerSession.findById(session.drawer_session_db_id);
+          if (updatedSession && updatedSession.status === 'closed') {
+            console.log(`✅ [DB] Vérification: Session bien fermée en base`);
+          } else {
+            console.error(
+              `❌ [DB] Vérification: Session pas fermée en base!`,
+              updatedSession?.status
+            );
+            throw new Error('Échec de la fermeture en base de données');
+          }
+        }
+      } else {
+        console.error(`❌ [DB] Aucun ID de session DB trouvé pour ${session.username}!`);
+
+        // ✅ FALLBACK: Rechercher et fermer toutes les sessions ouvertes pour ce caissier
+        const DrawerSession = require('../models/DrawerSession');
+        const openSessions = await DrawerSession.find({
+          cashier_id: cashierId,
+          status: 'open',
+        });
+
+        console.info(`🔧 [DB] Sessions ouvertes trouvées pour fallback: ${openSessions.length}`);
+
+        for (const openSession of openSessions) {
+          console.info(`🔧 [DB] Fermeture session fallback: ${openSession._id}`);
+          await DrawerSession.update(openSession._id, {
+            status: 'closed',
+            closed_at: new Date(),
+            updated_at: new Date(),
+            notes: 'Fermée automatiquement - session sans ID en mémoire',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ [DB] Erreur fermeture session en base:', error);
+      // ✅ FAIRE ÉCHOUER L'OPÉRATION SI ERREUR DB CRITIQUE
+      throw new Error(`Erreur persistance fermeture session: ${error.message}`);
+    }
+
+    // Libérer le LCD si possédé
     this.releaseLCDFromCashier(cashierId);
 
-    // Marquer la session comme fermée (EXISTANT - MODIFIER)
+    // Marquer la session comme fermée en mémoire
     session.status = 'closed';
     session.endTime = new Date();
     session.duration = session.endTime - session.startTime;
 
-    // ✅ MODIFIER : ÉMETTRE ÉVÉNEMENT SESSION FERMÉE avec données drawer
+    // ✅ ÉMETTRE ÉVÉNEMENT SESSION FERMÉE
     console.info(
       `📡 [WS-EVENT] Émission cashier_session.status.changed - session fermée pour ${session.username}`
     );
@@ -480,19 +556,14 @@ class CashierSessionService {
         duration: session.duration,
         sales_count: session.sales_count,
         total_sales: session.total_sales,
-        // ✅ NOUVEAU : Données fermeture fond
         drawer_closed: true,
         drawer_variance: drawer?.closing?.variance || 0,
       },
     });
 
-    // Retirer de la liste active (EXISTANT)
+    // Retirer de la liste active en mémoire
     this.activeSessions.delete(cashierId);
-
-    // ✅ NOUVEAU : Nettoyer le fond de caisse
     this.cashierDrawers.delete(cashierId);
-
-    // ✅ NOUVEAU : Nettoyer l'état panier (DÉPLACER DE L'EXISTANT)
     this.cashierCarts.delete(cashierId);
 
     return {

@@ -1,11 +1,12 @@
-// routes/cashierSessionRoutes.js - AVEC ROUTE CART UPDATE
+// routes/cashierSessionRoutes.js - CORRIGER LE PROBLÈME D'AUTHENTIFICATION
+
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../utils/auth');
 const ResponseHandler = require('../handlers/ResponseHandler');
 const cashierSessionController = require('../controllers/cashierSessionController');
 
-// ✅ TOUTES LES ROUTES PROTÉGÉES PAR AUTHENTIFICATION
+// ✅ APPLIQUER LE MIDDLEWARE D'AUTHENTIFICATION SUR TOUTES LES ROUTES
 router.use(authMiddleware);
 
 // ✅ GESTION DE SESSION
@@ -38,8 +39,13 @@ router.post(
 );
 router.post('/lcd/clear', cashierSessionController.clearLCDDisplay.bind(cashierSessionController));
 
+// ✅ GESTION FOND DE CAISSE - CORRECTIONS
 router.post('/drawer/movement', async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return ResponseHandler.unauthorized(res, 'Utilisateur non authentifié');
+    }
+
     const cashierId = req.user.id;
     const result = await cashierSessionController.addCashMovement(cashierId, req.body);
     return ResponseHandler.success(res, result);
@@ -48,9 +54,12 @@ router.post('/drawer/movement', async (req, res) => {
   }
 });
 
-// ✅ NOUVEAU : Obtenir statut fond de caisse
 router.get('/drawer/status', async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return ResponseHandler.unauthorized(res, 'Utilisateur non authentifié');
+    }
+
     const cashierId = req.user.id;
     const drawer = cashierSessionController.getCashierDrawer(cashierId);
     return ResponseHandler.success(res, { drawer });
@@ -59,25 +68,30 @@ router.get('/drawer/status', async (req, res) => {
   }
 });
 
-// ✅ NOUVEAU : Fermer fond de caisse avec réconciliation
+// ✅ CORRIGÉ : Fermeture fond de caisse avec vérification authentification
 router.post('/drawer/close', async (req, res) => {
   try {
-    const cashierId = req.user.id;
-    const result = await cashierSessionController.closeCashierSessionWithDrawer(
-      cashierId,
-      req.body
-    );
-    return ResponseHandler.success(res, result);
+    console.log('🔍 [ROUTE] drawer/close - req.user:', req.user ? 'PRÉSENT' : 'ABSENT');
+    console.log('🔍 [ROUTE] drawer/close - req.user.id:', req.user?.id);
+
+    if (!req.user || !req.user.id) {
+      console.error('❌ [ROUTE] drawer/close - Utilisateur non authentifié');
+      return ResponseHandler.unauthorized(res, 'Utilisateur non authentifié');
+    }
+
+    // ✅ APPELER DIRECTEMENT LA MÉTHODE DU CONTROLLER AVEC REQ ET RES
+    return await cashierSessionController.closeCashierSessionWithDrawer(req, res);
   } catch (error) {
+    console.error('❌ [ROUTE] drawer/close - Erreur:', error);
     return ResponseHandler.error(res, error);
   }
 });
 
-// ✅ NOUVEAU : GESTION PANIER
+// ✅ GESTION PANIER
 router.post('/cart/update', cashierSessionController.updateCart.bind(cashierSessionController));
 router.get('/cart/status', cashierSessionController.getCartStatus.bind(cashierSessionController));
 
-// ✅ ADMINISTRATION (optionnel - pour superviser)
+// ✅ ADMINISTRATION
 router.get(
   '/sessions/active',
   cashierSessionController.getActiveSessions.bind(cashierSessionController)
