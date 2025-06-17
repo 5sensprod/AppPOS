@@ -29,10 +29,20 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
   useEffect(() => {
     if (isOpen && !reportData && drawer && cashierSession) {
       const movements = drawer.movements || [];
-      const totalIn = movements
+
+      // ✅ DÉDUPLICATION DES MOUVEMENTS PAR ID
+      const uniqueMovements = movements.filter(
+        (movement, index, arr) => arr.findIndex((m) => m.id === movement.id) === index
+      );
+
+      console.log(
+        `📊 [REPORT] Mouvements: ${movements.length} total, ${uniqueMovements.length} uniques`
+      );
+
+      const totalIn = uniqueMovements
         .filter((m) => m.type === 'in')
         .reduce((sum, m) => sum + m.amount, 0);
-      const totalOut = movements
+      const totalOut = uniqueMovements
         .filter((m) => m.type === 'out')
         .reduce((sum, m) => sum + m.amount, 0);
 
@@ -49,13 +59,14 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
           variance: (drawer.currentAmount || 0) - (drawer.expectedAmount || 0),
           total_movements_in: totalIn,
           total_movements_out: totalOut,
-          movements_count: movements.length,
-          total_sales: movements
+          movements_count: uniqueMovements.length, // ✅ UTILISER LES MOUVEMENTS UNIQUES
+          total_sales: uniqueMovements
             .filter((m) => m.reason?.includes('Vente'))
             .reduce((sum, m) => sum + m.amount, 0),
           sales_count: cashierSession.sales_count || 0,
         },
-        movements: movements.map((m) => ({
+        movements: uniqueMovements.map((m) => ({
+          // ✅ UTILISER LES MOUVEMENTS UNIQUES
           ...m,
           timestamp: m.created_at || new Date().toISOString(),
         })),
@@ -65,7 +76,6 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
       setReport(reportData);
     }
   }, [isOpen, reportData, drawer, cashierSession]);
-
   const filteredMovements =
     report?.movements?.filter(
       (m) =>

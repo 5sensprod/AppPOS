@@ -239,17 +239,90 @@ export const useSessionStore = create(
         const handleDrawerMovement = (payload) => {
           console.log('💸 [SESSION STORE] Mouvement caisse reçu:', payload);
 
-          // Filtrer par utilisateur connecté
           if (payload.cashier_id === userId) {
-            set((state) => ({
-              ...state,
-              drawer: {
-                ...state.drawer,
-                currentAmount: payload.new_balance,
-                variance: payload.new_balance - state.drawer.expectedAmount,
-                movements: [payload.movement, ...state.drawer.movements.slice(0, 49)],
-              },
-            }));
+            set((state) => {
+              // ✅ VÉRIFIER SI LE MOUVEMENT EXISTE DÉJÀ
+              const existingMovement = state.drawer.movements.find(
+                (mov) => mov.id === payload.movement.id
+              );
+
+              if (existingMovement) {
+                console.log(
+                  '⏭️ [SESSION STORE] Mouvement déjà présent, ignoré:',
+                  payload.movement.id
+                );
+                // ✅ JUSTE METTRE À JOUR LES MONTANTS SANS AJOUTER LE MOUVEMENT
+                if (payload.drawer_state) {
+                  return {
+                    ...state,
+                    drawer: {
+                      ...state.drawer,
+                      currentAmount: payload.drawer_state.currentAmount,
+                      expectedAmount: payload.drawer_state.expectedAmount,
+                      variance: payload.drawer_state.variance,
+                      // ✅ NE PAS MODIFIER LA LISTE DES MOUVEMENTS
+                    },
+                  };
+                } else {
+                  // Recalculer les montants sans dupliquer
+                  let expectedAmount = state.drawer.openingAmount;
+                  state.drawer.movements.forEach((movement) => {
+                    if (movement.type === 'in') expectedAmount += movement.amount;
+                    else expectedAmount -= movement.amount;
+                  });
+
+                  return {
+                    ...state,
+                    drawer: {
+                      ...state.drawer,
+                      currentAmount: payload.new_balance,
+                      expectedAmount: expectedAmount,
+                      variance: payload.new_balance - expectedAmount,
+                      // ✅ NE PAS MODIFIER LA LISTE DES MOUVEMENTS
+                    },
+                  };
+                }
+              }
+
+              // ✅ MOUVEMENT NOUVEAU : L'AJOUTER NORMALEMENT
+              console.log('✅ [SESSION STORE] Nouveau mouvement ajouté:', payload.movement.id);
+
+              if (payload.drawer_state) {
+                // Nouvelle structure avec drawer_state
+                return {
+                  ...state,
+                  drawer: {
+                    ...state.drawer,
+                    currentAmount: payload.drawer_state.currentAmount,
+                    expectedAmount: payload.drawer_state.expectedAmount,
+                    variance: payload.drawer_state.variance,
+                    movements: [payload.movement, ...state.drawer.movements.slice(0, 49)],
+                  },
+                };
+              } else {
+                // Fallback : Ancienne structure ou calcul manuel
+                const movements = [payload.movement, ...state.drawer.movements.slice(0, 49)];
+
+                let expectedAmount = state.drawer.openingAmount;
+                movements.forEach((movement) => {
+                  if (movement.type === 'in') expectedAmount += movement.amount;
+                  else expectedAmount -= movement.amount;
+                });
+
+                const newVariance = payload.new_balance - expectedAmount;
+
+                return {
+                  ...state,
+                  drawer: {
+                    ...state.drawer,
+                    currentAmount: payload.new_balance,
+                    expectedAmount: expectedAmount,
+                    variance: newVariance,
+                    movements: movements,
+                  },
+                };
+              }
+            });
           }
         };
 
