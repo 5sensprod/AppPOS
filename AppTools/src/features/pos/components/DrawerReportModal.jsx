@@ -18,7 +18,7 @@ import {
   User,
 } from 'lucide-react';
 import { useDrawer, useSessionCashier } from '../../../stores/sessionStore';
-
+import salesService from '../../../services/salesService';
 const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
   const { drawer } = useDrawer();
   const { cashierSession } = useSessionCashier();
@@ -27,55 +27,103 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
   const [report, setReport] = useState(null);
 
   useEffect(() => {
-    if (isOpen && !reportData && drawer && cashierSession) {
-      const movements = drawer.movements || [];
+    const fetchData = async () => {
+      if (isOpen && !reportData && drawer && cashierSession) {
+        const movements = drawer.movements || [];
+        const totalIn = movements
+          .filter((m) => m.type === 'in')
+          .reduce((sum, m) => sum + m.amount, 0);
+        const totalOut = movements
+          .filter((m) => m.type === 'out')
+          .reduce((sum, m) => sum + m.amount, 0);
 
-      // ✅ DÉDUPLICATION DES MOUVEMENTS PAR ID
-      const uniqueMovements = movements.filter(
-        (movement, index, arr) => arr.findIndex((m) => m.id === movement.id) === index
-      );
+        let allSales = [];
+        let salesSummary = {
+          total_sales: 0,
+          sales_count: 0,
+          cash_sales: 0,
+          card_sales: 0,
+          mixed_sales: 0,
+        };
 
-      console.log(
-        `📊 [REPORT] Mouvements: ${movements.length} total, ${uniqueMovements.length} uniques`
-      );
+        try {
+          const salesResponse = await salesService.getSales({
+            cashier_id: cashierSession.cashier_id,
+            start_date: drawer.openedAt,
+            end_date: new Date().toISOString(),
+          });
 
-      const totalIn = uniqueMovements
-        .filter((m) => m.type === 'in')
-        .reduce((sum, m) => sum + m.amount, 0);
-      const totalOut = uniqueMovements
-        .filter((m) => m.type === 'out')
-        .reduce((sum, m) => sum + m.amount, 0);
+          allSales = salesResponse.data.sales || [];
 
-      setReport({
-        date: new Date().toISOString().split('T')[0],
-        cashier: cashierSession.username,
-        summary: {
-          session_duration: drawer.openedAt
-            ? Math.floor((new Date() - new Date(drawer.openedAt)) / (1000 * 60))
-            : 0,
-          opening_amount: drawer.openingAmount || 0,
-          closing_amount: drawer.currentAmount || 0,
-          expected_amount: drawer.expectedAmount || 0,
-          variance: (drawer.currentAmount || 0) - (drawer.expectedAmount || 0),
-          total_movements_in: totalIn,
-          total_movements_out: totalOut,
-          movements_count: uniqueMovements.length, // ✅ UTILISER LES MOUVEMENTS UNIQUES
-          total_sales: uniqueMovements
-            .filter((m) => m.reason?.includes('Vente'))
-            .reduce((sum, m) => sum + m.amount, 0),
-          sales_count: cashierSession.sales_count || 0,
-        },
-        movements: uniqueMovements.map((m) => ({
-          // ✅ UTILISER LES MOUVEMENTS UNIQUES
-          ...m,
-          timestamp: m.created_at || new Date().toISOString(),
-        })),
-        generated_at: new Date().toISOString(),
-      });
-    } else if (reportData) {
-      setReport(reportData);
-    }
+          // Filtrer les ventes de cette session uniquement
+          const sessionSales = allSales.filter((sale) => {
+            const saleDate = new Date(sale.created_at);
+            const sessionStart = new Date(drawer.openedAt);
+            return saleDate >= sessionStart && sale.cashier_id === cashierSession.cashier_id;
+          });
+
+          salesSummary = {
+            total_sales: sessionSales.reduce((sum, sale) => sum + sale.total_amount, 0),
+            sales_count: sessionSales.length,
+            cash_sales: sessionSales
+              .filter((s) => s.payment_method === 'cash')
+              .reduce((sum, s) => sum + s.total_amount, 0),
+            card_sales: sessionSales
+              .filter((s) => s.payment_method === 'card')
+              .reduce((sum, s) => sum + s.total_amount, 0),
+            mixed_sales: sessionSales
+              .filter((s) => s.payment_method === 'mixed')
+              .reduce((sum, s) => sum + s.total_amount, 0),
+          };
+
+          allSales = sessionSales;
+        } catch (error) {
+          console.error('Erreur récupération ventes:', error);
+          salesSummary = {
+            total_sales: movements
+              .filter((m) => m.reason?.includes('Vente'))
+              .reduce((sum, m) => sum + m.amount, 0),
+            sales_count: cashierSession.sales_count || 0,
+            cash_sales: movements
+              .filter((m) => m.reason?.includes('Vente'))
+              .reduce((sum, m) => sum + m.amount, 0),
+            card_sales: 0,
+            mixed_sales: 0,
+          };
+        }
+
+        setReport({
+          date: new Date().toISOString().split('T')[0],
+          cashier: cashierSession.username,
+          summary: {
+            session_duration: drawer.openedAt
+              ? Math.floor((new Date() - new Date(drawer.openedAt)) / (1000 * 60))
+              : 0,
+            opening_amount: drawer.openingAmount || 0,
+            closing_amount: drawer.currentAmount || 0,
+            expected_amount: drawer.expectedAmount || 0,
+            variance: (drawer.currentAmount || 0) - (drawer.expectedAmount || 0),
+            total_movements_in: totalIn,
+            total_movements_out: totalOut,
+            movements_count: movements.length,
+            ...salesSummary,
+          },
+          movements: movements.map((m) => ({
+            ...m,
+            timestamp: m.created_at || new Date().toISOString(),
+          })),
+          sales: allSales,
+          sales_summary: salesSummary,
+          generated_at: new Date().toISOString(),
+        });
+      } else if (reportData) {
+        setReport(reportData);
+      }
+    };
+
+    fetchData();
   }, [isOpen, reportData, drawer, cashierSession]);
+
   const filteredMovements =
     report?.movements?.filter(
       (m) =>
@@ -130,6 +178,7 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
 
   const tabs = [
     { id: 'overview', label: "Vue d'ensemble", icon: BarChart3 },
+    { id: 'sales', label: 'Ventes', icon: ShoppingBag }, // 🆕 NOUVEAU
     { id: 'movements', label: 'Mouvements', icon: TrendingUp },
     { id: 'details', label: 'Détails', icon: FileText },
   ];
@@ -376,6 +425,136 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sales Tab */}
+          {activeTab === 'sales' && (
+            <div className="space-y-4">
+              {/* Sales Summary */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-lg font-semibold mb-4">Résumé des ventes</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Total ventes :</span>
+                    <span className="ml-2 font-bold text-lg">
+                      {report.summary.total_sales.toFixed(2)}€
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Nombre de transactions :</span>
+                    <span className="ml-2 font-medium">{report.summary.sales_count}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Ticket moyen :</span>
+                    <span className="ml-2 font-medium">
+                      {report.summary.sales_count > 0
+                        ? (report.summary.total_sales / report.summary.sales_count).toFixed(2)
+                        : '0.00'}
+                      €
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Methods Breakdown */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-lg font-semibold mb-4">Répartition par mode de paiement</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-green-100 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-green-800 font-medium">Espèces</span>
+                      <span className="text-green-900 font-bold">
+                        {report.sales_summary.cash_sales.toFixed(2)}€
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-blue-100 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-blue-800 font-medium">Carte</span>
+                      <span className="text-blue-900 font-bold">
+                        {report.sales_summary.card_sales.toFixed(2)}€
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-purple-100 border border-purple-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-purple-800 font-medium">Mixte</span>
+                      <span className="text-purple-900 font-bold">
+                        {report.sales_summary.mixed_sales.toFixed(2)}€
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sales List */}
+              <div>
+                <h4 className="text-lg font-semibold mb-4">Liste des ventes</h4>
+                {!report.sales || report.sales.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ShoppingBag className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">Aucune vente enregistrée pour cette session</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {report.sales.map((sale, index) => (
+                      <div
+                        key={sale._id || index}
+                        className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">{sale.transaction_id}</span>
+                              <span
+                                className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                  sale.payment_method === 'cash'
+                                    ? 'bg-green-100 text-green-800'
+                                    : sale.payment_method === 'card'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-purple-100 text-purple-800'
+                                }`}
+                              >
+                                {sale.payment_method === 'cash'
+                                  ? 'Espèces'
+                                  : sale.payment_method === 'card'
+                                    ? 'Carte'
+                                    : 'Mixte'}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">
+                              {new Date(sale.created_at).toLocaleString('fr-FR')} •{' '}
+                              {sale.items?.length || 0} article(s)
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-lg font-bold text-gray-900">
+                              {sale.total_amount.toFixed(2)}€
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Sale Items */}
+                        {sale.items && sale.items.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="space-y-1">
+                              {sale.items.map((item, itemIndex) => (
+                                <div key={itemIndex} className="flex justify-between text-sm">
+                                  <span>
+                                    {item.product_name} x{item.quantity}
+                                  </span>
+                                  <span>{item.total_price.toFixed(2)}€</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
