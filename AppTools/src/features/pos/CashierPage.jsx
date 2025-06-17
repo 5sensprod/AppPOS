@@ -12,11 +12,13 @@ import DrawerIndicator from './components/DrawerIndicator';
 import DrawerMovementModal from './components/DrawerMovementModal';
 import DrawerClosingModal from './components/DrawerClosingModal';
 import DrawerReportModal from './components/DrawerReportModal';
+import ReportHistoryModal from './components/ReportHistoryModal';
 
 const CashierPage = () => {
   // ✅ SÉLECTEURS STABLES
   const user = useSessionStore((state) => state.user);
-  const stopSession = useSessionStore((state) => state.stopSession); // 🆕 Ajouter cette ligne
+  const stopSession = useSessionStore((state) => state.stopSession);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const [showClosingModal, setShowClosingModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -91,6 +93,7 @@ const CashierPage = () => {
       <SessionHeader
         onShowClosing={() => setShowClosingModal(true)}
         onShowReport={() => setShowReportModal(true)}
+        onShowHistory={() => setShowHistoryModal(true)} // 🆕 NOUVEAU
       />
 
       {/* ✅ NOUVEAU : Indicateur fond de caisse */}
@@ -121,6 +124,7 @@ const CashierPage = () => {
       />
 
       <DrawerReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} />
+      <ReportHistoryModal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} />
     </div>
   );
 };

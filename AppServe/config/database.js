@@ -18,8 +18,9 @@ class Database {
       'brands',
       'suppliers',
       'sales',
-      'drawer_sessions', // ✅ NOUVEAU
-      'drawer_movements', // ✅ NOUVEAU
+      'drawer_sessions',
+      'drawer_movements',
+      'session_reports',
     ];
     this.stores = {};
     this.initializeStores();

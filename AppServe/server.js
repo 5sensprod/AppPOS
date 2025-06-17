@@ -95,6 +95,7 @@ app.use('/api/cashier', require('./routes/cashierSessionRoutes'));
 app.use('/api/time', timeRoutes);
 app.use('/api/cashier', require('./routes/cashierSessionRoutes')); // Ajout des routes de sauvegarde
 app.use('/api/backup', authMiddleware, backupRoutes);
+app.use('/api/reports', authMiddleware, require('./routes/reportsRoutes'));
 
 // Route d'info serveur
 app.get('/api/server-info', (req, res) => {

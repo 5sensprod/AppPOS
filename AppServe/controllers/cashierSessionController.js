@@ -2,6 +2,8 @@
 const cashierSessionService = require('../services/cashierSessionService');
 const lcdDisplayService = require('../services/lcdDisplayService');
 const ResponseHandler = require('../handlers/ResponseHandler');
+const reportGenerationService = require('../services/reportGenerationService');
+const DrawerSession = require('../models/DrawerSession');
 
 class CashierSessionController {
   // ✅ OUVRIR SESSION DE CAISSE
@@ -368,7 +370,6 @@ class CashierSessionController {
     try {
       const cashierId = req.user.id;
       const closingData = req.body;
-
       console.log(
         `🔄 [CONTROLLER] Fermeture session avec fond pour cashier ${cashierId}:`,
         closingData
@@ -378,6 +379,14 @@ class CashierSessionController {
       if (closingData.counted_amount !== undefined && closingData.counted_amount < 0) {
         return ResponseHandler.badRequest(res, 'Montant compté invalide');
       }
+
+      // ✅ NOUVEAU : Récupérer l'ID de session avant fermeture
+      const activeSession = await DrawerSession.findOpenSession(cashierId);
+      if (!activeSession) {
+        return ResponseHandler.badRequest(res, 'Aucune session active trouvée');
+      }
+
+      const sessionId = activeSession._id;
 
       // ✅ IMPORTANT : Appeler la méthode du service avec les bonnes données
       const result = await cashierSessionService.closeCashierSession(cashierId, {
@@ -391,9 +400,42 @@ class CashierSessionController {
 
       console.log(`✅ [CONTROLLER] Session fermée avec succès pour cashier ${cashierId}`);
 
+      // ✅ NOUVEAU : Générer et sauvegarder automatiquement le rapport
+      let reportInfo = {
+        generated: false,
+        report_id: null,
+        error: null,
+      };
+
+      try {
+        console.log(`📊 [CONTROLLER] Génération rapport automatique pour session ${sessionId}`);
+
+        const reportData = await reportGenerationService.generateCompleteSessionReport(
+          sessionId,
+          closingData
+        );
+
+        console.log(`✅ [CONTROLLER] Rapport sauvegardé: ${reportData._id}`);
+
+        reportInfo = {
+          generated: true,
+          report_id: reportData._id,
+          error: null,
+        };
+      } catch (reportError) {
+        console.error('❌ [CONTROLLER] Erreur génération rapport automatique:', reportError);
+        // Ne pas faire échouer la fermeture si erreur rapport
+        reportInfo = {
+          generated: false,
+          report_id: null,
+          error: reportError.message,
+        };
+      }
+
       return ResponseHandler.success(res, {
         message: 'Session et fond de caisse fermés',
         session: result.session,
+        report_info: reportInfo,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {

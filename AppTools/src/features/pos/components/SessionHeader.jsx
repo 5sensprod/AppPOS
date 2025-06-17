@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import SessionOpeningModal from './SessionOpeningModal';
 
-const SessionHeader = ({ onShowClosing, onShowReport }) => {
+const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
   const cashierSession = useSessionStore((state) => state.cashierSession);
   const hasActiveCashierSession = useSessionStore((state) =>
     Boolean(state.cashierSession?.status === 'active')
@@ -343,6 +343,16 @@ const SessionHeader = ({ onShowClosing, onShowReport }) => {
                 >
                   <MonitorOff className="h-4 w-4 mr-1" />
                   Libérer LCD
+                </button>
+              )}
+
+              {hasActiveCashierSession && (
+                <button
+                  onClick={() => onShowHistory?.()}
+                  className="flex items-center px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-md transition-colors"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Historique
                 </button>
               )}
 
