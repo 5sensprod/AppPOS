@@ -117,14 +117,59 @@ const ReportHistoryModal = ({ isOpen, onClose }) => {
 
   const handleExportReport = async (reportId, format = 'pdf') => {
     try {
-      const blob = await reportsService.exportReport(reportId, format);
-      const url = window.URL.createObjectURL(blob);
+      console.log('Export demandé:', reportId, format);
+
+      // Construire l'URL avec le bon format
+      const url = `/api/reports/${reportId}/export?format=${format}`;
+
+      // Récupérer le token d'auth
+      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+
+      // Faire la requête avec fetch pour gérer le blob
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Erreur HTTP: ${response.status}`);
+      }
+
+      // Récupérer le nom du fichier depuis les headers
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `rapport-${reportId}.${format}`;
+
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match) {
+          filename = match[1];
+        }
+      }
+
+      // Convertir en blob
+      const blob = await response.blob();
+
+      // Créer le lien de téléchargement
+      const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = `rapport-${reportId}.${format}`;
+      link.href = downloadUrl;
+      link.download = filename;
+
+      // Déclencher le téléchargement
+      document.body.appendChild(link);
       link.click();
-      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+
+      // Nettoyer l'URL
+      window.URL.revokeObjectURL(downloadUrl);
+
+      console.log('Export réussi:', filename);
     } catch (err) {
+      console.error('Erreur export:', err);
       setError(`Erreur export: ${err.message}`);
     }
   };

@@ -18,7 +18,7 @@ class ReportGenerationService {
       // 2. Récupérer tous les mouvements de la session
       const movements = await DrawerMovement.findBySession(sessionId);
 
-      // 3. Récupérer toutes les ventes de la session
+      // 3. Récupérer toutes les ventes de la session AVEC ARTICLES DÉTAILLÉS
       const sessionStart = new Date(session.opened_at);
       const sessionEnd = closingData ? new Date() : new Date();
 
@@ -71,13 +71,14 @@ class ReportGenerationService {
           created_by: m.created_by,
         })),
 
-        // Métadonnées
+        // Métadonnées avec articles détaillés
         sales_data: sales.map((s) => ({
           transaction_id: s.transaction_id,
           total_amount: s.total_amount,
           payment_method: s.payment_method,
           items_count: s.items?.length || 0,
           created_at: s.created_at,
+          items: s.items || [], // ✅ ARTICLES DÉTAILLÉS AJOUTÉS
         })),
         variance_accepted: closingData?.variance_accepted || false,
         closing_notes: closingData?.notes || null,
