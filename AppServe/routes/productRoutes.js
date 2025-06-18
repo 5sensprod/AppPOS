@@ -10,6 +10,7 @@ const wooSyncMiddleware = require('../middleware/wooSyncMiddleware');
 const Product = require('../models/Product');
 
 // Routes existantes
+router.get('/stock/statistics', productController.getStockStatistics);
 router.get('/', productController.getAll);
 router.get('/filter', productController.filter);
 router.get('/:id', productController.getById);

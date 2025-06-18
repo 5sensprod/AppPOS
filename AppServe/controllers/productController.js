@@ -763,6 +763,126 @@ class ProductController extends BaseController {
     }
   }
 
+  // Statistique Stock
+  async getStockStatistics(req, res) {
+    try {
+      const allProducts = await this.model.findAll();
+
+      // Filtrer: produits simples uniquement
+      const simpleProducts = allProducts.filter((p) => p.type === 'simple');
+
+      // Filtrer: stock > 0
+      const productsInStock = simpleProducts.filter((p) => (p.stock || 0) > 0);
+
+      if (productsInStock.length === 0) {
+        return ResponseHandler.success(res, {
+          summary: {
+            total_products: allProducts.length,
+            simple_products: simpleProducts.length,
+            products_in_stock: 0,
+            excluded_products: simpleProducts.length,
+          },
+          financial: {
+            inventory_value: 0,
+            retail_value: 0,
+            potential_margin: 0,
+            tax_amount: 0,
+            tax_breakdown: {},
+          },
+        });
+      }
+
+      // Calculs financiers avec détail par taux de TVA
+      let inventoryValue = 0;
+      let retailValue = 0;
+      let totalTaxAmount = 0;
+      const taxBreakdown = {}; // Détail par taux de TVA
+
+      for (const product of productsInStock) {
+        const stock = product.stock || 0;
+        const purchasePrice = product.purchase_price || 0;
+        const price = product.price || 0;
+        const taxRate = product.tax_rate || 0;
+
+        const productInventoryValue = stock * purchasePrice;
+        const productRetailValue = stock * price;
+
+        inventoryValue += productInventoryValue;
+        retailValue += productRetailValue;
+
+        // Initialiser le taux s'il n'existe pas
+        if (!taxBreakdown[taxRate]) {
+          taxBreakdown[taxRate] = {
+            rate: taxRate,
+            product_count: 0,
+            inventory_value: 0,
+            retail_value: 0,
+            tax_amount: 0,
+          };
+        }
+
+        // Ajouter aux totaux pour ce taux
+        taxBreakdown[taxRate].product_count++;
+        taxBreakdown[taxRate].inventory_value += productInventoryValue;
+        taxBreakdown[taxRate].retail_value += productRetailValue;
+
+        // Calcul TVA: (prix_ttc × taux) / (100 + taux)
+        const productTaxAmount = taxRate > 0 ? (productRetailValue * taxRate) / (100 + taxRate) : 0;
+
+        taxBreakdown[taxRate].tax_amount += productTaxAmount;
+        totalTaxAmount += productTaxAmount;
+      }
+
+      const potentialMargin = retailValue - inventoryValue;
+      const marginPercentage = inventoryValue > 0 ? (potentialMargin / inventoryValue) * 100 : 0;
+
+      // Préparer le détail des taxes avec arrondis
+      const taxDetails = {};
+      Object.keys(taxBreakdown).forEach((rate) => {
+        const data = taxBreakdown[rate];
+        taxDetails[`rate_${rate}`] = {
+          rate: parseFloat(rate),
+          product_count: data.product_count,
+          inventory_value: Math.round(data.inventory_value * 100) / 100,
+          retail_value: Math.round(data.retail_value * 100) / 100,
+          tax_amount: Math.round(data.tax_amount * 100) / 100,
+        };
+      });
+
+      const statistics = {
+        summary: {
+          total_products: allProducts.length,
+          simple_products: simpleProducts.length,
+          products_in_stock: productsInStock.length,
+          excluded_products: simpleProducts.length - productsInStock.length,
+        },
+        financial: {
+          inventory_value: Math.round(inventoryValue * 100) / 100,
+          retail_value: Math.round(retailValue * 100) / 100,
+          potential_margin: Math.round(potentialMargin * 100) / 100,
+          margin_percentage: Math.round(marginPercentage * 100) / 100,
+          tax_amount: Math.round(totalTaxAmount * 100) / 100,
+          tax_breakdown: taxDetails,
+        },
+        performance: {
+          avg_inventory_per_product:
+            productsInStock.length > 0
+              ? Math.round((inventoryValue / productsInStock.length) * 100) / 100
+              : 0,
+          avg_retail_per_product:
+            productsInStock.length > 0
+              ? Math.round((retailValue / productsInStock.length) * 100) / 100
+              : 0,
+        },
+      };
+
+      return ResponseHandler.success(res, statistics);
+    } catch (error) {
+      console.error('Erreur calcul statistiques stock:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   // Recalcul des stats depuis les ventes existantes
   async recalculateProductStats(req, res) {
     try {
@@ -845,4 +965,5 @@ module.exports = exportController(productController, [
   'getBestSellers',
   'getProductStats',
   'recalculateProductStats',
+  'getStockStatistics',
 ]);
