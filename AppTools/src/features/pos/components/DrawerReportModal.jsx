@@ -10,15 +10,17 @@ import {
   Download,
   Printer,
   Search,
-  X,
   ArrowUpCircle,
   ArrowDownCircle,
   Wallet,
   ShoppingBag,
   User,
+  ClipboardList,
 } from 'lucide-react';
+import BaseModal from '../../../components/common/ui/BaseModal';
 import { useDrawer, useSessionCashier } from '../../../stores/sessionStore';
 import salesService from '../../../services/salesService';
+
 const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
   const { drawer } = useDrawer();
   const { cashierSession } = useSessionCashier();
@@ -178,588 +180,632 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
 
   const tabs = [
     { id: 'overview', label: "Vue d'ensemble", icon: BarChart3 },
-    { id: 'sales', label: 'Ventes', icon: ShoppingBag }, // 🆕 NOUVEAU
+    { id: 'sales', label: 'Ventes', icon: ShoppingBag },
     { id: 'movements', label: 'Mouvements', icon: TrendingUp },
     { id: 'details', label: 'Détails', icon: FileText },
   ];
 
+  // Footer avec boutons d'action
+  const footer = (
+    <div className="flex justify-between w-full">
+      <div className="flex items-center space-x-2">
+        <button
+          onClick={handleExport}
+          className="flex items-center space-x-2 px-3 py-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+        >
+          <Download className="h-4 w-4" />
+          <span>Export</span>
+        </button>
+        <button
+          onClick={handlePrint}
+          className="flex items-center space-x-2 px-3 py-2 text-sm text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+        >
+          <Printer className="h-4 w-4" />
+          <span>Imprimer</span>
+        </button>
+      </div>
+
+      <button
+        onClick={onClose}
+        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+      >
+        Fermer
+      </button>
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <FileText className="h-6 w-6 text-blue-600" />
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Rapport de fin de journée
-                </h3>
-                <div className="flex items-center space-x-4 text-sm text-gray-500">
-                  <div className="flex items-center space-x-1">
-                    <Calendar className="h-4 w-4" />
-                    <span>{new Date(report.date).toLocaleDateString('fr-FR')}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <User className="h-4 w-4" />
-                    <span>{report.cashier}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {new Date(report.generated_at).toLocaleTimeString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleExport}
-                className="flex items-center space-x-2 px-3 py-2 text-sm text-green-700 bg-green-50 hover:bg-green-100 rounded-lg"
-              >
-                <Download className="h-4 w-4" />
-                <span>Export</span>
-              </button>
-              <button
-                onClick={handlePrint}
-                className="flex items-center space-x-2 px-3 py-2 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg"
-              >
-                <Printer className="h-4 w-4" />
-                <span>Imprimer</span>
-              </button>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                <X className="h-6 w-6" />
-              </button>
-            </div>
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Rapport de fin de journée"
+      icon={ClipboardList}
+      footer={footer}
+      maxWidth="max-w-5xl"
+    >
+      {/* Informations d'en-tête */}
+      <div className="mb-6">
+        <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center space-x-1">
+            <Calendar className="h-4 w-4" />
+            <span>{new Date(report.date).toLocaleDateString('fr-FR')}</span>
           </div>
-
-          {/* Tabs */}
-          <div className="flex space-x-1 mt-4">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium ${
-                    activeTab === tab.id
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+          <div className="flex items-center space-x-1">
+            <User className="h-4 w-4" />
+            <span>{report.cashier}</span>
           </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-blue-600">Ouverture</p>
-                      <p className="text-2xl font-bold text-blue-900">
-                        {report.summary.opening_amount.toFixed(2)}€
-                      </p>
-                    </div>
-                    <Wallet className="h-8 w-8 text-blue-600" />
-                  </div>
-                </div>
-
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-green-600">Fermeture</p>
-                      <p className="text-2xl font-bold text-green-900">
-                        {report.summary.closing_amount.toFixed(2)}€
-                      </p>
-                    </div>
-                    <Wallet className="h-8 w-8 text-green-600" />
-                  </div>
-                </div>
-
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-purple-600">Ventes</p>
-                      <p className="text-2xl font-bold text-purple-900">
-                        {report.summary.total_sales.toFixed(2)}€
-                      </p>
-                      <p className="text-xs text-purple-600">
-                        {report.summary.sales_count} transaction(s)
-                      </p>
-                    </div>
-                    <ShoppingBag className="h-8 w-8 text-purple-600" />
-                  </div>
-                </div>
-
-                <div
-                  className={`${
-                    report.summary.variance >= 0
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-red-50 border-red-200'
-                  } border rounded-lg p-4`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p
-                        className={`text-sm ${
-                          report.summary.variance >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}
-                      >
-                        Écart
-                      </p>
-                      <p
-                        className={`text-2xl font-bold ${
-                          report.summary.variance >= 0 ? 'text-green-900' : 'text-red-900'
-                        }`}
-                      >
-                        {report.summary.variance >= 0 ? '+' : ''}
-                        {report.summary.variance.toFixed(2)}€
-                      </p>
-                    </div>
-                    {report.summary.variance >= 0 ? (
-                      <TrendingUp className="h-8 w-8 text-green-600" />
-                    ) : (
-                      <TrendingDown className="h-8 w-8 text-red-600" />
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Movement Summary */}
-              <div className="bg-gray-50 rounded-lg p-6">
-                <h4 className="text-lg font-semibold mb-4">Résumé des mouvements</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center space-x-2 mb-2">
-                      <ArrowUpCircle className="h-5 w-5 text-green-600" />
-                      <span className="font-medium">Entrées</span>
-                    </div>
-                    <p className="text-2xl font-bold text-green-600">
-                      +{report.summary.total_movements_in.toFixed(2)}€
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {report.movements.filter((m) => m.type === 'in').length} mouvement(s)
-                    </p>
-                  </div>
-
-                  <div className="text-center">
-                    <div className="flex items-center justify-center space-x-2 mb-2">
-                      <ArrowDownCircle className="h-5 w-5 text-red-600" />
-                      <span className="font-medium">Sorties</span>
-                    </div>
-                    <p className="text-2xl font-bold text-red-600">
-                      -{report.summary.total_movements_out.toFixed(2)}€
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {report.movements.filter((m) => m.type === 'out').length} mouvement(s)
-                    </p>
-                  </div>
-
-                  <div className="text-center">
-                    <div className="flex items-center justify-center space-x-2 mb-2">
-                      <BarChart3 className="h-5 w-5 text-blue-600" />
-                      <span className="font-medium">Net</span>
-                    </div>
-                    <p
-                      className={`text-2xl font-bold ${
-                        report.summary.total_movements_in - report.summary.total_movements_out >= 0
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      }`}
-                    >
-                      {report.summary.total_movements_in - report.summary.total_movements_out >= 0
-                        ? '+'
-                        : ''}
-                      {(
-                        report.summary.total_movements_in - report.summary.total_movements_out
-                      ).toFixed(2)}
-                      €
-                    </p>
-                    <p className="text-sm text-gray-500">Différence totale</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Session Info */}
-              <div className="bg-gray-50 rounded-lg p-6">
-                <h4 className="text-lg font-semibold mb-4">Informations de session</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Durée de session :</span>
-                      <span className="font-medium">
-                        {Math.floor(report.summary.session_duration / 60)}h
-                        {(report.summary.session_duration % 60).toString().padStart(2, '0')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Nombre de mouvements :</span>
-                      <span className="font-medium">{report.summary.movements_count}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Montant attendu :</span>
-                      <span className="font-medium">
-                        {report.summary.expected_amount.toFixed(2)}€
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Transactions :</span>
-                      <span className="font-medium">{report.summary.sales_count}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Sales Tab */}
-          {activeTab === 'sales' && (
-            <div className="space-y-4">
-              {/* Sales Summary */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-lg font-semibold mb-4">Résumé des ventes</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Total ventes :</span>
-                    <span className="ml-2 font-bold text-lg">
-                      {report.summary.total_sales.toFixed(2)}€
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Nombre de transactions :</span>
-                    <span className="ml-2 font-medium">{report.summary.sales_count}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Ticket moyen :</span>
-                    <span className="ml-2 font-medium">
-                      {report.summary.sales_count > 0
-                        ? (report.summary.total_sales / report.summary.sales_count).toFixed(2)
-                        : '0.00'}
-                      €
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Methods Breakdown */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-lg font-semibold mb-4">Répartition par mode de paiement</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-green-100 border border-green-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-green-800 font-medium">Espèces</span>
-                      <span className="text-green-900 font-bold">
-                        {report.sales_summary.cash_sales.toFixed(2)}€
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-blue-100 border border-blue-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-blue-800 font-medium">Carte</span>
-                      <span className="text-blue-900 font-bold">
-                        {report.sales_summary.card_sales.toFixed(2)}€
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-purple-100 border border-purple-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-purple-800 font-medium">Mixte</span>
-                      <span className="text-purple-900 font-bold">
-                        {report.sales_summary.mixed_sales.toFixed(2)}€
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sales List */}
-              <div>
-                <h4 className="text-lg font-semibold mb-4">Liste des ventes</h4>
-                {!report.sales || report.sales.length === 0 ? (
-                  <div className="text-center py-8">
-                    <ShoppingBag className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500">Aucune vente enregistrée pour cette session</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {report.sales.map((sale, index) => (
-                      <div
-                        key={sale._id || index}
-                        className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <span className="font-medium">{sale.transaction_id}</span>
-                              <span
-                                className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                  sale.payment_method === 'cash'
-                                    ? 'bg-green-100 text-green-800'
-                                    : sale.payment_method === 'card'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : 'bg-purple-100 text-purple-800'
-                                }`}
-                              >
-                                {sale.payment_method === 'cash'
-                                  ? 'Espèces'
-                                  : sale.payment_method === 'card'
-                                    ? 'Carte'
-                                    : 'Mixte'}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              {new Date(sale.created_at).toLocaleString('fr-FR')} •{' '}
-                              {sale.items?.length || 0} article(s)
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-lg font-bold text-gray-900">
-                              {sale.total_amount.toFixed(2)}€
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Sale Items */}
-                        {sale.items && sale.items.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            <div className="space-y-1">
-                              {sale.items.map((item, itemIndex) => (
-                                <div key={itemIndex} className="flex justify-between text-sm">
-                                  <span>
-                                    {item.product_name} x{item.quantity}
-                                  </span>
-                                  <span>{item.total_price.toFixed(2)}€</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Movements Tab */}
-          {activeTab === 'movements' && (
-            <div className="space-y-4">
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Rechercher dans les mouvements..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Movements List */}
-              <div className="space-y-2">
-                {filteredMovements.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">Aucun mouvement trouvé</p>
-                  </div>
-                ) : (
-                  filteredMovements.map((movement, index) => (
-                    <div
-                      key={movement.id || index}
-                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div
-                            className={`p-2 rounded-lg ${
-                              movement.type === 'in' ? 'bg-green-100' : 'bg-red-100'
-                            }`}
-                          >
-                            {movement.type === 'in' ? (
-                              <ArrowUpCircle className="h-5 w-5 text-green-600" />
-                            ) : (
-                              <ArrowDownCircle className="h-5 w-5 text-red-600" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <span className="font-medium">{movement.reason || 'Mouvement'}</span>
-                              <span
-                                className={`text-lg font-bold ${
-                                  movement.type === 'in' ? 'text-green-600' : 'text-red-600'
-                                }`}
-                              >
-                                {movement.type === 'in' ? '+' : '-'}
-                                {movement.amount.toFixed(2)}€
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {new Date(movement.timestamp).toLocaleString('fr-FR')}
-                              {movement.created_by && ` • Par ${movement.created_by}`}
-                            </div>
-                            {movement.notes && (
-                              <div className="text-sm text-gray-600 mt-1">
-                                <strong>Notes :</strong> {movement.notes}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Details Tab */}
-          {activeTab === 'details' && (
-            <div className="space-y-6">
-              {/* Summary Table */}
-              <div>
-                <h4 className="text-lg font-semibold mb-4">Résumé financier</h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h5 className="font-medium mb-2">Fond de caisse</h5>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span>Ouverture :</span>
-                          <span>{report.summary.opening_amount.toFixed(2)}€</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Fermeture :</span>
-                          <span>{report.summary.closing_amount.toFixed(2)}€</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Attendu :</span>
-                          <span>{report.summary.expected_amount.toFixed(2)}€</span>
-                        </div>
-                        <div className="flex justify-between font-bold border-t pt-1">
-                          <span>Écart :</span>
-                          <span
-                            className={
-                              report.summary.variance >= 0 ? 'text-green-600' : 'text-red-600'
-                            }
-                          >
-                            {report.summary.variance >= 0 ? '+' : ''}
-                            {report.summary.variance.toFixed(2)}€
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <h5 className="font-medium mb-2">Activité commerciale</h5>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span>Ventes :</span>
-                          <span>{report.summary.sales_count}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Chiffre d'affaires :</span>
-                          <span>{report.summary.total_sales.toFixed(2)}€</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Mouvements :</span>
-                          <span>{report.summary.movements_count}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Durée :</span>
-                          <span>
-                            {Math.floor(report.summary.session_duration / 60)}h
-                            {(report.summary.session_duration % 60).toString().padStart(2, '0')}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Movements Table */}
-              <div>
-                <h4 className="text-lg font-semibold mb-4">Détail des mouvements</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-300">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-300 px-4 py-2 text-left">Date/Heure</th>
-                        <th className="border border-gray-300 px-4 py-2 text-left">Type</th>
-                        <th className="border border-gray-300 px-4 py-2 text-right">Montant</th>
-                        <th className="border border-gray-300 px-4 py-2 text-left">Raison</th>
-                        <th className="border border-gray-300 px-4 py-2 text-left">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {report.movements.map((movement, index) => (
-                        <tr key={movement.id || index} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-4 py-2 text-sm">
-                            {new Date(movement.timestamp).toLocaleString('fr-FR')}
-                          </td>
-                          <td className="border border-gray-300 px-4 py-2">
-                            <span
-                              className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                movement.type === 'in'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}
-                            >
-                              {movement.type === 'in' ? 'Entrée' : 'Sortie'}
-                            </span>
-                          </td>
-                          <td
-                            className={`border border-gray-300 px-4 py-2 text-right font-medium ${
-                              movement.type === 'in' ? 'text-green-600' : 'text-red-600'
-                            }`}
-                          >
-                            {movement.type === 'in' ? '+' : '-'}
-                            {movement.amount.toFixed(2)}€
-                          </td>
-                          <td className="border border-gray-300 px-4 py-2 text-sm">
-                            {movement.reason || '-'}
-                          </td>
-                          <td className="border border-gray-300 px-4 py-2 text-sm">
-                            {movement.notes || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end p-6 border-t">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
-          >
-            Fermer
-          </button>
+          <div className="flex items-center space-x-1">
+            <Clock className="h-4 w-4" />
+            <span>
+              {new Date(report.generated_at).toLocaleTimeString('fr-FR', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Tabs */}
+      <div className="flex space-x-1 mb-6">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Content */}
+      <div className="space-y-6">
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-600 dark:text-blue-400">Ouverture</p>
+                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                      {report.summary.opening_amount.toFixed(2)}€
+                    </p>
+                  </div>
+                  <Wallet className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-green-600 dark:text-green-400">Fermeture</p>
+                    <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                      {report.summary.closing_amount.toFixed(2)}€
+                    </p>
+                  </div>
+                  <Wallet className="h-8 w-8 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+
+              <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-600 dark:text-purple-400">Ventes</p>
+                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                      {report.summary.total_sales.toFixed(2)}€
+                    </p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400">
+                      {report.summary.sales_count} transaction(s)
+                    </p>
+                  </div>
+                  <ShoppingBag className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                </div>
+              </div>
+
+              <div
+                className={`${
+                  report.summary.variance >= 0
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                } border rounded-lg p-4`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p
+                      className={`text-sm ${
+                        report.summary.variance >= 0
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-red-600 dark:text-red-400'
+                      }`}
+                    >
+                      Écart
+                    </p>
+                    <p
+                      className={`text-2xl font-bold ${
+                        report.summary.variance >= 0
+                          ? 'text-green-900 dark:text-green-100'
+                          : 'text-red-900 dark:text-red-100'
+                      }`}
+                    >
+                      {report.summary.variance >= 0 ? '+' : ''}
+                      {report.summary.variance.toFixed(2)}€
+                    </p>
+                  </div>
+                  {report.summary.variance >= 0 ? (
+                    <TrendingUp className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <TrendingDown className="h-8 w-8 text-red-600 dark:text-red-400" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Movement Summary */}
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+              <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                Résumé des mouvements
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="flex items-center justify-center space-x-2 mb-2">
+                    <ArrowUpCircle className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Entrées</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">
+                    +{report.summary.total_movements_in.toFixed(2)}€
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {report.movements.filter((m) => m.type === 'in').length} mouvement(s)
+                  </p>
+                </div>
+
+                <div className="text-center">
+                  <div className="flex items-center justify-center space-x-2 mb-2">
+                    <ArrowDownCircle className="h-5 w-5 text-red-600" />
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Sorties</span>
+                  </div>
+                  <p className="text-2xl font-bold text-red-600">
+                    -{report.summary.total_movements_out.toFixed(2)}€
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {report.movements.filter((m) => m.type === 'out').length} mouvement(s)
+                  </p>
+                </div>
+
+                <div className="text-center">
+                  <div className="flex items-center justify-center space-x-2 mb-2">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Net</span>
+                  </div>
+                  <p
+                    className={`text-2xl font-bold ${
+                      report.summary.total_movements_in - report.summary.total_movements_out >= 0
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    {report.summary.total_movements_in - report.summary.total_movements_out >= 0
+                      ? '+'
+                      : ''}
+                    {(
+                      report.summary.total_movements_in - report.summary.total_movements_out
+                    ).toFixed(2)}
+                    €
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Différence totale</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Session Info */}
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+              <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                Informations de session
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                    <span>Durée de session :</span>
+                    <span className="font-medium">
+                      {Math.floor(report.summary.session_duration / 60)}h
+                      {(report.summary.session_duration % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                    <span>Nombre de mouvements :</span>
+                    <span className="font-medium">{report.summary.movements_count}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                    <span>Montant attendu :</span>
+                    <span className="font-medium">
+                      {report.summary.expected_amount.toFixed(2)}€
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                    <span>Transactions :</span>
+                    <span className="font-medium">{report.summary.sales_count}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sales Tab */}
+        {activeTab === 'sales' && (
+          <div className="space-y-4">
+            {/* Sales Summary */}
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                Résumé des ventes
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="text-gray-700 dark:text-gray-300">
+                  <span>Total ventes :</span>
+                  <span className="ml-2 font-bold text-lg text-gray-900 dark:text-gray-100">
+                    {report.summary.total_sales.toFixed(2)}€
+                  </span>
+                </div>
+                <div className="text-gray-700 dark:text-gray-300">
+                  <span>Nombre de transactions :</span>
+                  <span className="ml-2 font-medium text-gray-900 dark:text-gray-100">
+                    {report.summary.sales_count}
+                  </span>
+                </div>
+                <div className="text-gray-700 dark:text-gray-300">
+                  <span>Ticket moyen :</span>
+                  <span className="ml-2 font-medium text-gray-900 dark:text-gray-100">
+                    {report.summary.sales_count > 0
+                      ? (report.summary.total_sales / report.summary.sales_count).toFixed(2)
+                      : '0.00'}
+                    €
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Methods Breakdown */}
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                Répartition par mode de paiement
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-green-100 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-green-800 dark:text-green-200 font-medium">Espèces</span>
+                    <span className="text-green-900 dark:text-green-100 font-bold">
+                      {report.sales_summary.cash_sales.toFixed(2)}€
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-blue-100 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-800 dark:text-blue-200 font-medium">Carte</span>
+                    <span className="text-blue-900 dark:text-blue-100 font-bold">
+                      {report.sales_summary.card_sales.toFixed(2)}€
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-purple-100 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-purple-800 dark:text-purple-200 font-medium">Mixte</span>
+                    <span className="text-purple-900 dark:text-purple-100 font-bold">
+                      {report.sales_summary.mixed_sales.toFixed(2)}€
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sales List */}
+            <div>
+              <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                Liste des ventes
+              </h4>
+              {!report.sales || report.sales.length === 0 ? (
+                <div className="text-center py-8">
+                  <ShoppingBag className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Aucune vente enregistrée pour cette session
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {report.sales.map((sale, index) => (
+                    <div
+                      key={sale._id || index}
+                      className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-gray-900 dark:text-gray-100">
+                              {sale.transaction_id}
+                            </span>
+                            <span
+                              className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                sale.payment_method === 'cash'
+                                  ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200'
+                                  : sale.payment_method === 'card'
+                                    ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200'
+                                    : 'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200'
+                              }`}
+                            >
+                              {sale.payment_method === 'cash'
+                                ? 'Espèces'
+                                : sale.payment_method === 'card'
+                                  ? 'Carte'
+                                  : 'Mixte'}
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            {new Date(sale.created_at).toLocaleString('fr-FR')} •{' '}
+                            {sale.items?.length || 0} article(s)
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                            {sale.total_amount.toFixed(2)}€
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Sale Items */}
+                      {sale.items && sale.items.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                          <div className="space-y-1">
+                            {sale.items.map((item, itemIndex) => (
+                              <div
+                                key={itemIndex}
+                                className="flex justify-between text-sm text-gray-700 dark:text-gray-300"
+                              >
+                                <span>
+                                  {item.product_name} x{item.quantity}
+                                </span>
+                                <span>{item.total_price.toFixed(2)}€</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Movements Tab */}
+        {activeTab === 'movements' && (
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Rechercher dans les mouvements..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Movements List */}
+            <div className="space-y-2">
+              {filteredMovements.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">Aucun mouvement trouvé</p>
+                </div>
+              ) : (
+                filteredMovements.map((movement, index) => (
+                  <div
+                    key={movement.id || index}
+                    className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={`p-2 rounded-lg ${
+                            movement.type === 'in'
+                              ? 'bg-green-100 dark:bg-green-900/20'
+                              : 'bg-red-100 dark:bg-red-900/20'
+                          }`}
+                        >
+                          {movement.type === 'in' ? (
+                            <ArrowUpCircle className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <ArrowDownCircle className="h-5 w-5 text-red-600" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-gray-900 dark:text-gray-100">
+                              {movement.reason || 'Mouvement'}
+                            </span>
+                            <span
+                              className={`text-lg font-bold ${
+                                movement.type === 'in' ? 'text-green-600' : 'text-red-600'
+                              }`}
+                            >
+                              {movement.type === 'in' ? '+' : '-'}
+                              {movement.amount.toFixed(2)}€
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {new Date(movement.timestamp).toLocaleString('fr-FR')}
+                            {movement.created_by && ` • Par ${movement.created_by}`}
+                          </div>
+                          {movement.notes && (
+                            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              <strong>Notes :</strong> {movement.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Details Tab */}
+        {activeTab === 'details' && (
+          <div className="space-y-6">
+            {/* Summary Table */}
+            <div>
+              <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                Résumé financier
+              </h4>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h5 className="font-medium mb-2 text-gray-900 dark:text-gray-100">
+                      Fond de caisse
+                    </h5>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                        <span>Ouverture :</span>
+                        <span>{report.summary.opening_amount.toFixed(2)}€</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                        <span>Fermeture :</span>
+                        <span>{report.summary.closing_amount.toFixed(2)}€</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                        <span>Attendu :</span>
+                        <span>{report.summary.expected_amount.toFixed(2)}€</span>
+                      </div>
+                      <div className="flex justify-between font-bold border-t border-gray-300 dark:border-gray-600 pt-1">
+                        <span className="text-gray-900 dark:text-gray-100">Écart :</span>
+                        <span
+                          className={
+                            report.summary.variance >= 0
+                              ? 'text-green-600 dark:text-green-400'
+                              : 'text-red-600 dark:text-red-400'
+                          }
+                        >
+                          {report.summary.variance >= 0 ? '+' : ''}
+                          {report.summary.variance.toFixed(2)}€
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="font-medium mb-2 text-gray-900 dark:text-gray-100">
+                      Activité commerciale
+                    </h5>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                        <span>Ventes :</span>
+                        <span>{report.summary.sales_count}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                        <span>Chiffre d'affaires :</span>
+                        <span>{report.summary.total_sales.toFixed(2)}€</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                        <span>Mouvements :</span>
+                        <span>{report.summary.movements_count}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                        <span>Durée :</span>
+                        <span>
+                          {Math.floor(report.summary.session_duration / 60)}h
+                          {(report.summary.session_duration % 60).toString().padStart(2, '0')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Movements Table */}
+            <div>
+              <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                Détail des mouvements
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-700">
+                      <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-gray-900 dark:text-gray-100">
+                        Date/Heure
+                      </th>
+                      <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-gray-900 dark:text-gray-100">
+                        Type
+                      </th>
+                      <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-right text-gray-900 dark:text-gray-100">
+                        Montant
+                      </th>
+                      <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-gray-900 dark:text-gray-100">
+                        Raison
+                      </th>
+                      <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-gray-900 dark:text-gray-100">
+                        Notes
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.movements.map((movement, index) => (
+                      <tr
+                        key={movement.id || index}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                      >
+                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                          {new Date(movement.timestamp).toLocaleString('fr-FR')}
+                        </td>
+                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">
+                          <span
+                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                              movement.type === 'in'
+                                ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200'
+                                : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+                            }`}
+                          >
+                            {movement.type === 'in' ? 'Entrée' : 'Sortie'}
+                          </span>
+                        </td>
+                        <td
+                          className={`border border-gray-300 dark:border-gray-600 px-4 py-2 text-right font-medium ${
+                            movement.type === 'in' ? 'text-green-600' : 'text-red-600'
+                          }`}
+                        >
+                          {movement.type === 'in' ? '+' : '-'}
+                          {movement.amount.toFixed(2)}€
+                        </td>
+                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                          {movement.reason || '-'}
+                        </td>
+                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                          {movement.notes || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </BaseModal>
   );
 };
 
