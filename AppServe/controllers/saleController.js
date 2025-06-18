@@ -42,13 +42,8 @@ class SaleController extends BaseController {
           return ResponseHandler.badRequest(res, `Produit ${product_id} non trouvé`);
         }
 
-        // Vérifier le stock si géré
-        if (product.manage_stock && product.stock < quantity) {
-          return ResponseHandler.badRequest(
-            res,
-            `Stock insuffisant pour ${product.name}. Disponible: ${product.stock}, Demandé: ${quantity}`
-          );
-        }
+        // ✅ SUPPRIMÉ: Vérification de stock - stocks négatifs autorisés
+        // Plus de blocage de vente pour stock insuffisant
 
         // Enrichir l'article
         const unitPrice = product.price;
@@ -179,17 +174,25 @@ class SaleController extends BaseController {
         console.debug('Erreur mise à jour stats session:', error.message);
       }
 
-      // 4. Décrémenter les stocks et émettre événements produits
+      // 4. ✅ NOUVEAU: Décrémenter les stocks (TOUS sauf services)
       for (const item of enrichedItems) {
         const product = await Product.findById(item.product_id);
 
         const updateData = {};
 
-        if (product.manage_stock) {
-          updateData.stock = Math.max(0, product.stock - item.quantity);
+        // ✅ LOGIQUE MODIFIÉE: Décrémenter TOUS les produits sauf type "service"
+        // Ignore manage_stock - se base uniquement sur le type
+        if (product.type !== 'service') {
+          // Autoriser les stocks négatifs (pas de Math.max)
+          updateData.stock = (product.stock || 0) - item.quantity;
+          console.log(
+            `📦 [STOCK] ${product.name}: ${product.stock || 0} → ${updateData.stock} (${item.quantity} vendus)`
+          );
+        } else {
+          console.log(`🚫 [SERVICE] ${product.name}: Stock non décrémenter (service)`);
         }
 
-        // Mise à jour des statistiques
+        // Mise à jour des statistiques (pour tous les produits)
         updateData.total_sold = (product.total_sold || 0) + item.quantity;
         updateData.sales_count = (product.sales_count || 0) + 1;
         updateData.last_sold_at = new Date();
@@ -204,7 +207,7 @@ class SaleController extends BaseController {
         this.productEventService.updated(item.product_id, updatedProduct);
 
         console.log(
-          `📦 Stock mis à jour via WebSocket: ${product.name} → ${updateData.stock || 'non géré'}`
+          `📊 Stats produit mises à jour via WebSocket: ${product.name} (${updateData.total_sold} vendus, ${updateData.revenue_total}€ CA)`
         );
       }
 
