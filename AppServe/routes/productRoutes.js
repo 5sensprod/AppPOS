@@ -1,7 +1,7 @@
 // Mise à jour de routes/productRoutes.js pour inclure les routes d'export
 const express = require('express');
 const router = express.Router();
-const productController = require('../controllers/productController');
+const productController = require('../controllers/product'); // Pointe vers product/index.js automatiquement
 const { exportToPdf, exportToCsv } = require('../controllers/productExportController');
 const validateSchema = require('../validation/validation');
 const { createProductSchema, updateProductSchema } = require('../validation/schemas');
@@ -73,7 +73,7 @@ router.post('/export/pdf', exportToPdf);
 router.post('/export/csv', exportToCsv);
 
 // POST /api/products/:id/repair-images
-router.post('/:id/repair-images', productController.repairProductImages.bind(productController));
+// router.post('/:id/repair-images', productController.repairProductImages.bind(productController));
 
 // Recherche par code-barres
 router.get('/barcode/:code', productController.searchByBarcode);
