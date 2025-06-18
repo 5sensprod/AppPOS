@@ -169,7 +169,7 @@ const ReportsPage = () => {
                 {formatNumber(stockStats.summary.products_in_stock)}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                sur {formatNumber(stockStats.summary.simple_products)} produits simples
+                sur {formatNumber(stockStats.summary.simple_products)} produits physiques
               </div>
               <div className="text-xs text-red-600 mt-1">
                 {formatNumber(stockStats.summary.excluded_products)} exclus (stock ≤ 0)
