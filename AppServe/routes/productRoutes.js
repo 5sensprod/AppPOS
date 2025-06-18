@@ -34,6 +34,7 @@ router.get('/:id/category-path', async (req, res) => {
     return ResponseHandler.error(res, error);
   }
 });
+router.post('/stock/statistics/export-pdf', productController.exportStockStatisticsToPDF);
 router.post('/', validateSchema(createProductSchema), productController.create);
 
 // Middleware de synchronisation pour les routes de mise à jour

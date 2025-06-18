@@ -1,32 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Package, TrendingUp, Calculator, PieChart, RefreshCw } from 'lucide-react';
+import {
+  Package,
+  TrendingUp,
+  Calculator,
+  PieChart,
+  RefreshCw,
+  Download,
+  FileText,
+} from 'lucide-react';
 import apiService from '../services/api';
+import { useAPIPDFExport } from '../hooks/useAPIPDFExport';
 
 const ReportsPage = () => {
   const [stockStats, setStockStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const { isExporting: isAPIExporting, exportStockStatisticsToPDF } = useAPIPDFExport();
 
-  const fetchStockStatistics = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await apiService.get('/api/products/stock/statistics');
-      setStockStats(response.data.data);
-      setLastUpdate(new Date());
-    } catch (err) {
-      setError('Erreur lors du chargement des statistiques');
-      console.error('Erreur stats:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchStockStatistics();
-  }, []);
-
+  // Fonctions utilitaires
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -53,6 +45,50 @@ const ReportsPage = () => {
     return `${rate}%`;
   };
 
+  const fetchStockStatistics = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiService.get('/api/products/stock/statistics');
+      setStockStats(response.data.data);
+      setLastUpdate(new Date());
+    } catch (err) {
+      setError('Erreur lors du chargement des statistiques');
+      console.error('Erreur stats:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const companyInfo = {
+        name: 'AXE Musique', // À récupérer depuis vos paramètres
+        address: '4 rue Lochet 51000 Châlons en Champagne',
+        siret: '418 647 574 00031',
+      };
+
+      await exportStockStatisticsToPDF(companyInfo);
+    } catch (error) {
+      console.error('Erreur export PDF:', error);
+      alert("Erreur lors de l'export PDF");
+    }
+  };
+
+  const handleExportHTMLToPDF = async () => {
+    try {
+      const fileName = `rapport_stock_${new Date().toISOString().split('T')[0]}.pdf`;
+      await exportElementToPDF('reports-container', fileName);
+    } catch (error) {
+      console.error('Erreur export HTML vers PDF:', error);
+      alert("Erreur lors de l'export PDF");
+    }
+  };
+
+  useEffect(() => {
+    fetchStockStatistics();
+  }, []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -76,7 +112,7 @@ const ReportsPage = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto" id="reports-container">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -91,6 +127,23 @@ const ReportsPage = () => {
               Mis à jour: {lastUpdate.toLocaleTimeString('fr-FR')}
             </span>
           )}
+          <button
+            onClick={handleExportPDF}
+            disabled={isAPIExporting || !stockStats}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isAPIExporting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Export...
+              </>
+            ) : (
+              <>
+                <FileText className="w-4 h-4" />
+                Export PDF
+              </>
+            )}
+          </button>
           <button
             onClick={fetchStockStatistics}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
