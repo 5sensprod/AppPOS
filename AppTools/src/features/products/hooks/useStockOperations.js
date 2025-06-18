@@ -32,7 +32,7 @@ export const useStockOperations = ({ updateProduct, fetchProducts }) => {
           case 'set':
             updateData = {
               stock: value,
-              manage_stock: true, // Activer la gestion de stock automatiquement
+              // manage_stock: true,  Activer la gestion de stock automatiquement
             };
             break;
 
