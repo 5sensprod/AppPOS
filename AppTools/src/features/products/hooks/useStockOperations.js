@@ -32,21 +32,18 @@ export const useStockOperations = ({ updateProduct, fetchProducts }) => {
           case 'set':
             updateData = {
               stock: value,
-              // manage_stock: true,  Activer la gestion de stock automatiquement
             };
             break;
 
           case 'add':
             updateData = {
               stock: (item.stock || 0) + value,
-              manage_stock: true,
             };
             break;
 
           case 'subtract':
             updateData = {
-              stock: Math.max(0, (item.stock || 0) - value), // Éviter les stocks négatifs
-              manage_stock: true,
+              stock: (item.stock || 0) - value, // Stock négatif autorisé
             };
             break;
 
