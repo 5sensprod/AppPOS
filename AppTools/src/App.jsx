@@ -22,6 +22,7 @@ import CategorieDetail from './features/categories/components/CategorieDetail';
 import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
 import CashierPage from './features/pos/CashierPage';
+import ReportsPage from './pages/ReportsPage';
 
 // Pages de configuration
 import SettingsPage from './pages/SettingsPage';
@@ -121,6 +122,17 @@ function AppRoutes() {
             <ProtectedRoute>
               <MainLayout>
                 <CashierPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/rapports"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ReportsPage />
               </MainLayout>
             </ProtectedRoute>
           }

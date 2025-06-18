@@ -70,7 +70,7 @@ export function initializeMenus() {
     id: 'reports',
     icon: <BarChart2 className="h-6 w-6" />,
     label: 'Rapports',
-    path: '/reports',
+    path: '/rapports',
   });
 
   menuRegistry.addSidebarItem({
