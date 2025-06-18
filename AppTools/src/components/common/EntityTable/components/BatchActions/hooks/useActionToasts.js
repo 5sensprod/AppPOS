@@ -104,13 +104,18 @@ export const useActionToasts = () => {
           set: 'défini',
           add: 'ajouté au stock',
           subtract: 'retiré du stock',
+          set_min_stock: 'stock minimum défini',
+          enable_manage: 'affichage du stock activé',
+          disable_manage: 'affichage du stock désactivé',
           toggle_manage: 'gestion du stock basculée',
         };
 
+        const actionLabel = actionLabels[action] || 'mis à jour';
+
         const message =
           count === 1
-            ? `Stock du ${entityName} ${actionLabels[action]}`
-            : `Stock de ${count} ${entityName}s ${actionLabels[action]}`;
+            ? `Stock du ${entityName} ${actionLabel}`
+            : `Stock de ${count} ${entityName}s ${actionLabel}`;
 
         success(message, { title: 'Stock mis à jour' });
       },

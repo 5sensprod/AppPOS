@@ -47,9 +47,21 @@ export const useStockOperations = ({ updateProduct, fetchProducts }) => {
             };
             break;
 
-          case 'toggle_manage':
+          case 'set_min_stock':
             updateData = {
-              manage_stock: !item.manage_stock,
+              min_stock: value,
+            };
+            break;
+
+          case 'enable_manage':
+            updateData = {
+              manage_stock: true,
+            };
+            break;
+
+          case 'disable_manage':
+            updateData = {
+              manage_stock: false,
             };
             break;
 
