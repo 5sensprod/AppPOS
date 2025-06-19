@@ -65,7 +65,10 @@ const ReceiptModal = () => {
                   </p>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                     <span className="font-mono">{item.quantity}</span> ×{' '}
-                    <span className="font-mono">{item.unit_price.toFixed(2)}€</span>
+                    <span className="font-mono">{item.unit_price.toFixed(2)}€</span>{' '}
+                    <span className="ml-2 text-[10px] text-gray-400">
+                      TVA {item.tax_rate || 20}%
+                    </span>
                   </p>
                 </div>
                 <span className="font-medium text-gray-900 dark:text-gray-100 font-mono">
@@ -74,7 +77,7 @@ const ReceiptModal = () => {
               </div>
 
               {/* Réduction item si présente */}
-              {item.discount_amount && item.discount_amount > 0 && (
+              {item.discount_amount > 0 && !isNaN(item.discount_amount) && (
                 <div className="flex justify-between items-center ml-4 text-xs">
                   <div className="flex items-center space-x-1 text-red-600 dark:text-red-400">
                     <Percent className="h-3 w-3" />

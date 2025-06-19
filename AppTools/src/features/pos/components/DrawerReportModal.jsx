@@ -643,11 +643,8 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
                                   : 'Mixte'}
                             </span>
                             {/* 🆕 Badge réduction si présente */}
-                            {((sale.total_discounts && sale.total_discounts > 0) ||
-                              (sale.item_discounts_total && sale.item_discounts_total > 0)) && (
-                              <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200">
-                                💰 Réduit
-                              </span>
+                            {(sale.total_discounts || sale.item_discounts_total) > 0 && (
+                              <span className="inline-flex ...">💰 Réduit</span>
                             )}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -660,11 +657,10 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
                             {sale.total_amount.toFixed(2)}€
                           </span>
                           {/* 🆕 Affichage économies */}
-                          {((sale.total_discounts && sale.total_discounts > 0) ||
-                            (sale.item_discounts_total && sale.item_discounts_total > 0)) && (
+                          {(sale.total_discounts || sale.item_discounts_total) > 0 && (
                             <div className="text-xs text-green-600 dark:text-green-400">
-                              -{(sale.total_discounts || sale.item_discounts_total || 0).toFixed(2)}
-                              € économisés
+                              -{(sale.total_discounts || sale.item_discounts_total).toFixed(2)}€
+                              économisés
                             </div>
                           )}
                         </div>
@@ -731,8 +727,7 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
                             )}
 
                             {/* Résumé des économies si réductions présentes */}
-                            {((sale.total_discounts && sale.total_discounts > 0) ||
-                              (sale.item_discounts_total && sale.item_discounts_total > 0)) && (
+                            {(sale.total_discounts || 0) + (sale.item_discounts_total || 0) > 0 && (
                               <div className="pt-2 border-t border-green-200 dark:border-green-600">
                                 <div className="flex justify-between text-xs text-green-600 dark:text-green-400 font-medium">
                                   <span className="flex items-center space-x-1">
@@ -742,9 +737,8 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
                                   <span>
                                     -
                                     {(
-                                      sale.total_discounts ||
-                                      sale.item_discounts_total ||
-                                      0
+                                      Number(sale.total_discounts || 0) +
+                                      Number(sale.item_discounts_total || 0)
                                     ).toFixed(2)}
                                     €
                                   </span>

@@ -73,7 +73,8 @@ const Cart = () => {
     const taxBreakdown = {};
 
     cart.items.forEach((item) => {
-      const taxRate = item.tax_rate || 20;
+      const taxRate = Number(item.tax_rate || 20); // 👈 transforme bien "20" en 20 (number)
+
       if (!taxBreakdown[taxRate]) {
         taxBreakdown[taxRate] = 0;
       }
@@ -84,6 +85,7 @@ const Cart = () => {
   };
 
   const taxBreakdown = getTaxBreakdown();
+  console.log('🧾 Détails panier (cart.items):', cart.items); // 👈
 
   // Calculer les totaux avec réductions
   const subtotalBeforeDiscounts = cart.items.reduce((sum, item) => {

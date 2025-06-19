@@ -60,7 +60,7 @@ export const useCashierStore = create((set, get) => ({
 
       const finalItemPrice = originalSubtotal - itemDiscountAmount;
       const taxRate = item.tax_rate || 20;
-      const estimatedItemTax = finalItemPrice * (taxRate / (100 + taxRate));
+      const estimatedItemTax = finalItemPrice - finalItemPrice / (1 + taxRate / 100);
 
       subtotalBeforeDiscounts += originalSubtotal;
       totalItemDiscounts += itemDiscountAmount;
@@ -70,7 +70,7 @@ export const useCashierStore = create((set, get) => ({
         ...item,
         total_price: Math.round(finalItemPrice * 100) / 100,
         discount_amount: itemDiscountAmount > 0 ? itemDiscountAmount : undefined,
-        // 🎯 APERÇU SEULEMENT - pas de calcul précis de TVA
+        tax_amount: Math.round(estimatedItemTax * 100) / 100,
         estimated_tax: Math.round(estimatedItemTax * 100) / 100,
       };
     });
