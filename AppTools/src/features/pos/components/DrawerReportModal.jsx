@@ -1,4 +1,3 @@
-// src/features/pos/components/DrawerReportModal.jsx
 import React, { useState, useEffect } from 'react';
 import {
   FileText,
@@ -452,7 +451,7 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
               <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
                 Résumé des ventes
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                 <div className="text-gray-700 dark:text-gray-300">
                   <span>Total ventes :</span>
                   <span className="ml-2 font-bold text-lg text-gray-900 dark:text-gray-100">
@@ -474,7 +473,100 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
                     €
                   </span>
                 </div>
+                {/* 🆕 NOUVEAU : Total des réductions */}
+                <div className="text-gray-700 dark:text-gray-300">
+                  <span>Total réductions :</span>
+                  <span className="ml-2 font-medium text-green-600 dark:text-green-400">
+                    {report.sales
+                      ? report.sales
+                          .reduce(
+                            (sum, sale) =>
+                              sum + (sale.total_discounts || sale.item_discounts_total || 0),
+                            0
+                          )
+                          .toFixed(2)
+                      : '0.00'}
+                    €
+                  </span>
+                </div>
               </div>
+
+              {/* 🆕 NOUVEAU : Détail des réductions si présentes */}
+              {report.sales &&
+                report.sales.some(
+                  (sale) =>
+                    (sale.total_discounts && sale.total_discounts > 0) ||
+                    (sale.item_discounts_total && sale.item_discounts_total > 0)
+                ) && (
+                  <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-600">
+                    <h5 className="font-medium mb-2 text-gray-900 dark:text-gray-100">
+                      📊 Analyse des réductions
+                    </h5>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
+                        <div className="text-red-700 dark:text-red-300">
+                          <div className="font-medium">Ventes avec réductions</div>
+                          <div className="text-lg font-bold">
+                            {
+                              report.sales.filter(
+                                (sale) =>
+                                  (sale.total_discounts && sale.total_discounts > 0) ||
+                                  (sale.item_discounts_total && sale.item_discounts_total > 0)
+                              ).length
+                            }
+                          </div>
+                          <div className="text-xs">sur {report.summary.sales_count} ventes</div>
+                        </div>
+                      </div>
+
+                      <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded p-3">
+                        <div className="text-orange-700 dark:text-orange-300">
+                          <div className="font-medium">Taux de réduction</div>
+                          <div className="text-lg font-bold">
+                            {report.summary.total_sales > 0
+                              ? (
+                                  (report.sales.reduce(
+                                    (sum, sale) =>
+                                      sum +
+                                      (sale.total_discounts || sale.item_discounts_total || 0),
+                                    0
+                                  ) /
+                                    report.summary.total_sales) *
+                                  100
+                                ).toFixed(1)
+                              : '0.0'}
+                            %
+                          </div>
+                          <div className="text-xs">du chiffre d'affaires</div>
+                        </div>
+                      </div>
+
+                      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded p-3">
+                        <div className="text-green-700 dark:text-green-300">
+                          <div className="font-medium">Réduction moyenne</div>
+                          <div className="text-lg font-bold">
+                            {(() => {
+                              const salesWithDiscounts = report.sales.filter(
+                                (sale) =>
+                                  (sale.total_discounts && sale.total_discounts > 0) ||
+                                  (sale.item_discounts_total && sale.item_discounts_total > 0)
+                              );
+                              if (salesWithDiscounts.length === 0) return '0.00';
+                              const totalDiscounts = salesWithDiscounts.reduce(
+                                (sum, sale) =>
+                                  sum + (sale.total_discounts || sale.item_discounts_total || 0),
+                                0
+                              );
+                              return (totalDiscounts / salesWithDiscounts.length).toFixed(2);
+                            })()}
+                            €
+                          </div>
+                          <div className="text-xs">par vente réduite</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
             </div>
 
             {/* Payment Methods Breakdown */}
@@ -550,6 +642,13 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
                                   ? 'Carte'
                                   : 'Mixte'}
                             </span>
+                            {/* 🆕 Badge réduction si présente */}
+                            {((sale.total_discounts && sale.total_discounts > 0) ||
+                              (sale.item_discounts_total && sale.item_discounts_total > 0)) && (
+                              <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200">
+                                💰 Réduit
+                              </span>
+                            )}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                             {new Date(sale.created_at).toLocaleString('fr-FR')} •{' '}
@@ -560,24 +659,98 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
                           <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
                             {sale.total_amount.toFixed(2)}€
                           </span>
+                          {/* 🆕 Affichage économies */}
+                          {((sale.total_discounts && sale.total_discounts > 0) ||
+                            (sale.item_discounts_total && sale.item_discounts_total > 0)) && (
+                            <div className="text-xs text-green-600 dark:text-green-400">
+                              -{(sale.total_discounts || sale.item_discounts_total || 0).toFixed(2)}
+                              € économisés
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Sale Items */}
+                      {/* Sale Items avec détails réductions */}
                       {sale.items && sale.items.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                          <div className="space-y-1">
+                          <div className="space-y-2">
                             {sale.items.map((item, itemIndex) => (
-                              <div
-                                key={itemIndex}
-                                className="flex justify-between text-sm text-gray-700 dark:text-gray-300"
-                              >
-                                <span>
-                                  {item.product_name} x{item.quantity}
-                                </span>
-                                <span>{item.total_price.toFixed(2)}€</span>
+                              <div key={itemIndex} className="space-y-1">
+                                {/* Ligne principale de l'article */}
+                                <div className="flex justify-between text-sm text-gray-700 dark:text-gray-300">
+                                  <span>
+                                    {item.product_name} x{item.quantity}
+                                    {item.unit_price && (
+                                      <span className="text-gray-500 dark:text-gray-400 ml-1">
+                                        ({item.unit_price.toFixed(2)}€/u)
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="font-medium">
+                                    {item.total_price.toFixed(2)}€
+                                  </span>
+                                </div>
+
+                                {/* Réduction sur cet article si présente */}
+                                {item.discount && item.discount.amount > 0 && (
+                                  <div className="flex justify-between text-xs text-red-600 dark:text-red-400 ml-2">
+                                    <span className="flex items-center space-x-1">
+                                      <span>📉</span>
+                                      <span>
+                                        Réduction{' '}
+                                        {item.discount.type === 'percentage'
+                                          ? `${item.discount.value}%`
+                                          : 'fixe'}
+                                        {item.discount.reason && ` (${item.discount.reason})`}
+                                      </span>
+                                    </span>
+                                    <span>-{item.discount.amount.toFixed(2)}€</span>
+                                  </div>
+                                )}
                               </div>
                             ))}
+
+                            {/* Réductions globales de la vente */}
+                            {sale.ticket_discount && sale.ticket_discount.amount > 0 && (
+                              <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
+                                <div className="flex justify-between text-xs text-red-600 dark:text-red-400">
+                                  <span className="flex items-center space-x-1">
+                                    <span>🎯</span>
+                                    <span>
+                                      Réduction ticket{' '}
+                                      {sale.ticket_discount.type === 'percentage'
+                                        ? `${sale.ticket_discount.value}%`
+                                        : 'fixe'}
+                                      {sale.ticket_discount.reason &&
+                                        ` (${sale.ticket_discount.reason})`}
+                                    </span>
+                                  </span>
+                                  <span>-{sale.ticket_discount.amount.toFixed(2)}€</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Résumé des économies si réductions présentes */}
+                            {((sale.total_discounts && sale.total_discounts > 0) ||
+                              (sale.item_discounts_total && sale.item_discounts_total > 0)) && (
+                              <div className="pt-2 border-t border-green-200 dark:border-green-600">
+                                <div className="flex justify-between text-xs text-green-600 dark:text-green-400 font-medium">
+                                  <span className="flex items-center space-x-1">
+                                    <span>💰</span>
+                                    <span>Total économies</span>
+                                  </span>
+                                  <span>
+                                    -
+                                    {(
+                                      sale.total_discounts ||
+                                      sale.item_discounts_total ||
+                                      0
+                                    ).toFixed(2)}
+                                    €
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -808,5 +981,4 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
     </BaseModal>
   );
 };
-
-export default DrawerReportModal;
+export default DrawerReportModal; // src/features/pos/components/DrawerReportModal.jsx
