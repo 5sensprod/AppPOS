@@ -14,20 +14,25 @@ class SaleController extends BaseController {
 
   async createSale(req, res) {
     try {
-      const { items, payment_method = 'cash' } = req.body;
-      const cashier = req.user; // Depuis le middleware auth
+      // ✅ Extraction avec réductions
+      const { items, payment_method = 'cash', ticket_discount = null } = req.body;
+
+      const cashier = req.user;
 
       // Validation
       if (!items || !Array.isArray(items) || items.length === 0) {
         return ResponseHandler.badRequest(res, 'Articles requis pour créer une vente');
       }
 
-      // 1. Valider et enrichir les articles
+      // 1. Valider et enrichir les articles AVEC réductions
       const enrichedItems = [];
-      let subtotal = 0;
+      let subtotalBeforeDiscounts = 0; // Total avant TOUTES réductions
+      let totalItemDiscounts = 0; // Total réductions items
+      let subtotalAfterItemDiscounts = 0; // Total après réductions items
 
       for (const item of items) {
-        const { product_id, quantity } = item;
+        // ✅ Extraire discount
+        const { product_id, quantity, discount = null } = item;
 
         if (!product_id || !quantity || quantity <= 0) {
           return ResponseHandler.badRequest(
@@ -42,13 +47,32 @@ class SaleController extends BaseController {
           return ResponseHandler.badRequest(res, `Produit ${product_id} non trouvé`);
         }
 
-        // ✅ SUPPRIMÉ: Vérification de stock - stocks négatifs autorisés
-        // Plus de blocage de vente pour stock insuffisant
-
-        // Enrichir l'article
         const unitPrice = product.price;
-        const totalPrice = quantity * unitPrice;
+        const itemSubtotal = quantity * unitPrice; // Prix item avant réduction
 
+        // ✅ Calcul réduction item
+        let itemDiscountAmount = 0;
+        let itemDiscount = { type: null, value: 0, amount: 0, reason: null };
+
+        if (discount && (discount.type === 'percentage' || discount.type === 'fixed')) {
+          if (discount.type === 'percentage') {
+            itemDiscountAmount = (itemSubtotal * discount.value) / 100;
+          } else if (discount.type === 'fixed') {
+            itemDiscountAmount = Math.min(discount.value, itemSubtotal);
+          }
+
+          itemDiscount = {
+            type: discount.type,
+            value: discount.value,
+            amount: Math.round(itemDiscountAmount * 100) / 100,
+            reason: discount.reason || null,
+          };
+        }
+
+        const itemTotalAfterDiscount = itemSubtotal - itemDiscount.amount;
+        totalItemDiscounts += itemDiscount.amount;
+
+        // ✅ Enrichir l'article
         enrichedItems.push({
           product_id,
           product_name: product.name,
@@ -56,25 +80,78 @@ class SaleController extends BaseController {
           barcode: product.meta_data?.find((m) => m.key === 'barcode')?.value || '',
           quantity,
           unit_price: unitPrice,
-          total_price: totalPrice,
+          subtotal_price: Math.round(itemSubtotal * 100) / 100,
+          discount: itemDiscount,
+          discount_amount: itemDiscount.amount,
+          total_price: Math.round(itemTotalAfterDiscount * 100) / 100,
+          tax_rate: parseFloat(product.tax_rate) || 0,
+          tax_amount: 0, // Calculé après
         });
 
-        subtotal += totalPrice;
+        subtotalBeforeDiscounts += itemSubtotal;
+        subtotalAfterItemDiscounts += itemTotalAfterDiscount;
       }
 
-      // 2. Calculer les taxes (20% par défaut si pas spécifié)
-      const taxAmount =
-        Math.round(enrichedItems.reduce((sum, item) => sum + (item.tax_amount || 0), 0) * 100) /
-        100;
-      const totalAmount =
-        Math.round(enrichedItems.reduce((sum, item) => sum + item.total_price, 0) * 100) / 100;
+      // 2. ✅ Calcul réduction ticket
+      let ticketDiscountData = { type: null, value: 0, amount: 0, reason: null };
+      let ticketDiscountAmount = 0;
 
-      // 3. Créer la vente
+      if (
+        ticket_discount &&
+        (ticket_discount.type === 'percentage' || ticket_discount.type === 'fixed')
+      ) {
+        if (ticket_discount.type === 'percentage') {
+          ticketDiscountAmount = (subtotalAfterItemDiscounts * ticket_discount.value) / 100;
+        } else if (ticket_discount.type === 'fixed') {
+          ticketDiscountAmount = Math.min(ticket_discount.value, subtotalAfterItemDiscounts);
+        }
+
+        ticketDiscountData = {
+          type: ticket_discount.type,
+          value: ticket_discount.value,
+          amount: Math.round(ticketDiscountAmount * 100) / 100,
+          reason: ticket_discount.reason || null,
+        };
+      }
+
+      // 3. ✅ Calculs finaux SIMPLES
+      const totalDiscounts = totalItemDiscounts + ticketDiscountAmount;
+      const finalTotal = subtotalAfterItemDiscounts - ticketDiscountAmount;
+
+      // ✅ TVA calculée sur le montant final (après TOUTES les réductions)
+      let finalTaxAmount = 0;
+      for (const item of enrichedItems) {
+        // Proportion de cet item dans le total final
+        const itemRatio = item.total_price / subtotalAfterItemDiscounts;
+        const itemFinalPrice = finalTotal * itemRatio;
+
+        // TVA de cet item après réductions
+        const taxRate = item.tax_rate;
+        const itemTaxAmount = taxRate > 0 ? itemFinalPrice * (taxRate / (100 + taxRate)) : 0;
+
+        // ✅ METTRE À JOUR LA TVA
+        item.tax_amount = Math.round(itemTaxAmount * 100) / 100;
+
+        // 🆕 LIGNE MANQUANTE - METTRE À JOUR LE PRIX FINAL
+        item.total_price = Math.round(itemFinalPrice * 100) / 100;
+
+        finalTaxAmount += item.tax_amount;
+      }
+
+      finalTaxAmount = Math.round(finalTaxAmount * 100) / 100;
+
+      // 4. ✅ Créer la vente
       const saleData = {
         items: enrichedItems,
-        subtotal: Math.round(subtotal * 100) / 100,
-        tax_amount: Math.round(taxAmount * 100) / 100,
-        total_amount: Math.round(totalAmount * 100) / 100,
+        subtotal: Math.round(subtotalBeforeDiscounts * 100) / 100, // ✅ Prix AVANT réductions
+
+        // Données réductions
+        item_discounts_total: Math.round(totalItemDiscounts * 100) / 100,
+        ticket_discount: ticketDiscountData,
+        total_discounts: Math.round(totalDiscounts * 100) / 100,
+
+        tax_amount: finalTaxAmount, // ✅ TVA sur montant final
+        total_amount: Math.round(finalTotal * 100) / 100, // ✅ Total après réductions
         payment_method,
         cashier_id: cashier.id,
         cashier_name: cashier.username,
@@ -83,57 +160,54 @@ class SaleController extends BaseController {
 
       const newSale = await Sale.create(saleData);
 
+      // ✅ GESTION DU FOND DE CAISSE (inchangée)
       if (payment_method === 'cash' || payment_method === 'mixed') {
         try {
           const cashierSessionService = require('../services/cashierSessionService');
 
-          // 1. Ajouter le montant de la vente au fond (argent reçu)
-          let cashAmount = totalAmount;
+          let cashAmount = saleData.total_amount;
           let changeAmount = 0;
 
-          // Si des données de paiement cash sont fournies (avec monnaie)
           if (req.body.cash_payment_data) {
             const { amount_received, change } = req.body.cash_payment_data;
             cashAmount = amount_received;
             changeAmount = change;
 
             console.log(
-              `💰 [SALE] Vente cash: ${totalAmount}€ - Reçu: ${amount_received}€ - Monnaie: ${change}€`
+              `💰 [SALE] Vente cash: ${saleData.total_amount}€ - Reçu: ${amount_received}€ - Monnaie: ${change}€`
             );
           }
 
-          // 2. Ajouter l'argent reçu au fond de caisse
           if (cashAmount > 0) {
             await cashierSessionService.addCashMovement(cashier.id, {
               type: 'in',
               amount: cashAmount,
               reason: `Vente ${newSale.transaction_id}`,
-              notes: `Paiement client - Total vente: ${totalAmount}€`,
+              notes: `Paiement client - Total vente: ${saleData.total_amount}€`,
             });
 
             console.log(`✅ [SALE] +${cashAmount}€ ajoutés au fond de caisse`);
           }
 
-          // 3. Déduire la monnaie rendue du fond de caisse
           if (changeAmount > 0) {
             await cashierSessionService.addCashMovement(cashier.id, {
               type: 'out',
               amount: changeAmount,
               reason: `Monnaie rendue ${newSale.transaction_id}`,
-              notes: `Monnaie client - Reçu: ${cashAmount}€, Vente: ${totalAmount}€`,
+              notes: `Monnaie client - Reçu: ${cashAmount}€, Vente: ${saleData.total_amount}€`,
             });
 
             console.log(`✅ [SALE] -${changeAmount}€ déduits du fond de caisse (monnaie)`);
           }
         } catch (drawerError) {
           console.warn('⚠️ [SALE] Erreur mise à jour fond de caisse:', drawerError.message);
-          // Ne pas faire échouer la vente si erreur fond de caisse
         }
       }
 
-      // Pour les paiements mixtes, ajouter seulement la partie cash
+      // Paiements mixtes
       if (payment_method === 'mixed' && req.body.mixed_payment_data) {
         try {
+          const cashierSessionService = require('../services/cashierSessionService');
           const { cash_amount, card_amount } = req.body.mixed_payment_data;
 
           if (cash_amount > 0) {
@@ -141,7 +215,7 @@ class SaleController extends BaseController {
               type: 'in',
               amount: cash_amount,
               reason: `Vente mixte ${newSale.transaction_id}`,
-              notes: `Partie cash - Total: ${totalAmount}€ (Cash: ${cash_amount}€, Carte: ${card_amount}€)`,
+              notes: `Partie cash - Total: ${saleData.total_amount}€ (Cash: ${cash_amount}€, Carte: ${card_amount}€)`,
             });
 
             console.log(`✅ [SALE] Paiement mixte: +${cash_amount}€ en espèces ajoutés au fond`);
@@ -151,14 +225,17 @@ class SaleController extends BaseController {
         }
       }
 
-      // ✅ ÉMETTRE ÉVÉNEMENT CRÉATION DE VENTE
+      // ✅ ÉVÉNEMENT CRÉATION DE VENTE
       this.eventService.created(newSale);
 
+      // ✅ MISE À JOUR STATISTIQUES SESSION CAISSIER
       const cashierSessionService = require('../services/cashierSessionService');
       try {
-        const updatedStats = cashierSessionService.updateSaleStats(cashier.id, totalAmount);
+        const updatedStats = cashierSessionService.updateSaleStats(
+          cashier.id,
+          saleData.total_amount
+        );
 
-        // ✅ ÉMETTRE ÉVÉNEMENT SESSION MISE À JOUR
         const sessionEventService = getEntityEventService('cashier_sessions');
         sessionEventService.updated(cashier.id, {
           cashier_id: cashier.id,
@@ -174,16 +251,14 @@ class SaleController extends BaseController {
         console.debug('Erreur mise à jour stats session:', error.message);
       }
 
-      // 4. ✅ NOUVEAU: Décrémenter les stocks (TOUS sauf services)
+      // ✅ DÉCRÉMENTER LES STOCKS ET METTRE À JOUR STATS PRODUITS (inchangé)
       for (const item of enrichedItems) {
         const product = await Product.findById(item.product_id);
 
         const updateData = {};
 
-        // ✅ LOGIQUE MODIFIÉE: Décrémenter TOUS les produits sauf type "service"
-        // Ignore manage_stock - se base uniquement sur le type
+        // Décrémenter TOUS les produits sauf type "service"
         if (product.type !== 'service') {
-          // Autoriser les stocks négatifs (pas de Math.max)
           updateData.stock = (product.stock || 0) - item.quantity;
           console.log(
             `📦 [STOCK] ${product.name}: ${product.stock || 0} → ${updateData.stock} (${item.quantity} vendus)`
@@ -192,7 +267,7 @@ class SaleController extends BaseController {
           console.log(`🚫 [SERVICE] ${product.name}: Stock non décrémenter (service)`);
         }
 
-        // Mise à jour des statistiques (pour tous les produits)
+        // ✅ MISE À JOUR DES STATISTIQUES (basé sur prix original, pas réduit)
         updateData.total_sold = (product.total_sold || 0) + item.quantity;
         updateData.sales_count = (product.sales_count || 0) + 1;
         updateData.last_sold_at = new Date();
@@ -202,7 +277,6 @@ class SaleController extends BaseController {
 
         await Product.update(item.product_id, updateData);
 
-        // ✅ ÉMETTRE ÉVÉNEMENT MISE À JOUR PRODUIT (STOCK)
         const updatedProduct = await Product.findById(item.product_id);
         this.productEventService.updated(item.product_id, updatedProduct);
 
@@ -211,6 +285,7 @@ class SaleController extends BaseController {
         );
       }
 
+      // ✅ RETOUR FINAL
       return ResponseHandler.created(res, {
         sale: newSale,
         message: 'Vente créée avec succès',
@@ -218,17 +293,77 @@ class SaleController extends BaseController {
           transaction_id: newSale.transaction_id,
           items: enrichedItems,
           subtotal: saleData.subtotal,
+
+          // Informations réductions
+          discounts: {
+            items_total: saleData.item_discounts_total,
+            ticket: saleData.ticket_discount,
+            total: saleData.total_discounts,
+          },
+
           tax_amount: saleData.tax_amount,
           total_amount: saleData.total_amount,
           payment_method: saleData.payment_method,
           cashier: saleData.cashier_name,
           date: newSale.created_at,
+          tax_breakdown: this.calculateTaxBreakdown(enrichedItems),
+
+          // Résumé des économies
+          savings_summary:
+            totalDiscounts > 0
+              ? {
+                  total_saved: totalDiscounts,
+                  original_total: saleData.subtotal,
+                  final_total: saleData.total_amount,
+                  savings_percentage:
+                    Math.round((totalDiscounts / saleData.subtotal) * 100 * 100) / 100,
+                }
+              : null,
         },
       });
     } catch (error) {
       console.error('Erreur création vente:', error);
       return ResponseHandler.error(res, error);
     }
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Calculer la répartition TVA par taux
+  calculateTaxBreakdown(items) {
+    const breakdown = {};
+
+    items.forEach((item) => {
+      const rate = item.tax_rate || 0;
+      const rateKey = `${rate}%`;
+
+      if (!breakdown[rateKey]) {
+        breakdown[rateKey] = {
+          rate: rate,
+          total_ht: 0,
+          total_ttc: 0,
+          tax_amount: 0,
+          items_count: 0,
+        };
+      }
+
+      // ✅ CORRECTION: Utiliser les valeurs APRÈS réductions
+      const totalTTC = item.total_price; // Prix après réductions item
+      const taxAmount = item.tax_amount; // TVA sur prix réduit
+      const totalHT = totalTTC - taxAmount; // Prix HT après réductions
+
+      breakdown[rateKey].total_ht += totalHT;
+      breakdown[rateKey].total_ttc += totalTTC;
+      breakdown[rateKey].tax_amount += taxAmount;
+      breakdown[rateKey].items_count += item.quantity;
+    });
+
+    // Arrondir tous les montants
+    Object.keys(breakdown).forEach((key) => {
+      breakdown[key].total_ht = Math.round(breakdown[key].total_ht * 100) / 100;
+      breakdown[key].total_ttc = Math.round(breakdown[key].total_ttc * 100) / 100;
+      breakdown[key].tax_amount = Math.round(breakdown[key].tax_amount * 100) / 100;
+    });
+
+    return breakdown;
   }
 
   async getSales(req, res) {

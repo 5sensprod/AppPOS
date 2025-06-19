@@ -12,8 +12,20 @@ class Sale extends BaseModel {
       transaction_id: this.generateTransactionId(),
       items: [],
       subtotal: 0,
+
+      // 🆕 NOUVEAUX CHAMPS POUR RÉDUCTIONS
+      item_discounts_total: 0, // Total des réductions sur items
+      ticket_discount: {
+        // Réduction globale sur ticket
+        type: null, // 'percentage' | 'fixed'
+        value: 0, // Valeur de la réduction
+        amount: 0, // Montant calculé de la réduction
+        reason: null, // Motif de la réduction
+      },
+      total_discounts: 0, // Total toutes réductions confondues
+
       tax_amount: 0,
-      total_amount: 0,
+      total_amount: 0, // Montant final après réductions
       payment_method: 'cash',
       status: 'completed',
       created_at: new Date(),
