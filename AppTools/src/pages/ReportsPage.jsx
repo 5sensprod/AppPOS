@@ -7,16 +7,29 @@ import {
   RefreshCw,
   Download,
   FileText,
+  Settings,
+  List,
+  BarChart3,
+  X,
+  Check,
 } from 'lucide-react';
 import apiService from '../services/api';
-import { useAPIPDFExport } from '../hooks/useAPIPDFExport';
+import { useAdvancedPDFExport } from '../hooks/useAdvancedPDFExport';
 
 const ReportsPage = () => {
   const [stockStats, setStockStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const { isExporting: isAPIExporting, exportStockStatisticsToPDF } = useAPIPDFExport();
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportOptions, setExportOptions] = useState({
+    reportType: 'summary', // 'summary' ou 'detailed'
+    includeCompanyInfo: true,
+    includeCharts: true,
+    sortBy: 'name', // 'name', 'sku', 'stock', 'value'
+    sortOrder: 'asc', // 'asc', 'desc'
+  });
+  const { isExporting, exportStockStatisticsToPDF } = useAdvancedPDFExport();
 
   // Fonctions utilitaires
   const formatCurrency = (amount) => {
@@ -63,24 +76,25 @@ const ReportsPage = () => {
   const handleExportPDF = async () => {
     try {
       const companyInfo = {
-        name: 'AXE Musique', // À récupérer depuis vos paramètres
+        name: 'AXE Musique',
         address: '4 rue Lochet 51000 Châlons en Champagne',
         siret: '418 647 574 00031',
       };
 
-      await exportStockStatisticsToPDF(companyInfo);
+      // Préparer les options pour l'API
+      const apiOptions = {
+        companyInfo,
+        reportType: exportOptions.reportType,
+        includeCompanyInfo: exportOptions.includeCompanyInfo,
+        includeCharts: exportOptions.includeCharts,
+        sortBy: exportOptions.sortBy,
+        sortOrder: exportOptions.sortOrder,
+      };
+
+      await exportStockStatisticsToPDF(apiOptions);
+      setShowExportModal(false);
     } catch (error) {
       console.error('Erreur export PDF:', error);
-      alert("Erreur lors de l'export PDF");
-    }
-  };
-
-  const handleExportHTMLToPDF = async () => {
-    try {
-      const fileName = `rapport_stock_${new Date().toISOString().split('T')[0]}.pdf`;
-      await exportElementToPDF('reports-container', fileName);
-    } catch (error) {
-      console.error('Erreur export HTML vers PDF:', error);
       alert("Erreur lors de l'export PDF");
     }
   };
@@ -128,21 +142,12 @@ const ReportsPage = () => {
             </span>
           )}
           <button
-            onClick={handleExportPDF}
-            disabled={isAPIExporting || !stockStats}
+            onClick={() => setShowExportModal(true)}
+            disabled={isExporting || !stockStats}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isAPIExporting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Export...
-              </>
-            ) : (
-              <>
-                <FileText className="w-4 h-4" />
-                Export PDF
-              </>
-            )}
+            <FileText className="w-4 h-4" />
+            Export PDF
           </button>
           <button
             onClick={fetchStockStatistics}
@@ -296,6 +301,241 @@ const ReportsPage = () => {
             </div>
           </div>
         </>
+      )}
+
+      {/* Modale d'export */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Options d'Export PDF
+                </h2>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  disabled={isExporting}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Type de rapport */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+                  Type de rapport
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      exportOptions.reportType === 'summary'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    }`}
+                    onClick={() => setExportOptions((prev) => ({ ...prev, reportType: 'summary' }))}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <BarChart3
+                        className={`w-5 h-5 ${exportOptions.reportType === 'summary' ? 'text-blue-600' : 'text-gray-500'}`}
+                      />
+                      <span
+                        className={`font-medium ${exportOptions.reportType === 'summary' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}
+                      >
+                        Rapport de Synthèse
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Vue d'ensemble avec métriques principales et répartition par TVA
+                    </p>
+                  </button>
+
+                  <button
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      exportOptions.reportType === 'detailed'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    }`}
+                    onClick={() =>
+                      setExportOptions((prev) => ({ ...prev, reportType: 'detailed' }))
+                    }
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <List
+                        className={`w-5 h-5 ${exportOptions.reportType === 'detailed' ? 'text-blue-600' : 'text-gray-500'}`}
+                      />
+                      <span
+                        className={`font-medium ${exportOptions.reportType === 'detailed' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}
+                      >
+                        Rapport Détaillé
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Liste complète des produits avec SKU, désignation, prix, stock et valeurs
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Options pour rapport détaillé */}
+              {exportOptions.reportType === 'detailed' && (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+                    Options du rapport détaillé
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Trier par
+                      </label>
+                      <select
+                        value={exportOptions.sortBy}
+                        onChange={(e) =>
+                          setExportOptions((prev) => ({ ...prev, sortBy: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                      >
+                        <option value="name">Désignation</option>
+                        <option value="sku">SKU</option>
+                        <option value="stock">Stock</option>
+                        <option value="value">Valeur stock</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Ordre
+                      </label>
+                      <select
+                        value={exportOptions.sortOrder}
+                        onChange={(e) =>
+                          setExportOptions((prev) => ({ ...prev, sortOrder: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                      >
+                        <option value="asc">Croissant</option>
+                        <option value="desc">Décroissant</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Options générales */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Options générales
+                </label>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={exportOptions.includeCompanyInfo}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeCompanyInfo: e.target.checked,
+                        }))
+                      }
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Inclure les informations de l'entreprise
+                    </span>
+                  </label>
+
+                  {exportOptions.reportType === 'summary' && (
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={exportOptions.includeCharts}
+                        onChange={(e) =>
+                          setExportOptions((prev) => ({
+                            ...prev,
+                            includeCharts: e.target.checked,
+                          }))
+                        }
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        Inclure les métriques graphiques
+                      </span>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Aperçu des colonnes pour rapport détaillé */}
+              {exportOptions.reportType === 'detailed' && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                    Colonnes du tableau détaillé :
+                  </h4>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                    <div>
+                      • <strong>SKU</strong> - Référence produit
+                    </div>
+                    <div>
+                      • <strong>Désignation</strong> - Nom du produit
+                    </div>
+                    <div>
+                      • <strong>PA HT</strong> - Prix d'achat hors taxes
+                    </div>
+                    <div>
+                      • <strong>PV TTC</strong> - Prix de vente toutes taxes comprises
+                    </div>
+                    <div>
+                      • <strong>Stock</strong> - Quantité en stock
+                    </div>
+                    <div>
+                      • <strong>TVA %</strong> - Taux de TVA
+                    </div>
+                    <div>
+                      • <strong>Valeur Stock</strong> - PA HT × Stock
+                    </div>
+                    <div>
+                      • <strong>Montant TVA</strong> - TVA calculée sur la valeur de vente
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 rounded-b-xl">
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  disabled={isExporting}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  disabled={isExporting}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {isExporting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Export...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Exporter PDF
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

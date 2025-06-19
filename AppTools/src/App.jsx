@@ -22,12 +22,12 @@ import CategorieDetail from './features/categories/components/CategorieDetail';
 import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
 import CashierPage from './features/pos/CashierPage';
-import ReportsPage from './pages/ReportsPage';
 
 // Pages de configuration
 import SettingsPage from './pages/SettingsPage';
 import LCDConfigPage from './pages/LCDConfigPage';
 import PrinterConfigPage from './pages/PrinterConfigPage';
+import ReportsPage from './pages/ReportsPage';
 
 // Loader
 const Loader = ({ message }) => (
