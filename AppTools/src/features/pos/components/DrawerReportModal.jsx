@@ -217,7 +217,7 @@ const DrawerReportModal = ({ isOpen, onClose, reportData = null }) => {
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Rapport de fin de journée"
+      title="Rapport de session"
       icon={ClipboardList}
       footer={footer}
       maxWidth="max-w-5xl"
