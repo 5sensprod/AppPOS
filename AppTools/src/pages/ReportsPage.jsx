@@ -22,12 +22,17 @@ const ReportsPage = () => {
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [categories, setCategories] = useState([]); // 🆕 Liste des catégories
+  const [loadingCategories, setLoadingCategories] = useState(false); // 🆕
   const [exportOptions, setExportOptions] = useState({
     reportType: 'summary', // 'summary' ou 'detailed'
     includeCompanyInfo: true,
     includeCharts: true,
     sortBy: 'name', // 'name', 'sku', 'stock', 'value'
     sortOrder: 'asc', // 'asc', 'desc'
+    groupByCategory: false, // 🆕 Nouveauté
+    selectedCategories: [], // 🆕 Nouveauté
+    includeUncategorized: true, // 🆕 Nouveauté
   });
   const { isExporting, exportStockStatisticsToPDF } = useAdvancedPDFExport();
 
@@ -56,6 +61,19 @@ const ReportsPage = () => {
     if (rate === 5.5) return 'Réduit (5.5%)';
     if (rate === 20) return 'Normal (20%)';
     return `${rate}%`;
+  };
+
+  // 🆕 Fonction pour charger les catégories
+  const fetchCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const response = await apiService.get('/api/categories');
+      setCategories(response.data.data || []);
+    } catch (err) {
+      console.error('Erreur chargement catégories:', err);
+    } finally {
+      setLoadingCategories(false);
+    }
   };
 
   const fetchStockStatistics = async () => {
@@ -89,7 +107,15 @@ const ReportsPage = () => {
         includeCharts: exportOptions.includeCharts,
         sortBy: exportOptions.sortBy,
         sortOrder: exportOptions.sortOrder,
+        groupByCategory: exportOptions.groupByCategory, // 🆕
+        selectedCategories: exportOptions.selectedCategories, // 🆕
+        includeUncategorized: exportOptions.includeUncategorized, // 🆕
       };
+
+      // 🔍 Debug: Vérifier ce qui est envoyé
+      console.log("📤 Options envoyées à l'API:", apiOptions);
+      console.log('🏷️ groupByCategory:', exportOptions.groupByCategory);
+      console.log('📂 selectedCategories:', exportOptions.selectedCategories);
 
       await exportStockStatisticsToPDF(apiOptions);
       setShowExportModal(false);
@@ -101,6 +127,7 @@ const ReportsPage = () => {
 
   useEffect(() => {
     fetchStockStatistics();
+    fetchCategories(); // 🆕 Charger aussi les catégories
   }, []);
 
   if (loading) {
@@ -386,6 +413,130 @@ const ReportsPage = () => {
                   <h4 className="font-medium text-gray-900 dark:text-white mb-3">
                     Options du rapport détaillé
                   </h4>
+
+                  {/* Option groupement par catégories */}
+                  <div className="mb-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={exportOptions.groupByCategory}
+                        onChange={(e) => {
+                          setExportOptions((prev) => ({
+                            ...prev,
+                            groupByCategory: e.target.checked,
+                            // Si on active le groupement, charger les catégories si pas encore fait
+                            selectedCategories: e.target.checked ? prev.selectedCategories : [],
+                          }));
+                          if (e.target.checked && categories.length === 0) {
+                            fetchCategories();
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Grouper par catégories
+                      </span>
+                    </label>
+                    <p className="text-xs text-gray-500 ml-7 mt-1">
+                      Afficher les produits regroupés par catégorie avec des sous-totaux
+                    </p>
+                  </div>
+
+                  {/* Sélection des catégories si groupement activé */}
+                  {exportOptions.groupByCategory && (
+                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                      <h5 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                        Sélection des catégories
+                      </h5>
+
+                      {loadingCategories ? (
+                        <div className="flex items-center gap-2 text-sm text-blue-600">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          Chargement des catégories...
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-3 mb-3">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExportOptions((prev) => ({
+                                  ...prev,
+                                  selectedCategories: categories.map((c) => c._id),
+                                }))
+                              }
+                              className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                            >
+                              Tout sélectionner
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExportOptions((prev) => ({
+                                  ...prev,
+                                  selectedCategories: [],
+                                }))
+                              }
+                              className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700"
+                            >
+                              Tout désélectionner
+                            </button>
+                            <span className="text-xs text-blue-700 dark:text-blue-300">
+                              {exportOptions.selectedCategories.length} / {categories.length}{' '}
+                              sélectionnées
+                            </span>
+                          </div>
+
+                          <div className="max-h-32 overflow-y-auto space-y-2">
+                            {categories.map((category) => (
+                              <label
+                                key={category._id}
+                                className="flex items-center gap-2 cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={exportOptions.selectedCategories.includes(category._id)}
+                                  onChange={(e) => {
+                                    setExportOptions((prev) => ({
+                                      ...prev,
+                                      selectedCategories: e.target.checked
+                                        ? [...prev.selectedCategories, category._id]
+                                        : prev.selectedCategories.filter(
+                                            (id) => id !== category._id
+                                          ),
+                                    }));
+                                  }}
+                                  className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-xs text-gray-700 dark:text-gray-300">
+                                  {category.name}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+
+                          <div className="mt-3 pt-2 border-t border-blue-200 dark:border-blue-700">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={exportOptions.includeUncategorized}
+                                onChange={(e) =>
+                                  setExportOptions((prev) => ({
+                                    ...prev,
+                                    includeUncategorized: e.target.checked,
+                                  }))
+                                }
+                                className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <span className="text-xs text-gray-700 dark:text-gray-300">
+                                Inclure les produits sans catégorie
+                              </span>
+                            </label>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

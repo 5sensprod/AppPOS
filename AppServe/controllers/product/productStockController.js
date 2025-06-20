@@ -5,6 +5,7 @@ const productWooCommerceService = require('../../services/ProductWooCommerceServ
 const ResponseHandler = require('../../handlers/ResponseHandler');
 const exportController = require('../../utils/exportController');
 const StockReportTemplate = require('../../templates/pdf/stockReportTemplate');
+const DetailedStockReportTemplate = require('../../templates/pdf/detailedStockReportTemplate');
 const TemplateHelpers = require('../../templates/pdf/helpers/templateHelpers');
 
 class ProductStockController extends BaseController {
@@ -14,8 +15,9 @@ class ProductStockController extends BaseController {
       deleteFromWoo: (id) => productWooCommerceService.deleteProduct(id),
     });
 
-    // Initialiser le template
+    // Initialiser les templates
     this.stockTemplate = new StockReportTemplate();
+    this.detailedTemplate = new DetailedStockReportTemplate();
     this.helpers = new TemplateHelpers();
   }
 
@@ -148,7 +150,7 @@ class ProductStockController extends BaseController {
       };
     });
 
-    const statistics = {
+    return {
       summary: {
         total_products: allProducts.length,
         simple_products: simpleProducts.length,
@@ -174,11 +176,11 @@ class ProductStockController extends BaseController {
             : 0,
       },
     };
-
-    return statistics;
   }
 
-  // 🆕 Méthode pour trier les produits selon les options
+  /**
+   * Trie les produits selon les options
+   */
   sortProducts(products, sortBy, sortOrder) {
     return [...products].sort((a, b) => {
       let aValue, bValue;
@@ -218,7 +220,10 @@ class ProductStockController extends BaseController {
     try {
       console.log('🔄 Début export PDF...');
 
-      // 🆕 Récupération des nouvelles options
+      // 🔍 Debug: Vérifier ce qui est reçu
+      console.log('📥 Body reçu complet:', JSON.stringify(req.body, null, 2));
+
+      // ✅ 1. D'ABORD extraire TOUTES les variables du req.body
       const {
         companyInfo = {},
         reportType = 'summary',
@@ -226,9 +231,14 @@ class ProductStockController extends BaseController {
         includeCharts = true,
         sortBy = 'name',
         sortOrder = 'asc',
+        groupByCategory = false,
+        selectedCategories = [],
+        includeUncategorized = true,
       } = req.body;
 
       console.log(`📋 Type de rapport: ${reportType}`);
+      console.log(`🏷️ Groupement par catégories: ${groupByCategory}`);
+      console.log(`📂 Catégories sélectionnées: ${selectedCategories}`);
 
       // Récupération des données
       const allProducts = await this.model.findAll();
@@ -249,7 +259,7 @@ class ProductStockController extends BaseController {
       );
       console.log('✅ Statistiques calculées');
 
-      // 🆕 Tri des produits pour le rapport détaillé
+      // Tri des produits pour le rapport détaillé
       let sortedProducts = productsInStock;
       if (reportType === 'detailed') {
         sortedProducts = this.sortProducts(productsInStock, sortBy, sortOrder);
@@ -286,33 +296,43 @@ class ProductStockController extends BaseController {
 
       await page.setViewport({ width: 1200, height: 800 });
 
-      // 🆕 Génération du HTML selon le type de rapport
-      let htmlContent;
+      // ✅ 2. ENSUITE créer templateOptions avec toutes les variables déjà définies
       const templateOptions = {
         companyInfo,
         includeCompanyInfo,
         includeCharts,
+        groupByCategory,
+        selectedCategories,
+        includeUncategorized,
       };
 
+      // ✅ 3. ENFIN générer le HTML via les templates
+      let htmlContent;
       if (reportType === 'detailed') {
-        // Vérifier si la méthode existe dans le template
-        if (typeof this.stockTemplate.generateDetailedStockReportHTML === 'function') {
-          htmlContent = this.stockTemplate.generateDetailedStockReportHTML(
-            stockStats,
-            sortedProducts,
-            templateOptions
-          );
-        } else {
-          // Fallback vers la méthode inline si le template n'a pas encore la méthode
-          htmlContent = this.generateDetailedReportHTML(
-            stockStats,
-            sortedProducts,
-            templateOptions
-          );
-        }
-        console.log('📄 HTML détaillé généré');
+        // 🔥 Utiliser le DetailedStockReportTemplate
+        htmlContent = await this.detailedTemplate.generateDetailedStockReportHTML(
+          stockStats,
+          sortedProducts,
+          templateOptions
+        );
+        console.log('📄 HTML détaillé généré via DetailedStockReportTemplate');
       } else {
-        htmlContent = this.stockTemplate.generateStockReportHTML(stockStats, templateOptions);
+        // Pour le rapport de synthèse
+        if (
+          this.stockTemplate &&
+          typeof this.stockTemplate.generateStockReportHTML === 'function'
+        ) {
+          // Adapter l'appel selon la signature de votre template existant
+          if (this.stockTemplate.generateStockReportHTML.length === 3) {
+            // Nouvelle signature avec options
+            htmlContent = this.stockTemplate.generateStockReportHTML(stockStats, templateOptions);
+          } else {
+            // Ancienne signature
+            htmlContent = this.stockTemplate.generateStockReportHTML(stockStats, companyInfo);
+          }
+        } else {
+          throw new Error('Template de rapport de synthèse non disponible');
+        }
         console.log('📄 HTML synthèse généré via template');
       }
 
@@ -322,7 +342,7 @@ class ProductStockController extends BaseController {
       });
       console.log('📱 Page chargée');
 
-      // Génération du fichier
+      // 🔥 GARDER LA LOGIQUE ORIGINALE AVEC FICHIER TEMPORAIRE
       const path = require('path');
       const os = require('os');
       const filename = `rapport_stock_${reportType}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -330,16 +350,18 @@ class ProductStockController extends BaseController {
 
       console.log('📋 Génération PDF...');
 
-      // 🆕 Configuration PDF adaptée au type de rapport
+      // Configuration PDF adaptée au type de rapport
       const pdfOptions = {
-        path: tempFilePath,
+        path: tempFilePath, // 🔥 FICHIER TEMPORAIRE comme dans l'original
         format: 'A4',
         printBackground: true,
         displayHeaderFooter: true,
-        headerTemplate: this.stockTemplate
-          ? this.stockTemplate.getHeaderTemplate(companyInfo)
-          : '<div></div>',
-        footerTemplate: this.stockTemplate ? this.stockTemplate.getFooterTemplate() : '<div></div>',
+        headerTemplate: this.detailedTemplate
+          ? this.detailedTemplate.getHeaderTemplate(companyInfo)
+          : this.stockTemplate?.getHeaderTemplate?.(companyInfo) || '<div></div>',
+        footerTemplate: this.detailedTemplate
+          ? this.detailedTemplate.getFooterTemplate()
+          : this.stockTemplate?.getFooterTemplate?.() || '<div></div>',
         preferCSSPageSize: true,
         timeout: 30000,
       };
@@ -348,7 +370,7 @@ class ProductStockController extends BaseController {
       if (reportType === 'detailed') {
         pdfOptions.landscape = true;
         pdfOptions.margin = {
-          top: '35mm', // Plus d'espace pour éviter le chevauchement avec le header
+          top: '35mm',
           right: '10mm',
           bottom: '25mm',
           left: '10mm',
@@ -364,13 +386,12 @@ class ProductStockController extends BaseController {
       }
 
       await page.pdf(pdfOptions);
-
       console.log('✅ PDF généré:', tempFilePath);
 
       await browser.close();
       browser = null;
 
-      // Vérification du fichier
+      // 🔥 LOGIQUE ORIGINALE : Vérification et envoi du fichier
       const fs = require('fs');
       if (!fs.existsSync(tempFilePath)) {
         throw new Error("Le fichier PDF n'a pas été créé");
@@ -379,7 +400,7 @@ class ProductStockController extends BaseController {
       const stats = fs.statSync(tempFilePath);
       console.log(`📁 Taille du fichier: ${stats.size} bytes`);
 
-      // Envoi du fichier
+      // 🔥 ENVOI COMME DANS L'ORIGINAL
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', stats.size);
@@ -404,11 +425,13 @@ class ProductStockController extends BaseController {
       fileStream.pipe(res);
     } catch (error) {
       console.error('❌ Erreur export PDF:', error);
+      console.error('❌ Stack trace:', error.stack);
 
       // Nettoyage
       if (browser) {
         try {
           await browser.close();
+          console.log('🧹 Navigateur fermé');
         } catch (closeError) {
           console.error('⚠️ Erreur fermeture navigateur:', closeError);
         }
@@ -419,6 +442,7 @@ class ProductStockController extends BaseController {
         try {
           if (fs.existsSync(tempFilePath)) {
             fs.unlinkSync(tempFilePath);
+            console.log('🗑️ Fichier temporaire nettoyé');
           }
         } catch (cleanupError) {
           console.error('⚠️ Erreur nettoyage:', cleanupError);
@@ -431,170 +455,6 @@ class ProductStockController extends BaseController {
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       });
     }
-  }
-
-  // 🆕 Méthode fallback pour le rapport détaillé (au cas où le template n'a pas encore la méthode)
-  generateDetailedReportHTML(stockStats, productsInStock, options = {}) {
-    const { companyInfo = {}, includeCompanyInfo = true } = options;
-
-    return `
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <title>Rapport de Stock Détaillé</title>
-        <style>
-            ${this.helpers.getAllStyles()}
-            
-            /* Styles spécifiques au rapport détaillé */
-            body { 
-                padding: 0;
-                margin: 0;
-                padding-top: 20mm;    /* 🆕 Espace pour éviter le chevauchement */
-                padding-left: 8mm;
-                padding-right: 8mm;
-                padding-bottom: 10mm;
-            }
-            
-            .company-info { 
-                background: #f9fafb; 
-                border-left: 4px solid #3b82f6; 
-                padding: 8mm; 
-                margin-bottom: 8mm; 
-                page-break-inside: avoid;
-            }
-            
-            .company-name { 
-                font-size: 14pt; 
-                font-weight: 600; 
-                margin-bottom: 3mm; 
-            }
-            
-            .products-table { 
-                width: 100%; 
-                border-collapse: collapse; 
-                font-size: 8pt; 
-                margin-top: 10mm;    /* 🆕 Moins d'espace ici car body a déjà du padding-top */
-                margin-bottom: 10mm;
-            }
-            
-            .products-table th { 
-                background: #374151; 
-                color: white; 
-                padding: 3mm 2mm; 
-                text-align: center; 
-                font-weight: 600; 
-                font-size: 7pt; 
-                border: 1px solid #4b5563; 
-            }
-            
-            .products-table th:first-child, 
-            .products-table th:nth-child(2) { 
-                text-align: left; 
-            }
-            
-            .products-table td { 
-                border: 1px solid #d1d5db; 
-                padding: 2mm; 
-                text-align: right; 
-            }
-            
-            .products-table td:first-child, 
-            .products-table td:nth-child(2) { 
-                text-align: left; 
-            }
-            
-            .products-table tbody tr:nth-child(even) { 
-                background: #f9fafb; 
-            }
-            
-            .totals-row { 
-                background: #e5e7eb !important; 
-                font-weight: bold; 
-                border-top: 2px solid #374151 !important; 
-            }
-            
-            @page { 
-                size: A4 landscape; 
-                margin: 15mm 10mm;  /* 🆕 Marges réduites pour plus d'espace */
-            }
-        </style>
-    </head>
-    <body>
-        <header class="header">
-            <h1>Rapport de Stock Détaillé</h1>
-            <div class="subtitle">
-                Généré le ${this.helpers.formatDate()} à ${this.helpers.formatTime()}
-            </div>
-        </header>
-
-        ${
-          includeCompanyInfo && companyInfo.name
-            ? `
-        <section class="company-info">
-            <div class="company-name">${this.helpers.escapeHtml(companyInfo.name)}</div>
-            <div>${this.helpers.escapeHtml(companyInfo.address || '')}</div>
-            ${companyInfo.siret ? `<div>SIRET : ${this.helpers.escapeHtml(companyInfo.siret)}</div>` : ''}
-        </section>
-        `
-            : ''
-        }
-
-        <table class="products-table">
-            <thead>
-                <tr>
-                    <th>SKU</th>
-                    <th>Désignation</th>
-                    <th>PA HT</th>
-                    <th>PV TTC</th>
-                    <th>Stock</th>
-                    <th>TVA %</th>
-                    <th>Valeur Stock</th>
-                    <th>Montant TVA</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${productsInStock
-                  .map((product) => {
-                    const stock = product.stock || 0;
-                    const purchasePrice = this.helpers.roundTo2Decimals(
-                      product.purchase_price || 0
-                    );
-                    const salePrice = this.helpers.roundTo2Decimals(product.price || 0);
-                    const taxRate = product.tax_rate || 0;
-                    const stockValue = this.helpers.roundTo2Decimals(stock * purchasePrice);
-                    const salePriceHT = taxRate > 0 ? salePrice / (1 + taxRate / 100) : salePrice;
-                    const taxAmount = this.helpers.roundTo2Decimals(
-                      taxRate > 0 ? (stock * salePriceHT * taxRate) / 100 : 0
-                    );
-
-                    return `
-                    <tr>
-                        <td>${this.helpers.escapeHtml(product.sku || '-')}</td>
-                        <td>${this.helpers.escapeHtml((product.name || '').substring(0, 50))}${(product.name || '').length > 50 ? '...' : ''}</td>
-                        <td>${this.helpers.formatCurrency(purchasePrice)}</td>
-                        <td>${this.helpers.formatCurrency(salePrice)}</td>
-                        <td>${this.helpers.formatNumber(stock)}</td>
-                        <td>${this.helpers.formatPercentage(taxRate)}</td>
-                        <td>${this.helpers.formatCurrency(stockValue)}</td>
-                        <td>${this.helpers.formatCurrency(taxAmount)}</td>
-                    </tr>
-                  `;
-                  })
-                  .join('')}
-                
-                <tr class="totals-row">
-                    <td colspan="4"><strong>TOTAL GÉNÉRAL</strong></td>
-                    <td><strong>${this.helpers.formatNumber(productsInStock.reduce((sum, p) => sum + (p.stock || 0), 0))}</strong></td>
-                    <td>-</td>
-                    <td><strong>${this.helpers.formatCurrency(stockStats.financial.inventory_value)}</strong></td>
-                    <td><strong>${this.helpers.formatCurrency(stockStats.financial.tax_amount)}</strong></td>
-                </tr>
-            </tbody>
-        </table>
-    </body>
-    </html>
-    `;
   }
 }
 

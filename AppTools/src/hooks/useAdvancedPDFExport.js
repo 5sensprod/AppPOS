@@ -42,6 +42,9 @@ export const useAdvancedPDFExport = () => {
         includeCompanyInfo = true,
         sortBy = 'name',
         sortOrder = 'asc',
+        groupByCategory = false, // 🆕 Ajout
+        selectedCategories = [], // 🆕 Ajout
+        includeUncategorized = true, // 🆕 Ajout
         autoDownload = true,
         onProgress = null,
         customFileName = null,
@@ -79,6 +82,9 @@ export const useAdvancedPDFExport = () => {
           includeCompanyInfo,
           sortBy,
           sortOrder,
+          groupByCategory, // 🆕 Ajout
+          selectedCategories, // 🆕 Ajout
+          includeUncategorized, // 🆕 Ajout
         };
 
         // Simulation du progrès pendant l'appel API
