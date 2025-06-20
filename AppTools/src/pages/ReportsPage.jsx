@@ -22,9 +22,11 @@ const ReportsPage = () => {
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [categories, setCategories] = useState([]); // 🆕 Liste des catégories
-  const [categoriesWithStock, setCategoriesWithStock] = useState([]); // 🔥 NOUVEAU: Catégories avec stock
+  const [categoryTree, setCategoryTree] = useState([]); // 🔥 Arbre depuis l'API
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
+  const [categorySelectorHeight, setCategorySelectorHeight] = useState(300); // 🔥 État pour la hauteur
+  const [isResizing, setIsResizing] = useState(false); // 🔥 État pour le redimensionnement
   const [exportOptions, setExportOptions] = useState({
     reportType: 'summary',
     includeCompanyInfo: true,
@@ -33,7 +35,7 @@ const ReportsPage = () => {
     sortOrder: 'asc',
     groupByCategory: false,
     selectedCategories: [],
-    includeUncategorized: true,
+    includeUncategorized: false, // 🔥 CHANGÉ : false par défaut
   });
   const { isExporting, exportStockStatisticsToPDF } = useAdvancedPDFExport();
 
@@ -64,172 +66,94 @@ const ReportsPage = () => {
     return `${rate}%`;
   };
 
-  // 🔥 NOUVELLE FONCTION: Construire l'arbre hiérarchique des catégories avec stock
-  const buildCategoryTreeWithStock = (categoriesWithStock) => {
-    console.log("🌳 Construction de l'arbre hiérarchique...");
-
-    // Créer un map pour accès rapide
-    const categoryMap = {};
-    categoriesWithStock.forEach((cat) => {
-      categoryMap[cat._id] = {
-        ...cat,
-        children: [],
-        isExpanded: false,
-      };
-    });
-
-    // Construire l'arbre
-    const rootCategories = [];
-
-    categoriesWithStock.forEach((category) => {
-      if (!category.parent_id) {
-        // Catégorie racine
-        rootCategories.push(categoryMap[category._id]);
-      } else if (categoryMap[category.parent_id]) {
-        // Catégorie enfant dont le parent a aussi du stock
-        categoryMap[category.parent_id].children.push(categoryMap[category._id]);
-      } else {
-        // Le parent n'a pas de stock, cette catégorie devient racine
-        rootCategories.push(categoryMap[category._id]);
-      }
-    });
-
-    // Trier récursivement
-    const sortTree = (categories) => {
-      categories.sort((a, b) => a.name.localeCompare(b.name));
-      categories.forEach((cat) => {
-        if (cat.children.length > 0) {
-          sortTree(cat.children);
-        }
-      });
-    };
-
-    sortTree(rootCategories);
-
-    console.log(`🌳 Arbre construit: ${rootCategories.length} catégories racines`);
-    return rootCategories;
-  };
-
-  // 🔥 NOUVEAU STATE: pour gérer l'état d'expansion de l'arbre
-  const [categoryTree, setCategoryTree] = useState([]);
-  const [expandedCategories, setExpandedCategories] = useState(new Set());
-
-  const calculateCategoriesWithStock = async () => {
+  // 🔥 FONCTION CORRIGÉE: Utiliser l'API hierarchical + croiser avec les données de stock
+  const fetchCategoriesWithStock = async () => {
+    setLoadingCategories(true);
     try {
-      console.log('🔄 Calcul des catégories avec stock...');
+      console.log("🔄 Chargement de l'arbre hiérarchique et des données de stock...");
 
-      // Récupérer toutes les catégories et tous les produits
-      const [categoriesResponse, productsResponse] = await Promise.all([
-        apiService.get('/api/categories'),
+      // 🎯 Récupérer à la fois l'arbre hiérarchique ET les produits avec stock
+      const [hierarchicalResponse, productsResponse] = await Promise.all([
+        apiService.get('/api/categories/hierarchical'),
         apiService.get('/api/products'),
       ]);
 
-      const allCategories = categoriesResponse.data.data || [];
+      const hierarchicalData = hierarchicalResponse.data.data || [];
       const allProducts = productsResponse.data.data || [];
 
       console.log(
-        `📊 ${allCategories.length} catégories et ${allProducts.length} produits trouvés`
+        `📊 ${hierarchicalData.length} catégories racines et ${allProducts.length} produits reçus`
       );
 
-      // Filtrer les produits en stock uniquement
-      const productsInStock = allProducts.filter(
-        (product) => product.type === 'simple' && (product.stock || 0) > 0
-      );
+      // 🔥 Créer un map des produits avec leurs données de stock
+      const productsMap = {};
+      allProducts.forEach((product) => {
+        if (product.type === 'simple' && (product.stock || 0) > 0) {
+          productsMap[product._id] = {
+            ...product,
+            hasStock: true,
+          };
+        }
+      });
 
-      console.log(`📦 ${productsInStock.length} produits en stock`);
+      console.log(`📦 ${Object.keys(productsMap).length} produits en stock trouvés`);
 
-      // 🔥 Fonction récursive pour trouver tous les descendants d'une catégorie
-      const findAllDescendants = (parentId) => {
-        const descendants = [];
-        const directChildren = allCategories.filter((cat) => cat.parent_id === parentId);
+      // 🔥 Filtrer récursivement pour ne garder que les catégories avec des produits en stock
+      const filterCategoriesWithStock = (categories) => {
+        return categories
+          .map((category) => {
+            // Croiser les produits de la catégorie avec ceux qui ont du stock
+            const productsInStock = (category.products || []).filter(
+              (product) => productsMap[product._id] // Le produit existe et a du stock
+            );
 
-        directChildren.forEach((child) => {
-          descendants.push(child._id);
-          // Récursion pour les petits-enfants
-          const grandChildren = findAllDescendants(child._id);
-          descendants.push(...grandChildren);
-        });
+            // Filtrer récursivement les enfants
+            const filteredChildren = category.children
+              ? filterCategoriesWithStock(category.children)
+              : [];
 
-        return descendants;
+            // Calculer le total de produits en stock (cette catégorie + enfants)
+            const totalProductsInStock =
+              productsInStock.length +
+              filteredChildren.reduce((sum, child) => sum + (child.totalProductsInStock || 0), 0);
+
+            // Garder la catégorie si elle a des produits en stock (directement ou via enfants)
+            if (totalProductsInStock > 0) {
+              return {
+                ...category,
+                children: filteredChildren,
+                productsInStock: productsInStock, // 🔥 Produits enrichis avec données de stock
+                productsInStockCount: productsInStock.length,
+                totalProductsInStock: totalProductsInStock,
+                isExpanded: false,
+              };
+            }
+
+            return null;
+          })
+          .filter(Boolean); // Supprimer les nulls
       };
 
-      // Calculer pour chaque catégorie si elle a des produits en stock
-      const categoriesWithStockInfo = allCategories.map((category) => {
-        // Trouver toutes les catégories concernées (elle-même + descendants)
-        const relevantCategories = [category._id, ...findAllDescendants(category._id)];
+      const filteredTree = filterCategoriesWithStock(hierarchicalData);
+      setCategoryTree(filteredTree);
 
-        // Compter les produits en stock dans ces catégories
-        const productsCount = productsInStock.filter((product) => {
-          const productCategories = product.categories || [];
-          return productCategories.some((catId) => relevantCategories.includes(catId));
-        }).length;
+      console.log(`✅ ${filteredTree.length} catégories racines avec stock disponibles`);
 
-        return {
-          ...category,
-          productsInStockCount: productsCount,
-          hasStock: productsCount > 0,
-        };
+      // Debug: afficher quelques catégories
+      filteredTree.slice(0, 3).forEach((cat) => {
+        console.log(
+          `  📂 ${cat.name}: ${cat.totalProductsInStock} produits total (${cat.productsInStockCount} directs)`
+        );
       });
-
-      // Filtrer seulement celles avec du stock
-      const categoriesWithStock = categoriesWithStockInfo.filter((cat) => cat.hasStock);
-
-      console.log(`✅ ${categoriesWithStock.length} catégories avec stock trouvées`);
-
-      // Debug: afficher quelques catégories avec stock
-      categoriesWithStock.slice(0, 5).forEach((cat) => {
-        console.log(`  📂 ${cat.name}: ${cat.productsInStockCount} produits en stock`);
-      });
-
-      return categoriesWithStock.sort((a, b) => a.name.localeCompare(b.name));
-    } catch (error) {
-      console.error('❌ Erreur calcul catégories avec stock:', error);
-      return [];
-    }
-  };
-
-  // 🆕 Fonction pour charger les catégories (version améliorée)
-  const fetchCategories = async () => {
-    setLoadingCategories(true);
-    try {
-      // Charger toutes les catégories pour l'ancien système
-      const response = await apiService.get('/api/categories');
-      setCategories(response.data.data || []);
-
-      // 🔥 Charger les catégories avec stock pour la nouvelle fonctionnalité
-      const categoriesWithStockData = await calculateCategoriesWithStock();
-      setCategoriesWithStock(categoriesWithStockData);
-
-      // 🔥 NOUVEAU: Construire l'arbre hiérarchique
-      const tree = buildCategoryTreeWithStock(categoriesWithStockData);
-      setCategoryTree(tree);
-
-      console.log(`📊 ${categoriesWithStockData.length} catégories avec stock disponibles`);
-      console.log(`🌳 ${tree.length} catégories racines dans l'arbre`);
     } catch (err) {
-      console.error('Erreur chargement catégories:', err);
+      console.error('❌ Erreur chargement catégories hiérarchiques:', err);
+      setCategoryTree([]);
     } finally {
       setLoadingCategories(false);
     }
   };
 
-  // 🔥 FONCTION MANQUANTE: Charger les statistiques de stock
-  const fetchStockStatistics = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await apiService.get('/api/products/stock/statistics');
-      setStockStats(response.data.data);
-      setLastUpdate(new Date());
-    } catch (err) {
-      setError('Erreur lors du chargement des statistiques');
-      console.error('Erreur stats:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🔥 NOUVELLES FONCTIONS: Gestion de l'arbre hiérarchique
+  // Fonctions de gestion de l'arbre
   const toggleCategoryExpansion = (categoryId) => {
     setExpandedCategories((prev) => {
       const newSet = new Set(prev);
@@ -246,7 +170,7 @@ const ReportsPage = () => {
     let ids = [];
     categories.forEach((cat) => {
       ids.push(cat._id);
-      if (cat.children.length > 0) {
+      if (cat.children && cat.children.length > 0) {
         ids.push(...collectAllCategoryIds(cat.children));
       }
     });
@@ -268,11 +192,50 @@ const ReportsPage = () => {
     }));
   };
 
-  // 🔥 COMPOSANT: Rendu récursif de l'arbre de catégories
+  const expandAllCategories = () => {
+    const allIds = collectAllCategoryIds(categoryTree);
+    setExpandedCategories(new Set(allIds));
+  };
+
+  const collapseAllCategories = () => {
+    setExpandedCategories(new Set());
+  };
+
+  // 🔥 NOUVEAU : Système de redimensionnement avec la souris
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    setIsResizing(true);
+
+    const startY = e.clientY;
+    const startHeight = categorySelectorHeight;
+
+    const handleMouseMove = (e) => {
+      const deltaY = e.clientY - startY;
+      const newHeight = Math.max(200, Math.min(500, startHeight + deltaY));
+      setCategorySelectorHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = ''; // Réactiver la sélection de texte
+      document.body.style.cursor = ''; // Restaurer le curseur
+    };
+
+    // Désactiver la sélection de texte pendant le redimensionnement
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'ns-resize';
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // 🔥 COMPOSANT: Rendu récursif de l'arbre de catégories (optimisé)
   const CategoryTreeNode = ({ category, level = 0 }) => {
     const isExpanded = expandedCategories.has(category._id);
     const isSelected = exportOptions.selectedCategories.includes(category._id);
-    const hasChildren = category.children.length > 0;
+    const hasChildren = category.children && category.children.length > 0;
 
     const handleToggleSelection = (e) => {
       const isChecking = e.target.checked;
@@ -297,9 +260,7 @@ const ReportsPage = () => {
     return (
       <div className="select-none">
         <div
-          className={`flex items-center gap-2 py-1 px-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded ${
-            level > 0 ? 'ml-' + level * 4 : ''
-          }`}
+          className={`flex items-center gap-2 py-1 px-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded`}
           style={{ marginLeft: level * 16 }}
         >
           {/* Bouton d'expansion */}
@@ -333,16 +294,29 @@ const ReportsPage = () => {
             className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
 
-          {/* Nom et badge */}
-          <label className="flex items-center gap-2 cursor-pointer flex-1 text-xs">
+          {/* Nom et badges */}
+          <label className="flex items-center gap-2 cursor-pointer flex-1 text-sm">
+            {' '}
+            {/* 🔥 text-sm au lieu de text-xs */}
             <span
               className={`text-gray-700 dark:text-gray-300 ${hasChildren ? 'font-medium' : ''}`}
             >
               {category.name}
             </span>
-            <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-xs font-medium">
-              {category.productsInStockCount}
-            </span>
+            {category.productsInStockCount > 0 && (
+              <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium">
+                {' '}
+                {/* 🔥 px-2 py-1 plus grand */}
+                {category.productsInStockCount}
+              </span>
+            )}
+            {category.totalProductsInStock > category.productsInStockCount && (
+              <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium">
+                {' '}
+                {/* 🔥 px-2 py-1 plus grand */}+
+                {category.totalProductsInStock - category.productsInStockCount}
+              </span>
+            )}
           </label>
         </div>
 
@@ -358,6 +332,21 @@ const ReportsPage = () => {
     );
   };
 
+  const fetchStockStatistics = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiService.get('/api/products/stock/statistics');
+      setStockStats(response.data.data);
+      setLastUpdate(new Date());
+    } catch (err) {
+      setError('Erreur lors du chargement des statistiques');
+      console.error('Erreur stats:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleExportPDF = async () => {
     try {
       const companyInfo = {
@@ -366,7 +355,6 @@ const ReportsPage = () => {
         siret: '418 647 574 00031',
       };
 
-      // Préparer les options pour l'API
       const apiOptions = {
         companyInfo,
         reportType: exportOptions.reportType,
@@ -379,7 +367,6 @@ const ReportsPage = () => {
         includeUncategorized: exportOptions.includeUncategorized,
       };
 
-      // 🔍 Debug: Vérifier ce qui est envoyé
       console.log("📤 Options envoyées à l'API:", apiOptions);
       console.log('🏷️ groupByCategory:', exportOptions.groupByCategory);
       console.log('📂 selectedCategories:', exportOptions.selectedCategories);
@@ -392,9 +379,27 @@ const ReportsPage = () => {
     }
   };
 
+  // Calculer le total de produits sélectionnés
+  const getSelectedProductsCount = () => {
+    const calculateTotal = (categories) => {
+      return categories.reduce((total, cat) => {
+        let catTotal = 0;
+        if (exportOptions.selectedCategories.includes(cat._id)) {
+          catTotal += cat.totalProductsInStock || 0;
+        }
+        if (cat.children) {
+          catTotal += calculateTotal(cat.children);
+        }
+        return total + catTotal;
+      }, 0);
+    };
+
+    return calculateTotal(categoryTree);
+  };
+
   useEffect(() => {
     fetchStockStatistics();
-    fetchCategories(); // 🆕 Charger aussi les catégories
+    fetchCategoriesWithStock(); // 🔥 Utilisation de la nouvelle fonction optimisée
   }, []);
 
   if (loading) {
@@ -693,8 +698,8 @@ const ReportsPage = () => {
                             groupByCategory: e.target.checked,
                             selectedCategories: e.target.checked ? prev.selectedCategories : [],
                           }));
-                          if (e.target.checked && categoriesWithStock.length === 0) {
-                            fetchCategories();
+                          if (e.target.checked && categoryTree.length === 0) {
+                            fetchCategoriesWithStock();
                           }
                         }}
                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -708,7 +713,7 @@ const ReportsPage = () => {
                     </p>
                   </div>
 
-                  {/* 🔥 NOUVELLE SÉLECTION DES CATÉGORIES avec stock uniquement */}
+                  {/* 🔥 Sélection des catégories avec arbre hiérarchique optimisé */}
                   {exportOptions.groupByCategory && (
                     <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
                       <h5 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
@@ -722,7 +727,7 @@ const ReportsPage = () => {
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-center gap-3 mb-3">
+                          <div className="flex items-center gap-3 mb-3 flex-wrap">
                             <button
                               type="button"
                               onClick={selectAllCategories}
@@ -740,39 +745,81 @@ const ReportsPage = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                // Développer/Réduire tout
-                                const allIds = collectAllCategoryIds(categoryTree);
-                                setExpandedCategories((prev) =>
-                                  prev.size === allIds.length ? new Set() : new Set(allIds)
-                                );
+                                if (expandedCategories.size === 0) {
+                                  expandAllCategories();
+                                } else {
+                                  collapseAllCategories();
+                                }
                               }}
                               className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700"
                             >
-                              {expandedCategories.size ===
-                              collectAllCategoryIds(categoryTree).length
-                                ? 'Réduire tout'
-                                : 'Développer tout'}
+                              {expandedCategories.size === 0 ? 'Développer tout' : 'Réduire tout'}
                             </button>
                             <span className="text-xs text-blue-700 dark:text-blue-300">
-                              {exportOptions.selectedCategories.length} /{' '}
-                              {categoriesWithStock.length} sélectionnées
+                              {exportOptions.selectedCategories.length} sélectionnées
                             </span>
                           </div>
 
-                          <div className="max-h-40 overflow-y-auto border border-blue-200 dark:border-blue-700 rounded bg-white dark:bg-gray-800 p-2">
-                            {categoryTree.length > 0 ? (
-                              categoryTree.map((category) => (
-                                <CategoryTreeNode
-                                  key={category._id}
-                                  category={category}
-                                  level={0}
-                                />
-                              ))
-                            ) : (
-                              <div className="text-xs text-gray-500 italic p-2">
-                                Aucune catégorie disponible
+                          {/* 🔥 NOUVEAU : Zone redimensionnable avec vraie poignée fonctionnelle */}
+                          <div className="relative">
+                            <div
+                              className="overflow-y-auto border border-blue-200 dark:border-blue-700 rounded bg-white dark:bg-gray-800 p-3"
+                              style={{
+                                height: `${categorySelectorHeight}px`,
+                                minHeight: '200px',
+                                maxHeight: '500px',
+                              }}
+                            >
+                              {categoryTree.length > 0 ? (
+                                categoryTree.map((category) => (
+                                  <CategoryTreeNode
+                                    key={category._id}
+                                    category={category}
+                                    level={0}
+                                  />
+                                ))
+                              ) : (
+                                <div className="text-xs text-gray-500 italic p-2">
+                                  Aucune catégorie avec stock disponible
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 🔥 Poignée de redimensionnement fonctionnelle */}
+                            <div
+                              className={`absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center group ${
+                                isResizing
+                                  ? 'bg-blue-500'
+                                  : 'bg-blue-200 dark:bg-blue-700 hover:bg-blue-300 dark:hover:bg-blue-600'
+                              } transition-colors duration-200`}
+                              onMouseDown={handleResizeStart}
+                              style={{ borderRadius: '0 0 6px 6px' }}
+                            >
+                              {/* Lignes de la poignée */}
+                              <div className="flex flex-col items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <div className="w-8 h-0.5 bg-white dark:bg-gray-300 rounded"></div>
+                                <div className="w-6 h-0.5 bg-white dark:bg-gray-300 rounded"></div>
+                                <div className="w-4 h-0.5 bg-white dark:bg-gray-300 rounded"></div>
                               </div>
-                            )}
+                            </div>
+                          </div>
+
+                          {/* Légende des badges */}
+                          <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-1">
+                                <span className="bg-blue-100 text-blue-700 px-1 rounded text-xs">
+                                  12
+                                </span>
+                                <span>Produits directs</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="bg-green-100 text-green-700 px-1 rounded text-xs">
+                                  +8
+                                </span>
+                                <span>Produits des sous-catégories</span>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Affichage d'un message si aucune catégorie n'a de stock */}
@@ -922,7 +969,7 @@ const ReportsPage = () => {
                 </div>
               )}
 
-              {/* 🔥 NOUVELLE SECTION: Résumé de la sélection */}
+              {/* 🔥 NOUVELLE SECTION: Résumé de la sélection optimisée */}
               {exportOptions.groupByCategory && exportOptions.selectedCategories.length > 0 && (
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
                   <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">
@@ -934,14 +981,7 @@ const ReportsPage = () => {
                       sélectionnée(s)
                     </div>
                     <div className="text-xs">
-                      Total estimé:{' '}
-                      <strong>
-                        {categoriesWithStock
-                          .filter((cat) => exportOptions.selectedCategories.includes(cat._id))
-                          .reduce((sum, cat) => sum + cat.productsInStockCount, 0)}{' '}
-                        produits
-                      </strong>{' '}
-                      dans les catégories sélectionnées
+                      Total estimé: <strong>{getSelectedProductsCount()} produits</strong> en stock
                     </div>
                   </div>
                 </div>
