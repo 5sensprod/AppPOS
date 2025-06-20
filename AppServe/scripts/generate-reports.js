@@ -17,6 +17,12 @@ const availableReports = [
     file: './rapports/produits-sans-stock.js',
     description: 'Liste les produits avec stock à 0, null ou undefined',
   },
+  {
+    id: 'produits-sans-categorie',
+    name: 'Produits sans catégorie',
+    file: './rapports/produits-sans-categorie.js',
+    description: 'Liste les produits sans catégorie assignée',
+  },
   // Ajouter d'autres rapports ici au fur et à mesure
 ];
 
@@ -43,6 +49,7 @@ function showHelp() {
   console.log('  node scripts/generate-reports.js codes-barres-zero');
   console.log('  node scripts/generate-reports.js codes-barres-zero --source=old');
   console.log('  node scripts/generate-reports.js produits-sans-stock --source=new');
+  console.log('  node scripts/generate-reports.js produits-sans-categorie');
   console.log('  node scripts/generate-reports.js --list');
 }
 
