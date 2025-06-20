@@ -23,16 +23,17 @@ const ReportsPage = () => {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [categories, setCategories] = useState([]); // 🆕 Liste des catégories
-  const [loadingCategories, setLoadingCategories] = useState(false); // 🆕
+  const [categoriesWithStock, setCategoriesWithStock] = useState([]); // 🔥 NOUVEAU: Catégories avec stock
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [exportOptions, setExportOptions] = useState({
-    reportType: 'summary', // 'summary' ou 'detailed'
+    reportType: 'summary',
     includeCompanyInfo: true,
     includeCharts: true,
-    sortBy: 'name', // 'name', 'sku', 'stock', 'value'
-    sortOrder: 'asc', // 'asc', 'desc'
-    groupByCategory: false, // 🆕 Nouveauté
-    selectedCategories: [], // 🆕 Nouveauté
-    includeUncategorized: true, // 🆕 Nouveauté
+    sortBy: 'name',
+    sortOrder: 'asc',
+    groupByCategory: false,
+    selectedCategories: [],
+    includeUncategorized: true,
   });
   const { isExporting, exportStockStatisticsToPDF } = useAdvancedPDFExport();
 
@@ -63,12 +64,148 @@ const ReportsPage = () => {
     return `${rate}%`;
   };
 
-  // 🆕 Fonction pour charger les catégories
+  // 🔥 NOUVELLE FONCTION: Construire l'arbre hiérarchique des catégories avec stock
+  const buildCategoryTreeWithStock = (categoriesWithStock) => {
+    console.log("🌳 Construction de l'arbre hiérarchique...");
+
+    // Créer un map pour accès rapide
+    const categoryMap = {};
+    categoriesWithStock.forEach((cat) => {
+      categoryMap[cat._id] = {
+        ...cat,
+        children: [],
+        isExpanded: false,
+      };
+    });
+
+    // Construire l'arbre
+    const rootCategories = [];
+
+    categoriesWithStock.forEach((category) => {
+      if (!category.parent_id) {
+        // Catégorie racine
+        rootCategories.push(categoryMap[category._id]);
+      } else if (categoryMap[category.parent_id]) {
+        // Catégorie enfant dont le parent a aussi du stock
+        categoryMap[category.parent_id].children.push(categoryMap[category._id]);
+      } else {
+        // Le parent n'a pas de stock, cette catégorie devient racine
+        rootCategories.push(categoryMap[category._id]);
+      }
+    });
+
+    // Trier récursivement
+    const sortTree = (categories) => {
+      categories.sort((a, b) => a.name.localeCompare(b.name));
+      categories.forEach((cat) => {
+        if (cat.children.length > 0) {
+          sortTree(cat.children);
+        }
+      });
+    };
+
+    sortTree(rootCategories);
+
+    console.log(`🌳 Arbre construit: ${rootCategories.length} catégories racines`);
+    return rootCategories;
+  };
+
+  // 🔥 NOUVEAU STATE: pour gérer l'état d'expansion de l'arbre
+  const [categoryTree, setCategoryTree] = useState([]);
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
+
+  const calculateCategoriesWithStock = async () => {
+    try {
+      console.log('🔄 Calcul des catégories avec stock...');
+
+      // Récupérer toutes les catégories et tous les produits
+      const [categoriesResponse, productsResponse] = await Promise.all([
+        apiService.get('/api/categories'),
+        apiService.get('/api/products'),
+      ]);
+
+      const allCategories = categoriesResponse.data.data || [];
+      const allProducts = productsResponse.data.data || [];
+
+      console.log(
+        `📊 ${allCategories.length} catégories et ${allProducts.length} produits trouvés`
+      );
+
+      // Filtrer les produits en stock uniquement
+      const productsInStock = allProducts.filter(
+        (product) => product.type === 'simple' && (product.stock || 0) > 0
+      );
+
+      console.log(`📦 ${productsInStock.length} produits en stock`);
+
+      // 🔥 Fonction récursive pour trouver tous les descendants d'une catégorie
+      const findAllDescendants = (parentId) => {
+        const descendants = [];
+        const directChildren = allCategories.filter((cat) => cat.parent_id === parentId);
+
+        directChildren.forEach((child) => {
+          descendants.push(child._id);
+          // Récursion pour les petits-enfants
+          const grandChildren = findAllDescendants(child._id);
+          descendants.push(...grandChildren);
+        });
+
+        return descendants;
+      };
+
+      // Calculer pour chaque catégorie si elle a des produits en stock
+      const categoriesWithStockInfo = allCategories.map((category) => {
+        // Trouver toutes les catégories concernées (elle-même + descendants)
+        const relevantCategories = [category._id, ...findAllDescendants(category._id)];
+
+        // Compter les produits en stock dans ces catégories
+        const productsCount = productsInStock.filter((product) => {
+          const productCategories = product.categories || [];
+          return productCategories.some((catId) => relevantCategories.includes(catId));
+        }).length;
+
+        return {
+          ...category,
+          productsInStockCount: productsCount,
+          hasStock: productsCount > 0,
+        };
+      });
+
+      // Filtrer seulement celles avec du stock
+      const categoriesWithStock = categoriesWithStockInfo.filter((cat) => cat.hasStock);
+
+      console.log(`✅ ${categoriesWithStock.length} catégories avec stock trouvées`);
+
+      // Debug: afficher quelques catégories avec stock
+      categoriesWithStock.slice(0, 5).forEach((cat) => {
+        console.log(`  📂 ${cat.name}: ${cat.productsInStockCount} produits en stock`);
+      });
+
+      return categoriesWithStock.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error) {
+      console.error('❌ Erreur calcul catégories avec stock:', error);
+      return [];
+    }
+  };
+
+  // 🆕 Fonction pour charger les catégories (version améliorée)
   const fetchCategories = async () => {
     setLoadingCategories(true);
     try {
+      // Charger toutes les catégories pour l'ancien système
       const response = await apiService.get('/api/categories');
       setCategories(response.data.data || []);
+
+      // 🔥 Charger les catégories avec stock pour la nouvelle fonctionnalité
+      const categoriesWithStockData = await calculateCategoriesWithStock();
+      setCategoriesWithStock(categoriesWithStockData);
+
+      // 🔥 NOUVEAU: Construire l'arbre hiérarchique
+      const tree = buildCategoryTreeWithStock(categoriesWithStockData);
+      setCategoryTree(tree);
+
+      console.log(`📊 ${categoriesWithStockData.length} catégories avec stock disponibles`);
+      console.log(`🌳 ${tree.length} catégories racines dans l'arbre`);
     } catch (err) {
       console.error('Erreur chargement catégories:', err);
     } finally {
@@ -76,6 +213,7 @@ const ReportsPage = () => {
     }
   };
 
+  // 🔥 FONCTION MANQUANTE: Charger les statistiques de stock
   const fetchStockStatistics = async () => {
     setLoading(true);
     setError(null);
@@ -89,6 +227,135 @@ const ReportsPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 🔥 NOUVELLES FONCTIONS: Gestion de l'arbre hiérarchique
+  const toggleCategoryExpansion = (categoryId) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
+
+  const collectAllCategoryIds = (categories) => {
+    let ids = [];
+    categories.forEach((cat) => {
+      ids.push(cat._id);
+      if (cat.children.length > 0) {
+        ids.push(...collectAllCategoryIds(cat.children));
+      }
+    });
+    return ids;
+  };
+
+  const selectAllCategories = () => {
+    const allIds = collectAllCategoryIds(categoryTree);
+    setExportOptions((prev) => ({
+      ...prev,
+      selectedCategories: allIds,
+    }));
+  };
+
+  const deselectAllCategories = () => {
+    setExportOptions((prev) => ({
+      ...prev,
+      selectedCategories: [],
+    }));
+  };
+
+  // 🔥 COMPOSANT: Rendu récursif de l'arbre de catégories
+  const CategoryTreeNode = ({ category, level = 0 }) => {
+    const isExpanded = expandedCategories.has(category._id);
+    const isSelected = exportOptions.selectedCategories.includes(category._id);
+    const hasChildren = category.children.length > 0;
+
+    const handleToggleSelection = (e) => {
+      const isChecking = e.target.checked;
+
+      // Collecter tous les IDs (catégorie + descendants)
+      const categoryAndDescendants = [category._id];
+      if (hasChildren) {
+        categoryAndDescendants.push(...collectAllCategoryIds(category.children));
+      }
+
+      setExportOptions((prev) => ({
+        ...prev,
+        selectedCategories: isChecking
+          ? [
+              ...prev.selectedCategories,
+              ...categoryAndDescendants.filter((id) => !prev.selectedCategories.includes(id)),
+            ]
+          : prev.selectedCategories.filter((id) => !categoryAndDescendants.includes(id)),
+      }));
+    };
+
+    return (
+      <div className="select-none">
+        <div
+          className={`flex items-center gap-2 py-1 px-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded ${
+            level > 0 ? 'ml-' + level * 4 : ''
+          }`}
+          style={{ marginLeft: level * 16 }}
+        >
+          {/* Bouton d'expansion */}
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={() => toggleCategoryExpansion(category._id)}
+              className="w-4 h-4 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <svg
+                className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          ) : (
+            <div className="w-4" />
+          )}
+
+          {/* Checkbox */}
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={handleToggleSelection}
+            className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+
+          {/* Nom et badge */}
+          <label className="flex items-center gap-2 cursor-pointer flex-1 text-xs">
+            <span
+              className={`text-gray-700 dark:text-gray-300 ${hasChildren ? 'font-medium' : ''}`}
+            >
+              {category.name}
+            </span>
+            <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-xs font-medium">
+              {category.productsInStockCount}
+            </span>
+          </label>
+        </div>
+
+        {/* Enfants */}
+        {hasChildren && isExpanded && (
+          <div className="mt-1">
+            {category.children.map((child) => (
+              <CategoryTreeNode key={child._id} category={child} level={level + 1} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleExportPDF = async () => {
@@ -107,9 +374,9 @@ const ReportsPage = () => {
         includeCharts: exportOptions.includeCharts,
         sortBy: exportOptions.sortBy,
         sortOrder: exportOptions.sortOrder,
-        groupByCategory: exportOptions.groupByCategory, // 🆕
-        selectedCategories: exportOptions.selectedCategories, // 🆕
-        includeUncategorized: exportOptions.includeUncategorized, // 🆕
+        groupByCategory: exportOptions.groupByCategory,
+        selectedCategories: exportOptions.selectedCategories,
+        includeUncategorized: exportOptions.includeUncategorized,
       };
 
       // 🔍 Debug: Vérifier ce qui est envoyé
@@ -424,10 +691,9 @@ const ReportsPage = () => {
                           setExportOptions((prev) => ({
                             ...prev,
                             groupByCategory: e.target.checked,
-                            // Si on active le groupement, charger les catégories si pas encore fait
                             selectedCategories: e.target.checked ? prev.selectedCategories : [],
                           }));
-                          if (e.target.checked && categories.length === 0) {
+                          if (e.target.checked && categoriesWithStock.length === 0) {
                             fetchCategories();
                           }
                         }}
@@ -442,11 +708,11 @@ const ReportsPage = () => {
                     </p>
                   </div>
 
-                  {/* Sélection des catégories si groupement activé */}
+                  {/* 🔥 NOUVELLE SÉLECTION DES CATÉGORIES avec stock uniquement */}
                   {exportOptions.groupByCategory && (
                     <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
                       <h5 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                        Sélection des catégories
+                        Sélection des catégories (avec stock uniquement)
                       </h5>
 
                       {loadingCategories ? (
@@ -459,61 +725,62 @@ const ReportsPage = () => {
                           <div className="flex items-center gap-3 mb-3">
                             <button
                               type="button"
-                              onClick={() =>
-                                setExportOptions((prev) => ({
-                                  ...prev,
-                                  selectedCategories: categories.map((c) => c._id),
-                                }))
-                              }
+                              onClick={selectAllCategories}
                               className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
                             >
                               Tout sélectionner
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                setExportOptions((prev) => ({
-                                  ...prev,
-                                  selectedCategories: [],
-                                }))
-                              }
+                              onClick={deselectAllCategories}
                               className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700"
                             >
                               Tout désélectionner
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Développer/Réduire tout
+                                const allIds = collectAllCategoryIds(categoryTree);
+                                setExpandedCategories((prev) =>
+                                  prev.size === allIds.length ? new Set() : new Set(allIds)
+                                );
+                              }}
+                              className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700"
+                            >
+                              {expandedCategories.size ===
+                              collectAllCategoryIds(categoryTree).length
+                                ? 'Réduire tout'
+                                : 'Développer tout'}
+                            </button>
                             <span className="text-xs text-blue-700 dark:text-blue-300">
-                              {exportOptions.selectedCategories.length} / {categories.length}{' '}
-                              sélectionnées
+                              {exportOptions.selectedCategories.length} /{' '}
+                              {categoriesWithStock.length} sélectionnées
                             </span>
                           </div>
 
-                          <div className="max-h-32 overflow-y-auto space-y-2">
-                            {categories.map((category) => (
-                              <label
-                                key={category._id}
-                                className="flex items-center gap-2 cursor-pointer"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={exportOptions.selectedCategories.includes(category._id)}
-                                  onChange={(e) => {
-                                    setExportOptions((prev) => ({
-                                      ...prev,
-                                      selectedCategories: e.target.checked
-                                        ? [...prev.selectedCategories, category._id]
-                                        : prev.selectedCategories.filter(
-                                            (id) => id !== category._id
-                                          ),
-                                    }));
-                                  }}
-                                  className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          <div className="max-h-40 overflow-y-auto border border-blue-200 dark:border-blue-700 rounded bg-white dark:bg-gray-800 p-2">
+                            {categoryTree.length > 0 ? (
+                              categoryTree.map((category) => (
+                                <CategoryTreeNode
+                                  key={category._id}
+                                  category={category}
+                                  level={0}
                                 />
-                                <span className="text-xs text-gray-700 dark:text-gray-300">
-                                  {category.name}
-                                </span>
-                              </label>
-                            ))}
+                              ))
+                            ) : (
+                              <div className="text-xs text-gray-500 italic p-2">
+                                Aucune catégorie disponible
+                              </div>
+                            )}
                           </div>
+
+                          {/* Affichage d'un message si aucune catégorie n'a de stock */}
+                          {categoryTree.length === 0 && (
+                            <div className="text-xs text-orange-600 italic">
+                              Aucune catégorie ne contient de produits en stock
+                            </div>
+                          )}
 
                           <div className="mt-3 pt-2 border-t border-blue-200 dark:border-blue-700">
                             <label className="flex items-center gap-2 cursor-pointer">
@@ -650,6 +917,31 @@ const ReportsPage = () => {
                     </div>
                     <div>
                       • <strong>Montant TVA</strong> - TVA calculée sur la valeur de vente
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 🔥 NOUVELLE SECTION: Résumé de la sélection */}
+              {exportOptions.groupByCategory && exportOptions.selectedCategories.length > 0 && (
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                  <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">
+                    Aperçu de la sélection
+                  </h4>
+                  <div className="text-sm text-green-800 dark:text-green-200">
+                    <div className="mb-2">
+                      <strong>{exportOptions.selectedCategories.length}</strong> catégorie(s)
+                      sélectionnée(s)
+                    </div>
+                    <div className="text-xs">
+                      Total estimé:{' '}
+                      <strong>
+                        {categoriesWithStock
+                          .filter((cat) => exportOptions.selectedCategories.includes(cat._id))
+                          .reduce((sum, cat) => sum + cat.productsInStockCount, 0)}{' '}
+                        produits
+                      </strong>{' '}
+                      dans les catégories sélectionnées
                     </div>
                   </div>
                 </div>
