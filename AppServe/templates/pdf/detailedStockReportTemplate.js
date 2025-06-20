@@ -539,70 +539,59 @@ class DetailedStockReportTemplate {
             );
 
             return `
-          <tr>
-              <td>${this.helpers.escapeHtml(product.sku || '-')}</td>
-              <td>${this.helpers.escapeHtml((product.name || '').substring(0, 50))}${(product.name || '').length > 50 ? '...' : ''}</td>
-              <td>${this.helpers.formatCurrency(purchasePrice)}</td>
-              <td>${this.helpers.formatCurrency(salePrice)}</td>
-              <td>${this.helpers.formatNumber(stock)}</td>
-              <td>${this.helpers.formatPercentage(taxRate)}</td>
-              <td>${this.helpers.formatCurrency(stockValue)}</td>
-              <td>${this.helpers.formatCurrency(taxAmount)}</td>
-          </tr>
-        `;
+        <tr>
+            <td>${this.helpers.escapeHtml(product.sku || '-')}</td>
+            <td>${this.helpers.escapeHtml((product.name || '').substring(0, 50))}${(product.name || '').length > 50 ? '...' : ''}</td>
+            <td>${this.helpers.formatCurrency(purchasePrice)}</td>
+            <td>${this.helpers.formatCurrency(salePrice)}</td>
+            <td>${this.helpers.formatNumber(stock)}</td>
+            <td>${this.helpers.formatPercentage(taxRate)}</td>
+            <td>${this.helpers.formatCurrency(stockValue)}</td>
+            <td>${this.helpers.formatCurrency(taxAmount)}</td>
+        </tr>
+      `;
           })
           .join('');
 
         return `
-        <section class="category-section">
-            <div class="category-header">
-                <div class="category-title">${this.helpers.escapeHtml(categoryInfo.path_string)}</div>
-                <div class="category-stats">
-                    <div class="category-stat">
-                        <span class="stat-label">Produits</span>
-                        <span class="stat-value">${this.helpers.formatNumber(stats.productCount)}</span>
-                    </div>
-                    <div class="category-stat">
-                        <span class="stat-label">Stock Total</span>
-                        <span class="stat-value">${this.helpers.formatNumber(stats.totalStock)}</span>
-                    </div>
-                    <div class="category-stat">
-                        <span class="stat-label">Valeur</span>
-                        <span class="stat-value">${this.helpers.formatCurrency(stats.totalValue)}</span>
-                    </div>
-                    <div class="category-stat">
-                        <span class="stat-label">TVA</span>
-                        <span class="stat-value">${this.helpers.formatCurrency(stats.totalTax)}</span>
-                    </div>
-                </div>
-            </div>
+      <section class="category-section">
+          <!-- 🔥 NOUVEAU: En-tête compact harmonisé -->
+          <div class="category-header-compact">
+              <h3 class="category-title-compact">${this.helpers.escapeHtml(categoryInfo.path_string)}</h3>
+              <div class="category-stats-inline">
+                  <span class="stat-compact">${this.helpers.formatNumber(stats.productCount)} produits</span>
+                  <span class="stat-compact">Stock: ${this.helpers.formatNumber(stats.totalStock)}</span>
+                  <span class="stat-compact">Valeur: ${this.helpers.formatCurrency(stats.totalValue)}</span>
+                  <span class="stat-compact">TVA: ${this.helpers.formatCurrency(stats.totalTax)}</span>
+              </div>
+          </div>
 
-            <table class="products-table">
-                <thead>
-                    <tr>
-                        <th>SKU</th>
-                        <th>Désignation</th>
-                        <th>PA HT</th>
-                        <th>PV TTC</th>
-                        <th>Stock</th>
-                        <th>TVA %</th>
-                        <th>Valeur Stock</th>
-                        <th>Montant TVA</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${productRows}
-                    <tr class="category-totals-row">
-                        <td colspan="4"><strong>TOTAL ${this.helpers.escapeHtml(categoryInfo.name.toUpperCase())}</strong></td>
-                        <td><strong>${this.helpers.formatNumber(stats.totalStock)}</strong></td>
-                        <td>-</td>
-                        <td><strong>${this.helpers.formatCurrency(stats.totalValue)}</strong></td>
-                        <td><strong>${this.helpers.formatCurrency(stats.totalTax)}</strong></td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-      `;
+          <table class="products-table">
+              <thead>
+                  <tr>
+                      <th>SKU</th>
+                      <th>Désignation</th>
+                      <th>PA HT</th>
+                      <th>PV TTC</th>
+                      <th>Stock</th>
+                      <th>TVA %</th>
+                      <th>Valeur Stock</th>
+                      <th>Montant TVA</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  ${productRows}
+                  <tr class="category-totals-row">
+                      <td colspan="4"><strong>TOTAL ${this.helpers.escapeHtml(categoryInfo.name.toUpperCase())}</strong></td>
+                      <td><strong>${this.helpers.formatNumber(stats.totalStock)}</strong></td>
+                      <td>-</td>
+                      <td><strong>${this.helpers.formatCurrency(stats.totalValue)}</strong></td>
+                      <td><strong>${this.helpers.formatCurrency(stats.totalTax)}</strong></td>
+                  </tr>
+              </tbody>
+          </table>
+      </section>
+    `;
       })
       .join('');
   }
@@ -805,90 +794,144 @@ class DetailedStockReportTemplate {
    */
   getCategoryGroupedStyles() {
     return `
-    ${this.getDetailedStyles()}
+  ${this.getDetailedStyles()}
 
-    /* Styles spécifiques pour les groupes de catégories */
-    .category-section {
-      margin-bottom: 15mm;
-      page-break-inside: avoid;
-    }
+  /* 🔥 RÉDUCTION DES MARGES GÉNÉRALES */
+  body { 
+    padding: 0;
+    margin: 0;
+    padding-top: 15mm; /* Réduit de 20mm à 15mm */
+    padding-left: 6mm;  /* Réduit de 8mm à 6mm */
+    padding-right: 6mm;
+    padding-bottom: 8mm; /* Réduit de 10mm à 8mm */
+    font-size: 9pt; /* Réduit la police de base */
+  }
 
-    .category-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 6mm;
-      margin-bottom: 5mm;
-      border-radius: 3mm;
-      page-break-inside: avoid;
-    }
+  /* 🔥 EN-TÊTE COMPACT HARMONISÉ */
+  .category-section {
+    margin-bottom: 8mm; /* Réduit de 15mm à 8mm */
+    page-break-inside: avoid;
+  }
 
-    .category-title {
-      font-size: 16pt;
-      font-weight: 700;
-      margin-bottom: 2mm;
-    }
+  .category-header-compact {
+    background: #374151; /* Style sobre comme stockReportTemplate */
+    color: white;
+    padding: 3mm 5mm; /* Réduit le padding */
+    margin-bottom: 2mm; /* Réduit l'espace */
+    border-radius: 0; /* Style carré plus professionnel */
+    border-left: 4px solid #3b82f6; /* Accent bleu */
+    page-break-inside: avoid;
+  }
 
-    .category-stats {
-      font-size: 10pt;
-      opacity: 0.9;
-      display: flex;
-      gap: 15mm;
-      flex-wrap: wrap;
-    }
+  .category-title-compact {
+    font-size: 12pt; /* Réduit de 16pt à 12pt */
+    font-weight: 700;
+    margin: 0;
+    margin-bottom: 2mm;
+  }
 
-    .category-stat {
-      display: flex;
-      flex-direction: column;
-    }
+  .category-stats-inline {
+    font-size: 8pt; /* Réduit la taille */
+    display: flex;
+    gap: 8mm; /* Espacement réduit */
+    flex-wrap: wrap;
+    opacity: 0.9;
+  }
 
-    .stat-label {
-      font-size: 8pt;
-      opacity: 0.8;
-      text-transform: uppercase;
-      letter-spacing: 0.5pt;
-    }
+  .stat-compact {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1mm 2mm;
+    border-radius: 2mm;
+    font-weight: 500;
+  }
 
-    .stat-value {
-      font-size: 11pt;
-      font-weight: 600;
-    }
+  /* 🔥 TABLEAUX PLUS COMPACTS */
+  .products-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    font-size: 7pt; /* Réduit de 8pt à 7pt */
+    margin-top: 2mm; /* Réduit de 10mm à 2mm */
+    margin-bottom: 5mm; /* Réduit de 10mm à 5mm */
+  }
 
-    .category-totals-row { 
-      background: #e2e8f0 !important; 
-      font-weight: bold; 
-      border-top: 2px solid #374151 !important;
-    }
+  .products-table th { 
+    background: #374151; 
+    color: white; 
+    padding: 2mm 1.5mm; /* Réduit le padding */
+    text-align: center; 
+    font-weight: 600; 
+    font-size: 6pt; /* Encore plus petit pour les en-têtes */
+    border: 1px solid #4b5563; 
+  }
 
-    .final-totals-row { 
-      background: #d1d5db !important; 
-      font-weight: bold; 
-      border-top: 3px solid #1f2937 !important;
-      font-size: 9pt;
-    }
+  .products-table td { 
+    border: 1px solid #d1d5db; 
+    padding: 1.5mm 1mm; /* Réduit le padding */
+    text-align: right; 
+    font-size: 7pt;
+  }
 
-    .summary-section {
-      background: #f0f9ff;
-      border: 2px solid #3b82f6;
-      border-radius: 5mm;
-      padding: 8mm;
-      margin-top: 10mm;
-      page-break-inside: avoid;
-    }
+  /* 🔥 SECTION SYNTHÈSE PLUS COMPACTE */
+  .summary-section {
+    background: #f0f9ff;
+    border: 1px solid #3b82f6; /* Bordure plus fine */
+    border-radius: 3mm;
+    padding: 5mm; /* Réduit de 8mm à 5mm */
+    margin-top: 5mm; /* Réduit de 10mm à 5mm */
+    page-break-inside: avoid;
+  }
 
-    .summary-title {
-      font-size: 14pt;
-      font-weight: 700;
-      color: #1e40af;
-      margin-bottom: 5mm;
-      text-align: center;
-    }
+  .summary-title {
+    font-size: 12pt; /* Réduit de 14pt à 12pt */
+    font-weight: 700;
+    color: #1e40af;
+    margin-bottom: 3mm; /* Réduit de 5mm à 3mm */
+    text-align: center;
+  }
 
-    .summary-content {
-      font-size: 10pt;
-      line-height: 1.6;
-      text-align: justify;
-    }
-    `;
+  .summary-content {
+    font-size: 9pt; /* Réduit de 10pt à 9pt */
+    line-height: 1.4; /* Réduit l'interlignage */
+    text-align: justify;
+  }
+
+  /* 🔥 INFORMATIONS ENTREPRISE COMPACTES */
+  .company-info { 
+    background: #f9fafb; 
+    border-left: 3px solid #3b82f6; /* Réduit de 4px à 3px */
+    padding: 5mm; /* Réduit de 8mm à 5mm */
+    margin-bottom: 5mm; /* Réduit de 8mm à 5mm */
+    page-break-inside: avoid;
+  }
+
+  .company-name { 
+    font-size: 12pt; /* Réduit de 14pt à 12pt */
+    font-weight: 600; 
+    margin-bottom: 2mm; /* Réduit de 3mm à 2mm */
+  }
+
+  /* 🔥 OPTIMISATION IMPRESSION */
+  @page { 
+    size: A4 landscape; 
+    margin: 12mm 8mm; /* Marges réduites */
+  }
+
+  /* 🔥 ÉVITER LES COUPURES DE PAGE */
+  .category-section {
+    page-break-inside: avoid;
+  }
+
+  .category-header-compact + .products-table {
+    page-break-before: avoid;
+  }
+
+  .final-totals-row { 
+    background: #d1d5db !important; 
+    font-weight: bold; 
+    border-top: 2px solid #1f2937 !important;
+    font-size: 8pt; /* Taille réduite */
+  }
+  `;
   }
 }
 
