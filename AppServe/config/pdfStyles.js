@@ -2,13 +2,39 @@
 
 /**
  * Configuration centralisée des styles CSS pour les rapports PDF
- * Style minimaliste optimisé pour l'impression
+ * Système hybride : valeurs par défaut + surcharges configurables
  */
 class PDFStyles {
   /**
-   * Styles de base pour tous les PDFs
+   * Configuration des tailles par défaut
    */
-  static getBase() {
+  static getDefaultSizes() {
+    return {
+      // Tailles de base
+      baseFont: '10pt',
+      // Tableaux
+      tableFont: '11pt',
+      tableHeaderFont: '10pt',
+      // En-têtes
+      mainTitle: '18pt',
+      sectionTitle: '12pt',
+      categoryTitle: '11pt',
+      // Métriques
+      metricValue: '14pt',
+      metricLabel: '8pt',
+      // Texte - 🔥 MODIFIEZ ICI pour la synthèse
+      bodyText: '11pt', // ← Était '9pt', maintenant '11pt'
+      smallText: '10pt', // ← Était '8pt', maintenant '10pt'
+      footerText: '9pt', // ← Était '7pt', maintenant '9pt'
+    };
+  }
+
+  /**
+   * Styles de base avec tailles configurables
+   */
+  static getBase(sizes = {}) {
+    const s = { ...this.getDefaultSizes(), ...sizes };
+
     return `
       * {
         margin: 0;
@@ -18,7 +44,7 @@ class PDFStyles {
 
       body {
         font-family: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        font-size: 10pt;
+        font-size: ${s.baseFont};
         line-height: 1.4;
         color: #000;
         background: white;
@@ -35,8 +61,9 @@ class PDFStyles {
       @media print {
         body {
           margin: 0;
-          padding: 6mm;
-          font-size: 9pt;
+          padding: 8mm;
+          padding-top: 12mm;
+          font-size: ${s.baseFont};
         }
         
         .page {
@@ -53,7 +80,7 @@ class PDFStyles {
 
       @page {
         size: A4;
-        margin: 10mm;
+        margin: 15mm;
         orphans: 3;
         widows: 3;
       }
@@ -63,7 +90,9 @@ class PDFStyles {
   /**
    * Styles pour les en-têtes
    */
-  static getHeader() {
+  static getHeader(sizes = {}) {
+    const s = { ...this.getDefaultSizes(), ...sizes };
+
     return `
       .header {
         border-bottom: 2px solid #000;
@@ -73,7 +102,7 @@ class PDFStyles {
       }
 
       .header h1 {
-        font-size: 18pt;
+        font-size: ${s.mainTitle};
         font-weight: 700;
         color: #000;
         margin-bottom: 2mm;
@@ -82,7 +111,7 @@ class PDFStyles {
       }
 
       .header .subtitle {
-        font-size: 9pt;
+        font-size: ${s.bodyText};
         color: #333;
         font-weight: 400;
       }
@@ -90,42 +119,17 @@ class PDFStyles {
   }
 
   /**
-   * Styles pour les informations d'entreprise
+   * Styles pour les tableaux (le plus important !)
    */
-  static getCompany() {
-    return `
-      .company-info {
-        border-left: 3px solid #000;
-        padding: 4mm 6mm;
-        margin-bottom: 6mm;
-        page-break-inside: avoid;
-      }
+  static getTables(sizes = {}) {
+    const s = { ...this.getDefaultSizes(), ...sizes };
 
-      .company-name {
-        font-size: 12pt;
-        font-weight: 600;
-        margin-bottom: 2mm;
-        color: #000;
-      }
-
-      .company-details {
-        font-size: 8pt;
-        color: #333;
-        line-height: 1.3;
-      }
-    `;
-  }
-
-  /**
-   * Styles pour les tableaux (minimaliste)
-   */
-  static getTables() {
     return `
       .data-table {
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 4mm;
-        font-size: 8pt;
+        font-size: ${s.tableFont};
       }
 
       .data-table th {
@@ -134,7 +138,7 @@ class PDFStyles {
         padding: 2mm 1.5mm;
         text-align: center;
         font-weight: bold;
-        font-size: 7pt;
+        font-size: ${s.tableHeaderFont};
         text-transform: uppercase;
         letter-spacing: 0.3pt;
       }
@@ -149,6 +153,7 @@ class PDFStyles {
         padding: 1.5mm 1mm;
         text-align: right;
         vertical-align: middle;
+        font-size: ${s.tableFont};
       }
 
       .data-table td:first-child,
@@ -160,13 +165,14 @@ class PDFStyles {
         background: white !important;
         font-weight: bold;
         border-top: 2px solid #000 !important;
+        font-size: ${s.tableFont};
       }
 
       .final-totals-row {
         background: white !important;
         font-weight: bold;
         border-top: 3px solid #000 !important;
-        font-size: 9pt;
+        font-size: ${s.bodyText};
       }
     `;
   }
@@ -174,7 +180,9 @@ class PDFStyles {
   /**
    * Styles pour les métriques
    */
-  static getMetrics() {
+  static getMetrics(sizes = {}) {
+    const s = { ...this.getDefaultSizes(), ...sizes };
+
     return `
       .metrics-section {
         margin-bottom: 6mm;
@@ -182,7 +190,7 @@ class PDFStyles {
       }
 
       .metrics-title {
-        font-size: 12pt;
+        font-size: ${s.sectionTitle};
         font-weight: 600;
         margin-bottom: 4mm;
         color: #000;
@@ -205,7 +213,7 @@ class PDFStyles {
       }
 
       .metric-label {
-        font-size: 8pt;
+        font-size: ${s.metricLabel};
         color: #333;
         margin-bottom: 1mm;
         font-weight: 500;
@@ -214,23 +222,25 @@ class PDFStyles {
       }
 
       .metric-value {
-        font-size: 14pt;
+        font-size: ${s.metricValue};
         font-weight: 700;
         color: #000;
         margin-bottom: 1mm;
       }
 
       .metric-subtitle {
-        font-size: 7pt;
+        font-size: ${s.footerText};
         color: #666;
       }
     `;
   }
 
   /**
-   * Styles pour les catégories (compact et minimaliste)
+   * Styles pour les catégories
    */
-  static getCategories() {
+  static getCategories(sizes = {}) {
+    const s = { ...this.getDefaultSizes(), ...sizes };
+
     return `
       .category-header {
         background: white;
@@ -243,7 +253,7 @@ class PDFStyles {
       }
 
       .category-title {
-        font-size: 11pt;
+        font-size: ${s.categoryTitle};
         font-weight: 600;
         margin: 0;
         margin-bottom: 2mm;
@@ -253,7 +263,7 @@ class PDFStyles {
       }
 
       .category-stats {
-        font-size: 8pt;
+        font-size: ${s.smallText};
         color: #333;
         display: flex;
         gap: 6mm;
@@ -269,7 +279,9 @@ class PDFStyles {
   /**
    * Styles pour la synthèse
    */
-  static getSummary() {
+  static getSummary(sizes = {}) {
+    const s = { ...this.getDefaultSizes(), ...sizes };
+
     return `
       .summary {
         border: 2px solid #000;
@@ -280,7 +292,7 @@ class PDFStyles {
       }
 
       .summary h3 {
-        font-size: 11pt;
+        font-size: ${s.categoryTitle};
         margin-bottom: 4mm;
         font-weight: 600;
         color: #000;
@@ -288,7 +300,7 @@ class PDFStyles {
       }
 
       .summary p {
-        font-size: 9pt;
+        font-size: ${s.bodyText};
         line-height: 1.4;
         margin-bottom: 3mm;
         text-align: justify;
@@ -302,7 +314,7 @@ class PDFStyles {
   }
 
   /**
-   * Styles spécifiques pour le layout compact
+   * Layout compact
    */
   static getCompactLayout() {
     return `
@@ -324,7 +336,7 @@ class PDFStyles {
   }
 
   /**
-   * Configuration pour paysage
+   * Configuration paysage
    */
   static getLandscapeConfig() {
     return `
@@ -348,27 +360,87 @@ class PDFStyles {
   }
 
   /**
-   * Assemblage des styles selon le type de rapport
+   * 🎯 MÉTHODE PRINCIPALE : Assemblage intelligent des styles
    */
   static getStylesFor(reportType, options = {}) {
-    const { landscape = false, groupByCategory = false } = options;
+    const {
+      landscape = false,
+      groupByCategory = false,
+      // 🔥 Options de tailles personnalisées
+      tableFontSize = null,
+      fontSize = 'normal', // 'small', 'normal', 'large'
+      customSizes = {},
+    } = options;
 
-    let styles = [this.getBase(), this.getHeader(), this.getCompany(), this.getTables()];
+    // 📏 Présets de tailles
+    const sizePresets = {
+      small: {
+        baseFont: '9pt',
+        tableFont: '7pt',
+        tableHeaderFont: '6pt',
+        mainTitle: '16pt',
+        sectionTitle: '10pt',
+        categoryTitle: '9pt',
+        metricValue: '12pt',
+        metricLabel: '7pt',
+        bodyText: '8pt',
+        smallText: '7pt',
+        footerText: '6pt',
+      },
+      normal: this.getDefaultSizes(),
+      large: {
+        baseFont: '11pt',
+        tableFont: '10pt',
+        tableHeaderFont: '9pt',
+        mainTitle: '20pt',
+        sectionTitle: '14pt',
+        categoryTitle: '13pt',
+        metricValue: '16pt',
+        metricLabel: '9pt',
+        bodyText: '10pt',
+        smallText: '9pt',
+        footerText: '8pt',
+      },
+    };
+
+    // 🎨 Calcul des tailles finales
+    let finalSizes = { ...sizePresets[fontSize] };
+
+    // Override spécifique pour les tableaux
+    if (tableFontSize) {
+      finalSizes.tableFont = tableFontSize;
+      finalSizes.tableHeaderFont = tableFontSize;
+    }
+
+    // Override personnalisés
+    finalSizes = { ...finalSizes, ...customSizes };
+
+    // 🏗️ Construction des styles
+    let styles = [
+      this.getBase(finalSizes),
+      this.getHeader(finalSizes),
+      this.getCompany(finalSizes),
+      this.getTables(finalSizes),
+    ];
 
     switch (reportType) {
       case 'summary':
-        styles.push(this.getMetrics(), this.getSummary(), this.getCompactLayout());
+        styles.push(
+          this.getMetrics(finalSizes),
+          this.getSummary(finalSizes),
+          this.getCompactLayout()
+        );
         break;
 
       case 'detailed':
         if (groupByCategory) {
-          styles.push(this.getCategories());
+          styles.push(this.getCategories(finalSizes));
         }
-        styles.push(this.getSummary());
+        styles.push(this.getSummary(finalSizes));
         break;
 
       case 'grouped':
-        styles.push(this.getCategories(), this.getSummary());
+        styles.push(this.getCategories(finalSizes), this.getSummary(finalSizes));
         break;
     }
 
@@ -377,6 +449,35 @@ class PDFStyles {
     }
 
     return styles.join('\n');
+  }
+
+  /**
+   * 🎯 Méthode pour les informations d'entreprise (ajoutée pour cohérence)
+   */
+  static getCompany(sizes = {}) {
+    const s = { ...this.getDefaultSizes(), ...sizes };
+
+    return `
+      .company-info {
+        border-left: 3px solid #000;
+        padding: 4mm 6mm;
+        margin-bottom: 6mm;
+        page-break-inside: avoid;
+      }
+
+      .company-name {
+        font-size: ${s.sectionTitle};
+        font-weight: 600;
+        margin-bottom: 2mm;
+        color: #000;
+      }
+
+      .company-details {
+        font-size: ${s.smallText};
+        color: #333;
+        line-height: 1.3;
+      }
+    `;
   }
 }
 

@@ -182,7 +182,7 @@ class DetailedStockReportTemplate {
    */
   getHeaderTemplate(companyInfo) {
     return `
-    <div style="font-size: 10px; color: #666; text-align: center; width: 100%; margin-top: 10px;">
+    <div style="font-size: 10px; color: #666; text-align: center; width: 100%; margin-top: 1px;">
       ${this.helpers.escapeHtml(companyInfo.name || 'Rapport de Stock Détaillé')} - Page <span class="pageNumber"></span> sur <span class="totalPages"></span>
     </div>
     `;

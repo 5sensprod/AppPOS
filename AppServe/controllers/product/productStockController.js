@@ -370,7 +370,7 @@ class ProductStockController extends BaseController {
       if (reportType === 'detailed') {
         pdfOptions.landscape = true;
         pdfOptions.margin = {
-          top: '35mm',
+          top: '50mm',
           right: '10mm',
           bottom: '25mm',
           left: '10mm',
@@ -378,7 +378,7 @@ class ProductStockController extends BaseController {
       } else {
         // Rapport de synthèse (portrait)
         pdfOptions.margin = {
-          top: '30mm',
+          top: '45mm',
           right: '15mm',
           bottom: '25mm',
           left: '15mm',
