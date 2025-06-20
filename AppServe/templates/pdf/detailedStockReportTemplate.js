@@ -629,24 +629,72 @@ class DetailedStockReportTemplate {
   /**
    * Génère le résumé pour le rapport par catégories
    */
+  /**
+   * 🔥 FONCTION CORRIGÉE: Génère le résumé pour le rapport par catégories
+   */
   renderCategorySummary(stockStats, groupEntries, selectedCategories) {
+    // 🔥 CALCUL CORRECT: Utiliser les données des groupes sélectionnés
+    const selectedProductsCount = groupEntries.reduce((total, [key, group]) => {
+      return total + group.stats.productCount;
+    }, 0);
+
+    const selectedInventoryValue = groupEntries.reduce((total, [key, group]) => {
+      return total + group.stats.totalValue;
+    }, 0);
+
+    const selectedTaxAmount = groupEntries.reduce((total, [key, group]) => {
+      return total + group.stats.totalTax;
+    }, 0);
+
+    // 🔥 CALCUL DU POTENTIEL COMMERCIAL pour les catégories sélectionnées
+    const selectedRetailValue = groupEntries.reduce((total, [key, group]) => {
+      return (
+        total +
+        group.products.reduce((subTotal, product) => {
+          const stock = product.stock || 0;
+          const salePrice = product.price || 0;
+          return subTotal + stock * salePrice;
+        }, 0)
+      );
+    }, 0);
+
+    // 🔥 CALCUL DES POURCENTAGES par rapport au total
+    const percentageProducts =
+      stockStats.summary.products_in_stock > 0
+        ? ((selectedProductsCount / stockStats.summary.products_in_stock) * 100).toFixed(1)
+        : 0;
+
+    const percentageValue =
+      stockStats.financial.inventory_value > 0
+        ? ((selectedInventoryValue / stockStats.financial.inventory_value) * 100).toFixed(1)
+        : 0;
+
+    // 🔥 CONSTRUCTION DES NOMS DES CATÉGORIES
+    const categoryNames = groupEntries.map(([key, group]) => group.categoryInfo.name).join(', ');
+
     const noteText =
       selectedCategories.length > 0
         ? `<br><br><em>Note: Ce rapport ne présente que les catégories sélectionnées (${selectedCategories.length} sur le total disponible) et leurs sous-catégories.</em>`
         : '';
 
     return `
-    <section class="summary-section">
-        <div class="summary-title">Synthèse par Catégories</div>
-        <div class="summary-content">
-            Ce rapport présente <strong>${this.helpers.formatNumber(stockStats.summary.products_in_stock)} produits</strong> 
-            répartis dans <strong>${groupEntries.length} catégorie(s)</strong>.
-            La valeur totale du stock représente <strong>${this.helpers.formatCurrency(stockStats.financial.inventory_value)}</strong> 
-            pour un potentiel commercial de <strong>${this.helpers.formatCurrency(stockStats.financial.retail_value)}</strong>.
-            ${noteText}
-        </div>
-    </section>
-    `;
+  <section class="summary-section">
+      <div class="summary-title">Synthèse par Catégories</div>
+      <div class="summary-content">
+          Ce rapport présente <strong>${this.helpers.formatNumber(selectedProductsCount)} produits</strong> 
+          dans ${groupEntries.length > 1 ? 'les catégories' : 'la catégorie'} : <strong>${categoryNames}</strong>.
+          <br><br>
+          Cette sélection représente <strong>${percentageProducts}%</strong> du stock total 
+          (${this.helpers.formatNumber(selectedProductsCount)} sur ${this.helpers.formatNumber(stockStats.summary.products_in_stock)} produits)
+          pour une valeur de <strong>${this.helpers.formatCurrency(selectedInventoryValue)}</strong> 
+          soit <strong>${percentageValue}%</strong> de la valeur totale du stock.
+          <br><br>
+          Potentiel commercial total : <strong>${this.helpers.formatCurrency(selectedRetailValue)}</strong> 
+          (marge potentielle : <strong>${this.helpers.formatCurrency(selectedRetailValue - selectedInventoryValue)}</strong>)
+          ${noteText}
+      </div>
+  </section>
+  `;
   }
 
   /**
