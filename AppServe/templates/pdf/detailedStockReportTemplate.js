@@ -2,20 +2,13 @@
 
 const TemplateHelpers = require('./helpers/templateHelpers');
 const Category = require('../../models/Category');
-const { buildCategoryPath } = require('../../utils/categoryHelpers'); // 🔥 Utilisation des helpers
+const { buildCategoryPath } = require('../../utils/categoryHelpers');
 
 class DetailedStockReportTemplate {
   constructor() {
     this.helpers = new TemplateHelpers();
   }
 
-  /**
-   * Génère le HTML complet du rapport de stock détaillé
-   * @param {Object} stockStats - Statistiques de stock
-   * @param {Array} productsInStock - Produits en stock
-   * @param {Object} options - Options du rapport
-   * @returns {string} - HTML complet
-   */
   async generateDetailedStockReportHTML(stockStats, productsInStock, options = {}) {
     const {
       companyInfo = {},
@@ -25,18 +18,13 @@ class DetailedStockReportTemplate {
       includeUncategorized = true,
     } = options;
 
-    // Si groupement par catégorie demandé, générer le rapport groupé
     if (groupByCategory) {
       return await this.generateCategoryGroupedReportHTML(stockStats, productsInStock, options);
     }
 
-    // Sinon, générer le rapport standard
     return this.generateStandardDetailedReportHTML(stockStats, productsInStock, options);
   }
 
-  /**
-   * Génère le rapport détaillé standard (sans groupement)
-   */
   generateStandardDetailedReportHTML(stockStats, productsInStock, options = {}) {
     const { companyInfo = {}, includeCompanyInfo = true } = options;
 
@@ -125,7 +113,6 @@ class DetailedStockReportTemplate {
             .join('');
 
           return `
-      <!-- 🔥 EN-TÊTE DE CATÉGORIE SOBRE -->
       <div class="category-header-simple">
           <h2 class="category-title-simple">${this.helpers.escapeHtml(categoryInfo.path_string)}</h2>
           <div class="category-stats-simple">
@@ -165,7 +152,6 @@ class DetailedStockReportTemplate {
         .join('') +
       `
     
-    <!-- 🔥 TOTAL GÉNÉRAL (une seule fois à la fin) -->
     <table class="data-table">
         <tbody>
             <tr class="final-totals-row">
@@ -182,7 +168,6 @@ class DetailedStockReportTemplate {
   }
 
   renderCompactCategorySummary(stockStats, groupEntries, selectedCategories) {
-    // Calculs des données sélectionnées
     const selectedProductsCount = groupEntries.reduce((total, [key, group]) => {
       return total + group.stats.productCount;
     }, 0);
@@ -202,7 +187,6 @@ class DetailedStockReportTemplate {
       );
     }, 0);
 
-    // Calculs des pourcentages
     const percentageProducts =
       stockStats.summary.products_in_stock > 0
         ? ((selectedProductsCount / stockStats.summary.products_in_stock) * 100).toFixed(1)
@@ -213,7 +197,6 @@ class DetailedStockReportTemplate {
         ? ((selectedInventoryValue / stockStats.financial.inventory_value) * 100).toFixed(1)
         : 0;
 
-    // Noms des catégories
     const categoryNames = groupEntries.map(([key, group]) => group.categoryInfo.name).join(', ');
 
     return `
@@ -254,7 +237,6 @@ class DetailedStockReportTemplate {
     return `
   ${this.helpers.getAllStyles()}
 
-  /* 🔥 BODY OPTIMISÉ POUR DÉMARRER DIRECTEMENT */
   body { 
     padding: 0;
     margin: 0;
@@ -265,7 +247,6 @@ class DetailedStockReportTemplate {
     font-size: 10pt;   /* Taille normale */
   }
 
-  /* 🔥 EN-TÊTE MINIMAL */
   .header {
     border-bottom: 2px solid #3b82f6;
     padding-bottom: 4mm;  /* Très réduit */
@@ -286,7 +267,6 @@ class DetailedStockReportTemplate {
     font-weight: 400;
   }
 
-  /* 🔥 INFORMATIONS ENTREPRISE COMPACTES */
   .company-info {
     background: #f9fafb;
     border-left: 3px solid #3b82f6;
@@ -308,7 +288,6 @@ class DetailedStockReportTemplate {
     line-height: 1.4;
   }
 
-  /* 🔥 EN-TÊTES DE CATÉGORIES SOBRES (comme stockReportTemplate) */
   .category-header-simple {
     background: #f8fafc;
     border-left: 4px solid #3b82f6;
@@ -341,7 +320,6 @@ class DetailedStockReportTemplate {
     /* Style simple sans fond coloré */
   }
 
-  /* 🔥 TABLEAUX STANDARD (comme stockReportTemplate) */
   .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -381,7 +359,6 @@ class DetailedStockReportTemplate {
     background: #f9fafb;
   }
 
-  /* 🔥 LIGNES DE TOTAUX */
   .totals-row {
     background: #e5e7eb !important;
     font-weight: bold;
@@ -395,7 +372,6 @@ class DetailedStockReportTemplate {
     font-size: 9pt;
   }
 
-  /* 🔥 SECTION SYNTHÈSE (comme stockReportTemplate) */
   .summary {
     border: 2px solid #3b82f6;
     padding: 6mm;         /* Réduit de 8mm à 6mm */
@@ -424,13 +400,11 @@ class DetailedStockReportTemplate {
     color: #000;
   }
 
-  /* 🔥 OPTIMISATION D'IMPRESSION */
   @page { 
     size: A4 landscape; 
     margin: 10mm 8mm;    /* Marges minimales */
   }
 
-  /* 🔥 PAS DE SAUT DE PAGE ENTRE CATÉGORIES */
   .category-header-simple {
     page-break-before: avoid;
   }
@@ -440,9 +414,7 @@ class DetailedStockReportTemplate {
   }
   `;
   }
-  /**
-   * Génère le rapport détaillé groupé par catégories
-   */
+
   async generateCategoryGroupedReportHTML(stockStats, productsInStock, options = {}) {
     const {
       companyInfo = {},
@@ -452,7 +424,6 @@ class DetailedStockReportTemplate {
     } = options;
 
     try {
-      // Grouper les produits par catégorie
       const groupedProducts = await this.groupProductsByCategory(
         productsInStock,
         selectedCategories,
@@ -488,52 +459,31 @@ class DetailedStockReportTemplate {
     }
   }
 
-  /**
-   * 🔥 NOUVELLE VERSION : Groupe les produits par catégorie avec hiérarchie
-   * @param {Array} products - Liste des produits
-   * @param {Array} selectedCategories - Catégories sélectionnées
-   * @param {boolean} includeUncategorized - Inclure les produits sans catégorie
-   * @returns {Object} - Produits groupés par catégorie
-   */
   async groupProductsByCategory(products, selectedCategories = [], includeUncategorized = true) {
     console.log(`🏷️ Groupement par catégories: ${selectedCategories.length} sélectionnées`);
     console.log(`📂 Catégories sélectionnées:`, selectedCategories);
 
     try {
-      // Récupérer toutes les catégories pour construire les chemins
       const allCategories = await Category.findAll();
       console.log(`📋 ${allCategories.length} catégories trouvées dans la base`);
 
-      // 🔥 ÉTAPE 1: Si des catégories sont sélectionnées, trouver TOUTES leurs descendants
       let effectiveCategories = [];
 
       if (selectedCategories.length > 0) {
         console.log(`🔍 Recherche des descendants pour les catégories sélectionnées...`);
 
-        // Pour chaque catégorie sélectionnée, inclure elle-même ET tous ses descendants
         for (const selectedCatId of selectedCategories) {
-          // Ajouter la catégorie elle-même
           effectiveCategories.push(selectedCatId);
 
-          // Trouver tous ses descendants
           const descendants = this.findAllDescendants(allCategories, selectedCatId);
           effectiveCategories.push(...descendants);
         }
 
-        // Supprimer les doublons
         effectiveCategories = [...new Set(effectiveCategories)];
-
-        console.log(
-          `📈 Categories effectives (avec descendants): ${effectiveCategories.length}`,
-          effectiveCategories
-        );
       } else {
-        // Si aucune catégorie sélectionnée, utiliser toutes les catégories
         effectiveCategories = allCategories.map((c) => c._id);
-        console.log(`📊 Toutes les catégories utilisées: ${effectiveCategories.length}`);
       }
 
-      // Créer un map des catégories pour un accès rapide
       const categoryMap = {};
       allCategories.forEach((cat) => {
         categoryMap[cat._id] = {
@@ -545,12 +495,11 @@ class DetailedStockReportTemplate {
       const groupedProducts = {};
       const processedProductIds = new Set();
 
-      // Fonction pour obtenir le chemin formaté d'une catégorie
       const getCategoryPath = (categoryId) => {
         if (!categoryId || !categoryMap[categoryId]) return null;
 
         try {
-          const pathInfo = buildCategoryPath(allCategories, categoryId); // 🔥 Utilisation des helpers
+          const pathInfo = buildCategoryPath(allCategories, categoryId);
           return {
             id: categoryId,
             name: categoryMap[categoryId].name,
@@ -570,20 +519,9 @@ class DetailedStockReportTemplate {
         }
       };
 
-      // 🔥 ÉTAPE 2: Traiter chaque produit
-      console.log(`🔄 Traitement de ${products.length} produits...`);
-
       products.forEach((product, index) => {
         const productCategories = product.categories || [];
 
-        if (index < 5) {
-          // Debug pour les 5 premiers produits
-          console.log(
-            `🎹 Produit "${product.name}": catégories = [${productCategories.join(', ')}]`
-          );
-        }
-
-        // Filtrer les catégories du produit selon la sélection effective
         let categoriesToProcess = productCategories;
         if (selectedCategories.length > 0) {
           categoriesToProcess = productCategories.filter((catId) =>
@@ -596,9 +534,7 @@ class DetailedStockReportTemplate {
         }
 
         if (categoriesToProcess.length > 0) {
-          // Pour chaque catégorie du produit, l'ajouter au groupe de sa catégorie racine sélectionnée
           categoriesToProcess.forEach((categoryId) => {
-            // 🔥 Trouver la catégorie racine sélectionnée pour cette catégorie
             const rootSelectedCategory = this.findRootSelectedCategory(
               allCategories,
               categoryId,
@@ -623,7 +559,6 @@ class DetailedStockReportTemplate {
                   };
                 }
 
-                // Éviter les doublons
                 if (!groupedProducts[key].products.find((p) => p._id === product._id)) {
                   groupedProducts[key].products.push(product);
 
@@ -639,20 +574,15 @@ class DetailedStockReportTemplate {
         }
       });
 
-      console.log(`✅ Produits traités: ${processedProductIds.size}/${products.length}`);
-
-      // 🔥 ÉTAPE 3: Ajouter les produits sans catégorie si demandé
       if (includeUncategorized) {
         const uncategorizedProducts = products.filter((product) => {
           const hasNoCategories = !product.categories || product.categories.length === 0;
           const notProcessed = !processedProductIds.has(product._id);
 
-          // Si des catégories sont sélectionnées, ne prendre que les non-catégorisés
           if (selectedCategories.length > 0) {
             return hasNoCategories;
           }
 
-          // Sinon, prendre ceux non traités
           return notProcessed || hasNoCategories;
         });
 
@@ -673,12 +603,9 @@ class DetailedStockReportTemplate {
               totalTax: 0,
             },
           };
-
-          console.log(`📂 Ajout de ${uncategorizedProducts.length} produits sans catégorie`);
         }
       }
 
-      // Calculer les statistiques pour chaque groupe
       Object.keys(groupedProducts).forEach((key) => {
         const group = groupedProducts[key];
         group.stats.productCount = group.products.length;
@@ -699,14 +626,10 @@ class DetailedStockReportTemplate {
         });
       });
 
-      // Trier les groupes par niveau de catégorie puis par nom
       const sortedGroups = Object.entries(groupedProducts)
         .sort(([aKey, aGroup], [bKey, bGroup]) => {
-          // D'abord par niveau (parents avant enfants)
           const levelDiff = aGroup.categoryInfo.level - bGroup.categoryInfo.level;
           if (levelDiff !== 0) return levelDiff;
-
-          // Puis par nom alphabétique
           return aKey.localeCompare(bKey, 'fr');
         })
         .reduce((acc, [key, group]) => {
@@ -714,9 +637,6 @@ class DetailedStockReportTemplate {
           return acc;
         }, {});
 
-      console.log(`✅ ${Object.keys(sortedGroups).length} groupes de catégories créés`);
-
-      // Debug des groupes créés
       Object.entries(sortedGroups).forEach(([key, group]) => {
         console.log(`📊 Groupe "${key}": ${group.products.length} produits`);
       });
@@ -724,7 +644,6 @@ class DetailedStockReportTemplate {
       return sortedGroups;
     } catch (error) {
       console.error('❌ Erreur groupement par catégories:', error);
-      // En cas d'erreur, retourner tous les produits dans un groupe unique
       return {
         'Tous les produits': {
           categoryInfo: {
@@ -749,21 +668,13 @@ class DetailedStockReportTemplate {
     }
   }
 
-  /**
-   * 🔥 NOUVELLE FONCTION: Trouve tous les descendants d'une catégorie
-   * @param {Array} allCategories - Toutes les catégories
-   * @param {string} parentId - ID de la catégorie parent
-   * @returns {Array} - Liste des IDs des descendants
-   */
   findAllDescendants(allCategories, parentId) {
     const descendants = [];
 
-    // Trouver les enfants directs
     const directChildren = allCategories.filter((cat) => cat.parent_id === parentId);
 
     directChildren.forEach((child) => {
       descendants.push(child._id);
-      // Récursion pour trouver les descendants des enfants
       const grandChildren = this.findAllDescendants(allCategories, child._id);
       descendants.push(...grandChildren);
     });
@@ -771,20 +682,11 @@ class DetailedStockReportTemplate {
     return descendants;
   }
 
-  /**
-   * 🔥 NOUVELLE FONCTION: Trouve la catégorie racine sélectionnée pour une catégorie donnée
-   * @param {Array} allCategories - Toutes les catégories
-   * @param {string} categoryId - ID de la catégorie
-   * @param {Array} selectedCategories - Catégories sélectionnées
-   * @returns {string|null} - ID de la catégorie racine sélectionnée
-   */
   findRootSelectedCategory(allCategories, categoryId, selectedCategories) {
-    // Si la catégorie elle-même est sélectionnée, la retourner
     if (selectedCategories.includes(categoryId)) {
       return categoryId;
     }
 
-    // Sinon, remonter la hiérarchie jusqu'à trouver une catégorie sélectionnée
     const category = allCategories.find((c) => c._id === categoryId);
     if (!category || !category.parent_id) {
       return null;
@@ -793,17 +695,11 @@ class DetailedStockReportTemplate {
     return this.findRootSelectedCategory(allCategories, category.parent_id, selectedCategories);
   }
 
-  /**
-   * Formate le nom d'une catégorie
-   */
   formatCategoryName(name) {
     if (!name || typeof name !== 'string') return name || 'Sans nom';
     return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
   }
 
-  /**
-   * Génère l'en-tête du rapport
-   */
   renderHeader(title, selectedCategoriesCount = 0) {
     const subtitle =
       selectedCategoriesCount > 0
@@ -818,9 +714,6 @@ class DetailedStockReportTemplate {
     `;
   }
 
-  /**
-   * Génère la section des informations entreprise
-   */
   renderCompanyInfo(companyInfo) {
     if (!companyInfo.name) return '';
 
@@ -837,9 +730,6 @@ class DetailedStockReportTemplate {
     `;
   }
 
-  /**
-   * Génère le tableau des produits pour le rapport standard
-   */
   renderProductsTable(productsInStock, stockStats) {
     const rows = productsInStock
       .map((product) => {
@@ -896,9 +786,6 @@ class DetailedStockReportTemplate {
     `;
   }
 
-  /**
-   * Génère les groupes de catégories
-   */
   renderCategoryGroups(groupEntries) {
     return groupEntries
       .map(([categoryKey, group]) => {
@@ -974,9 +861,6 @@ class DetailedStockReportTemplate {
       .join('');
   }
 
-  /**
-   * Génère les totaux finaux
-   */
   renderFinalTotals(productsInStock, stockStats) {
     return `
     <table class="products-table">
@@ -993,14 +877,7 @@ class DetailedStockReportTemplate {
     `;
   }
 
-  /**
-   * Génère le résumé pour le rapport par catégories
-   */
-  /**
-   * 🔥 FONCTION CORRIGÉE: Génère le résumé pour le rapport par catégories
-   */
   renderCategorySummary(stockStats, groupEntries, selectedCategories) {
-    // 🔥 CALCUL CORRECT: Utiliser les données des groupes sélectionnés
     const selectedProductsCount = groupEntries.reduce((total, [key, group]) => {
       return total + group.stats.productCount;
     }, 0);
@@ -1013,7 +890,6 @@ class DetailedStockReportTemplate {
       return total + group.stats.totalTax;
     }, 0);
 
-    // 🔥 CALCUL DU POTENTIEL COMMERCIAL pour les catégories sélectionnées
     const selectedRetailValue = groupEntries.reduce((total, [key, group]) => {
       return (
         total +
@@ -1025,7 +901,6 @@ class DetailedStockReportTemplate {
       );
     }, 0);
 
-    // 🔥 CALCUL DES POURCENTAGES par rapport au total
     const percentageProducts =
       stockStats.summary.products_in_stock > 0
         ? ((selectedProductsCount / stockStats.summary.products_in_stock) * 100).toFixed(1)
@@ -1036,7 +911,6 @@ class DetailedStockReportTemplate {
         ? ((selectedInventoryValue / stockStats.financial.inventory_value) * 100).toFixed(1)
         : 0;
 
-    // 🔥 CONSTRUCTION DES NOMS DES CATÉGORIES
     const categoryNames = groupEntries.map(([key, group]) => group.categoryInfo.name).join(', ');
 
     const noteText =
@@ -1064,9 +938,6 @@ class DetailedStockReportTemplate {
   `;
   }
 
-  /**
-   * Génère le template d'en-tête pour Puppeteer
-   */
   getHeaderTemplate(companyInfo) {
     return `
     <div style="font-size: 10px; color: #666; text-align: center; width: 100%; margin-top: 10px;">
@@ -1075,9 +946,6 @@ class DetailedStockReportTemplate {
     `;
   }
 
-  /**
-   * Génère le template de pied de page pour Puppeteer
-   */
   getFooterTemplate() {
     return `
     <div style="font-size: 9px; color: #999; text-align: center; width: 100%; margin-bottom: 10px;">
@@ -1086,9 +954,6 @@ class DetailedStockReportTemplate {
     `;
   }
 
-  /**
-   * Génère les styles CSS pour le rapport détaillé standard
-   */
   getDetailedStyles() {
     return `
     ${this.helpers.getAllStyles()}
@@ -1167,14 +1032,10 @@ class DetailedStockReportTemplate {
     `;
   }
 
-  /**
-   * Génère les styles CSS pour le rapport groupé par catégories
-   */
   getCategoryGroupedStyles() {
     return `
   ${this.getDetailedStyles()}
 
-  /* 🔥 RÉDUCTION DES MARGES GÉNÉRALES */
   body { 
     padding: 0;
     margin: 0;
@@ -1185,7 +1046,6 @@ class DetailedStockReportTemplate {
     font-size: 9pt; /* Réduit la police de base */
   }
 
-  /* 🔥 EN-TÊTE COMPACT HARMONISÉ */
   .category-section {
     margin-bottom: 8mm; /* Réduit de 15mm à 8mm */
     page-break-inside: avoid;
@@ -1223,7 +1083,6 @@ class DetailedStockReportTemplate {
     font-weight: 500;
   }
 
-  /* 🔥 TABLEAUX PLUS COMPACTS */
   .products-table { 
     width: 100%; 
     border-collapse: collapse; 
@@ -1249,7 +1108,6 @@ class DetailedStockReportTemplate {
     font-size: 7pt;
   }
 
-  /* 🔥 SECTION SYNTHÈSE PLUS COMPACTE */
   .summary-section {
     background: #f0f9ff;
     border: 1px solid #3b82f6; /* Bordure plus fine */
@@ -1273,7 +1131,6 @@ class DetailedStockReportTemplate {
     text-align: justify;
   }
 
-  /* 🔥 INFORMATIONS ENTREPRISE COMPACTES */
   .company-info { 
     background: #f9fafb; 
     border-left: 3px solid #3b82f6; /* Réduit de 4px à 3px */
@@ -1288,13 +1145,11 @@ class DetailedStockReportTemplate {
     margin-bottom: 2mm; /* Réduit de 3mm à 2mm */
   }
 
-  /* 🔥 OPTIMISATION IMPRESSION */
   @page { 
     size: A4 landscape; 
     margin: 12mm 8mm; /* Marges réduites */
   }
 
-  /* 🔥 ÉVITER LES COUPURES DE PAGE */
   .category-section {
     page-break-inside: avoid;
   }
