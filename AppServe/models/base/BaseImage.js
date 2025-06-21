@@ -6,7 +6,8 @@ const fsSync = require('fs');
 class BaseImage {
   constructor(entity) {
     this.entity = entity; // 'categories', 'products', brands, suppliers.
-    this.uploadPath = path.join(process.cwd(), 'public', entity);
+    const pathManager = require('../../utils/PathManager');
+    this.uploadPath = pathManager.getPublicPath(entity);
     this.maxFiles = 1;
     this.supportedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     this.maxSize = 5 * 1024 * 1024; // 5MB

@@ -8,6 +8,8 @@ class UploadConfig {
   constructor(imageHandler) {
     this.imageHandler = imageHandler;
     this.basePath = process.cwd();
+    const pathManager = require('../../utils/PathManager');
+    this.basePath = pathManager.getPublicPath();
     this.ensureDirectories();
   }
 

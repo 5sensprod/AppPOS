@@ -6,6 +6,18 @@ const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const bonjour = require('bonjour')(); // ✅ ajout nécessaire
 
+// ✅ NOUVEAU : Forcer les variables d'environnement en production
+const isPackaged = app.isPackaged;
+if (isPackaged) {
+  process.env.NODE_ENV = 'production';
+  process.env.ELECTRON_ENV = 'true';
+  console.log('🔧 [MAIN] Variables forcées pour production packagée');
+}
+
+console.log(`📦 [MAIN] isPackaged: ${isPackaged}`);
+console.log(`🔧 [MAIN] NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`🔧 [MAIN] ELECTRON_ENV: ${process.env.ELECTRON_ENV}`);
+
 // Importation des modules refactorisés
 const logger = require(path.join(__dirname, 'modules/logger'));
 const environment = require(path.join(__dirname, 'modules/environment'));

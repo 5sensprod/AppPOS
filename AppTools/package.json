@@ -1,6 +1,6 @@
 {
   "name": "apppos-desktop",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "AppPOS - Système de Point de Vente",
   "main": "main.js",
   "private": false,
@@ -80,6 +80,7 @@
         "filter": [
           "**/*",
           "!node_modules/**",
+          "!public/**",
           "!.git/**"
         ]
       }

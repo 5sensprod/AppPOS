@@ -5,9 +5,12 @@ const cors = require('cors');
 const http = require('http');
 require('dotenv').config();
 const { getLocalIpAddress } = require('./utils/network');
+
 // Importer les utilitaires
 const { setupServerWithHttp } = require('./utils/server-setup');
 const { authMiddleware } = require('./utils/auth');
+const pathManager = require('./utils/PathManager');
+
 // WebSocket Manager
 const websocketManager = require('./websocket/websocketManager');
 const { initializeWebSocketEventBridge } = require('./websocket/websocketEventBridge');
@@ -20,7 +23,9 @@ const cron = require('node-cron');
 
 // Créer l'application Express
 const app = express();
+
 const defaultPort = process.env.PORT || 3000;
+
 // Créer un serveur HTTP pour à la fois Express et WebSocket
 const server = http.createServer(app);
 
@@ -35,6 +40,9 @@ const corsOptions = {
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
+
+// Initialiser PathManager avant tout
+pathManager.initialize();
 
 // ✅ NOUVEAU : Fonction d'initialisation du serveur
 async function initializeServer() {
@@ -63,7 +71,7 @@ async function initializeServer() {
 app.use(cors(corsOptions));
 app.use(express.json());
 // Fichiers statiques
-app.use('/public', express.static(path.resolve(__dirname, 'public')));
+app.use('/public', express.static(pathManager.getPublicPath()));
 
 // Routes...
 const authRoutes = require('./routes/authRoutes');
