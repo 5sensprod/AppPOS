@@ -109,15 +109,25 @@
         "repo": "AppPOS"
       }
     ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "runAfterFinish": true,
-      "installerIcon": "icon.ico",
-      "uninstallerIcon": "icon.ico",
-      "installDirectory": "$PROGRAMFILES64\\${productName}",
-      "perMachine": false
+      "deleteAppDataOnUninstall": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "include": "../scripts/installer.nsh"
     }
   }
 }
