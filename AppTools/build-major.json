@@ -16,7 +16,7 @@
     {
       "from": "../AppServe",
       "to": "AppServe",
-      "filter": ["**/*", "!data/**", "!public/**", "!logs/**", "!backup/**"]
+      "filter": ["**/*", "!data/**", "!public/**", "!logs/**", "!backup/**", "!.git/**"]
     }
   ],
   "extraFiles": [
