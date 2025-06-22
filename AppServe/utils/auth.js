@@ -2,7 +2,7 @@
 const jwt = require('jsonwebtoken');
 const Datastore = require('nedb');
 const path = require('path');
-const bcrypt = require('bcrypt'); // Vous devrez installer cette dépendance
+const bcrypt = require('bcrypt');
 
 // Initialiser la base de données utilisateurs
 const usersDb = new Datastore({
@@ -11,23 +11,28 @@ const usersDb = new Datastore({
 });
 
 // Clé secrète pour signer les tokens JWT
-const JWT_SECRET = process.env.JWT_SECRET || 'votre_clé_secrète_par_défaut'; // À définir dans .env en production
-const TOKEN_EXPIRY = '24h'; // Durée de validité du token
+const JWT_SECRET = process.env.JWT_SECRET || 'votre_clé_secrète_par_défaut';
 
 /**
- * Génère un token JWT pour un utilisateur
+ * Génère un token JWT SANS expiration pour POS
  * @param {Object} user Objet utilisateur (sans le mot de passe)
- * @returns {String} Token JWT
+ * @returns {String} Token JWT persistant
  */
 function generateToken(user) {
-  // Ne jamais inclure le mot de passe dans le token
   const userForToken = {
     id: user._id,
     username: user.username,
     role: user.role,
+    iat: Math.floor(Date.now() / 1000), // Issued at
+    // PAS D'EXPIRATION - Token valide jusqu'à déconnexion manuelle
   };
 
-  return jwt.sign(userForToken, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+  return jwt.sign(userForToken, JWT_SECRET, {
+    algorithm: 'HS256',
+    issuer: 'AppPOS-Server',
+    audience: 'AppPOS-Client',
+    // Pas de expiresIn
+  });
 }
 
 /**
@@ -61,7 +66,7 @@ function login(username, password) {
           });
         }
 
-        // Générer un token JWT
+        // Générer un token JWT persistant
         const token = generateToken(user);
 
         // Ne jamais retourner le hash du mot de passe
@@ -71,6 +76,10 @@ function login(username, password) {
           success: true,
           token,
           user: userWithoutPassword,
+          tokenInfo: {
+            persistent: true,
+            message: "Token valide jusqu'à déconnexion",
+          },
         });
       } catch (error) {
         reject(new Error('Erreur lors de la vérification du mot de passe'));
@@ -134,32 +143,43 @@ async function register(userData) {
 }
 
 /**
- * Middleware pour vérifier l'authentification
+ * Middleware pour vérifier l'authentification (sans expiration)
  */
 function authMiddleware(req, res, next) {
   // Récupérer le token d'authentification
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Accès non autorisé. Token manquant.' });
+    return res.status(401).json({
+      message: 'Accès non autorisé. Token manquant.',
+      code: 'NO_TOKEN',
+    });
   }
 
   const token = authHeader.split(' ')[1];
 
   try {
-    // Vérifier et décoder le token
-    const decoded = jwt.verify(token, JWT_SECRET);
+    // Vérifier et décoder le token (ignorer l'expiration)
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      ignoreExpiration: true, // Ignorer l'expiration pour token persistant
+    });
 
     // Ajouter les informations de l'utilisateur à la requête
     req.user = decoded;
-
     next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Session expirée. Veuillez vous reconnecter.' });
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        message: 'Token invalide.',
+        code: 'INVALID_TOKEN',
+      });
     }
 
-    return res.status(403).json({ message: 'Token invalide.' });
+    console.error('Erreur JWT:', error);
+    return res.status(403).json({
+      message: 'Erreur de vérification du token.',
+      code: 'TOKEN_ERROR',
+    });
   }
 }
 

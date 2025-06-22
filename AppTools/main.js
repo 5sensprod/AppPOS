@@ -204,6 +204,13 @@ app.on('window-all-closed', function () {
 
 // Lors de la fermeture de l'application, terminer les processus
 app.on('before-quit', () => {
+  console.log("🚪 [ELECTRON] Fermeture de l'application...");
+
+  // Envoyer signal de nettoyage au renderer
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('app-closing');
+  }
+
   if (webServerInstance && webServer.stopWebServer) {
     webServer.stopWebServer();
   }

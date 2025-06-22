@@ -1,56 +1,59 @@
-// src/contexts/AuthContext.js
+// src/contexts/AuthContext.jsx - VERSION SIMPLIFIÉE
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import apiService from '../services/api';
 
-// Création du contexte
 const AuthContext = createContext();
-
-// Hook personnalisé pour utiliser le contexte
 export const useAuth = () => useContext(AuthContext);
 
-// Provider du contexte d'authentification
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fonction de déconnexion définie avant useEffect
+  // Fonction de déconnexion simplifiée
   const logout = useCallback(() => {
     localStorage.removeItem('authToken');
     apiService.setAuthToken(null);
 
-    // S'assurer que window.electronAPI existe avant de l'utiliser
+    // Nettoyer Electron API si disponible
     if (window.electronAPI && typeof window.electronAPI.setAuthToken === 'function') {
       window.electronAPI.setAuthToken(null);
     }
 
     setUser(null);
     setError(null);
+
+    console.log('✅ [AUTH] Déconnexion terminée');
   }, []);
 
-  // Initialisation de l'authentification
+  // Initialisation simplifiée
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // Configurer le callback de déconnexion
+        apiService.setLogoutCallback(logout);
+
         await apiService.init();
         const storedToken = localStorage.getItem('authToken');
 
         if (storedToken) {
           apiService.setAuthToken(storedToken);
 
-          // S'assurer que window.electronAPI existe avant de l'utiliser
           if (window.electronAPI && typeof window.electronAPI.setAuthToken === 'function') {
             window.electronAPI.setAuthToken(storedToken);
-            console.log('Token envoyé au processus principal');
-          } else {
-            console.warn("electronAPI.setAuthToken n'est pas disponible");
           }
 
-          const { data } = await apiService.get('/api/auth/me');
-          setUser(data?.user || null);
+          try {
+            const { data } = await apiService.get('/api/auth/me');
+            setUser(data?.user || null);
+            console.log('✅ [AUTH] Session restaurée');
+          } catch (error) {
+            console.error('❌ [AUTH] Token invalide:', error);
+            logout();
+          }
         }
       } catch (error) {
-        console.error("Erreur d'initialisation de l'auth:", error);
+        console.error("❌ [AUTH] Erreur d'initialisation:", error);
         logout();
       } finally {
         setLoading(false);
@@ -58,41 +61,84 @@ export const AuthProvider = ({ children }) => {
     };
 
     initAuth();
+
+    // 🔒 NETTOYAGE DU TOKEN À LA FERMETURE DU PROGRAMME
+    const handleBeforeUnload = (event) => {
+      console.log('🚪 [AUTH] Fermeture programme - suppression du token');
+      localStorage.removeItem('authToken');
+      sessionStorage.removeItem('authToken');
+
+      // Nettoyer Electron si disponible
+      if (window.electronAPI?.setAuthToken) {
+        window.electronAPI.setAuthToken(null);
+      }
+
+      // Pour Electron, pas besoin de preventDefault
+      if (!window.electronAPI) {
+        // Pour navigateur web classique
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+
+    // 🔒 NETTOYAGE À LA PERTE DE FOCUS (optionnel - pour sécurité renforcée)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('🔒 [AUTH] Application cachée - token conservé');
+        // Ne pas supprimer le token ici, juste pour le logging
+      }
+    };
+
+    // Écouter les événements de fermeture
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [logout]);
 
-  // Fonction de connexion
-  const login = useCallback(async (username, password) => {
-    setError(null);
-    try {
-      await apiService.init();
-      const { data } = await apiService.post('/api/auth/login', { username, password });
+  // Fonction de connexion simplifiée
+  const login = useCallback(
+    async (username, password) => {
+      setError(null);
+      setLoading(true);
 
-      if (data.success) {
-        localStorage.setItem('authToken', data.token);
-        apiService.setAuthToken(data.token);
+      try {
+        // Nettoyer d'abord
+        logout();
 
-        // S'assurer que window.electronAPI existe avant de l'utiliser
-        if (window.electronAPI && typeof window.electronAPI.setAuthToken === 'function') {
-          window.electronAPI.setAuthToken(data.token);
-          console.log('Token de connexion envoyé au processus principal');
+        await apiService.init();
+        const { data } = await apiService.post('/api/auth/login', { username, password });
+
+        if (data.success) {
+          localStorage.setItem('authToken', data.token);
+          apiService.setAuthToken(data.token);
+
+          if (window.electronAPI && typeof window.electronAPI.setAuthToken === 'function') {
+            window.electronAPI.setAuthToken(data.token);
+          }
+
+          setUser(data.user);
+          console.log('✅ [AUTH] Connexion réussie');
+          return true;
         } else {
-          console.warn("electronAPI.setAuthToken n'est pas disponible lors du login");
+          setError(data.message || 'Échec de la connexion');
+          return false;
         }
-
-        setUser(data.user);
-        return true;
-      } else {
-        setError(data.message || 'Échec de la connexion');
+      } catch (err) {
+        console.error('❌ [AUTH] Erreur de login:', err);
+        setError(err.response?.data?.message || 'Erreur de connexion');
         return false;
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Erreur de login:', err);
-      setError(err.response?.data?.message || 'Erreur de connexion');
-      return false;
-    }
-  }, []);
+    },
+    [logout]
+  );
 
-  // Reste du code inchangé...
   const register = useCallback(async (userData) => {
     setError(null);
     try {
@@ -119,5 +165,3 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-export default AuthContext;
