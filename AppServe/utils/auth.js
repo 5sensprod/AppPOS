@@ -1,4 +1,4 @@
-// utils/auth.js
+// utils/auth.js - AVEC VALIDATION REDÉMARRAGE SERVEUR
 const jwt = require('jsonwebtoken');
 const Datastore = require('nedb');
 const path = require('path');
@@ -13,10 +13,20 @@ const usersDb = new Datastore({
 // Clé secrète pour signer les tokens JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'votre_clé_secrète_par_défaut';
 
+// 🔧 NOUVEAU : ID unique du serveur généré au démarrage
+const SERVER_STARTUP_ID = Date.now().toString();
+
 /**
- * Génère un token JWT SANS expiration pour POS
+ * Récupère l'ID de démarrage du serveur actuel
+ */
+function getServerStartupId() {
+  return SERVER_STARTUP_ID;
+}
+
+/**
+ * Génère un token JWT avec l'ID du serveur pour validation
  * @param {Object} user Objet utilisateur (sans le mot de passe)
- * @returns {String} Token JWT persistant
+ * @returns {String} Token JWT avec ID serveur
  */
 function generateToken(user) {
   const userForToken = {
@@ -24,22 +34,19 @@ function generateToken(user) {
     username: user.username,
     role: user.role,
     iat: Math.floor(Date.now() / 1000), // Issued at
-    // PAS D'EXPIRATION - Token valide jusqu'à déconnexion manuelle
+    server_id: SERVER_STARTUP_ID, // 🔧 NOUVEAU : ID du serveur qui a généré ce token
   };
 
   return jwt.sign(userForToken, JWT_SECRET, {
     algorithm: 'HS256',
     issuer: 'AppPOS-Server',
     audience: 'AppPOS-Client',
-    // Pas de expiresIn
+    // Pas de expiresIn - Token valide jusqu'à redémarrage serveur
   });
 }
 
 /**
  * Vérifie les identifiants et connecte un utilisateur
- * @param {String} username Nom d'utilisateur
- * @param {String} password Mot de passe
- * @returns {Promise<Object>} Résultat de connexion { success, token, user, message }
  */
 function login(username, password) {
   return new Promise((resolve, reject) => {
@@ -66,7 +73,7 @@ function login(username, password) {
           });
         }
 
-        // Générer un token JWT persistant
+        // Générer un token JWT avec ID serveur
         const token = generateToken(user);
 
         // Ne jamais retourner le hash du mot de passe
@@ -78,7 +85,8 @@ function login(username, password) {
           user: userWithoutPassword,
           tokenInfo: {
             persistent: true,
-            message: "Token valide jusqu'à déconnexion",
+            message: "Token valide jusqu'à redémarrage serveur",
+            server_id: SERVER_STARTUP_ID, // 🔧 NOUVEAU : Inclure l'ID serveur
           },
         });
       } catch (error) {
@@ -90,8 +98,6 @@ function login(username, password) {
 
 /**
  * Crée un nouvel utilisateur
- * @param {Object} userData Données utilisateur
- * @returns {Promise<Object>} Résultat de création { success, user, message }
  */
 async function register(userData) {
   return new Promise(async (resolve, reject) => {
@@ -143,7 +149,7 @@ async function register(userData) {
 }
 
 /**
- * Middleware pour vérifier l'authentification (sans expiration)
+ * Middleware pour vérifier l'authentification AVEC validation du redémarrage serveur
  */
 function authMiddleware(req, res, next) {
   // Récupérer le token d'authentification
@@ -159,10 +165,32 @@ function authMiddleware(req, res, next) {
   const token = authHeader.split(' ')[1];
 
   try {
-    // Vérifier et décoder le token (ignorer l'expiration)
+    // Vérifier et décoder le token
     const decoded = jwt.verify(token, JWT_SECRET, {
-      ignoreExpiration: true, // Ignorer l'expiration pour token persistant
+      ignoreExpiration: true, // Toujours ignorer l'expiration
     });
+
+    // 🔧 NOUVEAU : Vérifier que le token a été généré par cette instance du serveur
+    if (decoded.server_id && decoded.server_id !== SERVER_STARTUP_ID) {
+      console.log(
+        `🔄 [AUTH] Token invalide - serveur redémarré. Token ID: ${decoded.server_id}, Serveur ID: ${SERVER_STARTUP_ID}`
+      );
+      return res.status(401).json({
+        message: 'Token invalide - serveur redémarré.',
+        code: 'SERVER_RESTARTED',
+        server_restarted: true, // 🔧 Flag spécial pour le frontend
+      });
+    }
+
+    // 🔧 NOUVEAU : Si token ancien (sans server_id), l'invalider aussi
+    if (!decoded.server_id) {
+      console.log('🔄 [AUTH] Token ancien sans server_id - invalidation');
+      return res.status(401).json({
+        message: 'Token obsolète - reconnexion requise.',
+        code: 'TOKEN_OBSOLETE',
+        server_restarted: true,
+      });
+    }
 
     // Ajouter les informations de l'utilisateur à la requête
     req.user = decoded;
@@ -185,7 +213,6 @@ function authMiddleware(req, res, next) {
 
 /**
  * Middleware pour vérifier les rôles
- * @param {String[]} roles Rôles autorisés
  */
 function roleMiddleware(roles) {
   return (req, res, next) => {
@@ -209,4 +236,5 @@ module.exports = {
   generateToken,
   authMiddleware,
   roleMiddleware,
+  getServerStartupId, // 🔧 NOUVEAU : Exposer l'ID serveur
 };

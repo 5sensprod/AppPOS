@@ -36,7 +36,7 @@ class WebSocketManager {
     // ✅ BROADCAST TEMPS SERVEUR TOUTES LES MINUTES
     this.timeInterval = setInterval(() => {
       this.broadcastServerTime();
-    }, 60000); // Toutes les minutes pile
+    }, 60000);
 
     // ✅ BROADCAST INITIAL
     setTimeout(() => this.broadcastServerTime(), 1000);
@@ -48,14 +48,13 @@ class WebSocketManager {
     const serverTime = {
       timestamp: Date.now(),
       iso: new Date().toISOString(),
-      minute_changed: true, // Signal pour recalculer les durées
+      minute_changed: true,
     };
 
     this.broadcast('server.time.update', serverTime);
     console.log(`⏰ [WS] Temps serveur diffusé: ${new Date().toLocaleTimeString()}`);
   }
 
-  // ✅ CLEANUP
   destroy() {
     if (this.timeInterval) {
       clearInterval(this.timeInterval);
@@ -82,7 +81,7 @@ class WebSocketManager {
     }
   }
 
-  // ✅ MÉTHODES EXISTANTES POUR ENTITÉS
+  // ✅ MÉTHODES POUR ENTITÉS
   notifyEntityCreated(entityType, entityData) {
     const entityPlural = standardizeEntityType(entityType);
     this.broadcast(`${entityPlural}.created`, entityData, [entityPlural]);
@@ -115,7 +114,7 @@ class WebSocketManager {
     this.broadcast(`${entityPlural}.count.updated`, { entityId, count }, [entityPlural]);
   }
 
-  // ✅ NOUVELLES MÉTHODES POUR SESSIONS CAISSE
+  // ✅ MÉTHODES POUR SESSIONS CAISSE
   notifyCashierSessionStatusChanged(payload) {
     const { cashier_id, username, session } = payload;
     const eventData = {
@@ -157,7 +156,7 @@ class WebSocketManager {
     );
   }
 
-  // ✅ NOUVELLES MÉTHODES POUR LCD
+  // ✅ MÉTHODES POUR LCD
   notifyLCDOwnershipChanged(payload) {
     const { owned, owner, previous_owner } = payload;
     const eventData = {
@@ -194,7 +193,7 @@ class WebSocketManager {
     }
   }
 
-  // ✅ NOUVEAU : Notification mouvement de caisse
+  // ✅ MÉTHODES POUR MOUVEMENTS CAISSE
   notifyCashierDrawerMovement(payload) {
     const { cashier_id, movement, new_balance } = payload;
     const eventData = {
@@ -220,7 +219,6 @@ class WebSocketManager {
     );
   }
 
-  // ✅ NOUVEAU : Notification statut fond de caisse
   notifyCashierDrawerStatus(payload) {
     const eventData = {
       cashier_id: payload.cashier_id,
@@ -235,7 +233,7 @@ class WebSocketManager {
     console.log(`[WS-DRAWER] Statut fond diffusé pour cashier ${payload.cashier_id}`);
   }
 
-  // ✅ MÉTHODES UTILITAIRES EXISTANTES
+  // ✅ MÉTHODES UTILITAIRES
   sendToClient(client, type, payload) {
     if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify({ type, payload }));

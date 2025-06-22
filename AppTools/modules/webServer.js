@@ -45,7 +45,45 @@ function initWebServer(app, environment, mainWindow) {
   const apiIp = getLocalIpAddresses()[0] || 'localhost';
   const apiUrl = `http://${apiIp}:${apiPort}`;
 
-  expressApp.use('/api', createProxyMiddleware({ target: apiUrl, changeOrigin: true }));
+  // 🔧 PROXY MODIFIÉ AVEC GESTION D'ERREUR AUTH
+  const apiProxy = createProxyMiddleware({
+    target: apiUrl,
+    changeOrigin: true,
+    // 🔧 GESTION DES ERREURS DE CONNEXION
+    onError: (err, req, res) => {
+      console.log(`🔧 [PROXY] Erreur connexion API pour ${req.url}:`, err.code);
+
+      // 🔒 Si c'est une route d'auth et le serveur est down → 401
+      if (req.url.includes('/auth/') && (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND')) {
+        console.log('🚪 [PROXY] Serveur API inaccessible pour route auth → 401');
+        res.status(401).json({
+          success: false,
+          message: 'Serveur redémarré - reconnexion requise',
+          code: 'SERVER_RESTARTED',
+        });
+        return;
+      }
+
+      // Pour les autres routes → 503 normal
+      res.status(503).json({
+        success: false,
+        message: 'Service temporairement indisponible',
+        code: 'SERVICE_UNAVAILABLE',
+      });
+    },
+    // 🔧 MODIFICATION DES RÉPONSES
+    onProxyRes: (proxyRes, req, res) => {
+      // 🔒 Si route auth et erreur serveur → Transformer en 401
+      if (req.url.includes('/auth/') && proxyRes.statusCode >= 500) {
+        console.log(`🔧 [PROXY] Erreur ${proxyRes.statusCode} sur route auth → 401`);
+        res.status(401);
+      }
+    },
+    // 🔧 TIMEOUT RÉDUIT POUR DÉTECTION RAPIDE
+    timeout: 5000, // 5 secondes au lieu de 30 par défaut
+  });
+
+  expressApp.use('/api', apiProxy);
 
   const distPath = app.isPackaged
     ? path.join(process.resourcesPath, 'app.asar', 'dist')

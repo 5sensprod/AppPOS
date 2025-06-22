@@ -1,4 +1,4 @@
-// src/services/api.js - VERSION CORRIGÉE
+// src/services/api.js - NETTOYAGE ADAPTATIF
 import axios from 'axios';
 import apiConfigService from './apiConfig';
 
@@ -7,21 +7,18 @@ class ApiService {
     this.api = axios.create();
     this.authToken = null;
     this.logoutCallback = null;
-    this.interceptorsSetup = false; // Éviter la double configuration
+    this.interceptorsSetup = false;
   }
 
-  // Configurer le callback de déconnexion automatique
   setLogoutCallback(callback) {
     this.logoutCallback = callback;
   }
 
-  // Initialise le service API avec 3 tentatives max
   async init(retries = 3) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         await apiConfigService.init();
 
-        // Configurer les intercepteurs UNE SEULE FOIS
         if (!this.interceptorsSetup) {
           this.setupInterceptors();
           this.interceptorsSetup = true;
@@ -36,16 +33,12 @@ class ApiService {
     }
   }
 
-  // Configuration des intercepteurs (VERSION SIMPLIFIÉE)
   setupInterceptors() {
-    // Intercepteur de requête
     this.api.interceptors.request.use(
       (config) => {
-        // Ajouter automatiquement le token d'auth
         if (this.authToken) {
           config.headers.Authorization = `Bearer ${this.authToken}`;
         }
-
         console.log(`🌐 [API] ${config.method?.toUpperCase()} ${config.url}`);
         return config;
       },
@@ -55,7 +48,6 @@ class ApiService {
       }
     );
 
-    // Intercepteur de réponse SIMPLIFIÉ (sans redécouverte automatique)
     this.api.interceptors.response.use(
       (response) => {
         console.log(`✅ [API] ${response.status} ${response.config.url}`);
@@ -64,29 +56,23 @@ class ApiService {
       async (error) => {
         const originalRequest = error.config;
 
-        // GESTION DES ERREURS 401 UNIQUEMENT
         if (error.response?.status === 401 && !originalRequest._retry) {
           console.warn('🚨 [API] Erreur 401 - Token invalide');
-
           originalRequest._retry = true;
 
-          // Nettoyer le token local
           this.clearAuthData();
 
-          // Déclencher la déconnexion si callback configuré
           if (this.logoutCallback) {
             console.log('🚪 [API] Déclenchement de la déconnexion automatique');
             this.logoutCallback();
           }
         }
 
-        // MARQUER LES ERREURS RÉSEAU (sans retry automatique)
         if (!error.response) {
           console.error('❌ [API] Erreur réseau - Serveur inaccessible');
           error.isNetworkError = true;
         }
 
-        // MARQUER LES ERREURS SERVEUR
         if (error.response?.status >= 500) {
           console.error('❌ [API] Erreur serveur:', error.response.status);
           error.isServerError = true;
@@ -99,28 +85,24 @@ class ApiService {
     console.log('✅ [API] Intercepteurs configurés');
   }
 
-  // Nettoyage complet des données d'auth
+  // 🔧 NETTOYAGE ADAPTATIF SELON ENVIRONNEMENT
   clearAuthData() {
     this.authToken = null;
 
-    // Supprimer de localStorage
+    // Nettoyer des deux types de stockage
     localStorage.removeItem('authToken');
-
-    // Supprimer de sessionStorage
     sessionStorage.removeItem('authToken');
 
-    // Nettoyer les headers Axios
     delete this.api.defaults.headers.common['Authorization'];
 
-    // Nettoyer Electron API si disponible
     if (window.electronAPI?.setAuthToken) {
       window.electronAPI.setAuthToken(null);
     }
 
-    console.log("🧹 [API] Données d'authentification nettoyées");
+    const storageType = window.electronAPI ? 'localStorage' : 'sessionStorage';
+    console.log(`🧹 [API] Données auth nettoyées (${storageType})`);
   }
 
-  // Génère l'URL complète et exécute la requête HTTP
   async request(method, url, data = null, config = {}) {
     try {
       const fullUrl = apiConfigService.createUrl(url);
@@ -147,7 +129,6 @@ class ApiService {
     return this.request('delete', url, null, config);
   }
 
-  // Définit le token d'authentification
   setAuthToken(token) {
     this.authToken = token;
 
@@ -183,11 +164,10 @@ class ApiService {
     return apiConfigService.getBaseUrl();
   }
 
-  // Méthode MANUELLE pour forcer la redécouverte (pas automatique)
   async rediscoverServer() {
     try {
       console.log('🔄 [API] Redécouverte forcée du serveur...');
-      apiConfigService.apiBaseUrl = null; // Reset de l'URL cachée
+      apiConfigService.apiBaseUrl = null;
       await apiConfigService.init();
       return true;
     } catch (error) {
@@ -197,5 +177,4 @@ class ApiService {
   }
 }
 
-// Exporter une instance unique
 export default new ApiService();
