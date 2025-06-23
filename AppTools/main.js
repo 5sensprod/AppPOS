@@ -1,10 +1,10 @@
-// main.js
+// main.js - AVEC DÉMARRAGE OPTIMISÉ
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
-const bonjour = require('bonjour')(); // ✅ ajout nécessaire
+const bonjour = require('bonjour')();
 
 // ✅ NOUVEAU : Forcer les variables d'environnement en production
 const isPackaged = app.isPackaged;
@@ -44,6 +44,90 @@ environment.checkEnvironment(app);
 // Charger les variables d'environnement
 environment.loadEnvVariables(app);
 
+// ✅ NOUVEAU : Fonction pour vérifier si le serveur API est prêt
+async function waitForApiServer(maxWaitTime = 10000) {
+  const startTime = Date.now();
+  const checkInterval = 500; // Vérifier toutes les 500ms
+
+  console.log('🔍 [MAIN] Vérification de la disponibilité du serveur API...');
+
+  while (Date.now() - startTime < maxWaitTime) {
+    try {
+      const axios = require('axios');
+      await axios.get('http://localhost:3000/test', { timeout: 1000 });
+      const elapsed = Date.now() - startTime;
+      console.log(`✅ [MAIN] Serveur API prêt en ${elapsed}ms`);
+      return true;
+    } catch (error) {
+      // Serveur pas encore prêt, attendre
+      await new Promise((resolve) => setTimeout(resolve, checkInterval));
+    }
+  }
+
+  console.warn('⚠️ [MAIN] Timeout - Serveur API non disponible après 10s');
+  return false;
+}
+
+// ✅ NOUVEAU : Démarrage avec splash screen
+function createSplashWindow() {
+  console.log('🚀 [MAIN] Création de la fenêtre splash...');
+
+  const splash = new BrowserWindow({
+    width: 400,
+    height: 300,
+    frame: false,
+    alwaysOnTop: true,
+    transparent: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  // Créer un splash HTML simple
+  const splashHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <style>
+          body {
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+          }
+          .logo { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
+          .spinner { 
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+          }
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          .status { font-size: 14px; opacity: 0.8; }
+        </style>
+      </head>
+      <body>
+        <div class="logo">AppPOS</div>
+        <div class="spinner"></div>
+        <div class="status">Démarrage du serveur...</div>
+      </body>
+    </html>
+  `;
+
+  splash.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(splashHtml));
+  return splash;
+}
+
 ipcMain.handle('discover-api-server', () => {
   return new Promise((resolve, reject) => {
     const browser = bonjour.find({ type: 'http' });
@@ -65,7 +149,6 @@ ipcMain.handle('discover-api-server', () => {
   });
 });
 
-// Découvrir tous les services HTTP publiés via Bonjour
 ipcMain.handle('get-mdns-services', () => {
   return new Promise((resolve) => {
     const browser = bonjour.find({ type: 'http' });
@@ -84,7 +167,7 @@ ipcMain.handle('get-mdns-services', () => {
     setTimeout(() => {
       browser.stop();
       resolve(servicesFound);
-    }, 3000); // Attendre 3 sec. pour découvrir les services
+    }, 3000);
   });
 });
 
@@ -96,6 +179,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: false, // ✅ NOUVEAU : Ne pas afficher immédiatement
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -120,6 +204,12 @@ function createWindow() {
   console.log(`Chargement de l'URL: ${url}`);
   mainWindow.loadURL(url);
 
+  // ✅ NOUVEAU : Afficher la fenêtre seulement quand elle est prête
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    console.log('✅ [MAIN] Fenêtre principale affichée');
+  });
+
   // Ouvrir les DevTools en mode développement
   if (environment.isDevMode) {
     mainWindow.webContents.openDevTools();
@@ -142,7 +232,7 @@ function createWindow() {
       autoUpdater.checkForUpdatesAndNotify().catch((err) => {
         console.error('Erreur lors de la vérification des mises à jour:', err);
       });
-    }, 3000); // Petit délai pour s'assurer que tout est bien initialisé
+    }, 3000);
   }
 
   // Démarrer le serveur web si mainWindow est prêt
@@ -150,7 +240,6 @@ function createWindow() {
     if (!webServerInstance) {
       webServerInstance = webServer.initWebServer(app, environment, mainWindow);
     } else {
-      // La fenêtre est chargée, envoyer les URLs existantes
       webServer.sendUrlsToWindow(mainWindow);
     }
   });
@@ -166,7 +255,6 @@ ipcMain.on('check-for-updates', () => {
   }
 });
 
-// Ajouter un écouteur pour les demandes d'URLs
 ipcMain.on('request-network-urls', () => {
   console.log('Demande des URLs réseau reçue');
   if (mainWindow && webServerInstance) {
@@ -176,23 +264,46 @@ ipcMain.on('request-network-urls', () => {
 
 setupWebCaptureListener(ipcMain);
 
-// Créer la fenêtre quand l'app est prête
-app.whenReady().then(() => {
-  console.log('Electron est prêt!');
+// ✅ NOUVEAU : Démarrage optimisé avec splash
+app.whenReady().then(async () => {
+  console.log('🚀 [MAIN] Electron est prêt!');
+
+  let splash = null;
 
   // Démarrer le serveur API si nécessaire
   apiProcess = apiServer.startAPIServer(app, environment);
 
-  // Si l'API est gérée en externe ou n'a pas besoin d'être démarrée, créer la fenêtre immédiatement
   if (!apiProcess) {
+    // API externe ou pas besoin → Fenêtre immédiate
+    console.log('📱 [MAIN] API externe - fenêtre immédiate');
     createWindow();
   } else {
-    // Attendre pour que l'API démarre
-    setTimeout(createWindow, 5000);
+    // API interne → Splash + attente intelligente
+    console.log('⏳ [MAIN] API interne - démarrage avec splash');
+
+    splash = createSplashWindow();
+
+    // Attendre que le serveur soit prêt (max 10s)
+    const apiReady = await waitForApiServer(10000);
+
+    if (apiReady) {
+      console.log('✅ [MAIN] API prête - création fenêtre principale');
+    } else {
+      console.log('⚠️ [MAIN] API non prête - création fenêtre quand même');
+    }
+
+    // Créer la fenêtre principale
+    createWindow();
+
+    // Fermer le splash après un petit délai
+    setTimeout(() => {
+      if (splash && !splash.isDestroyed()) {
+        splash.close();
+      }
+    }, 1000);
   }
 
   app.on('activate', function () {
-    // Sur macOS, recréer la fenêtre quand l'icône du dock est cliquée
     if (mainWindow === null) createWindow();
   });
 });
@@ -206,7 +317,6 @@ app.on('window-all-closed', function () {
 app.on('before-quit', () => {
   console.log("🚪 [ELECTRON] Fermeture de l'application...");
 
-  // Envoyer signal de nettoyage au renderer
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('app-closing');
   }

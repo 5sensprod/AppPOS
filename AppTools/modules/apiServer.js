@@ -1,143 +1,147 @@
-// modules/apiServer.js
+// modules/apiServer.js - Version corrigée
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const logger = require('./logger');
 
-// Fonction pour démarrer le serveur API
 function startAPIServer(app, environment) {
   console.log(`Chemin d'application: ${app.getAppPath()}`);
   console.log(`Chemin des resources: ${process.resourcesPath}`);
   console.log(`Environnement NODE_ENV: ${process.env.NODE_ENV}`);
 
-  // Ne pas démarrer l'API si elle est gérée en externe
   if (environment.isDevMode && environment.isApiExternallyManaged) {
     console.log('Mode développement: le serveur API est géré en externe');
     return null;
   }
 
   console.log('Démarrage du serveur API...');
-  // Obtenir le chemin vers AppServe selon l'environnement
   const appServePath = environment.getAppServePath(app);
-  console.log('Vérification des modules dans:', appServePath);
 
-  // Vérifiez si les modules essentiels existent
+  // ✅ NOUVEAU: Vérification complète des chemins
+  const nodeModulesPath = path.join(appServePath, 'node_modules');
   const criticalModules = ['express', 'dotenv', 'cors'];
+
+  console.log('=== DIAGNOSTIC COMPLET ===');
+  console.log(`AppServe path: ${appServePath}`);
+  console.log(`Node modules path: ${nodeModulesPath}`);
+  console.log(`Node modules exists: ${fs.existsSync(nodeModulesPath)}`);
+
+  // Vérifier chaque module critique
+  const missingModules = [];
   for (const module of criticalModules) {
-    const modulePath = path.join(appServePath, 'node_modules', module);
-    console.log(`Module ${module} existe: ${fs.existsSync(modulePath)}`);
+    const modulePath = path.join(nodeModulesPath, module);
+    const exists = fs.existsSync(modulePath);
+    console.log(`Module ${module}: ${exists ? '✅' : '❌'} (${modulePath})`);
+    if (!exists) missingModules.push(module);
   }
 
-  const serverPath = path.join(appServePath, 'server.js');
-  console.log('Chemin du serveur API:', serverPath);
-
-  // Vérifier si le fichier existe
-  if (!fs.existsSync(serverPath)) {
-    console.error(`Erreur: Le fichier ${serverPath} n'existe pas!`);
+  if (missingModules.length > 0) {
+    console.error(`❌ MODULES MANQUANTS: ${missingModules.join(', ')}`);
     return null;
   }
 
-  // Définir les variables d'environnement pour le serveur
+  const serverPath = path.join(appServePath, 'server.js');
+  if (!fs.existsSync(serverPath)) {
+    console.error(`❌ Fichier serveur manquant: ${serverPath}`);
+    return null;
+  }
+
+  // ✅ NOUVEAU: Variables d'environnement améliorées
   const serverEnv = {
     ...process.env,
     NODE_ENV: environment.isDevMode ? 'development' : 'production',
+    ELECTRON_ENV: 'true', // Important pour PathManager
     PORT: process.env.PORT || '3000',
+    NODE_PATH: nodeModulesPath, // Ajouter le chemin des modules
     WC_URL: process.env.WC_URL,
     WC_CONSUMER_KEY: process.env.WC_CONSUMER_KEY,
     WC_CONSUMER_SECRET: process.env.WC_CONSUMER_SECRET,
   };
 
-  console.log("Démarrage du serveur API avec les variables d'environnement:", {
-    NODE_ENV: serverEnv.NODE_ENV,
-    PORT: serverEnv.PORT,
-  });
-
-  // Rechercher node.exe dans plusieurs emplacements possibles
-  let nodePath = null;
-  const possibleNodePaths = [
-    path.join(process.resourcesPath, 'node.exe'), // Celui que nous avons ajouté dans extraFiles
-    path.join(process.resourcesPath, 'AppServe', 'node_modules', '.bin', 'node.exe'),
+  // ✅ AMÉLIORATION: Recherche Node.exe plus robuste
+  const nodePaths = [
+    path.join(process.resourcesPath, 'node.exe'),
     path.join(path.dirname(process.execPath), 'node.exe'),
-    'C:\\Program Files\\nodejs\\node.exe',
-    'C:\\nvm4w\\nodejs\\node.exe',
-    'node', // En dernier recours, essayer node dans le PATH
+    process.execPath, // Utiliser l'exe d'Electron en dernier recours
   ];
 
-  for (const possiblePath of possibleNodePaths) {
-    if (possiblePath === 'node' || fs.existsSync(possiblePath)) {
+  let nodePath = null;
+  for (const possiblePath of nodePaths) {
+    if (fs.existsSync(possiblePath)) {
       nodePath = possiblePath;
-      console.log(`Node.js trouvé à: ${nodePath}`);
+      console.log(`✅ Node.js trouvé: ${nodePath}`);
       break;
     }
   }
 
   if (!nodePath) {
-    console.error('ERREUR CRITIQUE: Impossible de trouver node.exe!');
+    console.error('❌ ERREUR: Node.js introuvable!');
     return null;
   }
 
-  console.log('===== DIAGNOSTIC API SERVER =====');
-  console.log(`Node executable path: ${process.execPath}`);
-  console.log(`Node.js path utilisé: ${nodePath}`);
-  console.log(`Server path: ${serverPath}`);
-  console.log(`Working directory: ${appServePath}`);
-  console.log(`Node modules exist: ${fs.existsSync(path.join(appServePath, 'node_modules'))}`);
-
-  // Créer un processus pour le serveur API
-  let apiProc;
   try {
-    apiProc = spawn(nodePath, [serverPath], {
-      stdio: 'pipe',
+    console.log('=== LANCEMENT API ===');
+    console.log(`Commande: "${nodePath}" "${serverPath}"`);
+    console.log(`Répertoire: ${appServePath}`);
+
+    const apiProc = spawn(nodePath, [serverPath], {
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: serverEnv,
       cwd: appServePath,
-      windowsHide: false, // Pour debugger plus facilement sur Windows
+      windowsHide: false,
     });
 
-    // Indicateur pour savoir si le processus a démarré correctement
     let hasStarted = false;
+    let startupTimeout = setTimeout(() => {
+      if (!hasStarted) {
+        console.error("⏰ TIMEOUT: Le serveur API n'a pas démarré dans les temps");
+        apiProc.kill();
+      }
+    }, 30000); // 30 secondes
 
     apiProc.on('spawn', () => {
-      console.log('✅ Processus API démarré avec succès');
+      console.log('✅ Processus API spawné');
       hasStarted = true;
+      clearTimeout(startupTimeout);
     });
 
     apiProc.on('error', (err) => {
-      console.error(`❌ ERREUR lors du démarrage du processus API: ${err.message}`);
-      console.error(`Détails de l'erreur: ${JSON.stringify(err)}`);
+      console.error(`❌ ERREUR processus API:`, err);
+      clearTimeout(startupTimeout);
     });
 
-    // Configurer la journalisation API si disponible
-    if (logger.setupApiLogging) {
-      logger.setupApiLogging(app, apiProc);
-    }
-
-    // Gérer les logs standard
+    // Logs améliorés
     apiProc.stdout.on('data', (data) => {
-      console.log(`API: ${data.toString().trim()}`);
-    });
+      const output = data.toString().trim();
+      console.log(`[API] ${output}`);
 
-    // Gérer les logs d'erreur
-    apiProc.stderr.on('data', (data) => {
-      console.error(`API Error: ${data.toString().trim()}`);
-    });
-
-    // Gérer la fermeture du processus
-    apiProc.on('close', (code, signal) => {
-      console.log(`Processus API fermé avec code: ${code}, signal: ${signal}`);
-
-      // Si le processus se termine rapidement, c'est probablement une erreur
-      if (!hasStarted || code !== 0) {
-        console.error(`⚠️ Le processus API s'est terminé anormalement. Code: ${code}`);
+      // Détecter le démarrage réussi
+      if (output.includes('Serveur démarré') || output.includes('Server started')) {
+        hasStarted = true;
+        clearTimeout(startupTimeout);
       }
+    });
+
+    apiProc.stderr.on('data', (data) => {
+      const error = data.toString().trim();
+      console.error(`[API ERROR] ${error}`);
+
+      // Détecter les erreurs critiques
+      if (error.includes('Cannot find module') || error.includes('MODULE_NOT_FOUND')) {
+        console.error('❌ ERREUR CRITIQUE: Module manquant détecté');
+      }
+    });
+
+    apiProc.on('close', (code, signal) => {
+      clearTimeout(startupTimeout);
+      console.log(`[API] Processus fermé - Code: ${code}, Signal: ${signal}`);
     });
 
     return apiProc;
   } catch (error) {
-    console.error(`Erreur fatale lors du démarrage du serveur API: ${error.message}`);
+    console.error(`❌ ERREUR fatale:`, error);
     return null;
   }
 }
 
-module.exports = {
-  startAPIServer,
-};
+module.exports = { startAPIServer };

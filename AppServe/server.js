@@ -106,8 +106,10 @@ app.get('/api/server-info', (req, res) => {
     port: port,
     url: `http://${ipAddress}:${port}`,
     websocket: `ws://${ipAddress}:${port}/ws`,
-    startup_timestamp: getServerStartupId(), // 🔧 MÊME ID QUE L'AUTH
-    startup_time: new Date(parseInt(getServerStartupId())).toISOString(),
+    dataPath: pathManager.getDataPath(),
+    publicPath: pathManager.getPublicPath(),
+    useAppData: pathManager.useAppData,
+    mode: pathManager.useAppData ? 'AppData' : 'Local',
   });
 });
 

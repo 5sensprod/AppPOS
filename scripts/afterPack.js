@@ -53,11 +53,26 @@ exports.default = async function (context) {
 
   // ✅ NOUVEAU : Gestion des node_modules selon le type de build
   if (isUpdateBuild) {
-    console.log('🔄 [UPDATE BUILD] Build léger détecté - pas de gestion node_modules');
-    console.log("✅ [UPDATE] L'application utilisera les node_modules existants");
+    console.log('🔄 [UPDATE BUILD] Gestion des node_modules pour mise à jour légère...');
 
-    // ✅ NOUVEAU : Ne rien faire pour les updates - les modules restent en place
-    // L'app utilisera directement les node_modules déjà installés
+    // Vérifier si les node_modules existent déjà dans l'installation
+    if (fs.existsSync(installationTargetPath)) {
+      console.log('✅ [UPDATE] node_modules existants trouvés, conservation');
+
+      // Copier les node_modules existants vers le nouveau build
+      try {
+        console.log('📦 [UPDATE] Copie des node_modules existants...');
+        fs.copySync(installationTargetPath, nodeModulesPath);
+        console.log('✅ [UPDATE] node_modules copiés avec succès');
+      } catch (error) {
+        console.error('❌ [UPDATE] Erreur copie node_modules:', error);
+        console.log('🔄 [UPDATE] Installation fraîche des modules...');
+        await installNodeModules(appServePath, nodeModulesPath);
+      }
+    } else {
+      console.log('⚠️ [UPDATE] Aucun node_modules existant, installation nécessaire');
+      await installNodeModules(appServePath, nodeModulesPath);
+    }
   } else {
     console.log('📦 [MAJOR BUILD] Installation complète des node_modules...');
 
