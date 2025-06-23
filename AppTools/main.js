@@ -1,10 +1,15 @@
-// main.js - AVEC DÉMARRAGE OPTIMISÉ ET AUTHENTIFICATION (CORRIGÉ)
+// main.js - AVEC MODULE SPLASH PROFESSIONNEL
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const bonjour = require('bonjour')();
+
+// ✅ NOUVEAU : Importation du module splash
+const { createSplashWindow, updateSplashStatus, closeSplash } = require(
+  path.join(__dirname, 'modules/splash')
+);
 
 // ✅ NOUVEAU : Forcer les variables d'environnement en production
 const isPackaged = app.isPackaged;
@@ -30,6 +35,7 @@ const { setupWebCaptureListener } = require(path.join(__dirname, 'modules', 'web
 let mainWindow;
 let apiProcess = null;
 let webServerInstance = null;
+let splashWindow = null; // ✅ NOUVEAU : Référence au splash
 
 // ✅ NOUVEAU : Variables pour gérer l'authentification
 let isUserAuthenticated = false;
@@ -95,12 +101,23 @@ async function waitForApiServer(maxWaitTime = 10000) {
 
   console.log('🔍 [MAIN] Vérification de la disponibilité du serveur API...');
 
+  // ✅ NOUVEAU : Mettre à jour le splash
+  if (splashWindow) {
+    updateSplashStatus(splashWindow, 'Connexion au serveur API...');
+  }
+
   while (Date.now() - startTime < maxWaitTime) {
     try {
       const axios = require('axios');
       await axios.get('http://localhost:3000/test', { timeout: 1000 });
       const elapsed = Date.now() - startTime;
       console.log(`✅ [MAIN] Serveur API prêt en ${elapsed}ms`);
+
+      // ✅ NOUVEAU : Mettre à jour le splash
+      if (splashWindow) {
+        updateSplashStatus(splashWindow, 'Serveur API connecté !');
+      }
+
       return true;
     } catch (error) {
       // Serveur pas encore prêt, attendre
@@ -109,67 +126,13 @@ async function waitForApiServer(maxWaitTime = 10000) {
   }
 
   console.warn('⚠️ [MAIN] Timeout - Serveur API non disponible après 10s');
+
+  // ✅ NOUVEAU : Mettre à jour le splash
+  if (splashWindow) {
+    updateSplashStatus(splashWindow, 'Démarrage en mode hors ligne...');
+  }
+
   return false;
-}
-
-// ✅ NOUVEAU : Démarrage avec splash screen
-function createSplashWindow() {
-  console.log('🚀 [MAIN] Création de la fenêtre splash...');
-
-  const splash = new BrowserWindow({
-    width: 400,
-    height: 300,
-    frame: false,
-    alwaysOnTop: true,
-    transparent: true,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-
-  // Créer un splash HTML simple
-  const splashHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <style>
-          body {
-            margin: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            text-align: center;
-          }
-          .logo { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
-          .spinner { 
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top: 3px solid white;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-          }
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          .status { font-size: 14px; opacity: 0.8; }
-        </style>
-      </head>
-      <body>
-        <div class="logo">AppPOS by 5SENSPROD</div>
-        <div class="spinner"></div>
-        <div class="status">Démarrage du serveur...</div>
-      </body>
-    </html>
-  `;
-
-  splash.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(splashHtml));
-  return splash;
 }
 
 // ✅ NOUVEAU : Gestionnaires IPC pour l'authentification
@@ -246,6 +209,11 @@ function createWindow() {
   console.log('Création de la fenêtre principale...');
   const appVersion = app.getVersion();
 
+  // ✅ NOUVEAU : Mettre à jour le splash
+  if (splashWindow) {
+    updateSplashStatus(splashWindow, "Initialisation de l'interface...");
+  }
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -278,6 +246,12 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     console.log('✅ [MAIN] Fenêtre principale affichée');
+
+    // ✅ NOUVEAU : Fermer le splash après un délai
+    if (splashWindow) {
+      closeSplash(splashWindow, 800);
+      splashWindow = null;
+    }
   });
 
   // Ouvrir les DevTools en mode développement
@@ -343,11 +317,18 @@ ipcMain.on('request-network-urls', () => {
 
 setupWebCaptureListener(ipcMain);
 
-// ✅ NOUVEAU : Démarrage optimisé avec splash
+// ✅ NOUVEAU : Démarrage optimisé avec splash professionnel
 app.whenReady().then(async () => {
   console.log('🚀 [MAIN] Electron est prêt!');
 
-  let splash = null;
+  // ✅ NOUVEAU : Créer le splash professionnel
+  splashWindow = createSplashWindow({
+    appName: 'AppPOS',
+    company: '5SENSPROD',
+    version: app.getVersion(),
+    status: 'Initialisation...',
+    theme: 'dark', // Options: 'corporate', 'dark', 'light', 'blue'
+  });
 
   // Démarrer le serveur API si nécessaire
   apiProcess = apiServer.startAPIServer(app, environment);
@@ -355,31 +336,30 @@ app.whenReady().then(async () => {
   if (!apiProcess) {
     // API externe ou pas besoin → Fenêtre immédiate
     console.log('📱 [MAIN] API externe - fenêtre immédiate');
+    updateSplashStatus(splashWindow, 'Mode API externe détecté...');
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // Délai pour voir le message
     createWindow();
   } else {
     // API interne → Splash + attente intelligente
     console.log('⏳ [MAIN] API interne - démarrage avec splash');
-
-    splash = createSplashWindow();
+    updateSplashStatus(splashWindow, 'Démarrage du serveur API...');
 
     // Attendre que le serveur soit prêt (max 10s)
     const apiReady = await waitForApiServer(10000);
 
     if (apiReady) {
       console.log('✅ [MAIN] API prête - création fenêtre principale');
+      updateSplashStatus(splashWindow, "Chargement de l'application...");
     } else {
       console.log('⚠️ [MAIN] API non prête - création fenêtre quand même');
+      updateSplashStatus(splashWindow, 'Chargement en mode dégradé...');
     }
+
+    // Petit délai pour voir le dernier message
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Créer la fenêtre principale
     createWindow();
-
-    // Fermer le splash après un petit délai
-    setTimeout(() => {
-      if (splash && !splash.isDestroyed()) {
-        splash.close();
-      }
-    }, 1000);
   }
 
   app.on('activate', function () {
@@ -398,6 +378,11 @@ app.on('before-quit', () => {
 
   // Arrêter la vérification des mises à jour
   stopUpdateCheck();
+
+  // ✅ NOUVEAU : S'assurer que le splash est fermé
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.close();
+  }
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('app-closing');
