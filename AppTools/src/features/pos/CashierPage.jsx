@@ -1,4 +1,4 @@
-// src/features/pos/CashierPage.jsx - Version complète avec fond de caisse
+// src/features/pos/CashierPage.jsx - VERSION FINALE PROPRE
 import React, { useEffect, useCallback, useState } from 'react';
 import { useCashierStore } from './stores/cashierStore';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -7,21 +7,30 @@ import ProductSearch from './components/ProductSearch';
 import Cart from './components/Cart';
 import PaymentModal from './components/PaymentModal';
 import ReceiptModal from './components/ReceiptModal';
-import ErrorDisplay from './components/ErrorDisplay';
 import DrawerIndicator from './components/DrawerIndicator';
 import DrawerMovementModal from './components/DrawerMovementModal';
 import DrawerClosingModal from './components/DrawerClosingModal';
 import DrawerReportModal from './components/DrawerReportModal';
 import ReportHistoryModal from './components/ReportHistoryModal';
+import SessionOpeningModal from './components/SessionOpeningModal';
 
 const CashierPage = () => {
-  // ✅ SÉLECTEURS STABLES
-  const user = useSessionStore((state) => state.user);
-  const stopSession = useSessionStore((state) => state.stopSession);
+  // États pour les modales
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-
   const [showClosingModal, setShowClosingModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showLCDModal, setShowLCDModal] = useState(false);
+  const [lcdPreselected, setLcdPreselected] = useState(false);
+
+  // Stores
+  const user = useSessionStore((state) => state.user);
+  const stopSession = useSessionStore((state) => state.stopSession);
+  const sessionLoading = useSessionStore((state) => state.sessionLoading);
+  const lcdPorts = useSessionStore((state) => state.lcdPorts);
+  const lcdLoading = useSessionStore((state) => state.lcdLoading);
+  const lcdError = useSessionStore((state) => state.lcdError);
+  const requestLCD = useSessionStore((state) => state.requestLCD);
+  const startSession = useSessionStore((state) => state.startSession);
 
   const hasActiveCashierSession = useSessionStore((state) =>
     Boolean(state.cashierSession?.status === 'active')
@@ -33,13 +42,45 @@ const CashierPage = () => {
         state.cashierSession?.status === 'active'
     )
   );
-  const lcdError = useSessionStore((state) => state.lcdError);
   const lcd = useSessionStore((state) => state.lcd);
 
-  // ✅ STORE PANIER
   const { addToCart, error, setError } = useCashierStore();
 
-  // ✅ GESTION AJOUT PRODUIT AVEC LCD ZUSTAND
+  // Handlers
+  const handleShowLCDConfig = () => {
+    setLcdPreselected(true);
+    setShowLCDModal(true);
+  };
+
+  const handleUnifiedSessionOpen = async (sessionData) => {
+    try {
+      const { useLCD, lcdPort, lcdConfig, drawer, lcdOnly } = sessionData;
+
+      if (lcdOnly) {
+        // Mode LCD seulement
+        await requestLCD(
+          lcdPort,
+          lcdConfig || {
+            baudRate: 9600,
+            dataBits: 8,
+            parity: 'none',
+            stopBits: 1,
+          }
+        );
+        console.log('✅ LCD connecté');
+      } else {
+        // Session complète
+        await startSession(useLCD ? lcdPort : null, useLCD ? lcdConfig : {}, drawer);
+        console.log('✅ Session + fond ouverts');
+      }
+
+      setShowLCDModal(false);
+      setLcdPreselected(false);
+    } catch (error) {
+      console.error('Erreur ouverture session/LCD:', error);
+    }
+  };
+
   const handleProductFound = useCallback(
     async (product) => {
       // Vérifications de stock
@@ -52,13 +93,13 @@ const CashierPage = () => {
       addToCart(product, 1);
       setError(null);
 
-      // ✅ AFFICHAGE PRIX VIA ZUSTAND LCD
+      // Affichage prix sur LCD
       if (canUseLCD) {
         try {
           const productName =
             product.name.length > 20 ? product.name.substring(0, 17) + '...' : product.name;
           await lcd.showPrice(productName, product.price);
-          console.log(`💰 [CASHIER PAGE] Prix affiché: ${productName} - ${product.price}€`);
+          console.log(`💰 Prix affiché: ${productName} - ${product.price}€`);
         } catch (error) {
           console.debug('Erreur affichage produit LCD:', error.message);
         }
@@ -76,7 +117,7 @@ const CashierPage = () => {
     }
   };
 
-  // ✅ RACCOURCIS CLAVIER
+  // Raccourcis clavier
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.target.tagName === 'INPUT') return;
@@ -89,23 +130,20 @@ const CashierPage = () => {
 
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-900 p-4">
-      {/* ✅ HEADER UNIFIÉ */}
+      {/* Header avec callbacks */}
       <SessionHeader
         onShowClosing={() => setShowClosingModal(true)}
         onShowReport={() => setShowReportModal(true)}
-        onShowHistory={() => setShowHistoryModal(true)} // 🆕 NOUVEAU
+        onShowHistory={() => setShowHistoryModal(true)}
+        onShowLCDConfig={handleShowLCDConfig}
       />
 
-      {/* ✅ NOUVEAU : Indicateur fond de caisse */}
+      {/* Indicateur fond de caisse */}
       <DrawerIndicator />
 
-      {/* ✅ AFFICHAGE DES ERREURS */}
-      <ErrorDisplay cartError={error} lcdError={lcdError} onClearCartError={() => setError(null)} />
-
-      {/* ✅ INTERFACE PRINCIPALE */}
+      {/* Interface principale */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
         <div className="lg:col-span-1">
-          {/* ✅ COMPOSANT ProductSearch AVEC LES NOUVELLES ROUTES */}
           <ProductSearch onProductFound={handleProductFound} disabled={!hasActiveCashierSession} />
         </div>
         <div className="lg:col-span-2">
@@ -113,7 +151,7 @@ const CashierPage = () => {
         </div>
       </div>
 
-      {/* ✅ MODALES */}
+      {/* Modales existantes */}
       <PaymentModal />
       <ReceiptModal />
       <DrawerMovementModal />
@@ -122,9 +160,25 @@ const CashierPage = () => {
         onClose={() => setShowClosingModal(false)}
         onConfirm={handleCloseSession}
       />
-
       <DrawerReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} />
       <ReportHistoryModal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} />
+
+      {/* Modale LCD unifiée */}
+      {showLCDModal && (
+        <SessionOpeningModal
+          isOpen={showLCDModal}
+          onClose={() => {
+            setShowLCDModal(false);
+            setLcdPreselected(false);
+          }}
+          onConfirm={handleUnifiedSessionOpen}
+          loading={sessionLoading || lcdLoading}
+          lcdPorts={lcdPorts}
+          lcdPreselected={lcdPreselected}
+          lcdOnly={lcdPreselected}
+          lcdError={lcdError}
+        />
+      )}
     </div>
   );
 };

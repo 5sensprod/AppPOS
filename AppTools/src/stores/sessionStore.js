@@ -350,6 +350,18 @@ export const useSessionStore = create(
         websocketService.on('lcd.ownership.changed', handleLCDOwnershipChanged);
         websocketService.on('cashier_drawer.movement.added', handleDrawerMovement);
         websocketService.on('cashier_drawer.status.changed', handleDrawerStatus);
+        websocketService.on('lcd.connection.lost', () => {
+          set((state) => ({ ...state, lcdError: 'LCD déconnecté - Reconnexion en cours...' }));
+        });
+
+        websocketService.on('lcd.connection.restored', (payload) => {
+          console.log('✅ [SESSION STORE] Event lcd.connection.restored reçu:', payload);
+          set((state) => ({ ...state, lcdError: null }));
+        });
+
+        websocketService.on('lcd.connection.failed', () => {
+          set((state) => ({ ...state, lcdError: 'LCD déconnecté - Reconnexion échouée' }));
+        });
 
         // ✅ MARQUER COMME INITIALISÉ
         set((state) => ({

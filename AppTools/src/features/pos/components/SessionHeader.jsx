@@ -1,4 +1,4 @@
-// src/features/pos/components/SessionHeader.jsx - VERSION CORRIGÉE
+// src/features/pos/components/SessionHeader.jsx - VERSION FINALE PROPRE
 import React, { useState, useEffect } from 'react';
 import { useSessionStore } from '../../../stores/sessionStore';
 import {
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import SessionOpeningModal from './SessionOpeningModal';
 
-const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
+const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory, onShowLCDConfig }) => {
   const cashierSession = useSessionStore((state) => state.cashierSession);
   const hasActiveCashierSession = useSessionStore((state) =>
     Boolean(state.cashierSession?.status === 'active')
@@ -24,7 +24,6 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
   const sessionLoading = useSessionStore((state) => state.sessionLoading);
   const sessionError = useSessionStore((state) => state.sessionError);
   const startSession = useSessionStore((state) => state.startSession);
-  const stopSession = useSessionStore((state) => state.stopSession);
   const syncInitialState = useSessionStore((state) => state.syncInitialState);
   const initWebSocketListeners = useSessionStore((state) => state.initWebSocketListeners);
 
@@ -32,16 +31,11 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
   const lcdPorts = useSessionStore((state) => state.lcdPorts);
   const lcdLoading = useSessionStore((state) => state.lcdLoading);
   const lcdError = useSessionStore((state) => state.lcdError);
-  const requestLCD = useSessionStore((state) => state.requestLCD);
   const releaseLCD = useSessionStore((state) => state.releaseLCD);
   const loadLCDPorts = useSessionStore((state) => state.loadLCDPorts);
   const user = useSessionStore((state) => state.user);
 
-  // ✅ ÉTATS LOCAUX - ORDRE CORRIGÉ
   const [showSessionOpenModal, setShowSessionOpenModal] = useState(false);
-  const [lcdPreselected, setLcdPreselected] = useState(false); // ✅ CORRIGÉ: setLcdPreselected au lieu de setLCDPreselected
-  const [showLCDSetup, setShowLCDSetup] = useState(false);
-  const [selectedPort, setSelectedPort] = useState('');
   const [serverTime, setServerTime] = useState(new Date());
   const [timeOffset, setTimeOffset] = useState(0);
 
@@ -52,18 +46,16 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
     nom: 'Caisse Principale',
   };
 
-  // ✅ INITIALISATION WEBSOCKET + SYNC INITIALE (UNE SEULE FOIS)
+  // Initialisation WebSocket + Sync initiale
   useEffect(() => {
     if (!user?.id) return;
 
     console.log(`🔄 [SESSION HEADER] Initialisation pour user ${user.id}`);
 
-    // ✅ 1. SYNC INITIALE (remplace le polling répétitif)
     syncInitialState().catch((error) => {
       console.warn('[SESSION HEADER] Erreur sync initiale:', error.message);
     });
 
-    // ✅ 2. INITIALISER LES LISTENERS WEBSOCKET
     let cleanupWebSocket = null;
 
     initWebSocketListeners()
@@ -77,7 +69,6 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
         console.warn('[SESSION HEADER] Erreur initialisation WebSocket:', error);
       });
 
-    // ✅ CLEANUP
     return () => {
       console.log('🧹 [SESSION HEADER] Nettoyage pour user', user.id);
       if (cleanupWebSocket) {
@@ -86,24 +77,19 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
     };
   }, [user?.id, syncInitialState, initWebSocketListeners]);
 
-  // ✅ TEMPS SERVEUR WEBSOCKET (INCHANGÉ)
+  // Temps serveur WebSocket
   useEffect(() => {
     import('../../../services/websocketService').then((module) => {
       const websocketService = module.default;
-
       if (!websocketService) return;
 
       const handleServerTimeUpdate = (payload) => {
         const serverTimestamp = payload.timestamp;
         const clientTimestamp = Date.now();
-
         const offset = serverTimestamp - clientTimestamp;
+
         setTimeOffset(offset);
         setServerTime(new Date(serverTimestamp));
-
-        console.log(
-          `⏰ [SESSION HEADER] Temps serveur reçu: ${new Date(serverTimestamp).toLocaleTimeString()}`
-        );
       };
 
       websocketService.on('server.time.update', handleServerTimeUpdate);
@@ -123,7 +109,7 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
     });
   }, []);
 
-  // ✅ TIMER CLIENT POUR TEMPS SERVEUR (INCHANGÉ)
+  // Timer client pour temps serveur
   useEffect(() => {
     const clientTimer = setInterval(() => {
       const adjustedTime = new Date(Date.now() + timeOffset);
@@ -133,82 +119,39 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
     return () => clearInterval(clientTimer);
   }, [timeOffset]);
 
-  // ✅ CHARGEMENT PORTS LCD (INCHANGÉ)
+  // Chargement ports LCD
   useEffect(() => {
     loadLCDPorts().catch(() => {});
   }, [loadLCDPorts]);
 
-  useEffect(() => {
-    if (lcdPorts.length > 0 && !selectedPort) {
-      setSelectedPort(lcdPorts[0].path);
-    }
-  }, [lcdPorts, selectedPort]);
+  // Handlers
+  const handleOpenSession = () => {
+    setShowSessionOpenModal(true);
+  };
 
-  // ✅ HANDLERS POUR ACTIONS - VERSION UNIFIÉE
-  const handleOpenSession = async () => {
-    try {
-      // ✅ Ouvrir modal unifiée
-      setShowSessionOpenModal(true);
-    } catch (error) {
-      console.error('Erreur ouverture session:', error);
+  const handleOpenLCDConfig = () => {
+    if (onShowLCDConfig) {
+      onShowLCDConfig();
+    } else {
+      console.error('❌ onShowLCDConfig prop manquante !');
     }
   };
 
-  const handleOpenSessionWithLCD = async () => {
-    try {
-      // ✅ Ouvrir modal unifiée avec LCD pré-sélectionné
-      setLcdPreselected(true); // ✅ CORRIGÉ
-      setShowSessionOpenModal(true);
-    } catch (error) {
-      console.error('Erreur ouverture session avec LCD:', error);
-    }
-  };
-
-  // ✅ NOUVEAU HANDLER UNIFIÉ
   const handleUnifiedSessionOpen = async (sessionData) => {
     try {
       const { useLCD, lcdPort, lcdConfig, drawer } = sessionData;
-
       await startSession(useLCD ? lcdPort : null, useLCD ? lcdConfig : {}, drawer);
-
       setShowSessionOpenModal(false);
-      setLcdPreselected(false); // ✅ CORRIGÉ
       console.log('✅ Session + fond ouverts');
     } catch (error) {
-      console.error('Erreur ouverture session unifiée:', error);
-    }
-  };
-
-  const handleCloseSession = async () => {
-    try {
-      await stopSession();
-      console.log('✅ [SESSION HEADER] Session fermée (WebSocket confirmera)');
-    } catch (error) {
-      console.error('Erreur fermeture session:', error);
-    }
-  };
-
-  const handleRequestLCD = async () => {
-    if (!selectedPort) return;
-
-    try {
-      await requestLCD(selectedPort, {
-        baudRate: 9600,
-        dataBits: 8,
-        parity: 'none',
-        stopBits: 1,
-      });
-      setShowLCDSetup(false);
-      console.log('✅ [SESSION HEADER] LCD demandé (WebSocket confirmera)');
-    } catch (error) {
-      console.error('Erreur connexion LCD:', error);
+      console.error('Erreur ouverture session:', error);
     }
   };
 
   const handleReleaseLCD = async () => {
     try {
       await releaseLCD();
-      console.log('✅ [SESSION HEADER] LCD libéré (WebSocket confirmera)');
+      console.log('✅ LCD libéré');
     } catch (error) {
       console.error('Erreur libération LCD:', error);
     }
@@ -254,7 +197,7 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
     );
   };
 
-  // ✅ AFFICHAGE SESSION ACTIVE (DONNÉES WEBSOCKET TEMPS RÉEL)
+  // Affichage session active
   if (hasActiveCashierSession) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
@@ -308,7 +251,6 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
-              {/* ✅ STATS TEMPS RÉEL VIA WEBSOCKET */}
               <div className="flex items-center text-gray-600 dark:text-gray-300">
                 <ShoppingBag className="h-4 w-4 mr-2" />
                 <span className="font-medium">
@@ -319,19 +261,19 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
 
               <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
 
-              {/* ✅ STATUS LCD TEMPS RÉEL VIA WEBSOCKET */}
               <LCDIndicator />
             </div>
 
             <div className="flex items-center space-x-2">
-              {!hasLCDControl && !lcdStatus?.owned && (
+              {/* Bouton LCD */}
+              {!hasLCDControl && (
                 <button
-                  onClick={() => setShowLCDSetup(true)}
+                  onClick={handleOpenLCDConfig}
                   disabled={lcdLoading}
                   className="flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md disabled:opacity-50 transition-colors"
                 >
                   <Monitor className="h-4 w-4 mr-1" />
-                  Connecter LCD
+                  {lcdError ? 'Reconnecter LCD' : 'Connecter LCD'}
                 </button>
               )}
 
@@ -346,37 +288,36 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
                 </button>
               )}
 
-              {hasActiveCashierSession && (
-                <button
-                  onClick={() => onShowHistory?.()}
-                  className="flex items-center px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-md transition-colors"
-                >
-                  <FileText className="h-4 w-4 mr-1" />
-                  Historique
-                </button>
-              )}
+              {/* Autres boutons */}
+              <button
+                onClick={() => onShowHistory?.()}
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-md transition-colors"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Historique
+              </button>
 
               <button
-                onClick={() => onShowClosing?.()} // Au lieu de handleCloseSession
+                onClick={() => onShowClosing?.()}
                 disabled={sessionLoading}
                 className="flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md disabled:opacity-50 transition-colors"
               >
                 <LogOut className="h-4 w-4 mr-1" />
                 Fermer Session
               </button>
-              {hasActiveCashierSession && (
-                <button
-                  onClick={() => onShowReport?.()}
-                  className="flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
-                >
-                  <FileText className="h-4 w-4 mr-1" />
-                  Rapport
-                </button>
-              )}
+
+              <button
+                onClick={() => onShowReport?.()}
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Rapport
+              </button>
             </div>
           </div>
         </div>
 
+        {/* Affichage erreurs */}
         {(sessionError || lcdError) && (
           <div className="mx-6 mb-4">
             <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
@@ -402,7 +343,7 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
     );
   }
 
-  // ✅ AFFICHAGE AUCUNE SESSION - MODIFIÉ
+  // Affichage aucune session
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
       <div className="px-6 py-4">
@@ -435,21 +376,18 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
 
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
 
-            {/* ✅ BOUTON UNIFIÉ */}
-            <div className="flex space-x-2">
-              <button
-                onClick={handleOpenSession}
-                disabled={sessionLoading}
-                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 transition-colors"
-              >
-                {sessionLoading ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <LogIn className="h-4 w-4 mr-2" />
-                )}
-                Démarrer la journée
-              </button>
-            </div>
+            <button
+              onClick={handleOpenSession}
+              disabled={sessionLoading}
+              className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 transition-colors"
+            >
+              {sessionLoading ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <LogIn className="h-4 w-4 mr-2" />
+              )}
+              Démarrer la journée
+            </button>
           </div>
         </div>
 
@@ -472,74 +410,18 @@ const SessionHeader = ({ onShowClosing, onShowReport, onShowHistory }) => {
         )}
       </div>
 
-      {/* ✅ MODAL UNIFIÉE */}
+      {/* Modale pour session complète */}
       {showSessionOpenModal && (
         <SessionOpeningModal
           isOpen={showSessionOpenModal}
-          onClose={() => {
-            setShowSessionOpenModal(false);
-            setLcdPreselected(false); // ✅ CORRIGÉ
-          }}
+          onClose={() => setShowSessionOpenModal(false)}
           onConfirm={handleUnifiedSessionOpen}
-          loading={sessionLoading}
+          loading={sessionLoading || lcdLoading}
           lcdPorts={lcdPorts}
-          lcdPreselected={lcdPreselected} // ✅ CORRIGÉ
+          lcdPreselected={false}
+          lcdOnly={false}
+          lcdError={lcdError}
         />
-      )}
-
-      {/* ✅ MODAL LCD SETUP (POUR SESSION ACTIVE) */}
-      {showLCDSetup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-6 w-96 max-w-full">
-            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
-              Configuration LCD
-            </h3>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                Port série
-              </label>
-              <select
-                value={selectedPort}
-                onChange={(e) => setSelectedPort(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Sélectionner un port</option>
-                {lcdPorts.map((port) => (
-                  <option key={port.path} value={port.path}>
-                    {port.path} - {port.description}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {lcdError && (
-              <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-                <span className="text-sm text-red-800 dark:text-red-200">{lcdError}</span>
-              </div>
-            )}
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowLCDSetup(false);
-                  useSessionStore.getState().setLcdError(null);
-                }}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-              >
-                Annuler
-              </button>
-
-              <button
-                onClick={handleRequestLCD}
-                disabled={!selectedPort || lcdLoading}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50 transition-colors"
-              >
-                {lcdLoading ? 'Connexion...' : 'Connecter LCD'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

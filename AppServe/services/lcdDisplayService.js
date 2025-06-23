@@ -746,6 +746,14 @@ class LCDDisplayService {
           });
         });
 
+        console.log('📡 [LCD] Émission event reconnexion...');
+        const apiEventEmitter = require('./apiEventEmitter');
+        apiEventEmitter.emit('lcd.connection.restored', {
+          port: portPath,
+          owner: this.getOwnerInfo(),
+          timestamp: Date.now(),
+        });
+
         // Welcome après 2s
         setTimeout(() => {
           this.showWelcomeMessage().catch((error) => {

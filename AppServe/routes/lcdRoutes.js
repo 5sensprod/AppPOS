@@ -28,4 +28,7 @@ router.post('/show/error', updateActivity, lcdController.showError.bind(lcdContr
 // Test (avec middleware d'activité)
 router.post('/test', updateActivity, lcdController.testDisplay.bind(lcdController));
 
+// ✅ NOUVEAU : Reconnexion
+router.post('/reconnect', updateActivity, lcdController.reconnectLCD.bind(lcdController));
+
 module.exports = router;

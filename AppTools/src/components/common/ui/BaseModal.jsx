@@ -1,4 +1,4 @@
-// AppTools\src\components\ui\BaseModal.jsx
+// AppTools\src\components\ui\BaseModal.jsx - VERSION FINALE PROPRE
 import { X } from 'lucide-react';
 
 const BaseModal = ({
@@ -8,13 +8,16 @@ const BaseModal = ({
   icon: Icon,
   children,
   footer,
-  maxWidth = 'max-w-2xl', // Configurable
+  maxWidth = 'max-w-2xl',
   className = '',
 }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4"
+      style={{ zIndex: 99999 }}
+    >
       <div
         className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${maxWidth} w-full h-full max-h-[95vh] sm:max-h-[90vh] flex flex-col ${className}`}
       >
