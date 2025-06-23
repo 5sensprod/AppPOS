@@ -233,6 +233,41 @@ class WebSocketManager {
     console.log(`[WS-DRAWER] Statut fond diffusé pour cashier ${payload.cashier_id}`);
   }
 
+  notifyLCDConnectionLost(payload) {
+    const eventData = {
+      port: payload.port,
+      owner: payload.owner,
+      error: payload.error,
+      timestamp: payload.timestamp,
+    };
+
+    this.broadcast('lcd.connection.lost', eventData);
+    console.log(`[WS-LCD] Déconnexion LCD ${payload.port} diffusée`);
+  }
+
+  notifyLCDConnectionRestored(payload) {
+    const eventData = {
+      port: payload.port,
+      owner: payload.owner,
+      timestamp: payload.timestamp,
+    };
+
+    this.broadcast('lcd.connection.restored', eventData);
+    console.log(`[WS-LCD] Reconnexion LCD ${payload.port} diffusée`);
+  }
+
+  notifyLCDConnectionFailed(payload) {
+    const eventData = {
+      port: payload.port,
+      owner: payload.owner,
+      attempts: payload.attempts,
+      timestamp: payload.timestamp,
+    };
+
+    this.broadcast('lcd.connection.failed', eventData);
+    console.log(`[WS-LCD] Échec reconnexion LCD ${payload.port} diffusée`);
+  }
+
   // ✅ MÉTHODES UTILITAIRES
   sendToClient(client, type, payload) {
     if (client.readyState === WebSocket.OPEN) {

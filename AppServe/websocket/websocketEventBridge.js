@@ -88,6 +88,21 @@ function initializeWebSocketEventBridge() {
     websocketManager.notifyCashierDrawerStatus(payload);
   });
 
+  apiEventEmitter.on('lcd.connection.lost', (payload) => {
+    console.log(`[EVENT-WS] LCD déconnecté sur ${payload.port} relayé vers WebSocket`);
+    websocketManager.notifyLCDConnectionLost(payload);
+  });
+
+  apiEventEmitter.on('lcd.connection.restored', (payload) => {
+    console.log(`[EVENT-WS] LCD reconnecté sur ${payload.port} relayé vers WebSocket`);
+    websocketManager.notifyLCDConnectionRestored(payload);
+  });
+
+  apiEventEmitter.on('lcd.connection.failed', (payload) => {
+    console.log(`[EVENT-WS] LCD échec reconnexion sur ${payload.port} relayé vers WebSocket`);
+    websocketManager.notifyLCDConnectionFailed(payload);
+  });
+
   console.log('[EVENT-WS] Bridge initialisé entre Event Emitter et WebSocket Manager');
   console.log('[EVENT-WS] ✅ Événements sessions caisse et LCD ajoutés');
 }

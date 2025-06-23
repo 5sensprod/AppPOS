@@ -26,6 +26,56 @@ class LCDDisplayService {
       errors: 0,
       averageTime: 0,
     };
+    // ✅ NOUVEAU : Monitoring LCD
+    this.healthCheck = {
+      isMonitoring: false,
+      interval: null,
+      lastSuccessfulWrite: null,
+      consecutiveFailures: 0,
+      maxFailures: 3,
+      checkIntervalMs: 5000, // 5 secondes
+    };
+
+    // ✅ NOUVEAU : État de connexion
+    this.connectionState = {
+      isConnected: false,
+      wasConnected: false,
+      lastDisconnectedAt: null,
+      reconnectAttempts: 0,
+      maxReconnectAttempts: 5,
+    };
+
+    // ✅ NOUVEAU : Gestion des erreurs
+    this.errorHandling = {
+      isHandlingError: false,
+      lastError: null,
+      errorCount: 0,
+    };
+  }
+
+  // ✅ NOUVEAU : Démarrer monitoring
+  startHealthMonitoring() {
+    if (this.healthCheck.isMonitoring) return;
+
+    console.log('🔍 [LCD MONITOR] Démarrage du monitoring LCD');
+    this.healthCheck.isMonitoring = true;
+
+    this.healthCheck.interval = setInterval(async () => {
+      await this.performHealthCheck();
+    }, this.healthCheck.checkIntervalMs);
+  }
+
+  // ✅ NOUVEAU : Arrêter monitoring
+  stopHealthMonitoring() {
+    if (!this.healthCheck.isMonitoring) return;
+
+    console.log('🛑 [LCD MONITOR] Arrêt du monitoring LCD');
+    this.healthCheck.isMonitoring = false;
+
+    if (this.healthCheck.interval) {
+      clearInterval(this.healthCheck.interval);
+      this.healthCheck.interval = null;
+    }
   }
 
   // ✅ QUEUE AVEC PRIORITÉ ET DÉDUPLICATION
@@ -71,6 +121,287 @@ class LCDDisplayService {
         this.processQueue();
       }
     });
+  }
+
+  setupPortErrorHandlers() {
+    if (!this.port) return;
+
+    // Gestionnaire d'erreur principal
+    this.port.on('error', (error) => {
+      this.handlePortError(error);
+    });
+
+    // Gestionnaire fermeture inattendue
+    this.port.on('close', (error) => {
+      if (error) {
+        console.warn(`⚠️ [LCD ERROR] Port fermé avec erreur:`, error);
+        this.handlePortError(error);
+      } else {
+        console.log(`🔌 [LCD] Port fermé proprement`);
+      }
+    });
+
+    // Gestionnaire déconnexion
+    this.port.on('disconnect', (error) => {
+      console.warn(`🔌 [LCD ERROR] Port déconnecté:`, error || 'Raison inconnue');
+      this.handlePortError(error || new Error('Port déconnecté'));
+    });
+  }
+
+  // ✅ NOUVEAU : Gestion centralisée des erreurs port
+  handlePortError(error) {
+    // Éviter gestion multiple simultanée
+    if (this.errorHandling.isHandlingError) {
+      return;
+    }
+
+    this.errorHandling.isHandlingError = true;
+    this.errorHandling.lastError = error;
+    this.errorHandling.errorCount++;
+
+    console.error(`🚨 [LCD ERROR] Erreur port détectée:`, error.message);
+
+    // Marquer comme déconnecté
+    if (this.connectionState.isConnected) {
+      this.handleLCDDisconnected(error);
+    }
+
+    // Reset flag après traitement
+    setTimeout(() => {
+      this.errorHandling.isHandlingError = false;
+    }, 1000);
+  }
+
+  // ✅ NOUVEAU : Vérification de santé LCD
+  async performHealthCheck() {
+    if (!this.connectedDisplay?.connected || !this.port?.isOpen) {
+      return;
+    }
+
+    // Éviter check pendant gestion d'erreur
+    if (this.errorHandling.isHandlingError) {
+      return;
+    }
+
+    try {
+      await this.testLCDConnection();
+
+      // ✅ Success
+      this.healthCheck.lastSuccessfulWrite = Date.now();
+      this.healthCheck.consecutiveFailures = 0;
+
+      // Si on était déconnecté, notifier reconnexion
+      if (!this.connectionState.isConnected && this.connectionState.wasConnected) {
+        this.handleLCDReconnected();
+      }
+
+      this.connectionState.isConnected = true;
+      this.connectionState.wasConnected = true;
+    } catch (error) {
+      this.healthCheck.consecutiveFailures++;
+
+      console.warn(
+        `⚠️ [LCD MONITOR] Échec health check ${this.healthCheck.consecutiveFailures}/${this.healthCheck.maxFailures}:`,
+        error.message
+      );
+
+      // Si trop d'échecs consécutifs = déconnexion détectée
+      if (this.healthCheck.consecutiveFailures >= this.healthCheck.maxFailures) {
+        this.handleLCDDisconnected(error);
+      }
+    }
+  }
+
+  // ✅ NOUVEAU : Test silencieux de connexion
+  async testLCDConnection() {
+    return new Promise((resolve, reject) => {
+      if (!this.port || !this.port.isOpen) {
+        reject(new Error('Port non ouvert'));
+        return;
+      }
+
+      // ✅ NOUVEAU : Vérifier si port en erreur
+      if (this.errorHandling.isHandlingError) {
+        reject(new Error("Port en cours de gestion d'erreur"));
+        return;
+      }
+
+      // Timeout plus court pour health check
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout test connexion LCD'));
+      }, 1000); // 1s au lieu de 2s
+
+      try {
+        // Test avec caractère null (invisible)
+        this.port.write('\0', (error) => {
+          clearTimeout(timeout);
+          if (error) {
+            reject(new Error(`Test connexion échoué: ${error.message}`));
+          } else {
+            this.port.drain((drainError) => {
+              if (drainError) {
+                reject(new Error(`Test drain échoué: ${drainError.message}`));
+              } else {
+                resolve();
+              }
+            });
+          }
+        });
+      } catch (writeError) {
+        clearTimeout(timeout);
+        reject(new Error(`Erreur écriture test: ${writeError.message}`));
+      }
+    });
+  }
+
+  // ✅ NOUVEAU : Gestion déconnexion détectée
+  handleLCDDisconnected(error) {
+    if (!this.connectionState.isConnected) {
+      return; // Déjà en état déconnecté
+    }
+
+    console.error('🚨 [LCD MONITOR] Déconnexion LCD détectée:', error.message);
+
+    this.connectionState.isConnected = false;
+    this.connectionState.lastDisconnectedAt = Date.now();
+    this.connectionState.reconnectAttempts = 0;
+
+    // Arrêter la queue pour éviter erreurs en cascade
+    this.operationQueue = [];
+    this.isProcessingQueue = false;
+
+    // ✅ ÉMETTRE ÉVÉNEMENT WEBSOCKET
+    try {
+      const apiEventEmitter = require('./apiEventEmitter');
+      apiEventEmitter.emit('lcd.connection.lost', {
+        port: this.connectedDisplay?.path,
+        owner: this.getOwnerInfo(),
+        error: error.message,
+        timestamp: Date.now(),
+      });
+    } catch (emitError) {
+      console.error('[LCD ERROR] Erreur émission événement:', emitError.message);
+    }
+
+    // Fermer le port défaillant proprement
+    this.closePortSafely();
+
+    // Démarrer tentatives de reconnexion
+    setTimeout(() => {
+      this.startReconnectionAttempts();
+    }, 2000); // Délai avant première tentative
+  }
+
+  async closePortSafely() {
+    if (!this.port) return;
+
+    try {
+      // Supprimer les listeners pour éviter events en cascade
+      this.port.removeAllListeners('error');
+      this.port.removeAllListeners('close');
+      this.port.removeAllListeners('disconnect');
+
+      if (this.port.isOpen) {
+        await new Promise((resolve) => {
+          this.port.close(() => {
+            resolve(); // Toujours résoudre, même si erreur
+          });
+        });
+      }
+    } catch (error) {
+      console.warn('[LCD] Erreur fermeture port (ignorée):', error.message);
+    } finally {
+      this.port = null;
+    }
+  }
+
+  // ✅ MODIFICATION : closePort avec fermeture sécurisée
+  async closePort() {
+    // Vider la queue avant fermeture
+    this.operationQueue = [];
+    this.isProcessingQueue = false;
+
+    await this.closePortSafely();
+  }
+
+  // ✅ NOUVEAU : Gestion reconnexion réussie
+  handleLCDReconnected() {
+    console.log('🔌 [LCD MONITOR] Reconnexion LCD réussie');
+
+    this.connectionState.isConnected = true;
+    this.connectionState.reconnectAttempts = 0;
+
+    // ✅ NOUVEAU : Message de reconnexion immédiat
+    setTimeout(async () => {
+      try {
+        await this.writeToDisplay('Reconnexion', 'LCD reussie');
+
+        // Puis welcome après 2s
+        setTimeout(async () => {
+          await this.showWelcomeMessage();
+        }, 2000);
+      } catch (error) {
+        console.debug('[LCD] Erreur message reconnexion:', error.message);
+      }
+    }, 500);
+
+    // Émettre événement WebSocket
+    const apiEventEmitter = require('./apiEventEmitter');
+    apiEventEmitter.emit('lcd.connection.restored', {
+      port: this.connectedDisplay?.path,
+      owner: this.getOwnerInfo(),
+      timestamp: Date.now(),
+    });
+  }
+
+  // ✅ NOUVEAU : Tentatives de reconnexion automatique
+  startReconnectionAttempts() {
+    if (!this.connectedDisplay?.path) {
+      console.warn('[LCD MONITOR] Pas de port à reconnecter');
+      return;
+    }
+
+    const reconnectInterval = setInterval(async () => {
+      if (this.connectionState.reconnectAttempts >= this.connectionState.maxReconnectAttempts) {
+        console.error('🚨 [LCD MONITOR] Max tentatives reconnexion atteint - abandon');
+        clearInterval(reconnectInterval);
+
+        // Émettre échec reconnexion
+        try {
+          const apiEventEmitter = require('./apiEventEmitter');
+          apiEventEmitter.emit('lcd.connection.failed', {
+            port: this.connectedDisplay.path,
+            owner: this.getOwnerInfo(),
+            attempts: this.connectionState.reconnectAttempts,
+            timestamp: Date.now(),
+          });
+        } catch (error) {
+          console.error('[LCD] Erreur émission échec reconnexion:', error.message);
+        }
+        return;
+      }
+
+      this.connectionState.reconnectAttempts++;
+      console.log(
+        `🔄 [LCD MONITOR] Tentative reconnexion ${this.connectionState.reconnectAttempts}/${this.connectionState.maxReconnectAttempts}`
+      );
+
+      try {
+        // Reset états avant tentative
+        this.errorHandling.isHandlingError = false;
+
+        // Tentative de reconnexion sur le même port
+        await this.connectToDisplay(this.connectedDisplay.path, this.connectedDisplay.config);
+
+        console.log('✅ [LCD MONITOR] Reconnexion automatique réussie');
+        clearInterval(reconnectInterval);
+      } catch (error) {
+        console.warn(
+          `⚠️ [LCD MONITOR] Tentative ${this.connectionState.reconnectAttempts} échouée:`,
+          error.message
+        );
+      }
+    }, 3000); // Tentative toutes les 3 secondes
   }
 
   // ✅ DÉDUPLICATION AVANCÉE
@@ -325,6 +656,7 @@ class LCDDisplayService {
   }
 
   // ✅ CONNEXION (inchangé mais avec reset queue)
+  // ✅ connectToDisplay COMPLET avec message reconnexion
   async connectToDisplay(portPath, config = {}) {
     try {
       const finalConfig = { ...this.displayConfig, ...config };
@@ -340,6 +672,7 @@ class LCDDisplayService {
         errors: 0,
         averageTime: 0,
       };
+      this.errorHandling.isHandlingError = false;
 
       // Fermer port existant
       if (this.port && this.port.isOpen) {
@@ -356,6 +689,9 @@ class LCDDisplayService {
         stopBits: finalConfig.stopBits,
         autoOpen: false,
       });
+
+      // ✅ GESTIONNAIRES D'ERREURS AVANT OUVERTURE
+      this.setupPortErrorHandlers();
 
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
@@ -380,17 +716,60 @@ class LCDDisplayService {
         connectedAt: new Date(),
       };
 
-      // ✅ INITIALISATION AVEC QUEUE
+      // ✅ INITIALISATION : Clear d'abord
       await this.clearDisplay();
-      // await this.showWelcomeMessage();
 
-      console.info(`✅ LCD connecté sur ${portPath} avec queue robuste`);
+      // ✅ NOUVEAU : Gestion message reconnexion
+      const isReconnection = this.connectionState.reconnectAttempts > 0;
+
+      if (isReconnection) {
+        console.log('📱 [LCD] Affichage message reconnexion...');
+
+        // Message reconnexion DIRECT (sans queue pour être sûr)
+        const reconnectMessage = 'Reconnexion\r\nLCD reussie';
+        await new Promise((resolve, reject) => {
+          this.port.write(reconnectMessage, (error) => {
+            if (error) {
+              console.error('[LCD] Erreur écriture reconnexion:', error.message);
+              reject(error);
+            } else {
+              this.port.drain((drainError) => {
+                if (drainError) {
+                  console.error('[LCD] Erreur drain reconnexion:', drainError.message);
+                  reject(drainError);
+                } else {
+                  console.log('✅ [LCD] Message reconnexion affiché');
+                  resolve();
+                }
+              });
+            }
+          });
+        });
+
+        // Welcome après 2s
+        setTimeout(() => {
+          this.showWelcomeMessage().catch((error) => {
+            console.debug('[LCD] Erreur welcome post-reconnexion:', error.message);
+          });
+        }, 2000);
+      } else {
+        // Première connexion = pas de message reconnexion
+        console.log('📱 [LCD] Première connexion - pas de message reconnexion');
+      }
+
+      // ✅ DÉMARRER MONITORING APRÈS CONNEXION
+      this.startHealthMonitoring();
+      this.connectionState.isConnected = true;
+      this.connectionState.wasConnected = true;
+
+      console.info(`✅ LCD connecté sur ${portPath} avec monitoring actif`);
 
       return {
         success: true,
         message: `LCD connecté sur ${portPath}`,
         config: finalConfig,
-        queueEnabled: true,
+        monitoring: true,
+        reconnection: isReconnection,
       };
     } catch (error) {
       await this.closePort();
@@ -418,7 +797,12 @@ class LCDDisplayService {
 
   // ✅ DÉCONNEXION
   disconnect() {
-    this.closePort();
+    this.stopHealthMonitoring();
+    this.connectionState.isConnected = false;
+    this.connectionState.wasConnected = false;
+    this.errorHandling.isHandlingError = false;
+
+    this.closePortSafely();
     this.connectedDisplay = null;
     this.lastDisplayedContent = null;
   }
@@ -436,7 +820,42 @@ class LCDDisplayService {
         stats: this.queueStats,
       },
       last_content: this.lastDisplayedContent,
+      health: {
+        monitoring: this.healthCheck.isMonitoring,
+        last_check: this.healthCheck.lastSuccessfulWrite,
+        consecutive_failures: this.healthCheck.consecutiveFailures,
+        connection_state: this.connectionState.isConnected,
+        was_connected: this.connectionState.wasConnected,
+        reconnect_attempts: this.connectionState.reconnectAttempts,
+      },
+      // ✅ NOUVEAU : Infos erreur
+      error_info: {
+        handling_error: this.errorHandling.isHandlingError,
+        last_error: this.errorHandling.lastError?.message || null,
+        error_count: this.errorHandling.errorCount,
+      },
     };
+  }
+
+  getOwnerInfo() {
+    // Récupérer info propriétaire depuis cashierSessionService si disponible
+    try {
+      const cashierSessionService = require('./cashierSessionService');
+      const lcdStatus = cashierSessionService.getLCDStatus();
+      return lcdStatus?.owner || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async manualReconnect() {
+    if (!this.connectedDisplay?.path) {
+      throw new Error('Aucun port à reconnecter');
+    }
+
+    console.log(`🔄 [LCD MONITOR] Reconnexion manuelle sur ${this.connectedDisplay.path}`);
+
+    return await this.connectToDisplay(this.connectedDisplay.path, this.connectedDisplay.config);
   }
 
   // ✅ MESSAGES PRÉDÉFINIS AVEC QUEUE

@@ -47,6 +47,21 @@ class ApiEventEmitter extends EventEmitter {
     console.log(`[EVENT] Émission de ${normalized}.count.updated`);
     this.emit(`${normalized}.count.updated`, { id, count });
   }
+
+  lcdConnectionLost(data) {
+    console.log(`[EVENT] Émission de lcd.connection.lost pour port ${data.port}`);
+    this.emit('lcd.connection.lost', data);
+  }
+
+  lcdConnectionRestored(data) {
+    console.log(`[EVENT] Émission de lcd.connection.restored pour port ${data.port}`);
+    this.emit('lcd.connection.restored', data);
+  }
+
+  lcdConnectionFailed(data) {
+    console.log(`[EVENT] Émission de lcd.connection.failed pour port ${data.port}`);
+    this.emit('lcd.connection.failed', data);
+  }
 }
 
 const apiEventEmitter = new ApiEventEmitter();

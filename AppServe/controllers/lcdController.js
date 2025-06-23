@@ -143,6 +143,20 @@ class LCDController {
     }
   }
 
+  async reconnectLCD(req, res) {
+    try {
+      const result = await lcdDisplayService.manualReconnect();
+
+      return ResponseHandler.success(res, {
+        message: 'Reconnexion LCD réussie',
+        connection: result,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   // === MÉTHODES UTILITAIRES ===
 
   detectClientType(req) {
