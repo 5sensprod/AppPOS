@@ -1,0 +1,63 @@
+{
+  "appId": "com.cinqsensprod.apppos",
+  "productName": "AppPOS",
+  "files": ["dist/**/*", "main.js", "preload.js", "modules/**/*", "httpClient.js"],
+  "extraResources": [
+    {
+      "from": "../AppTools",
+      "to": "AppTools",
+      "filter": [
+        "src/utils/productContentSelector.js",
+        "src/injected/productContentSelector.js",
+        "src/injected/productContentSelector.css",
+        "src/injected/modules/*.js"
+      ]
+    },
+    {
+      "from": "../AppServe",
+      "to": "AppServe",
+      "filter": ["**/*", "!node_modules/**", "!data/**", "!public/**", "!.git/**"]
+    }
+  ],
+  "extraFiles": [
+    {
+      "from": "../AppServe/node_modules",
+      "to": "resources/AppServe/node_modules"
+    },
+    {
+      "from": "C:\\nvm4w\\nodejs\\node.exe",
+      "to": "resources/node.exe"
+    }
+  ],
+  "directories": {
+    "output": "../release"
+  },
+  "asar": true,
+  "asarUnpack": ["node_modules/7zip-bin/**/*"],
+  "afterPack": "../scripts/afterPack.js",
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "5sensprod",
+      "repo": "AppPOS"
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": false,
+    "createDesktopShortcut": true,
+    "runAfterFinish": true,
+    "deleteAppDataOnUninstall": false,
+    "perMachine": true,
+    "allowElevation": true,
+    "include": "../scripts/installer.nsh"
+  }
+}

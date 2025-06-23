@@ -117,7 +117,7 @@ function createSplashWindow() {
         </style>
       </head>
       <body>
-        <div class="logo">AppPOS</div>
+        <div class="logo">AppPOS by 5SENSPROD</div>
         <div class="spinner"></div>
         <div class="status">Démarrage du serveur...</div>
       </body>

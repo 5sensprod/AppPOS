@@ -1,4 +1,4 @@
-// modules/apiServer.js - Version corrigée
+// modules/apiServer.js - Version avec AppData node_modules
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -17,14 +17,40 @@ function startAPIServer(app, environment) {
   console.log('Démarrage du serveur API...');
   const appServePath = environment.getAppServePath(app);
 
-  // ✅ NOUVEAU: Vérification complète des chemins
-  const nodeModulesPath = path.join(appServePath, 'node_modules');
+  // ✅ NOUVEAU: Déterminer le chemin des node_modules selon l'environnement
+  let nodeModulesPath;
+  const isPackaged = app.isPackaged;
+
+  if (isPackaged) {
+    // 🏭 PRODUCTION: Utiliser node_modules dans AppData
+    nodeModulesPath = path.join(app.getPath('userData'), 'AppServe', 'node_modules');
+    console.log(`🏭 [PROD] node_modules depuis AppData: ${nodeModulesPath}`);
+  } else {
+    // 🔧 DEV: Utiliser node_modules locaux
+    nodeModulesPath = path.join(appServePath, 'node_modules');
+    console.log(`🔧 [DEV] node_modules locaux: ${nodeModulesPath}`);
+  }
+
   const criticalModules = ['express', 'dotenv', 'cors'];
 
   console.log('=== DIAGNOSTIC COMPLET ===');
   console.log(`AppServe path: ${appServePath}`);
   console.log(`Node modules path: ${nodeModulesPath}`);
   console.log(`Node modules exists: ${fs.existsSync(nodeModulesPath)}`);
+
+  // ✅ Vérifier que le répertoire node_modules existe
+  if (!fs.existsSync(nodeModulesPath)) {
+    console.error(`❌ ERREUR: Répertoire node_modules introuvable: ${nodeModulesPath}`);
+
+    if (isPackaged) {
+      console.error(
+        '💡 SOLUTION: Exécuter un build complet pour installer node_modules dans AppData'
+      );
+      console.error('   Commande: npm run publish');
+    }
+
+    return null;
+  }
 
   // Vérifier chaque module critique
   const missingModules = [];
@@ -37,8 +63,18 @@ function startAPIServer(app, environment) {
 
   if (missingModules.length > 0) {
     console.error(`❌ MODULES MANQUANTS: ${missingModules.join(', ')}`);
+
+    if (isPackaged) {
+      console.error('💡 SOLUTION: node_modules AppData incomplets, rebuilder avec:');
+      console.error('   npm run publish (build complet)');
+    }
+
     return null;
   }
+
+  // ✅ Compter les modules disponibles
+  const moduleCount = fs.readdirSync(nodeModulesPath).length;
+  console.log(`📦 Modules disponibles: ${moduleCount}`);
 
   const serverPath = path.join(appServePath, 'server.js');
   if (!fs.existsSync(serverPath)) {
@@ -46,17 +82,20 @@ function startAPIServer(app, environment) {
     return null;
   }
 
-  // ✅ NOUVEAU: Variables d'environnement améliorées
+  // ✅ MODIFIÉ: Variables d'environnement avec NODE_PATH vers AppData
   const serverEnv = {
     ...process.env,
     NODE_ENV: environment.isDevMode ? 'development' : 'production',
     ELECTRON_ENV: 'true', // Important pour PathManager
     PORT: process.env.PORT || '3000',
-    NODE_PATH: nodeModulesPath, // Ajouter le chemin des modules
+    NODE_PATH: nodeModulesPath, // ✅ CRUCIAL: Pointer vers AppData en prod
     WC_URL: process.env.WC_URL,
     WC_CONSUMER_KEY: process.env.WC_CONSUMER_KEY,
     WC_CONSUMER_SECRET: process.env.WC_CONSUMER_SECRET,
   };
+
+  // ✅ Log pour debug
+  console.log(`🔧 NODE_PATH configuré: ${serverEnv.NODE_PATH}`);
 
   // ✅ AMÉLIORATION: Recherche Node.exe plus robuste
   const nodePaths = [
@@ -83,6 +122,7 @@ function startAPIServer(app, environment) {
     console.log('=== LANCEMENT API ===');
     console.log(`Commande: "${nodePath}" "${serverPath}"`);
     console.log(`Répertoire: ${appServePath}`);
+    console.log(`NODE_PATH: ${serverEnv.NODE_PATH}`);
 
     const apiProc = spawn(nodePath, [serverPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -126,9 +166,13 @@ function startAPIServer(app, environment) {
       const error = data.toString().trim();
       console.error(`[API ERROR] ${error}`);
 
-      // Détecter les erreurs critiques
+      // Détecter les erreurs critiques avec diagnostics
       if (error.includes('Cannot find module') || error.includes('MODULE_NOT_FOUND')) {
         console.error('❌ ERREUR CRITIQUE: Module manquant détecté');
+        console.error(`💡 Vérifier NODE_PATH: ${serverEnv.NODE_PATH}`);
+        console.error(
+          `💡 Modules disponibles: ${fs.existsSync(nodeModulesPath) ? fs.readdirSync(nodeModulesPath).length : 'Répertoire inexistant'}`
+        );
       }
     });
 
