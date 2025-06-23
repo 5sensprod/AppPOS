@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import salesService from '../../../services/salesService';
 import cashierSessionService from '../../../services/cashierSessionService';
-
+import { useSessionStore } from '../../../stores/sessionStore';
 export const useCashierStore = create((set, get) => ({
   // ✅ ÉTAT DU PANIER - APERÇU FRONTEND UNIQUEMENT
   cart: {
@@ -121,6 +121,8 @@ export const useCashierStore = create((set, get) => ({
 
   // ✅ ACTIONS PANIER (aperçu frontend)
   addToCart: (product, quantity = 1) => {
+    console.log('🔍 [STORE] addToCart appelé:', product.name, quantity);
+
     const state = get();
     const existingItemIndex = state.cart.items.findIndex((item) => item.product_id === product._id);
 
@@ -144,7 +146,37 @@ export const useCashierStore = create((set, get) => ({
       newItems = [...state.cart.items, cartItem];
     }
 
+    console.log('🔍 [STORE] Items après ajout:', newItems.length);
     get().recalculatePreviewAndNotify(newItems);
+
+    // ✅ AFFICHAGE LCD
+    console.log('🔍 [STORE] Début affichage LCD...');
+    setTimeout(async () => {
+      console.log('🔍 [STORE] Dans setTimeout LCD...');
+      try {
+        // ✅ UTILISER L'IMPORT DIRECT au lieu de window
+        const sessionState = useSessionStore.getState();
+        console.log('🔍 [STORE] sessionState récupéré via import');
+
+        if (sessionState?.lcdStatus?.owned) {
+          console.log('🔍 [STORE] LCD owned, affichage...');
+          const productNameTruncated =
+            product.name.length > 17 ? product.name.substring(0, 17) : product.name;
+
+          await sessionState.lcd.writeMessage(
+            `${product.price.toFixed(2)}EUR`,
+            productNameTruncated
+          );
+          console.log(
+            `💰 [STORE] Produit LCD affiché: ${productNameTruncated} - ${product.price}€`
+          );
+        } else {
+          console.log('🔍 [STORE] LCD pas owned');
+        }
+      } catch (error) {
+        console.error('❌ [STORE] Erreur affichage produit LCD:', error);
+      }
+    }, 200);
   },
 
   updateCartItemQuantity: (productId, newQuantity) => {
@@ -176,6 +208,30 @@ export const useCashierStore = create((set, get) => ({
     );
 
     get().recalculatePreviewAndNotify(newItems);
+
+    // ✅ NOUVEAU : Affichage LCD pour modification quantité
+    setTimeout(async () => {
+      try {
+        const sessionState = useSessionStore.getState();
+        if (sessionState?.lcdStatus?.owned) {
+          const updatedItem = newItems.find((item) => item.product_id === productId);
+          if (updatedItem) {
+            // Tronquer le nom à 14 chars pour laisser place à " x99"
+            const productNameTruncated =
+              updatedItem.product_name.length > 14
+                ? updatedItem.product_name.substring(0, 14)
+                : updatedItem.product_name;
+
+            const line1 = `${updatedItem.total_price.toFixed(2)}EUR`;
+            const line2 = `${productNameTruncated} x${newQuantity}`;
+            await sessionState.lcd.writeMessage(line1, line2);
+            console.log(`🔄 [STORE] Quantité LCD: ${line1} - ${line2}`);
+          }
+        }
+      } catch (error) {
+        console.debug('❌ [STORE] Erreur affichage quantité LCD:', error.message);
+      }
+    }, 200);
   },
 
   removeFromCart: (productId) => {

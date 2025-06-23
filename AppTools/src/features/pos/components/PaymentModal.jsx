@@ -4,6 +4,7 @@ import { CreditCard, Banknote, Check } from 'lucide-react';
 import BaseModal from '../../../components/common/ui/BaseModal';
 import { useCashierStore } from '../stores/cashierStore';
 import ChangeCalculator from './ChangeCalculator';
+import { useSessionStore } from '../../../stores/sessionStore';
 
 const PaymentModal = () => {
   const { showPaymentModal, setShowPaymentModal, processSale, cart, loading } = useCashierStore();
@@ -12,13 +13,13 @@ const PaymentModal = () => {
 
   const handlePayment = async () => {
     try {
-      // Pour les paiements en espèces, vérifier que le montant est suffisant
+      // Vérifications existantes (inchangées)
       if (paymentMethod === 'cash' && cashPaymentData.amountReceived < cart.total) {
         alert('Le montant reçu est insuffisant');
         return;
       }
 
-      // ✅ NOUVEAU : Préparer les données selon le type de paiement
+      // Préparer les données (votre code existant - inchangé)
       let paymentData = { payment_method: paymentMethod };
 
       if (paymentMethod === 'cash') {
@@ -29,25 +30,61 @@ const PaymentModal = () => {
         };
       }
 
-      // TODO: Ajouter support paiement mixte
-      // if (paymentMethod === 'mixed') {
-      //   paymentData.mixed_payment_data = {
-      //     cash_amount: mixedPaymentData.cashAmount,
-      //     card_amount: mixedPaymentData.cardAmount,
-      //   };
-      // }
-
       console.log('💳 [PAYMENT] Données envoyées:', paymentData);
 
-      // ✅ MODIFIER : Passer les données complètes au lieu du seul payment_method
-      await processSale(paymentData);
-      setShowPaymentModal(false);
+      // Traitement de la vente (votre code existant)
+      const saleResult = await processSale(paymentData);
 
-      // ✅ NOUVEAU : Reset des données après paiement réussi
+      // ✅ NOUVEAU : Séquence LCD avec type de paiement
+      if (window.useSessionStore || useSessionStore) {
+        const sessionState = (window.useSessionStore || useSessionStore).getState();
+        if (sessionState?.lcdStatus?.owned) {
+          try {
+            console.log(`🧾 [PAYMENT] Début séquence LCD avec paiement`);
+
+            // 1. Afficher type de paiement (2s)
+            const paymentTypeDisplay =
+              paymentMethod === 'cash'
+                ? 'Especes'
+                : paymentMethod === 'card'
+                  ? 'Carte bancaire'
+                  : paymentMethod === 'mixed'
+                    ? 'Paiement mixte'
+                    : 'Paiement';
+
+            await sessionState.lcd.writeMessage('Paiement accepte', paymentTypeDisplay);
+            console.log(`💳 [PAYMENT] Type paiement affiché: ${paymentTypeDisplay}`);
+
+            // 2. Thank you après 3s
+            setTimeout(async () => {
+              try {
+                await sessionState.lcd.showThankYou();
+                console.log(`🙏 [PAYMENT] Thank you affiché`);
+
+                // 3. Welcome après 3s supplémentaires
+                setTimeout(async () => {
+                  try {
+                    await sessionState.lcd.showWelcome();
+                    console.log(`👋 [PAYMENT] Welcome affiché (fin transaction)`);
+                  } catch (error) {
+                    console.debug('⚠️ [PAYMENT] Erreur Welcome final:', error.message);
+                  }
+                }, 3000);
+              } catch (error) {
+                console.debug('⚠️ [PAYMENT] Erreur Thank you:', error.message);
+              }
+            }, 3000);
+          } catch (error) {
+            console.debug('⚠️ [PAYMENT] Erreur séquence LCD finale:', error.message);
+          }
+        }
+      }
+
+      // Fermer la modal (votre code existant)
+      setShowPaymentModal(false);
       setCashPaymentData({ amountReceived: 0, change: 0 });
     } catch (error) {
       console.error('Erreur paiement:', error);
-      // Afficher une meilleure erreur à l'utilisateur
       alert('Erreur lors du paiement: ' + (error.message || 'Erreur inconnue'));
     }
   };

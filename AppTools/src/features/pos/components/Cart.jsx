@@ -261,14 +261,17 @@ const Cart = () => {
 
           <button
             onClick={async () => {
-              // Afficher total sur LCD avant modal
               try {
                 const sessionState = useSessionStore.getState();
                 if (sessionState?.lcdStatus?.owned) {
-                  await sessionState.lcd.showTotal(cart.total);
+                  // ✅ LIGNE 1 : Montant
+                  const line1 = `${cart.total.toFixed(2)}EUR`;
+                  // ✅ LIGNE 2 : TOTAL + nombre + singulier/pluriel
+                  const line2 = `TOTAL ${cart.itemCount} Article${cart.itemCount > 1 ? 's' : ''}`;
+
+                  await sessionState.lcd.writeMessage(line1, line2);
                 }
               } catch (error) {
-                // Erreur silencieuse - ne pas bloquer l'interface
                 console.debug('LCD non disponible');
               }
 

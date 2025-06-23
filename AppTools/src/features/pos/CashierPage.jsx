@@ -83,26 +83,30 @@ const CashierPage = () => {
 
   const handleProductFound = useCallback(
     async (product) => {
-      // Vérifications de stock
+      // Vérifications de stock (votre code existant)
       if (product.manage_stock && product.stock <= 0) {
         setError(`Produit "${product.name}" en rupture de stock`);
         return;
       }
 
-      // Ajouter au panier
-      addToCart(product, 1);
-      setError(null);
+      try {
+        // Ajouter au panier
+        addToCart(product, 1);
+        setError(null);
 
-      // Affichage prix sur LCD
-      if (canUseLCD) {
-        try {
-          const productName =
-            product.name.length > 20 ? product.name.substring(0, 17) + '...' : product.name;
-          await lcd.showPrice(productName, product.price);
-          console.log(`💰 Prix affiché: ${productName} - ${product.price}€`);
-        } catch (error) {
-          console.debug('Erreur affichage produit LCD:', error.message);
+        // ✅ NOUVEAU : Affichage prix produit sur LCD
+        if (canUseLCD) {
+          const productNameTruncated =
+            product.name.length > 20 ? product.name.substring(0, 20) : product.name;
+
+          await lcd.writeMessage(productNameTruncated, `${product.price.toFixed(2)}EUR`);
+          console.log(
+            `💰 [CASHIER PAGE] Produit affiché: ${productNameTruncated} - ${product.price}€`
+          );
         }
+      } catch (error) {
+        console.error('Erreur ajout produit:', error);
+        setError(`Erreur lors de l'ajout: ${error.message}`);
       }
     },
     [addToCart, setError, canUseLCD, lcd]

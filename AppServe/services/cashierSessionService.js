@@ -501,13 +501,20 @@ class CashierSessionService {
     // Mettre à jour
     this.cashierCarts.set(cashierId, { itemCount, total, lastUpdate: new Date() });
 
-    // Affichage LCD
+    // ✅ NOUVEAU : Affichage LCD CONDITIONNEL
     try {
+      // ❌ SUPPRIMER L'AFFICHAGE AUTOMATIQUE
+      // if (itemCount === 0 && !options.skipWelcome) {
+      //   await lcdDisplayService.showWelcomeMessage();
+      // } else if (itemCount > 0) {
+      //   await lcdDisplayService.writeToDisplay(`Qte: ${itemCount}`, `${total.toFixed(2)}EUR`);
+      // }
+
+      // ✅ NOUVEAU : Seulement Welcome si panier vide
       if (itemCount === 0 && !options.skipWelcome) {
         await lcdDisplayService.showWelcomeMessage();
-      } else if (itemCount > 0) {
-        await lcdDisplayService.writeToDisplay(`Qte: ${itemCount}`, `${total.toFixed(2)}EUR`);
       }
+      // ✅ Pour les autres cas, laisser le frontend gérer l'affichage
     } catch (error) {
       console.warn('⚠️ [API] Erreur mise à jour LCD:', error.message);
     }
@@ -602,21 +609,20 @@ class CashierSessionService {
 
   // ✅ TRAITEMENT VENTE - SIMPLIFIÉ
   async processSaleComplete(cashierId) {
+    console.log('🔄 [BACKEND] processSaleComplete appelé - délégué au frontend');
+
     if (!this.lcdOwnership || this.lcdOwnership.cashier_id !== cashierId) return;
 
     try {
-      await lcdDisplayService.showThankYou();
+      // ❌ SUPPRIMER : await lcdDisplayService.showThankYou();
+      // ❌ SUPPRIMER : this._handleLCDWithDelay(() => lcdDisplayService.showWelcomeMessage());
 
-      // Retour welcome après délai
-      this._handleLCDWithDelay(() => lcdDisplayService.showWelcomeMessage());
-
-      // Reset panier
+      // ✅ GARDER seulement : Reset panier backend
       this.updateCashierCart(cashierId, 0, 0.0, { skipWelcome: true });
     } catch (error) {
       console.warn('Erreur séquence vente:', error.message);
     }
   }
-
   updateSaleStats(cashierId, saleAmount) {
     const session = this.activeSessions.get(cashierId);
     if (!session) return;
