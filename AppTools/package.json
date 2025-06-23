@@ -80,6 +80,7 @@
         "filter": [
           "**/*",
           "!node_modules/**",
+          "!data/**",
           "!public/**",
           "!.git/**"
         ]

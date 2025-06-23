@@ -1,12 +1,13 @@
-// utils/auth.js - AVEC VALIDATION REDÉMARRAGE SERVEUR
+// utils/auth.js - CORRIGÉ AVEC PathManager
 const jwt = require('jsonwebtoken');
 const Datastore = require('nedb');
 const path = require('path');
 const bcrypt = require('bcrypt');
+const pathManager = require('./PathManager'); // 🔧 AJOUT
 
-// Initialiser la base de données utilisateurs
+// 🔧 CORRIGÉ : Utiliser PathManager au lieu du chemin hardcodé
 const usersDb = new Datastore({
-  filename: path.join(__dirname, '../data/users.db'),
+  filename: pathManager.getDataPath('users.db'), // ✅ UTILISE PathManager
   autoload: true,
 });
 

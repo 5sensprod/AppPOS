@@ -1,4 +1,4 @@
-// config/database.js - Version modifiée avec PathManager conditionnel
+// config/database.js - Version corrigée sans fallback problématique
 const Datastore = require('nedb');
 const path = require('path');
 const fs = require('fs');
@@ -6,7 +6,6 @@ const pathManager = require('../utils/PathManager');
 
 class Database {
   constructor() {
-    // ✅ Entities existantes + nouvelles pour fond de caisse
     this.entities = [
       'categories',
       'products',
@@ -24,19 +23,16 @@ class Database {
     this.initializeAsync();
   }
 
-  /**
-   * ✅ NOUVEAU : Initialisation asynchrone avec PathManager
-   */
   async initializeAsync() {
     try {
       console.log('🗃️ [DATABASE] Initialisation...');
 
-      // Initialiser PathManager si pas encore fait
+      // 🔧 ATTENDRE que PathManager soit initialisé
       if (!pathManager.initialized) {
         await pathManager.initialize();
       }
 
-      // ✅ MODIFIÉ : Utiliser PathManager au lieu du chemin hardcodé
+      // ✅ TOUJOURS utiliser PathManager (plus de fallback)
       this.dataDir = pathManager.getDataPath();
 
       console.log(`📁 [DATABASE] Mode: ${pathManager.useAppData ? 'AppData' : 'Local'}`);
@@ -59,9 +55,6 @@ class Database {
     }
   }
 
-  /**
-   * ✅ NOUVEAU : Assure que le répertoire de données existe
-   */
   ensureDataDirectory() {
     if (!fs.existsSync(this.dataDir)) {
       fs.mkdirSync(this.dataDir, { recursive: true });
@@ -70,18 +63,16 @@ class Database {
   }
 
   /**
-   * ✅ MODIFIÉ : Configuration des DB avec chemin dynamique
+   * 🔧 CORRIGÉ : Configuration des DB sans fallback problématique
    */
   getDbConfig(filename) {
-    // Attendre l'initialisation si pas encore fait
-    if (!this.initialized && !this.dataDir) {
-      console.warn('⚠️ [DATABASE] Utilisation du chemin par défaut (initialisation en cours)');
-      // Fallback temporaire
-      const fallbackDir = pathManager.getDataPath
-        ? pathManager.getDataPath()
-        : path.join(__dirname, '../data');
+    // 🚨 ATTENDRE l'initialisation si nécessaire
+    if (!this.initialized || !this.dataDir) {
+      console.error('❌ [DATABASE] Base de données pas encore initialisée !');
+      // 🔧 NOUVEAU : Utiliser pathManager même si pas encore initialisé
+      const tempDataDir = pathManager.getDataPath();
       return {
-        filename: process.env.NODE_ENV === 'test' ? null : path.join(fallbackDir, filename),
+        filename: process.env.NODE_ENV === 'test' ? null : path.join(tempDataDir, filename),
         autoload: true,
       };
     }
@@ -146,9 +137,6 @@ class Database {
     }
   }
 
-  /**
-   * ✅ INCHANGÉ : Méthode getStore existante
-   */
   getStore(entity) {
     if (!this.stores[entity]) {
       console.warn(`⚠️ [DATABASE] Store ${entity} non trouvé`);
@@ -157,9 +145,6 @@ class Database {
     return this.stores[entity];
   }
 
-  /**
-   * ✅ NOUVEAU : Méthode pour attendre l'initialisation complète
-   */
   async waitForInitialization() {
     while (!this.initialized) {
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -167,9 +152,6 @@ class Database {
     return true;
   }
 
-  /**
-   * ✅ NOUVEAU : Diagnostic des bases de données
-   */
   async diagnose() {
     console.log('🔍 [DATABASE] DIAGNOSTIC');
     console.log(`   - Initialisé: ${this.initialized}`);
@@ -205,9 +187,6 @@ class Database {
     }
   }
 
-  /**
-   * ✅ NOUVEAU : Méthode pour obtenir les chemins des fichiers DB
-   */
   getDatabasePaths() {
     const paths = {};
     this.entities.forEach((entity) => {
@@ -217,13 +196,13 @@ class Database {
   }
 }
 
-// ✅ MODIFIÉ : Export avec gestion d'initialisation
+// ✅ Export avec gestion d'initialisation
 const database = new Database();
 
 // Export des stores (compatible avec l'existant)
 module.exports = database.stores;
 
-// ✅ NOUVEAU : Export additionnel pour accès à l'instance
+// ✅ Export additionnel pour accès à l'instance
 module.exports.database = database;
 module.exports.waitForInitialization = () => database.waitForInitialization();
 module.exports.diagnose = () => database.diagnose();
