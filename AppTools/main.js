@@ -1,4 +1,4 @@
-// main.js - AVEC DÉMARRAGE OPTIMISÉ
+// main.js - AVEC DÉMARRAGE OPTIMISÉ ET AUTHENTIFICATION (CORRIGÉ)
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -31,6 +31,10 @@ let mainWindow;
 let apiProcess = null;
 let webServerInstance = null;
 
+// ✅ NOUVEAU : Variables pour gérer l'authentification
+let isUserAuthenticated = false;
+let updateCheckTimer = null;
+
 // Initialisation des logs
 logger.setupFileLogging(app);
 logger.setupLogs(log, autoUpdater);
@@ -43,6 +47,46 @@ environment.checkEnvironment(app);
 
 // Charger les variables d'environnement
 environment.loadEnvVariables(app);
+
+// ✅ NOUVEAU : Fonction pour démarrer/arrêter la vérification automatique des mises à jour
+function scheduleUpdateCheck() {
+  if (!app.isPackaged || !isUserAuthenticated) {
+    console.log(
+      '🔒 [UPDATER] Vérification des mises à jour différée - utilisateur non authentifié'
+    );
+    return;
+  }
+
+  console.log('⏰ [UPDATER] Programmation de la vérification des mises à jour...');
+
+  // Vérifier immédiatement
+  setTimeout(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.error('Erreur lors de la vérification des mises à jour:', err);
+    });
+  }, 3000);
+
+  // Programmer des vérifications périodiques (toutes les 2 heures)
+  updateCheckTimer = setInterval(
+    () => {
+      if (isUserAuthenticated) {
+        console.log('🔄 [UPDATER] Vérification périodique des mises à jour...');
+        autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+          console.error('Erreur lors de la vérification périodique des mises à jour:', err);
+        });
+      }
+    },
+    2 * 60 * 60 * 1000
+  ); // 2 heures
+}
+
+function stopUpdateCheck() {
+  if (updateCheckTimer) {
+    clearInterval(updateCheckTimer);
+    updateCheckTimer = null;
+    console.log('⏹️ [UPDATER] Vérification automatique des mises à jour arrêtée');
+  }
+}
 
 // ✅ NOUVEAU : Fonction pour vérifier si le serveur API est prêt
 async function waitForApiServer(maxWaitTime = 10000) {
@@ -127,6 +171,32 @@ function createSplashWindow() {
   splash.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(splashHtml));
   return splash;
 }
+
+// ✅ NOUVEAU : Gestionnaires IPC pour l'authentification
+ipcMain.handle('user-authenticated', (event, userData) => {
+  console.log('🔓 [AUTH] Utilisateur authentifié:', userData?.username || 'utilisateur');
+  isUserAuthenticated = true;
+
+  // Démarrer la vérification des mises à jour maintenant que l'utilisateur est connecté
+  scheduleUpdateCheck();
+
+  return { success: true };
+});
+
+ipcMain.handle('user-logout', () => {
+  console.log('🔒 [AUTH] Utilisateur déconnecté');
+  isUserAuthenticated = false;
+
+  // Arrêter la vérification automatique des mises à jour
+  stopUpdateCheck();
+
+  return { success: true };
+});
+
+// ✅ NOUVEAU : Vérifier le statut d'authentification depuis le renderer
+ipcMain.handle('get-auth-status', () => {
+  return { isAuthenticated: isUserAuthenticated };
+});
 
 ipcMain.handle('discover-api-server', () => {
   return new Promise((resolve, reject) => {
@@ -218,6 +288,8 @@ function createWindow() {
   // Événement de fermeture
   mainWindow.on('closed', function () {
     mainWindow = null;
+    // Arrêter la vérification des mises à jour si la fenêtre se ferme
+    stopUpdateCheck();
   });
 
   console.log('Fenêtre principale créée avec succès!');
@@ -225,15 +297,9 @@ function createWindow() {
   // Une fois la fenêtre créée, configurer les événements de mise à jour
   updater.setupUpdateEvents(autoUpdater, mainWindow, dialog);
 
-  // Vérifier les mises à jour si en production
-  if (app.isPackaged) {
-    console.log('Application packagée, vérification automatique des mises à jour...');
-    setTimeout(() => {
-      autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-        console.error('Erreur lors de la vérification des mises à jour:', err);
-      });
-    }, 3000);
-  }
+  // ✅ MODIFIÉ : Ne pas vérifier les mises à jour automatiquement au démarrage
+  // La vérification se fera seulement après authentification
+  console.log("🔒 [UPDATER] Vérification des mises à jour en attente d'authentification");
 
   // Démarrer le serveur web si mainWindow est prêt
   mainWindow.webContents.on('did-finish-load', () => {
@@ -248,6 +314,19 @@ function createWindow() {
 // Configurer les écouteurs IPC
 ipcMain.on('check-for-updates', () => {
   console.log('Demande de vérification manuelle des mises à jour');
+
+  // ✅ NOUVEAU : Vérifier l'authentification avant de permettre la vérification manuelle
+  if (!isUserAuthenticated) {
+    console.log('🔒 [UPDATER] Vérification refusée - utilisateur non authentifié');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-message', {
+        message: 'Authentification requise pour vérifier les mises à jour',
+        error: 'NON_AUTHENTIFIE',
+      });
+    }
+    return;
+  }
+
   if (mainWindow) {
     updater.checkForUpdates(autoUpdater);
   } else {
@@ -316,6 +395,9 @@ app.on('window-all-closed', function () {
 // Lors de la fermeture de l'application, terminer les processus
 app.on('before-quit', () => {
   console.log("🚪 [ELECTRON] Fermeture de l'application...");
+
+  // Arrêter la vérification des mises à jour
+  stopUpdateCheck();
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('app-closing');

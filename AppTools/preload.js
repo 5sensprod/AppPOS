@@ -1,4 +1,4 @@
-// preload.js
+// preload.js - Mise à jour avec APIs d'authentification
 const { contextBridge, ipcRenderer } = require('electron');
 
 // Exposer des API sécurisées au processus de rendu
@@ -38,10 +38,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('update-message', callback);
   },
   getWebSocketSupport: () => ({ supported: true }),
+
+  // ✅ NOUVELLES APIs pour l'authentification et les mises à jour
+  userAuthenticated: (userData) => ipcRenderer.invoke('user-authenticated', userData),
+  userLogout: () => ipcRenderer.invoke('user-logout'),
+  getAuthStatus: () => ipcRenderer.invoke('get-auth-status'),
+
+  // API pour vérifier si l'utilisateur peut accéder aux mises à jour
+  canCheckUpdates: async () => {
+    const authStatus = await ipcRenderer.invoke('get-auth-status');
+    return authStatus.isAuthenticated;
+  },
 });
 
 window.addEventListener('DOMContentLoaded', () => {
-  console.log('DOMContentLoaded - Preload script executed');
+  console.log('DOMContentLoaded - Preload script executed with auth APIs');
 });
 
 // Configurer la communication entre la WebView et l'application principale

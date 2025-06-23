@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.jsx - NETTOYÉ SANS WEBSOCKET
+// src/contexts/AuthContext.jsx - NETTOYÉ SANS WEBSOCKET + NOTIFICATIONS ELECTRON
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import apiService from '../services/api';
 
@@ -30,8 +30,23 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const logout = useCallback(() => {
+  // ✅ NOUVELLE FONCTION : Notifier Electron de la déconnexion (DANS le composant)
+  const notifyElectronLogout = useCallback(async () => {
+    try {
+      if (window.electronAPI?.userLogout) {
+        await window.electronAPI.userLogout();
+        console.log('🔒 [AUTH] Déconnexion signalée à Electron');
+      }
+    } catch (error) {
+      console.warn('⚠️ [AUTH] Erreur notification déconnexion Electron:', error);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
     console.log('🚪 [AUTH] Déconnexion...');
+
+    // ✅ NOUVEAU : Notifier Electron AVANT de nettoyer
+    await notifyElectronLogout();
 
     clearToken();
     apiService.setAuthToken(null);
@@ -54,7 +69,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setError(null);
     console.log('✅ [AUTH] Déconnexion terminée');
-  }, []);
+  }, [notifyElectronLogout]);
 
   // ✅ VÉRIFICATION SIMPLIFIÉE - Le backend gère tout
   const checkServerAndToken = useCallback(async () => {
@@ -84,6 +99,21 @@ export const AuthProvider = ({ children }) => {
 
         if (window.electronAPI?.setAuthToken) {
           window.electronAPI.setAuthToken(storedToken);
+        }
+
+        // ✅ NOUVEAU : Notifier Electron de l'authentification lors de la restauration
+        if (window.electronAPI?.userAuthenticated) {
+          try {
+            await window.electronAPI.userAuthenticated({
+              username: data.user.username,
+              role: data.user.role,
+              timestamp: new Date().toISOString(),
+              restored: true,
+            });
+            console.log('🔓 [AUTH] Session restaurée signalée à Electron');
+          } catch (error) {
+            console.warn('⚠️ [AUTH] Erreur notification session restaurée:', error);
+          }
         }
 
         setUser(data.user);
@@ -132,6 +162,7 @@ export const AuthProvider = ({ children }) => {
       // 📱 ELECTRON : Conservation token jusqu'à fermeture app
       const handleElectronClosing = () => {
         console.log('🔒 [AUTH] Fermeture Electron - suppression token');
+        notifyElectronLogout().catch(console.error);
         clearToken();
         if (window.electronAPI?.setAuthToken) {
           window.electronAPI.setAuthToken(null);
@@ -140,6 +171,7 @@ export const AuthProvider = ({ children }) => {
 
       const handleBeforeUnload = () => {
         console.log('🚪 [AUTH] beforeunload Electron');
+        notifyElectronLogout().catch(console.error);
         clearToken();
         if (window.electronAPI?.setAuthToken) {
           window.electronAPI.setAuthToken(null);
@@ -175,13 +207,30 @@ export const AuthProvider = ({ children }) => {
     }
   }, [logout, checkServerAndToken]);
 
+  // ✅ NOUVELLE FONCTION : Notifier Electron de l'authentification
+  const notifyElectronAuth = useCallback(async (userData) => {
+    try {
+      if (window.electronAPI?.userAuthenticated) {
+        await window.electronAPI.userAuthenticated({
+          username: userData.username,
+          role: userData.role,
+          timestamp: new Date().toISOString(),
+          restored: false,
+        });
+        console.log('🔓 [AUTH] Connexion signalée à Electron');
+      }
+    } catch (error) {
+      console.warn('⚠️ [AUTH] Erreur notification connexion Electron:', error);
+    }
+  }, []);
+
   const login = useCallback(
     async (username, password) => {
       setError(null);
       setLoading(true);
 
       try {
-        logout();
+        await logout();
         await apiService.init();
 
         const { data } = await apiService.post('/api/auth/login', { username, password });
@@ -195,6 +244,10 @@ export const AuthProvider = ({ children }) => {
           }
 
           setUser(data.user);
+
+          // ✅ NOUVEAU : Notifier Electron de la nouvelle connexion
+          await notifyElectronAuth(data.user);
+
           console.log(`✅ [AUTH] Connexion avec ${getStorageType()}`);
           return true;
         } else {
@@ -209,7 +262,7 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       }
     },
-    [logout]
+    [logout, notifyElectronAuth]
   );
 
   const register = useCallback(async (userData) => {
