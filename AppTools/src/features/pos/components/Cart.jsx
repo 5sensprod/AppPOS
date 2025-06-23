@@ -4,6 +4,7 @@ import { ShoppingCart, CreditCard, Percent } from 'lucide-react';
 import { useCashierStore } from '../stores/cashierStore';
 import CartItem from './CartItem';
 import DiscountModal from './DiscountModal';
+import { useSessionStore } from '../../../stores/sessionStore';
 
 const Cart = () => {
   const {
@@ -259,9 +260,21 @@ const Cart = () => {
           </div>
 
           <button
-            onClick={() => setShowPaymentModal(true)}
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 
-                       rounded-lg transition-colors flex items-center justify-center"
+            onClick={async () => {
+              // Afficher total sur LCD avant modal
+              try {
+                const sessionState = useSessionStore.getState();
+                if (sessionState?.lcdStatus?.owned) {
+                  await sessionState.lcd.showTotal(cart.total);
+                }
+              } catch (error) {
+                // Erreur silencieuse - ne pas bloquer l'interface
+                console.debug('LCD non disponible');
+              }
+
+              setShowPaymentModal(true);
+            }}
+            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
           >
             <CreditCard className="h-5 w-5 mr-2" />
             Procéder au paiement
