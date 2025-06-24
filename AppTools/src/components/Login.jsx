@@ -87,6 +87,7 @@ function Login({ theme = 'corporate' }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const { login, logout, isAuthenticated, user, error, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -101,7 +102,13 @@ function Login({ theme = 'corporate' }) {
 
     const success = await login(username, password);
     if (success) {
-      navigate('/');
+      // Démarrer la transition douce
+      setIsTransitioning(true);
+
+      // Délai court pour voir la confirmation puis naviguer
+      setTimeout(() => {
+        navigate('/');
+      }, 1000); // Plus court, plus subtil
     } else {
       // Si pas de succès et pas d'erreur dans le context, on met notre propre message
       if (!error) {
@@ -146,7 +153,11 @@ function Login({ theme = 'corporate' }) {
   }
 
   return (
-    <div className={`min-h-screen flex items-center justify-center ${currentTheme.background} p-4`}>
+    <div
+      className={`min-h-screen flex items-center justify-center ${currentTheme.background} p-4 transition-opacity duration-500 ${
+        isTransitioning ? 'opacity-95' : 'opacity-100'
+      }`}
+    >
       {/* Éléments décoratifs d'arrière-plan */}
       <div className="absolute inset-0 overflow-hidden">
         {currentTheme.decorative.map((decorativeClass, index) => (
@@ -168,7 +179,7 @@ function Login({ theme = 'corporate' }) {
 
         {/* Carte principale */}
         <div className={`${currentTheme.card} rounded-2xl p-8 border shadow-2xl`}>
-          {isAuthenticated ? (
+          {isAuthenticated || isTransitioning ? (
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-12 h-12 bg-green-500/20 rounded-full mb-4">
                 <CheckCircle className="w-6 h-6 text-green-400" />
@@ -177,26 +188,37 @@ function Login({ theme = 'corporate' }) {
                 Connexion réussie
               </h3>
               <p className={`${currentTheme.text.secondary} mb-6`}>
-                Bienvenue,{' '}
-                <span className={`font-medium ${currentTheme.accent}`}>{user.username}</span>
-              </p>
-              <div className="space-y-3">
-                <button
-                  onClick={() => navigate('/')}
-                  className={`w-full py-3 px-4 bg-gradient-to-r ${currentTheme.primary} text-white font-medium rounded-xl transform hover:scale-105 transition-all duration-200 shadow-lg`}
-                >
-                  <span className="flex items-center justify-center space-x-2">
-                    <span>Accéder au terminal</span>
-                    <ArrowRight className="w-4 h-4" />
+                {isTransitioning ? (
+                  <span className="inline-flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Redirection en cours...</span>
                   </span>
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className={`w-full py-3 px-4 ${currentTheme.secondary} ${currentTheme.text.primary} font-medium rounded-xl border transition-all duration-200`}
-                >
-                  Déconnexion
-                </button>
-              </div>
+                ) : (
+                  <>
+                    Bienvenue,{' '}
+                    <span className={`font-medium ${currentTheme.accent}`}>{user.username}</span>
+                  </>
+                )}
+              </p>
+              {!isTransitioning && (
+                <div className="space-y-3">
+                  <button
+                    onClick={() => navigate('/')}
+                    className={`w-full py-3 px-4 bg-gradient-to-r ${currentTheme.primary} text-white font-medium rounded-xl transform hover:scale-105 transition-all duration-200 shadow-lg`}
+                  >
+                    <span className="flex items-center justify-center space-x-2">
+                      <span>Accéder au terminal</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className={`w-full py-3 px-4 ${currentTheme.secondary} ${currentTheme.text.primary} font-medium rounded-xl border transition-all duration-200`}
+                  >
+                    Déconnexion
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <form onSubmit={handleLogin} className="space-y-6">
