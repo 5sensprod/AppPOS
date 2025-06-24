@@ -102,7 +102,7 @@ function AppRoutes() {
     // ✅ WRAPPER AVEC SESSION ZUSTAND
     <SessionProvider>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Login theme="dark" />} />
 
         <Route
           path="/"
