@@ -42,40 +42,59 @@ const PaymentModal = () => {
           try {
             console.log(`🧾 [PAYMENT] Début séquence LCD avec paiement`);
 
-            // 1. Afficher type de paiement (2s)
-            const paymentTypeDisplay =
-              paymentMethod === 'cash'
-                ? 'Especes'
-                : paymentMethod === 'card'
-                  ? 'Carte bancaire'
-                  : paymentMethod === 'mixed'
-                    ? 'Paiement mixte'
-                    : 'Paiement';
+            if (paymentMethod === 'cash') {
+              // ✅ ESPÈCES : Affichage direct montant donné + monnaie
+              const line2 = `Especes ${cashPaymentData.amountReceived.toFixed(2)}EUR`;
+              const line1 =
+                cashPaymentData.change > 0
+                  ? `A rendre: ${cashPaymentData.change.toFixed(2)}EUR`
+                  : 'Montant exact';
 
-            await sessionState.lcd.writeMessage('Paiement accepte', paymentTypeDisplay);
-            console.log(`💳 [PAYMENT] Type paiement affiché: ${paymentTypeDisplay}`);
+              await sessionState.lcd.writeMessage(line1, line2);
+              console.log(`💰 [PAYMENT] Espèces affiché: ${line1} / ${line2}`);
 
-            // 2. Thank you après 3s
-            setTimeout(async () => {
-              try {
-                await sessionState.lcd.showThankYou();
-                console.log(`🙏 [PAYMENT] Thank you affiché`);
+              // Thank you après 3s
+              setTimeout(async () => {
+                try {
+                  await sessionState.lcd.showThankYou();
+                  console.log(`🙏 [PAYMENT] Thank you affiché`);
 
-                // 3. Welcome après 3s supplémentaires
-                setTimeout(async () => {
-                  try {
+                  // Welcome après 3s
+                  setTimeout(async () => {
+                    try {
+                      await sessionState.lcd.showWelcome();
+                      console.log(`👋 [PAYMENT] Welcome affiché`);
+                    } catch (error) {
+                      console.debug('⚠️ [PAYMENT] Erreur Welcome:', error.message);
+                    }
+                  }, 3000);
+                } catch (error) {
+                  console.debug('⚠️ [PAYMENT] Erreur Thank you:', error.message);
+                }
+              }, 3000);
+            } else {
+              // ✅ CARTE : Paiement accepté
+              const paymentTypeDisplay =
+                paymentMethod === 'card' ? 'Carte bancaire' : 'Paiement mixte';
+
+              await sessionState.lcd.writeMessage('Paiement accepte', paymentTypeDisplay);
+              console.log(`💳 [PAYMENT] Type paiement affiché: ${paymentTypeDisplay}`);
+
+              // Thank you après 3s
+              setTimeout(async () => {
+                try {
+                  await sessionState.lcd.showThankYou();
+                  // Welcome après 3s
+                  setTimeout(async () => {
                     await sessionState.lcd.showWelcome();
-                    console.log(`👋 [PAYMENT] Welcome affiché (fin transaction)`);
-                  } catch (error) {
-                    console.debug('⚠️ [PAYMENT] Erreur Welcome final:', error.message);
-                  }
-                }, 3000);
-              } catch (error) {
-                console.debug('⚠️ [PAYMENT] Erreur Thank you:', error.message);
-              }
-            }, 3000);
+                  }, 3000);
+                } catch (error) {
+                  console.debug('⚠️ [PAYMENT] Erreur séquence carte:', error.message);
+                }
+              }, 3000);
+            }
           } catch (error) {
-            console.debug('⚠️ [PAYMENT] Erreur séquence LCD finale:', error.message);
+            console.debug('⚠️ [PAYMENT] Erreur séquence LCD:', error.message);
           }
         }
       }
