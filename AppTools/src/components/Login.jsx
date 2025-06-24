@@ -31,6 +31,22 @@ const LOGIN_THEMES = {
       'absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl',
     ],
   },
+  clear: {
+    background: 'bg-gradient-to-br from-gray-100 via-gray-50 to-white',
+    card: 'bg-white/90 backdrop-blur-sm border-gray-200/50',
+    primary: 'from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800',
+    secondary: 'bg-gray-100 hover:bg-gray-200 border-gray-300',
+    accent: 'text-blue-600',
+    text: {
+      primary: 'text-gray-800',
+      secondary: 'text-gray-600',
+      muted: 'text-gray-400',
+    },
+    decorative: [
+      'absolute -top-40 -right-40 w-80 h-80 bg-blue-100/30 rounded-full blur-3xl',
+      'absolute -bottom-40 -left-40 w-80 h-80 bg-gray-100/40 rounded-full blur-3xl',
+    ],
+  },
   dark: {
     background: 'bg-gradient-to-br from-gray-900 via-gray-800 to-black',
     card: 'bg-gray-800/50 backdrop-blur-sm border-gray-700/50',
@@ -108,7 +124,7 @@ function Login({ theme = 'corporate' }) {
       // Délai court pour voir la confirmation puis naviguer
       setTimeout(() => {
         navigate('/');
-      }, 1000); // Plus court, plus subtil
+      }, 1100); // Plus court, plus subtil
     } else {
       // Si pas de succès et pas d'erreur dans le context, on met notre propre message
       if (!error) {
@@ -239,7 +255,11 @@ function Login({ theme = 'corporate' }) {
                     type="text"
                     value={username}
                     onChange={handleUsernameChange}
-                    className={`w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl ${currentTheme.text.primary} placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm transition-all duration-200`}
+                    className={`w-full pl-10 pr-4 py-3 ${
+                      currentTheme.background.includes('gray-100')
+                        ? 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
+                        : 'bg-white/10 border-white/20 placeholder-slate-400'
+                    } ${currentTheme.text.primary} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm transition-all duration-200`}
                     placeholder="Saisissez votre nom d'utilisateur"
                     required
                   />
@@ -259,14 +279,22 @@ function Login({ theme = 'corporate' }) {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={handlePasswordChange}
-                    className={`w-full pl-10 pr-12 py-3 bg-white/10 border border-white/20 rounded-xl ${currentTheme.text.primary} placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm transition-all duration-200`}
+                    className={`w-full pl-10 pr-12 py-3 ${
+                      currentTheme.background.includes('gray-100')
+                        ? 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
+                        : 'bg-white/10 border-white/20 placeholder-slate-400'
+                    } ${currentTheme.text.primary} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm transition-all duration-200`}
                     placeholder="Saisissez votre mot de passe"
                     required
                   />
                   <button
                     type="button"
                     onClick={togglePasswordVisibility}
-                    className={`absolute inset-y-0 right-0 pr-3 flex items-center ${currentTheme.text.muted} hover:text-white transition-colors duration-200`}
+                    className={`absolute inset-y-0 right-0 pr-3 flex items-center ${currentTheme.text.muted} ${
+                      currentTheme.background.includes('gray-100')
+                        ? 'hover:text-gray-700'
+                        : 'hover:text-white'
+                    } transition-colors duration-200`}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -311,6 +339,7 @@ export const createLoginVariant = (themeName) => {
 
 // Variantes prédéfinies
 export const CorporateLogin = createLoginVariant('corporate');
+export const ClearLogin = createLoginVariant('clear');
 export const DarkLogin = createLoginVariant('dark');
 export const ModernLogin = createLoginVariant('modern');
 export const POSLogin = createLoginVariant('pos');
