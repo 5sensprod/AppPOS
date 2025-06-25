@@ -1,4 +1,5 @@
 // AppServe/templates/pdf/stockReportTemplate.js
+// 🔧 MODIFICATION UNIQUEMENT de la méthode renderTaxSection pour éviter le débordement
 
 const TemplateHelpers = require('./helpers/templateHelpers');
 
@@ -26,6 +27,47 @@ class StockReportTemplate {
         <title>Rapport de Stock</title>
         <style>
             ${this.helpers.getStylesFor('summary')}
+            /* 🔥 STYLES SPÉCIFIQUES pour corriger le débordement du tableau TVA */
+            .tax-section .data-table {
+              font-size: 9pt; /* Police plus petite */
+              table-layout: fixed; /* Force le respect des largeurs */
+            }
+            
+            .tax-section .data-table th,
+            .tax-section .data-table td {
+              padding: 1mm 0.5mm; /* Padding réduit */
+              word-wrap: break-word;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            
+            /* 🔥 Largeurs spécifiques pour le tableau TVA */
+            .tax-section .data-table th:nth-child(1), 
+            .tax-section .data-table td:nth-child(1) { width: 20%; } /* Taux TVA */
+            .tax-section .data-table th:nth-child(2), 
+            .tax-section .data-table td:nth-child(2) { width: 12%; } /* Nb Produits */
+            .tax-section .data-table th:nth-child(3), 
+            .tax-section .data-table td:nth-child(3) { width: 17%; } /* Valeur Achat */
+            .tax-section .data-table th:nth-child(4), 
+            .tax-section .data-table td:nth-child(4) { width: 17%; } /* Valeur Vente */
+            .tax-section .data-table th:nth-child(5), 
+            .tax-section .data-table td:nth-child(5) { width: 17%; } /* TVA Collectée */
+            .tax-section .data-table th:nth-child(6), 
+            .tax-section .data-table td:nth-child(6) { width: 17%; } /* Marge Brute */
+            
+            /* 🔥 Style pour les montants - police monospace plus compacte */
+            .tax-section .currency-cell {
+              font-family: 'Courier New', monospace;
+              font-size: 8pt;
+              white-space: nowrap;
+              text-align: right;
+            }
+            
+            /* 🔥 Totaux en gras avec police adaptée */
+            .tax-section .totals-row td {
+              font-weight: bold;
+              font-size: 8.5pt;
+            }
         </style>
     </head>
     <body>
@@ -113,7 +155,7 @@ class StockReportTemplate {
   }
 
   /**
-   * Génère la section de répartition par TVA
+   * 🔧 Génère la section de répartition par TVA - VERSION CORRIGÉE
    */
   renderTaxSection(stockStats) {
     const taxRows = Object.entries(stockStats.financial.tax_breakdown)
@@ -123,10 +165,10 @@ class StockReportTemplate {
         <tr>
             <td>${this.helpers.getTaxRateLabel(data.rate)}</td>
             <td>${this.helpers.formatNumber(data.product_count)}</td>
-            <td>${this.helpers.formatCurrency(data.inventory_value)}</td>
-            <td>${this.helpers.formatCurrency(data.retail_value)}</td>
-            <td>${this.helpers.formatCurrency(data.tax_amount)}</td>
-            <td>${this.helpers.formatCurrency(marginValue)}</td>
+            <td class="currency-cell">${this.helpers.formatCurrency(data.inventory_value)}</td>
+            <td class="currency-cell">${this.helpers.formatCurrency(data.retail_value)}</td>
+            <td class="currency-cell">${this.helpers.formatCurrency(data.tax_amount)}</td>
+            <td class="currency-cell">${this.helpers.formatCurrency(marginValue)}</td>
         </tr>
         `;
       })
@@ -152,10 +194,10 @@ class StockReportTemplate {
                 <tr class="totals-row">
                     <td><strong>TOTAL GÉNÉRAL</strong></td>
                     <td><strong>${this.helpers.formatNumber(stockStats.summary.products_in_stock)}</strong></td>
-                    <td><strong>${this.helpers.formatCurrency(stockStats.financial.inventory_value)}</strong></td>
-                    <td><strong>${this.helpers.formatCurrency(stockStats.financial.retail_value)}</strong></td>
-                    <td><strong>${this.helpers.formatCurrency(stockStats.financial.tax_amount)}</strong></td>
-                    <td><strong>${this.helpers.formatCurrency(stockStats.financial.potential_margin)}</strong></td>
+                    <td class="currency-cell"><strong>${this.helpers.formatCurrency(stockStats.financial.inventory_value)}</strong></td>
+                    <td class="currency-cell"><strong>${this.helpers.formatCurrency(stockStats.financial.retail_value)}</strong></td>
+                    <td class="currency-cell"><strong>${this.helpers.formatCurrency(stockStats.financial.tax_amount)}</strong></td>
+                    <td class="currency-cell"><strong>${this.helpers.formatCurrency(stockStats.financial.potential_margin)}</strong></td>
                 </tr>
             </tbody>
         </table>
