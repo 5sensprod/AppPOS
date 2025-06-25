@@ -21,10 +21,6 @@ class GroupedStockReportTemplate {
       isSimplified = false,
     } = options;
 
-    console.log(`🚀 generateGroupedStockReportHTML appelée`);
-    console.log(`🔥 Mode simplifié:`, isSimplified);
-    console.log(`📂 Catégories sélectionnées:`, selectedCategories.length);
-
     try {
       const groupedProducts = await this.groupProductsByCategory(
         productsInStock,
@@ -33,7 +29,6 @@ class GroupedStockReportTemplate {
       );
 
       const groupEntries = Object.entries(groupedProducts);
-      console.log(`📋 ${groupEntries.length} groupes créés pour le rendu`);
 
       const title = `Rapport de Stock par Catégories${isSimplified ? ' (Simplifié)' : ''}`;
 
@@ -84,13 +79,8 @@ class GroupedStockReportTemplate {
    * Groupement des produits par catégorie avec gestion des sélections
    */
   async groupProductsByCategory(products, selectedCategories = [], includeUncategorized = true) {
-    console.log(`🏷️ DEBUT - Groupement par catégories`);
-    console.log(`📂 selectedCategories reçues:`, selectedCategories);
-    console.log(`📦 Nombre de produits à traiter:`, products.length);
-
     try {
       const allCategories = await Category.findAll();
-      console.log(`📋 ${allCategories.length} catégories trouvées dans la base`);
 
       const categoryMap = this.buildCategoryMap(allCategories);
       const getCategoryPath = (categoryId) =>
@@ -203,39 +193,38 @@ class GroupedStockReportTemplate {
   ) {
     const productCategories = product.categories || [];
 
-    if (index < 3) {
-      console.log(`🔍 Produit ${index + 1} "${product.name}":`, productCategories);
+    // 🔥 FIX: Éviter de traiter le même produit plusieurs fois
+    if (processedProductIds.has(product._id)) {
+      return;
     }
 
     if (selectedCategories.length > 0) {
-      // Mode sélection
       const matchingCategories = productCategories.filter((catId) =>
         effectiveCategories.includes(catId)
       );
 
       if (matchingCategories.length === 0) return;
 
-      matchingCategories.forEach((categoryId) => {
-        const rootSelectedCategory = this.findRootSelectedCategory(
-          allCategories,
-          categoryId,
-          selectedCategories
-        );
+      // 🔥 FIX: Prendre SEULEMENT la première catégorie
+      const primaryCategory = matchingCategories[0];
+      const rootSelectedCategory = this.findRootSelectedCategory(
+        allCategories,
+        primaryCategory,
+        selectedCategories
+      );
 
-        if (rootSelectedCategory) {
-          this.addProductToGroup(product, rootSelectedCategory, getCategoryPath, groupedProducts);
-        }
-      });
+      if (rootSelectedCategory) {
+        this.addProductToGroup(product, rootSelectedCategory, getCategoryPath, groupedProducts);
+        processedProductIds.add(product._id);
+      }
     } else {
-      // Mode complet
       if (productCategories.length > 0) {
-        productCategories.forEach((categoryId) => {
-          this.addProductToGroup(product, categoryId, getCategoryPath, groupedProducts);
-        });
+        // 🔥 FIX: Prendre SEULEMENT la première catégorie
+        const primaryCategory = productCategories[0];
+        this.addProductToGroup(product, primaryCategory, getCategoryPath, groupedProducts);
+        processedProductIds.add(product._id);
       }
     }
-
-    processedProductIds.add(product._id);
   }
 
   addProductToGroup(product, categoryId, getCategoryPath, groupedProducts) {
@@ -252,6 +241,7 @@ class GroupedStockReportTemplate {
       };
     }
 
+    // 🔥 FIX: Vérifier les doublons
     if (!groupedProducts[key].products.find((p) => p._id === product._id)) {
       groupedProducts[key].products.push(product);
     }
@@ -281,8 +271,6 @@ class GroupedStockReportTemplate {
     }
 
     if (uncategorizedProducts.length > 0) {
-      console.log(`📦 ${uncategorizedProducts.length} produits "Sans catégorie" ajoutés`);
-
       groupedProducts['Sans catégorie'] = {
         categoryInfo: {
           id: null,
@@ -359,24 +347,10 @@ class GroupedStockReportTemplate {
     };
   }
 
-  logFinalResults(sortedGroups, selectedCategories) {
-    console.log(`✅ RÉSULTAT FINAL : ${Object.keys(sortedGroups).length} groupes créés`);
-    console.log(`🔍 Mode sélection actif:`, selectedCategories.length > 0);
-    Object.entries(sortedGroups).forEach(([key, group]) => {
-      console.log(`  📂 "${key}": ${group.stats.productCount} produits`);
-    });
-
-    if (selectedCategories.length > 0 && Object.keys(sortedGroups).length === 0) {
-      console.warn(`⚠️  ATTENTION: Mode sélection mais aucun groupe créé !`);
-    }
-  }
-
   /**
    * Rendu simplifié - Totaux par catégorie racine seulement
    */
   renderSimplifiedCategoryGroups(groupEntries) {
-    console.log('🔥 renderSimplifiedCategoryGroups appelée avec', groupEntries.length, 'groupes');
-
     const rootCategories = this.groupByRootCategory(groupEntries);
     const simplifiedRows = this.buildSimplifiedRows(rootCategories);
     const grandTotals = this.calculateGrandTotals(rootCategories);
@@ -426,7 +400,6 @@ class GroupedStockReportTemplate {
       rootCategories[rootName].push([categoryKey, group]);
     });
 
-    console.log('🔥 Catégories racines regroupées:', Object.keys(rootCategories));
     return rootCategories;
   }
 
