@@ -46,7 +46,7 @@ class GroupedStockReportTemplate {
     <style>
         ${this.helpers.getStylesFor('grouped', {
           landscape: !isSimplified,
-          fontSize: isSimplified ? 'normal' : 'small',
+          fontSize: 'normal',
         })}
         ${isSimplified ? this.getSimplifiedStyles() : ''}
     </style>

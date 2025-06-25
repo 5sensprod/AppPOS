@@ -310,11 +310,12 @@ const StockCategoryChart = ({ className = '' }) => {
               outerRadius={120}
               fill="#8884d8"
               dataKey="value"
-              // 🎯 FIX 1: Supprimer les interactions de highlight
-              activeIndex={-1} // Pas d'élément actif
-              activeShape={undefined} // Pas de forme active
-              onMouseEnter={() => {}} // Désactiver hover
-              onClick={() => {}} // Désactiver clic
+              // 🎯 FIX 1: Désactivation des highlights mais garder tooltip
+              activeIndex={undefined}
+              activeShape={null}
+              onMouseEnter={undefined}
+              onMouseLeave={undefined}
+              onClick={undefined}
               // 🎯 FIX 2: Animation smooth des labels flottants
               animationBegin={0}
               animationDuration={300}
@@ -324,15 +325,16 @@ const StockCategoryChart = ({ className = '' }) => {
                 <Cell
                   key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}
-                  // 🎯 FIX 1: Désactiver complètement les interactions
+                  // 🎯 FIX: Garder les events pour le tooltip mais sans highlight visuel
                   style={{ cursor: 'default' }}
                 />
               ))}
             </Pie>
             <Tooltip
               content={<CustomTooltip />}
-              // Garder le tooltip mais sans interaction
+              // 🎯 FIX: Réactiver le tooltip mais sans curseur
               cursor={false}
+              animationDuration={150}
             />
             {/* 🎯 FIX 2: Légende avec transition */}
             <Legend
@@ -345,17 +347,44 @@ const StockCategoryChart = ({ className = '' }) => {
         </ResponsiveContainer>
       </div>
 
-      {/* 🎯 NOUVEAU: CSS pour les labels flottants */}
-      <style jsx>{`
-        .recharts-pie-label-text {
-          transition: all 300ms ease-in-out !important;
-          opacity: ${isTransitioning ? '0.3' : '1'} !important;
-        }
-        .recharts-pie-label-line {
-          transition: all 300ms ease-in-out !important;
-          opacity: ${isTransitioning ? '0.3' : '1'} !important;
-        }
-      `}</style>
+      {/* 🎯 CSS standard pour les labels flottants + suppression highlights */}
+      <style>
+        {`
+          .recharts-pie-label-text {
+            transition: all 300ms ease-in-out !important;
+            opacity: ${isTransitioning ? '0.3' : '1'} !important;
+          }
+          .recharts-pie-label-line {
+            transition: all 300ms ease-in-out !important;
+            opacity: ${isTransitioning ? '0.3' : '1'} !important;
+          }
+          /* Supprimer les highlights mais garder les hovers pour tooltip */
+          .recharts-sector:focus {
+            outline: none !important;
+          }
+          .recharts-pie {
+            outline: none !important;
+          }
+          .recharts-surface {
+            outline: none !important;
+          }
+          /* Désactiver les effets visuels de highlight */
+          .recharts-active-shape {
+            opacity: 0 !important;
+            display: none !important;
+          }
+          /* Supprimer highlight du canvas au clic */
+          .recharts-wrapper {
+            outline: none !important;
+          }
+          .recharts-wrapper:focus {
+            outline: none !important;
+          }
+          svg:focus {
+            outline: none !important;
+          }
+        `}
+      </style>
 
       {/* Note explicative avec transition */}
       <div
