@@ -207,25 +207,6 @@ class StockReportTemplate {
     </section>
     `;
   }
-
-  /**
-   * Templates pour Puppeteer
-   */
-  getHeaderTemplate(companyInfo) {
-    return `
-    <div style="font-size: 10px; color: #666; text-align: center; width: 100%; margin-top: 10px;">
-      ${this.helpers.escapeHtml((companyInfo && companyInfo.name) || 'Rapport de Stock')} - Page <span class="pageNumber"></span> sur <span class="totalPages"></span>
-    </div>
-    `;
-  }
-
-  getFooterTemplate() {
-    return `
-    <div style="font-size: 9px; color: #999; text-align: center; width: 100%; margin-bottom: 10px;">
-      Rapport généré automatiquement par APPPOS - ${this.helpers.formatShortDate()}
-    </div>
-    `;
-  }
 }
 
 module.exports = StockReportTemplate;

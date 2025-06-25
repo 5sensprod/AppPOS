@@ -6,7 +6,6 @@ const ResponseHandler = require('../../handlers/ResponseHandler');
 const exportController = require('../../utils/exportController');
 const StockReportTemplate = require('../../templates/pdf/stockReportTemplate');
 const DetailedStockReportTemplate = require('../../templates/pdf/detailedStockReportTemplate');
-const TemplateHelpers = require('../../templates/pdf/helpers/templateHelpers');
 
 class ProductStockController extends BaseController {
   constructor() {
@@ -15,10 +14,8 @@ class ProductStockController extends BaseController {
       deleteFromWoo: (id) => productWooCommerceService.deleteProduct(id),
     });
 
-    // Initialiser les templates
     this.stockTemplate = new StockReportTemplate();
     this.detailedTemplate = new DetailedStockReportTemplate();
-    this.helpers = new TemplateHelpers();
   }
 
   async updateStock(req, res) {
@@ -37,11 +34,7 @@ class ProductStockController extends BaseController {
       const existing = await this.getByIdOr404(id, res);
       if (!existing) return;
 
-      await this.model.update(id, {
-        stock: parseInt(stock),
-        updated_at: new Date(),
-      });
-
+      await this.model.update(id, { stock: parseInt(stock), updated_at: new Date() });
       const updated = await this.model.findById(id);
 
       console.log(`Stock ajusté pour ${updated.name}: ${existing.stock} → ${stock} (${reason})`);
@@ -62,33 +55,13 @@ class ProductStockController extends BaseController {
   async getStockStatistics(req, res) {
     try {
       const allProducts = await this.model.findAll();
-
       const simpleProducts = allProducts.filter((p) => p.type === 'simple');
       const productsInStock = simpleProducts.filter((p) => (p.stock || 0) > 0);
 
-      if (productsInStock.length === 0) {
-        return ResponseHandler.success(res, {
-          summary: {
-            total_products: allProducts.length,
-            simple_products: simpleProducts.length,
-            products_in_stock: 0,
-            excluded_products: simpleProducts.length,
-          },
-          financial: {
-            inventory_value: 0,
-            retail_value: 0,
-            potential_margin: 0,
-            tax_amount: 0,
-            tax_breakdown: {},
-          },
-        });
-      }
-
-      const statistics = this.calculateStockStatistics(
-        productsInStock,
-        allProducts,
-        simpleProducts
-      );
+      const statistics =
+        productsInStock.length === 0
+          ? this.getEmptyStatistics(allProducts, simpleProducts)
+          : this.calculateStockStatistics(productsInStock, allProducts, simpleProducts);
 
       return ResponseHandler.success(res, statistics);
     } catch (error) {
@@ -97,27 +70,44 @@ class ProductStockController extends BaseController {
     }
   }
 
+  getEmptyStatistics(allProducts, simpleProducts) {
+    return {
+      summary: {
+        total_products: allProducts.length,
+        simple_products: simpleProducts.length,
+        products_in_stock: 0,
+        excluded_products: simpleProducts.length,
+      },
+      financial: {
+        inventory_value: 0,
+        retail_value: 0,
+        potential_margin: 0,
+        tax_amount: 0,
+        tax_breakdown: {},
+      },
+    };
+  }
+
   calculateStockStatistics(productsInStock, allProducts, simpleProducts) {
     let inventoryValue = 0;
     let retailValue = 0;
     let totalTaxAmount = 0;
     const taxBreakdown = {};
 
-    for (const product of productsInStock) {
-      const stock = product.stock || 0;
-      const purchasePrice = product.purchase_price || 0;
-      const price = product.price || 0;
-      const taxRate = product.tax_rate || 0;
+    // Calcul des valeurs
+    productsInStock.forEach((product) => {
+      const { stock = 0, purchase_price = 0, price = 0, tax_rate = 0 } = product;
 
-      const productInventoryValue = stock * purchasePrice;
+      const productInventoryValue = stock * purchase_price;
       const productRetailValue = stock * price;
 
       inventoryValue += productInventoryValue;
       retailValue += productRetailValue;
 
-      if (!taxBreakdown[taxRate]) {
-        taxBreakdown[taxRate] = {
-          rate: taxRate,
+      // Gestion de la répartition par taux de taxe
+      if (!taxBreakdown[tax_rate]) {
+        taxBreakdown[tax_rate] = {
+          rate: tax_rate,
           product_count: 0,
           inventory_value: 0,
           retail_value: 0,
@@ -125,30 +115,34 @@ class ProductStockController extends BaseController {
         };
       }
 
-      taxBreakdown[taxRate].product_count++;
-      taxBreakdown[taxRate].inventory_value += productInventoryValue;
-      taxBreakdown[taxRate].retail_value += productRetailValue;
+      const breakdown = taxBreakdown[tax_rate];
+      breakdown.product_count++;
+      breakdown.inventory_value += productInventoryValue;
+      breakdown.retail_value += productRetailValue;
 
-      const productTaxAmount = taxRate > 0 ? (productRetailValue * taxRate) / (100 + taxRate) : 0;
-
-      taxBreakdown[taxRate].tax_amount += productTaxAmount;
+      const productTaxAmount =
+        tax_rate > 0 ? (productRetailValue * tax_rate) / (100 + tax_rate) : 0;
+      breakdown.tax_amount += productTaxAmount;
       totalTaxAmount += productTaxAmount;
-    }
+    });
 
+    // Calculs dérivés
     const potentialMargin = retailValue - inventoryValue;
     const marginPercentage = inventoryValue > 0 ? (potentialMargin / inventoryValue) * 100 : 0;
 
-    const taxDetails = {};
-    Object.keys(taxBreakdown).forEach((rate) => {
-      const data = taxBreakdown[rate];
-      taxDetails[`rate_${rate}`] = {
-        rate: parseFloat(rate),
-        product_count: data.product_count,
-        inventory_value: Math.round(data.inventory_value * 100) / 100,
-        retail_value: Math.round(data.retail_value * 100) / 100,
-        tax_amount: Math.round(data.tax_amount * 100) / 100,
-      };
-    });
+    // Formatage des détails de taxe
+    const taxDetails = Object.fromEntries(
+      Object.entries(taxBreakdown).map(([rate, data]) => [
+        `rate_${rate}`,
+        {
+          rate: parseFloat(rate),
+          product_count: data.product_count,
+          inventory_value: Math.round(data.inventory_value * 100) / 100,
+          retail_value: Math.round(data.retail_value * 100) / 100,
+          tax_amount: Math.round(data.tax_amount * 100) / 100,
+        },
+      ])
+    );
 
     return {
       summary: {
@@ -178,38 +172,28 @@ class ProductStockController extends BaseController {
     };
   }
 
-  /**
-   * Trie les produits selon les options
-   */
   sortProducts(products, sortBy, sortOrder) {
-    return [...products].sort((a, b) => {
-      let aValue, bValue;
-
-      switch (sortBy) {
+    const getSortValue = (product, key) => {
+      switch (key) {
         case 'sku':
-          aValue = (a.sku || '').toLowerCase();
-          bValue = (b.sku || '').toLowerCase();
-          break;
+          return (product.sku || '').toLowerCase();
         case 'stock':
-          aValue = a.stock || 0;
-          bValue = b.stock || 0;
-          break;
+          return product.stock || 0;
         case 'value':
-          aValue = (a.stock || 0) * (a.purchase_price || 0);
-          bValue = (b.stock || 0) * (b.purchase_price || 0);
-          break;
-        case 'name':
+          return (product.stock || 0) * (product.purchase_price || 0);
         default:
-          aValue = (a.name || '').toLowerCase();
-          bValue = (b.name || '').toLowerCase();
-          break;
+          return (product.name || '').toLowerCase();
       }
+    };
 
-      if (typeof aValue === 'string') {
-        return sortOrder === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
-      } else {
-        return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
-      }
+    return [...products].sort((a, b) => {
+      const aValue = getSortValue(a, sortBy);
+      const bValue = getSortValue(b, sortBy);
+
+      const comparison =
+        typeof aValue === 'string' ? aValue.localeCompare(bValue) : aValue - bValue;
+
+      return sortOrder === 'asc' ? comparison : -comparison;
     });
   }
 
@@ -217,193 +201,154 @@ class ProductStockController extends BaseController {
     try {
       console.log('🔄 Début export PDF avec html-pdf...');
 
-      // Vérifier que html-pdf est disponible
-      let pdf;
-      try {
-        pdf = require('html-pdf');
-        console.log('✅ html-pdf chargé (PhantomJS - sans Chrome)');
-      } catch (error) {
-        console.error('❌ html-pdf non disponible:', error.message);
-        throw new Error('html-pdf non installé. Exécutez: npm install html-pdf');
-      }
+      // Vérification de html-pdf
+      const pdf = this.requireHtmlPdf();
 
-      // 🔍 Debug: Vérifier ce qui est reçu
-      console.log('📥 Body reçu complet:', JSON.stringify(req.body, null, 2));
+      // Extraction et validation des paramètres
+      const params = this.extractPDFParams(req.body);
+      console.log(`📋 Type de rapport: ${params.reportType}`);
 
-      // ✅ Extraire les variables du req.body
-      const {
-        companyInfo = {},
-        reportType = 'summary',
-        includeCompanyInfo = true,
-        includeCharts = true,
-        sortBy = 'name',
-        sortOrder = 'asc',
-        groupByCategory = false,
-        selectedCategories = [],
-        includeUncategorized = true,
-      } = req.body;
+      // Récupération et validation des données
+      const { productsInStock, stockStats } = await this.getProductsForPDF();
 
-      console.log(`📋 Type de rapport: ${reportType}`);
-      console.log(`🏷️ Groupement par catégories: ${groupByCategory}`);
-      console.log(`📂 Catégories sélectionnées: ${selectedCategories}`);
+      // Génération du contenu HTML
+      const htmlContent = await this.generateHTMLContent(params, stockStats, productsInStock);
 
-      // Récupération des données
-      const allProducts = await this.model.findAll();
-      const simpleProducts = allProducts.filter((p) => p.type === 'simple');
-      const productsInStock = simpleProducts.filter((p) => (p.stock || 0) > 0);
+      // Configuration et génération du PDF
+      const pdfBuffer = await this.generatePDFBuffer(htmlContent, params.reportType);
 
-      if (productsInStock.length === 0) {
-        return ResponseHandler.badRequest(res, 'Aucun produit en stock à exporter');
-      }
-
-      console.log(`📊 ${productsInStock.length} produits en stock trouvés`);
-
-      // Calcul des statistiques
-      const stockStats = this.calculateStockStatistics(
-        productsInStock,
-        allProducts,
-        simpleProducts
-      );
-      console.log('✅ Statistiques calculées');
-
-      // Tri des produits pour le rapport détaillé
-      let sortedProducts = productsInStock;
-      if (reportType === 'detailed') {
-        sortedProducts = this.sortProducts(productsInStock, sortBy, sortOrder);
-        console.log(`🔄 Produits triés par ${sortBy} (${sortOrder})`);
-      }
-
-      // ✅ Créer templateOptions avec toutes les variables
-      const templateOptions = {
-        companyInfo,
-        includeCompanyInfo,
-        includeCharts,
-        groupByCategory,
-        selectedCategories,
-        includeUncategorized,
-      };
-
-      // ✅ Générer le HTML via vos templates existants
-      let htmlContent;
-      if (reportType === 'detailed') {
-        // 🔥 Utiliser le DetailedStockReportTemplate
-        htmlContent = await this.detailedTemplate.generateDetailedStockReportHTML(
-          stockStats,
-          sortedProducts,
-          templateOptions
-        );
-        console.log('📄 HTML détaillé généré via DetailedStockReportTemplate');
-      } else {
-        // Pour le rapport de synthèse
-        if (
-          this.stockTemplate &&
-          typeof this.stockTemplate.generateStockReportHTML === 'function'
-        ) {
-          // Adapter l'appel selon la signature de votre template existant
-          if (this.stockTemplate.generateStockReportHTML.length === 3) {
-            // Nouvelle signature avec options
-            htmlContent = this.stockTemplate.generateStockReportHTML(stockStats, templateOptions);
-          } else {
-            // Ancienne signature
-            htmlContent = this.stockTemplate.generateStockReportHTML(stockStats, companyInfo);
-          }
-        } else {
-          throw new Error('Template de rapport de synthèse non disponible');
-        }
-        console.log('📄 HTML synthèse généré via template');
-      }
-
-      // 🔥 CONFIGURATION HTML-PDF (PhantomJS)
-      const options = {
-        // Format et orientation
-        format: 'A4',
-        orientation: reportType === 'detailed' ? 'landscape' : 'portrait',
-
-        // Marges selon le type de rapport
-        border:
-          reportType === 'detailed'
-            ? {
-                top: '12mm', // ✅ Optimisé
-                right: '8mm',
-                bottom: '12mm',
-                left: '8mm',
-              }
-            : {
-                top: '15mm',
-                right: '12mm',
-                bottom: '15mm',
-                left: '12mm',
-              },
-
-        // Options de rendu
-        type: 'pdf',
-        quality: '75',
-        dpi: 150,
-
-        // Timeout et autres options PhantomJS
-        timeout: 30000,
-
-        // En-têtes et pieds de page (optionnels avec html-pdf)
-        /*
-      header: {
-        height: '40mm',
-        contents: this.detailedTemplate
-          ? this.detailedTemplate.getHeaderTemplate(companyInfo)
-          : this.stockTemplate?.getHeaderTemplate?.(companyInfo) || ''
-      },
-      footer: {
-        height: '20mm',
-        contents: this.detailedTemplate
-          ? this.detailedTemplate.getFooterTemplate()
-          : this.stockTemplate?.getFooterTemplate?.() || ''
-      },
-      */
-
-        // Options PhantomJS spécifiques
-        phantomjsOptions: {
-          '--web-security': 'no',
-          '--load-images': 'yes',
-          '--ignore-ssl-errors': 'yes',
-        },
-      };
-
-      console.log('📋 Génération PDF avec html-pdf (PhantomJS)...');
-
-      // 🔥 GÉNÉRER LE PDF avec html-pdf
-      const pdfBuffer = await new Promise((resolve, reject) => {
-        pdf.create(htmlContent, options).toBuffer((err, buffer) => {
-          if (err) {
-            console.error('❌ Erreur génération PDF:', err);
-            reject(err);
-          } else {
-            console.log('✅ PDF généré avec succès');
-            resolve(buffer);
-          }
-        });
-      });
-
-      // Générer un nom de fichier unique
-      const filename = `rapport_stock_${reportType}_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      // 🔥 ENVOYER DIRECTEMENT LE BUFFER
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Length', pdfBuffer.length);
-
-      console.log(`📁 Taille du PDF: ${pdfBuffer.length} bytes`);
-
-      res.send(pdfBuffer);
-      console.log('✅ PDF envoyé avec succès');
+      // Envoi de la réponse
+      this.sendPDFResponse(res, pdfBuffer, params.reportType);
     } catch (error) {
       console.error('❌ Erreur export PDF:', error);
-      console.error('❌ Stack trace:', error.stack);
-
       return ResponseHandler.error(res, {
         message: 'Erreur lors de la génération du PDF',
         details: error.message,
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       });
     }
+  }
+
+  requireHtmlPdf() {
+    try {
+      const pdf = require('html-pdf');
+      console.log('✅ html-pdf chargé');
+      return pdf;
+    } catch (error) {
+      console.error('❌ html-pdf non disponible:', error.message);
+      throw new Error('html-pdf non installé. Exécutez: npm install html-pdf');
+    }
+  }
+
+  extractPDFParams(body) {
+    return {
+      companyInfo: body.companyInfo || {},
+      reportType: body.reportType || 'summary',
+      includeCompanyInfo: body.includeCompanyInfo !== false,
+      includeCharts: body.includeCharts !== false,
+      sortBy: body.sortBy || 'name',
+      sortOrder: body.sortOrder || 'asc',
+      groupByCategory: body.groupByCategory || false,
+      selectedCategories: body.selectedCategories || [],
+      includeUncategorized: body.includeUncategorized !== false,
+    };
+  }
+
+  async getProductsForPDF() {
+    const allProducts = await this.model.findAll();
+    const simpleProducts = allProducts.filter((p) => p.type === 'simple');
+    const productsInStock = simpleProducts.filter((p) => (p.stock || 0) > 0);
+
+    if (productsInStock.length === 0) {
+      throw new Error('Aucun produit en stock à exporter');
+    }
+
+    const stockStats = this.calculateStockStatistics(productsInStock, allProducts, simpleProducts);
+    console.log(`📊 ${productsInStock.length} produits en stock trouvés`);
+
+    return { productsInStock, stockStats };
+  }
+
+  async generateHTMLContent(params, stockStats, productsInStock) {
+    const templateOptions = {
+      companyInfo: params.companyInfo,
+      includeCompanyInfo: params.includeCompanyInfo,
+      includeCharts: params.includeCharts,
+      groupByCategory: params.groupByCategory,
+      selectedCategories: params.selectedCategories,
+      includeUncategorized: params.includeUncategorized,
+    };
+
+    if (params.reportType === 'detailed') {
+      const sortedProducts = this.sortProducts(productsInStock, params.sortBy, params.sortOrder);
+      const htmlContent = await this.detailedTemplate.generateDetailedStockReportHTML(
+        stockStats,
+        sortedProducts,
+        templateOptions
+      );
+      console.log('📄 HTML détaillé généré');
+      return htmlContent;
+    } else {
+      if (!this.stockTemplate?.generateStockReportHTML) {
+        throw new Error('Template de rapport de synthèse non disponible');
+      }
+
+      const htmlContent =
+        this.stockTemplate.generateStockReportHTML.length === 3
+          ? this.stockTemplate.generateStockReportHTML(stockStats, templateOptions)
+          : this.stockTemplate.generateStockReportHTML(stockStats, params.companyInfo);
+
+      console.log('📄 HTML synthèse généré');
+      return htmlContent;
+    }
+  }
+
+  async generatePDFBuffer(htmlContent, reportType) {
+    const pdf = require('html-pdf');
+
+    const options = {
+      format: 'A4',
+      orientation: reportType === 'detailed' ? 'landscape' : 'portrait',
+      border:
+        reportType === 'detailed'
+          ? { top: '12mm', right: '8mm', bottom: '12mm', left: '8mm' }
+          : { top: '15mm', right: '12mm', bottom: '15mm', left: '12mm' },
+      type: 'pdf',
+      quality: '75',
+      dpi: 150,
+      timeout: 30000,
+      phantomjsOptions: {
+        '--web-security': 'no',
+        '--load-images': 'yes',
+        '--ignore-ssl-errors': 'yes',
+      },
+    };
+
+    console.log('📋 Génération PDF avec html-pdf...');
+
+    return new Promise((resolve, reject) => {
+      pdf.create(htmlContent, options).toBuffer((err, buffer) => {
+        if (err) {
+          console.error('❌ Erreur génération PDF:', err);
+          reject(err);
+        } else {
+          console.log('✅ PDF généré avec succès');
+          resolve(buffer);
+        }
+      });
+    });
+  }
+
+  sendPDFResponse(res, pdfBuffer, reportType) {
+    const filename = `rapport_stock_${reportType}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    console.log(`📁 Taille du PDF: ${pdfBuffer.length} bytes`);
+    res.send(pdfBuffer);
+    console.log('✅ PDF envoyé avec succès');
   }
 }
 
