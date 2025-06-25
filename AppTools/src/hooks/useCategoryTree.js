@@ -1,228 +1,247 @@
-// src/hooks/useExportOptions.js
+// src/hooks/useCategoryTree.js
+// 🔧 VERSION CORRIGÉE avec export par défaut
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import apiService from '../services/api';
 
 /**
- * Hook personnalisé pour gérer les options d'export PDF
- * @returns {Object} État et fonctions de gestion des options
+ * Hook personnalisé pour gérer l'arbre de catégories avec stock
+ * @returns {Object} État et fonctions de gestion de l'arbre
  */
-export const useExportOptions = () => {
-  // État initial des options d'export
-  const [exportOptions, setExportOptions] = useState({
-    reportType: 'summary',
-    includeCompanyInfo: true,
-    includeCharts: true,
-    sortBy: 'name',
-    sortOrder: 'asc',
-    groupByCategory: false,
-    selectedCategories: [],
-    includeUncategorized: false, // false par défaut
-  });
-
-  // État pour la hauteur du sélecteur de catégories
-  const [categorySelectorHeight, setCategorySelectorHeight] = useState(300);
-  const [isResizing, setIsResizing] = useState(false);
+export const useCategoryTree = () => {
+  const [categoryTree, setCategoryTree] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
 
   /**
-   * Met à jour une option spécifique
+   * Filtre récursivement les catégories pour ne garder que celles avec du stock
    */
-  const updateOption = useCallback((key, value) => {
-    setExportOptions((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+  const filterCategoriesWithStock = useCallback((categories, productsMap) => {
+    return categories
+      .map((category) => {
+        // Croiser les produits de la catégorie avec ceux qui ont du stock
+        const productsInStock = (category.products || []).filter(
+          (product) => productsMap[product._id] // Le produit existe et a du stock
+        );
+
+        // Filtrer récursivement les enfants
+        const filteredChildren = category.children
+          ? filterCategoriesWithStock(category.children, productsMap)
+          : [];
+
+        // Calculer le total de produits en stock (cette catégorie + enfants)
+        const totalProductsInStock =
+          productsInStock.length +
+          filteredChildren.reduce((sum, child) => sum + (child.totalProductsInStock || 0), 0);
+
+        // Garder la catégorie si elle a des produits en stock (directement ou via enfants)
+        if (totalProductsInStock > 0) {
+          return {
+            ...category,
+            children: filteredChildren,
+            productsInStock: productsInStock, // Produits enrichis avec données de stock
+            productsInStockCount: productsInStock.length,
+            totalProductsInStock: totalProductsInStock,
+            isExpanded: false,
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean); // Supprimer les nulls
   }, []);
 
   /**
-   * Met à jour plusieurs options en une fois
+   * Récupère l'arbre hiérarchique des catégories avec les données de stock
    */
-  const updateOptions = useCallback((updates) => {
-    setExportOptions((prev) => ({
-      ...prev,
-      ...updates,
-    }));
-  }, []);
+  const fetchCategoriesWithStock = useCallback(async () => {
+    setLoadingCategories(true);
+    try {
+      console.log("🔄 Chargement de l'arbre hiérarchique et des données de stock...");
+
+      // Récupérer à la fois l'arbre hiérarchique ET les produits avec stock
+      const [hierarchicalResponse, productsResponse] = await Promise.all([
+        apiService.get('/api/categories/hierarchical'),
+        apiService.get('/api/products'),
+      ]);
+
+      const hierarchicalData = hierarchicalResponse.data.data || [];
+      const allProducts = productsResponse.data.data || [];
+
+      console.log(
+        `📊 ${hierarchicalData.length} catégories racines et ${allProducts.length} produits reçus`
+      );
+
+      // Créer un map des produits avec leurs données de stock
+      const productsMap = {};
+      allProducts.forEach((product) => {
+        if (product.type === 'simple' && (product.stock || 0) > 0) {
+          productsMap[product._id] = {
+            ...product,
+            hasStock: true,
+          };
+        }
+      });
+
+      console.log(`📦 ${Object.keys(productsMap).length} produits en stock trouvés`);
+
+      // Filtrer pour ne garder que les catégories avec des produits en stock
+      const filteredTree = filterCategoriesWithStock(hierarchicalData, productsMap);
+      setCategoryTree(filteredTree);
+
+      console.log(`✅ ${filteredTree.length} catégories racines avec stock disponibles`);
+
+      // Debug: afficher quelques catégories
+      filteredTree.slice(0, 3).forEach((cat) => {
+        console.log(
+          `  📂 ${cat.name}: ${cat.totalProductsInStock} produits total (${cat.productsInStockCount} directs)`
+        );
+      });
+    } catch (err) {
+      console.error('❌ Erreur chargement catégories hiérarchiques:', err);
+      setCategoryTree([]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, [filterCategoriesWithStock]);
 
   /**
-   * Bascule une option booléenne
+   * Bascule l'expansion d'une catégorie
    */
-  const toggleOption = useCallback((key) => {
-    setExportOptions((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  }, []);
-
-  /**
-   * Met à jour le type de rapport et ajuste les options en conséquence
-   */
-  const setReportType = useCallback((reportType) => {
-    setExportOptions((prev) => {
-      const newOptions = { ...prev, reportType };
-
-      // Si on passe à "summary", désactiver le groupement par catégories
-      if (reportType === 'summary') {
-        newOptions.groupByCategory = false;
-        newOptions.selectedCategories = [];
+  const toggleCategoryExpansion = useCallback((categoryId) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
       }
-
-      return newOptions;
+      return newSet;
     });
   }, []);
 
   /**
-   * Active/désactive le groupement par catégories
+   * Collecte récursivement tous les IDs de catégories
    */
-  const setGroupByCategory = useCallback((enabled) => {
-    setExportOptions((prev) => ({
-      ...prev,
-      groupByCategory: enabled,
-      selectedCategories: enabled ? prev.selectedCategories : [],
-    }));
+  const collectAllCategoryIds = useCallback((categories) => {
+    let ids = [];
+    categories.forEach((cat) => {
+      ids.push(cat._id);
+      if (cat.children && cat.children.length > 0) {
+        ids.push(...collectAllCategoryIds(cat.children));
+      }
+    });
+    return ids;
   }, []);
 
   /**
-   * Met à jour la liste des catégories sélectionnées
+   * Sélectionne toutes les catégories
    */
-  const setSelectedCategories = useCallback((categories) => {
-    setExportOptions((prev) => ({
-      ...prev,
-      selectedCategories: categories,
-    }));
-  }, []);
-
-  /**
-   * Sélectionne toutes les catégories fournies
-   */
-  const selectAllCategories = useCallback((allCategoryIds) => {
-    setExportOptions((prev) => ({
-      ...prev,
-      selectedCategories: allCategoryIds,
-    }));
-  }, []);
+  const selectAllCategories = useCallback(() => {
+    return collectAllCategoryIds(categoryTree);
+  }, [categoryTree, collectAllCategoryIds]);
 
   /**
    * Désélectionne toutes les catégories
    */
   const deselectAllCategories = useCallback(() => {
-    setExportOptions((prev) => ({
-      ...prev,
-      selectedCategories: [],
-    }));
+    return [];
   }, []);
 
   /**
-   * Gère la sélection d'une catégorie avec ses descendants
+   * Développe toutes les catégories
    */
-  const handleCategorySelection = useCallback((categoryId, isSelected, categoryAndDescendants) => {
-    setExportOptions((prev) => ({
-      ...prev,
-      selectedCategories: isSelected
-        ? [
-            ...prev.selectedCategories,
-            ...categoryAndDescendants.filter((id) => !prev.selectedCategories.includes(id)),
-          ]
-        : prev.selectedCategories.filter((id) => !categoryAndDescendants.includes(id)),
-    }));
+  const expandAllCategories = useCallback(() => {
+    const allIds = collectAllCategoryIds(categoryTree);
+    setExpandedCategories(new Set(allIds));
+  }, [categoryTree, collectAllCategoryIds]);
+
+  /**
+   * Réduit toutes les catégories
+   */
+  const collapseAllCategories = useCallback(() => {
+    setExpandedCategories(new Set());
   }, []);
 
   /**
-   * Gestion du redimensionnement du sélecteur de catégories
+   * Calcule le nombre total de produits sélectionnés
    */
-  const handleResizeStart = useCallback(
-    (e) => {
-      e.preventDefault();
-      setIsResizing(true);
-
-      const startY = e.clientY;
-      const startHeight = categorySelectorHeight;
-
-      const handleMouseMove = (e) => {
-        const deltaY = e.clientY - startY;
-        const newHeight = Math.max(200, Math.min(500, startHeight + deltaY));
-        setCategorySelectorHeight(newHeight);
+  const getSelectedProductsCount = useCallback(
+    (selectedCategories) => {
+      const calculateTotal = (categories) => {
+        return categories.reduce((total, cat) => {
+          let catTotal = 0;
+          if (selectedCategories.includes(cat._id)) {
+            catTotal += cat.totalProductsInStock || 0;
+          }
+          if (cat.children) {
+            catTotal += calculateTotal(cat.children);
+          }
+          return total + catTotal;
+        }, 0);
       };
 
-      const handleMouseUp = () => {
-        setIsResizing(false);
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.body.style.userSelect = ''; // Réactiver la sélection de texte
-        document.body.style.cursor = ''; // Restaurer le curseur
-      };
-
-      // Désactiver la sélection de texte pendant le redimensionnement
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'ns-resize';
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      return calculateTotal(categoryTree);
     },
-    [categorySelectorHeight]
+    [categoryTree]
   );
 
   /**
-   * Remet les options à leur état initial
+   * Gère la sélection/désélection d'une catégorie avec ses descendants
    */
-  const resetOptions = useCallback(() => {
-    setExportOptions({
-      reportType: 'summary',
-      includeCompanyInfo: true,
-      includeCharts: true,
-      sortBy: 'name',
-      sortOrder: 'asc',
-      groupByCategory: false,
-      selectedCategories: [],
-      includeUncategorized: false,
-    });
-    setCategorySelectorHeight(300);
-  }, []);
+  const handleCategorySelection = useCallback(
+    (category, isChecking, currentSelection) => {
+      // Collecter tous les IDs (catégorie + descendants)
+      const categoryAndDescendants = [category._id];
+      const hasChildren = category.children && category.children.length > 0;
 
-  /**
-   * Prépare les options pour l'API
-   */
-  const prepareApiOptions = useCallback(
-    (companyInfo) => {
-      return {
-        companyInfo,
-        reportType: exportOptions.reportType,
-        includeCompanyInfo: exportOptions.includeCompanyInfo,
-        includeCharts: exportOptions.includeCharts,
-        sortBy: exportOptions.sortBy,
-        sortOrder: exportOptions.sortOrder,
-        groupByCategory: exportOptions.groupByCategory,
-        selectedCategories: exportOptions.selectedCategories,
-        includeUncategorized: exportOptions.includeUncategorized,
-      };
+      if (hasChildren) {
+        categoryAndDescendants.push(...collectAllCategoryIds(category.children));
+      }
+
+      if (isChecking) {
+        // Ajouter les catégories qui ne sont pas déjà sélectionnées
+        const newSelections = categoryAndDescendants.filter((id) => !currentSelection.includes(id));
+        return [...currentSelection, ...newSelections];
+      } else {
+        // Retirer toutes les catégories (parent + descendants)
+        return currentSelection.filter((id) => !categoryAndDescendants.includes(id));
+      }
     },
-    [exportOptions]
+    [collectAllCategoryIds]
   );
+
+  // Chargement initial si nécessaire
+  useEffect(() => {
+    if (categoryTree.length === 0) {
+      // Ne pas charger automatiquement, laisser le composant parent décider
+    }
+  }, []);
 
   return {
     // État
-    exportOptions,
-    categorySelectorHeight,
-    isResizing,
+    categoryTree,
+    loadingCategories,
+    expandedCategories,
 
-    // Actions générales
-    updateOption,
-    updateOptions,
-    toggleOption,
-    resetOptions,
+    // Actions de chargement
+    fetchCategoriesWithStock,
 
-    // Actions spécifiques
-    setReportType,
-    setGroupByCategory,
-    setSelectedCategories,
+    // Actions d'expansion
+    toggleCategoryExpansion,
+    expandAllCategories,
+    collapseAllCategories,
+
+    // Actions de sélection
     selectAllCategories,
     deselectAllCategories,
     handleCategorySelection,
 
-    // Redimensionnement
-    setCategorySelectorHeight,
-    handleResizeStart,
-
     // Utilitaires
-    prepareApiOptions,
+    collectAllCategoryIds,
+    getSelectedProductsCount,
   };
 };
+
+// 🔥 EXPORT PAR DÉFAUT AUSSI (pour compatibilité)
+export default useCategoryTree;

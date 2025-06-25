@@ -1,4 +1,5 @@
 // src/hooks/useExportOptions.js
+// 🔧 VERSION CORRIGÉE avec export par défaut
 
 import { useState, useCallback } from 'react';
 
@@ -16,7 +17,8 @@ export const useExportOptions = () => {
     sortOrder: 'asc',
     groupByCategory: false,
     selectedCategories: [],
-    includeUncategorized: false, // false par défaut
+    includeUncategorized: false,
+    isSimplified: false, // 🔥 NOUVELLE OPTION
   });
 
   // État pour la hauteur du sélecteur de catégories
@@ -64,6 +66,7 @@ export const useExportOptions = () => {
       if (reportType === 'summary') {
         newOptions.groupByCategory = false;
         newOptions.selectedCategories = [];
+        newOptions.isSimplified = false; // 🔥 Réinitialiser aussi le mode simplifié
       }
 
       return newOptions;
@@ -78,6 +81,18 @@ export const useExportOptions = () => {
       ...prev,
       groupByCategory: enabled,
       selectedCategories: enabled ? prev.selectedCategories : [],
+      // 🔥 Si on désactive le groupement, désactiver aussi le mode simplifié
+      isSimplified: enabled ? prev.isSimplified : false,
+    }));
+  }, []);
+
+  /**
+   * 🔥 NOUVELLE MÉTHODE : Active/désactive le mode simplifié
+   */
+  const setSimplified = useCallback((enabled) => {
+    setExportOptions((prev) => ({
+      ...prev,
+      isSimplified: enabled,
     }));
   }, []);
 
@@ -147,11 +162,10 @@ export const useExportOptions = () => {
         setIsResizing(false);
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
-        document.body.style.userSelect = ''; // Réactiver la sélection de texte
-        document.body.style.cursor = ''; // Restaurer le curseur
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
       };
 
-      // Désactiver la sélection de texte pendant le redimensionnement
       document.body.style.userSelect = 'none';
       document.body.style.cursor = 'ns-resize';
 
@@ -174,6 +188,7 @@ export const useExportOptions = () => {
       groupByCategory: false,
       selectedCategories: [],
       includeUncategorized: false,
+      isSimplified: false, // 🔥 Inclure dans la réinitialisation
     });
     setCategorySelectorHeight(300);
   }, []);
@@ -193,6 +208,7 @@ export const useExportOptions = () => {
         groupByCategory: exportOptions.groupByCategory,
         selectedCategories: exportOptions.selectedCategories,
         includeUncategorized: exportOptions.includeUncategorized,
+        isSimplified: exportOptions.isSimplified, // 🔥 NOUVELLE OPTION POUR L'API
       };
     },
     [exportOptions]
@@ -209,10 +225,12 @@ export const useExportOptions = () => {
     updateOptions,
     toggleOption,
     resetOptions,
+    setExportOptions, // 🔥 AJOUT MANQUANT : Exposer setExportOptions directement
 
     // Actions spécifiques
     setReportType,
     setGroupByCategory,
+    setSimplified, // 🔥 NOUVELLE ACTION
     setSelectedCategories,
     selectAllCategories,
     deselectAllCategories,
@@ -226,3 +244,6 @@ export const useExportOptions = () => {
     prepareApiOptions,
   };
 };
+
+// 🔥 EXPORT PAR DÉFAUT AUSSI (pour compatibilité)
+export default useExportOptions;

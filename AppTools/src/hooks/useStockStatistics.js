@@ -1,4 +1,5 @@
 // src/hooks/useStockStatistics.js
+// 🔧 VERSION CORRIGÉE avec export par défaut
 
 import { useState, useEffect } from 'react';
 import apiService from '../services/api';
@@ -60,3 +61,6 @@ export const useStockStatistics = () => {
     refreshData,
   };
 };
+
+// 🔥 EXPORT PAR DÉFAUT AUSSI (pour compatibilité)
+export default useStockStatistics;

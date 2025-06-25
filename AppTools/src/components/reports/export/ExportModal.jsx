@@ -30,6 +30,12 @@ const SelectionSummary = ({ exportOptions, getSelectedProductsCount }) => {
           <strong>{getSelectedProductsCount(exportOptions.selectedCategories)} produits</strong> en
           stock
         </div>
+        {/* 🔥 NOUVEAU : Indicateur mode simplifié */}
+        {exportOptions.isSimplified && (
+          <div className="text-xs mt-1 font-italic text-green-700 dark:text-green-300">
+            📊 Mode simplifié activé : seuls les totaux par catégorie seront affichés
+          </div>
+        )}
       </div>
     </div>
   );
@@ -78,7 +84,7 @@ const ExportModal = ({ onClose, onExport, isExporting }) => {
     categorySelectorHeight,
     isResizing,
     setReportType,
-    setExportOptions,
+    setExportOptions, // 🔥 CETTE LIGNE ÉTAIT MANQUANTE
     setCategorySelectorHeight,
     handleResizeStart,
     prepareApiOptions,
@@ -104,6 +110,7 @@ const ExportModal = ({ onClose, onExport, isExporting }) => {
       console.log("📤 Options envoyées à l'API:", apiOptions);
       console.log('🏷️ groupByCategory:', exportOptions.groupByCategory);
       console.log('📂 selectedCategories:', exportOptions.selectedCategories);
+      console.log('🔥 isSimplified:', exportOptions.isSimplified); // 🔥 NOUVEAU LOG
 
       // Appeler la fonction d'export
       await onExport(apiOptions);
