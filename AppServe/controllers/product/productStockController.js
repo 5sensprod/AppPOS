@@ -214,16 +214,23 @@ class ProductStockController extends BaseController {
   }
 
   async exportStockStatisticsToPDF(req, res) {
-    let browser = null;
-    let tempFilePath = null;
-
     try {
-      console.log('🔄 Début export PDF...');
+      console.log('🔄 Début export PDF avec html-pdf...');
+
+      // Vérifier que html-pdf est disponible
+      let pdf;
+      try {
+        pdf = require('html-pdf');
+        console.log('✅ html-pdf chargé (PhantomJS - sans Chrome)');
+      } catch (error) {
+        console.error('❌ html-pdf non disponible:', error.message);
+        throw new Error('html-pdf non installé. Exécutez: npm install html-pdf');
+      }
 
       // 🔍 Debug: Vérifier ce qui est reçu
       console.log('📥 Body reçu complet:', JSON.stringify(req.body, null, 2));
 
-      // ✅ 1. D'ABORD extraire TOUTES les variables du req.body
+      // ✅ Extraire les variables du req.body
       const {
         companyInfo = {},
         reportType = 'summary',
@@ -266,37 +273,7 @@ class ProductStockController extends BaseController {
         console.log(`🔄 Produits triés par ${sortBy} (${sortOrder})`);
       }
 
-      // Test de Puppeteer
-      let puppeteer;
-      try {
-        puppeteer = require('puppeteer');
-        console.log('✅ Puppeteer chargé');
-      } catch (error) {
-        console.error('❌ Puppeteer non disponible:', error.message);
-        throw new Error('Puppeteer non installé. Exécutez: npm install puppeteer');
-      }
-
-      // Configuration Puppeteer
-      const browserOptions = {
-        headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
-        ],
-      };
-
-      console.log('🚀 Lancement du navigateur...');
-      browser = await puppeteer.launch(browserOptions);
-      const page = await browser.newPage();
-
-      await page.setViewport({ width: 1200, height: 800 });
-
-      // ✅ 2. ENSUITE créer templateOptions avec toutes les variables déjà définies
+      // ✅ Créer templateOptions avec toutes les variables
       const templateOptions = {
         companyInfo,
         includeCompanyInfo,
@@ -306,7 +283,7 @@ class ProductStockController extends BaseController {
         includeUncategorized,
       };
 
-      // ✅ 3. ENFIN générer le HTML via les templates
+      // ✅ Générer le HTML via vos templates existants
       let htmlContent;
       if (reportType === 'detailed') {
         // 🔥 Utiliser le DetailedStockReportTemplate
@@ -336,118 +313,90 @@ class ProductStockController extends BaseController {
         console.log('📄 HTML synthèse généré via template');
       }
 
-      await page.setContent(htmlContent, {
-        waitUntil: 'networkidle0',
-        timeout: 30000,
-      });
-      console.log('📱 Page chargée');
-
-      // 🔥 GARDER LA LOGIQUE ORIGINALE AVEC FICHIER TEMPORAIRE
-      const path = require('path');
-      const os = require('os');
-      const filename = `rapport_stock_${reportType}_${new Date().toISOString().split('T')[0]}.pdf`;
-      tempFilePath = path.join(os.tmpdir(), filename);
-
-      console.log('📋 Génération PDF...');
-
-      // Configuration PDF adaptée au type de rapport
-      const pdfOptions = {
-        path: tempFilePath, // 🔥 FICHIER TEMPORAIRE comme dans l'original
+      // 🔥 CONFIGURATION HTML-PDF (PhantomJS)
+      const options = {
+        // Format et orientation
         format: 'A4',
-        printBackground: true,
-        displayHeaderFooter: true,
-        headerTemplate: this.detailedTemplate
-          ? this.detailedTemplate.getHeaderTemplate(companyInfo)
-          : this.stockTemplate?.getHeaderTemplate?.(companyInfo) || '<div></div>',
-        footerTemplate: this.detailedTemplate
-          ? this.detailedTemplate.getFooterTemplate()
-          : this.stockTemplate?.getFooterTemplate?.() || '<div></div>',
-        preferCSSPageSize: true,
+        orientation: reportType === 'detailed' ? 'landscape' : 'portrait',
+
+        // Marges selon le type de rapport
+        border:
+          reportType === 'detailed'
+            ? {
+                top: '12mm', // ✅ Optimisé
+                right: '8mm',
+                bottom: '12mm',
+                left: '8mm',
+              }
+            : {
+                top: '15mm',
+                right: '12mm',
+                bottom: '15mm',
+                left: '12mm',
+              },
+
+        // Options de rendu
+        type: 'pdf',
+        quality: '75',
+        dpi: 150,
+
+        // Timeout et autres options PhantomJS
         timeout: 30000,
+
+        // En-têtes et pieds de page (optionnels avec html-pdf)
+        /*
+      header: {
+        height: '40mm',
+        contents: this.detailedTemplate
+          ? this.detailedTemplate.getHeaderTemplate(companyInfo)
+          : this.stockTemplate?.getHeaderTemplate?.(companyInfo) || ''
+      },
+      footer: {
+        height: '20mm',
+        contents: this.detailedTemplate
+          ? this.detailedTemplate.getFooterTemplate()
+          : this.stockTemplate?.getFooterTemplate?.() || ''
+      },
+      */
+
+        // Options PhantomJS spécifiques
+        phantomjsOptions: {
+          '--web-security': 'no',
+          '--load-images': 'yes',
+          '--ignore-ssl-errors': 'yes',
+        },
       };
 
-      // Configuration selon le type de rapport
-      if (reportType === 'detailed') {
-        pdfOptions.landscape = true;
-        pdfOptions.margin = {
-          top: '50mm',
-          right: '10mm',
-          bottom: '25mm',
-          left: '10mm',
-        };
-      } else {
-        // Rapport de synthèse (portrait)
-        pdfOptions.margin = {
-          top: '45mm',
-          right: '15mm',
-          bottom: '25mm',
-          left: '15mm',
-        };
-      }
+      console.log('📋 Génération PDF avec html-pdf (PhantomJS)...');
 
-      await page.pdf(pdfOptions);
-      console.log('✅ PDF généré:', tempFilePath);
-
-      await browser.close();
-      browser = null;
-
-      // 🔥 LOGIQUE ORIGINALE : Vérification et envoi du fichier
-      const fs = require('fs');
-      if (!fs.existsSync(tempFilePath)) {
-        throw new Error("Le fichier PDF n'a pas été créé");
-      }
-
-      const stats = fs.statSync(tempFilePath);
-      console.log(`📁 Taille du fichier: ${stats.size} bytes`);
-
-      // 🔥 ENVOI COMME DANS L'ORIGINAL
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Length', stats.size);
-
-      const fileStream = fs.createReadStream(tempFilePath);
-
-      fileStream.on('error', (error) => {
-        console.error('❌ Erreur lecture fichier:', error);
-        if (!res.headersSent) {
-          return ResponseHandler.error(res, error);
-        }
-      });
-
-      fileStream.on('end', () => {
-        console.log('✅ Fichier envoyé avec succès');
-        fs.unlink(tempFilePath, (err) => {
-          if (err) console.error('⚠️ Erreur suppression fichier temporaire:', err);
-          else console.log('🗑️ Fichier temporaire supprimé');
+      // 🔥 GÉNÉRER LE PDF avec html-pdf
+      const pdfBuffer = await new Promise((resolve, reject) => {
+        pdf.create(htmlContent, options).toBuffer((err, buffer) => {
+          if (err) {
+            console.error('❌ Erreur génération PDF:', err);
+            reject(err);
+          } else {
+            console.log('✅ PDF généré avec succès');
+            resolve(buffer);
+          }
         });
       });
 
-      fileStream.pipe(res);
+      // Générer un nom de fichier unique
+      const filename = `rapport_stock_${reportType}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      // 🔥 ENVOYER DIRECTEMENT LE BUFFER
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+
+      console.log(`📁 Taille du PDF: ${pdfBuffer.length} bytes`);
+
+      res.send(pdfBuffer);
+      console.log('✅ PDF envoyé avec succès');
     } catch (error) {
       console.error('❌ Erreur export PDF:', error);
       console.error('❌ Stack trace:', error.stack);
-
-      // Nettoyage
-      if (browser) {
-        try {
-          await browser.close();
-          console.log('🧹 Navigateur fermé');
-        } catch (closeError) {
-          console.error('⚠️ Erreur fermeture navigateur:', closeError);
-        }
-      }
-
-      if (tempFilePath) {
-        const fs = require('fs');
-        try {
-          if (fs.existsSync(tempFilePath)) {
-            fs.unlinkSync(tempFilePath);
-            console.log('🗑️ Fichier temporaire nettoyé');
-          }
-        } catch (cleanupError) {
-          console.error('⚠️ Erreur nettoyage:', cleanupError);
-        }
-      }
 
       return ResponseHandler.error(res, {
         message: 'Erreur lors de la génération du PDF',

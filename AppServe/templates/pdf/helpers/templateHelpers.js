@@ -1,6 +1,6 @@
 // AppServe/templates/pdf/helpers/templateHelpers.js
 
-const PDFStyles = require('../../../config/pdfStyles');
+const PDFStyles = require('../pdfStyles');
 
 class TemplateHelpers {
   /**
