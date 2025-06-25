@@ -11,6 +11,7 @@ const useReportsStore = create(
       categories: null,
       products: null,
       categoryAnalytics: null,
+      preCalculatedChartData: null,
 
       // États de chargement
       loading: {
@@ -306,6 +307,114 @@ const useReportsStore = create(
           .slice(0, limit);
 
         return { chartData, totals };
+      },
+
+      calculateAllChartData: () => {
+        const { categoryAnalytics } = get();
+
+        if (!categoryAnalytics) {
+          return null;
+        }
+
+        const { rootCategories, totals } = categoryAnalytics;
+
+        // Pré-calculer les 3 modes en une seule fois
+        const allModes = {
+          value: [],
+          products: [],
+          margin: [],
+        };
+
+        rootCategories.forEach((cat) => {
+          // Mode valeur
+          if (cat.value > 0) {
+            allModes.value.push({
+              name: cat.name,
+              value: cat.value,
+              formattedValue: `${cat.value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`,
+              percentage:
+                totals.totalValue > 0 ? ((cat.value / totals.totalValue) * 100).toFixed(1) : 0,
+              products: cat.products,
+              stockValue: cat.value,
+              margin: cat.margin,
+            });
+          }
+
+          // Mode produits
+          if (cat.products > 0) {
+            allModes.products.push({
+              name: cat.name,
+              value: cat.products,
+              formattedValue: `${cat.products} produits`,
+              percentage:
+                totals.totalProducts > 0
+                  ? ((cat.products / totals.totalProducts) * 100).toFixed(1)
+                  : 0,
+              products: cat.products,
+              stockValue: cat.value,
+              margin: cat.margin,
+            });
+          }
+
+          // Mode marge
+          if (cat.margin > 0) {
+            allModes.margin.push({
+              name: cat.name,
+              value: cat.margin,
+              formattedValue: `${cat.margin.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`,
+              percentage:
+                totals.totalMargin > 0 ? ((cat.margin / totals.totalMargin) * 100).toFixed(1) : 0,
+              products: cat.products,
+              stockValue: cat.value,
+              margin: cat.margin,
+            });
+          }
+        });
+
+        // Trier et limiter chaque mode
+        Object.keys(allModes).forEach((mode) => {
+          allModes[mode] = allModes[mode].sort((a, b) => b.value - a.value).slice(0, 12);
+        });
+
+        // Stocker les données pré-calculées
+        set((state) => ({
+          ...state,
+          preCalculatedChartData: {
+            ...allModes,
+            totals,
+            lastCalculated: new Date(),
+          },
+        }));
+
+        return allModes;
+      },
+
+      /**
+       * 🚀 NOUVEAU : Getter ultra-rapide pour les données de graphique
+       */
+      getOptimizedChartData: (mode = 'value') => {
+        const { preCalculatedChartData, calculateAllChartData } = get();
+
+        // Si pas de données pré-calculées, les calculer UNE SEULE FOIS
+        if (!preCalculatedChartData) {
+          calculateAllChartData();
+          // Récupérer directement les données fraîchement calculées
+          const freshData = get().preCalculatedChartData;
+          return {
+            chartData: freshData?.[mode] || [],
+            totals: freshData?.totals || { totalValue: 0, totalProducts: 0, totalMargin: 0 },
+          };
+        }
+
+        // Données déjà disponibles, les retourner directement
+        return {
+          chartData: preCalculatedChartData[mode] || [],
+          totals: preCalculatedChartData.totals || {
+            totalValue: 0,
+            totalProducts: 0,
+            totalMargin: 0,
+          },
+        };
       },
 
       /**

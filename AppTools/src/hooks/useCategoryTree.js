@@ -1,27 +1,27 @@
-// src/hooks/useCategoryTree.js - VERSION OPTIMISÉE AVEC ZUSTAND
+// src/hooks/useCategoryTree.js - VERSION FINALE ZUSTAND
 import { useState, useCallback, useMemo } from 'react';
 import useReportsStore from '../stores/useReportsStore';
 
 /**
  * Hook personnalisé pour gérer l'arbre de catégories avec stock - VERSION ZUSTAND
- * 🚀 Utilise les données du store au lieu d'appels API séparés
+ * 🚀 Plus d'appels API séparés - utilise les données du store
  */
 export const useCategoryTree = () => {
   const [expandedCategories, setExpandedCategories] = useState(new Set());
 
-  // 🚀 ZUSTAND : Utiliser les données du store
+  // 🚀 ZUSTAND : Utiliser les données du store (déjà chargées)
   const { categories, products, loading, fetchCategories, fetchProducts, fetchAllReportsData } =
     useReportsStore();
 
   /**
-   * 🚀 OPTIMISATION : Construction de l'arbre à partir des données du store
+   * 🚀 CONSTRUCTION OPTIMISÉE : Arbre depuis les données du store
    */
   const categoryTree = useMemo(() => {
     if (!categories || !products) return [];
 
-    console.log("🔄 Construction de l'arbre depuis le store...");
+    console.log('🔄 Construction arbre depuis store...');
 
-    // Créer un map des produits avec stock
+    // Map des produits avec stock
     const productsMap = {};
     products.forEach((product) => {
       if (product.type === 'simple' && (product.stock || 0) > 0) {
@@ -30,7 +30,6 @@ export const useCategoryTree = () => {
     });
 
     // Construction de l'arbre hiérarchique
-    const rootCategories = [];
     const categoryMap = {};
 
     // Créer la map des catégories
@@ -45,6 +44,7 @@ export const useCategoryTree = () => {
     });
 
     // Construire la hiérarchie
+    const rootCategories = [];
     categories.forEach((cat) => {
       if (cat.parent_id && categoryMap[cat.parent_id]) {
         categoryMap[cat.parent_id].children.push(categoryMap[cat._id]);
@@ -53,7 +53,7 @@ export const useCategoryTree = () => {
       }
     });
 
-    // Ajouter les produits aux catégories et calculer les totaux
+    // Calculer les produits en stock récursivement
     const calculateProductsInStock = (category) => {
       // Produits directs de cette catégorie
       const directProducts = products.filter(
@@ -81,27 +81,27 @@ export const useCategoryTree = () => {
     // Filtrer pour ne garder que celles avec du stock
     const filteredTree = rootCategories.filter((cat) => cat.totalProductsInStock > 0);
 
-    console.log(`✅ ${filteredTree.length} catégories racines avec stock construites`);
+    console.log(`✅ ${filteredTree.length} catégories avec stock (depuis store)`);
     return filteredTree;
   }, [categories, products]);
 
   /**
-   * 🚀 OPTIMISATION : Chargement depuis le store
+   * 🚀 CHARGEMENT OPTIMISÉ : Utilise le store
    */
   const fetchCategoriesWithStock = useCallback(async () => {
     try {
       // Si on a déjà les données, pas besoin de recharger
       if (categories && products) {
-        console.log('✅ Données déjà disponibles dans le store');
+        console.log('✅ Données déjà dans le store - pas de rechargement');
         return;
       }
 
-      console.log("🔄 Chargement des données pour l'arbre...");
+      console.log('🔄 Chargement données pour arbre...');
 
-      // Charger toutes les données en parallèle via le store
+      // Charger via le store (données partagées)
       await fetchAllReportsData();
     } catch (err) {
-      console.error('❌ Erreur chargement données:', err);
+      console.error('❌ Erreur chargement:', err);
 
       // Fallback : charger séparément
       try {
@@ -209,7 +209,7 @@ export const useCategoryTree = () => {
   );
 
   return {
-    // État - API identique
+    // État - API identique à l'ancienne version
     categoryTree,
     loadingCategories: loading.categories || loading.products,
     expandedCategories,
