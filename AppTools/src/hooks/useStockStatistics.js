@@ -1,66 +1,53 @@
-// src/hooks/useStockStatistics.js
-// 🔧 VERSION CORRIGÉE avec export par défaut
-
-import { useState, useEffect } from 'react';
-import apiService from '../services/api';
+// src/hooks/useStockStatistics.js - VERSION MIGRÉE AVEC ZUSTAND
+import { useEffect } from 'react';
+import useReportsStore from '../stores/useReportsStore';
 
 /**
- * Hook personnalisé pour gérer les statistiques de stock
- * @returns {Object} État et fonctions de gestion des statistiques
+ * Hook personnalisé pour gérer les statistiques de stock - VERSION ZUSTAND
+ * 🚀 Compatible à 100% avec l'ancienne version
+ *
+ * @returns {Object} État et fonctions de gestion des statistiques (API identique)
  */
 export const useStockStatistics = () => {
-  const [stockStats, setStockStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
+  // 🚀 ZUSTAND : Utilisation du store centralisé
+  const { stockStats, loading, errors, lastUpdate, fetchStockStats, isLoading, getLastUpdate } =
+    useReportsStore();
 
   /**
-   * Récupère les statistiques depuis l'API
-   */
-  const fetchStockStatistics = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      console.log('🔄 Chargement des statistiques de stock...');
-      const response = await apiService.get('/api/products/stock/statistics');
-
-      setStockStats(response.data.data);
-      setLastUpdate(new Date());
-      console.log('✅ Statistiques chargées avec succès');
-    } catch (err) {
-      const errorMessage = 'Erreur lors du chargement des statistiques';
-      setError(errorMessage);
-      console.error('❌ Erreur stats:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Actualise les données
+   * Actualise les données - API identique à l'ancienne version
    */
   const refreshData = () => {
-    fetchStockStatistics();
+    fetchStockStats();
   };
 
-  // Chargement initial
+  /**
+   * Wrapper pour fetchStockStatistics - compatibilité API
+   */
+  const fetchStockStatistics = () => {
+    return fetchStockStats();
+  };
+
+  // 🚀 Chargement automatique au montage (comportement identique)
   useEffect(() => {
-    fetchStockStatistics();
-  }, []);
+    // Charger seulement si pas déjà de données récentes
+    if (!stockStats) {
+      fetchStockStats();
+    }
+  }, [stockStats, fetchStockStats]);
 
+  // 🚀 RETOUR : API 100% identique à l'ancienne version
   return {
-    // État
+    // État - noms identiques
     stockStats,
-    loading,
-    error,
-    lastUpdate,
+    loading: loading.stockStats || isLoading(), // Compatibilité avec l'ancien loading
+    error: errors.stockStats, // Compatibilité avec l'ancien error
+    lastUpdate: lastUpdate.stockStats || getLastUpdate(), // Compatibilité avec lastUpdate
 
-    // Actions
+    // Actions - noms identiques
     fetchStockStatistics,
     refreshData,
   };
 };
 
-// 🔥 EXPORT PAR DÉFAUT AUSSI (pour compatibilité)
+// 🔥 EXPORT PAR DÉFAUT (compatibilité)
 export default useStockStatistics;

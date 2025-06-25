@@ -1,4 +1,4 @@
-// src/pages/ReportsPage.jsx
+// src/pages/ReportsPage.jsx - MISE À JOUR
 
 import React, { useState } from 'react';
 import { RefreshCw, FileText } from 'lucide-react';
@@ -7,6 +7,7 @@ import { RefreshCw, FileText } from 'lucide-react';
 import StockMetrics from '../components/reports/StockMetrics';
 import TaxBreakdown from '../components/reports/TaxBreakdown';
 import ReportSummary from '../components/reports/ReportSummary';
+import StockCategoryChart from '../components/reports/StockCategoryChart'; // 🆕 NOUVEAU
 import ExportModal from '../components/reports/export/ExportModal';
 
 // Hooks
@@ -82,7 +83,6 @@ const ReportsPage = () => {
 
   // Hooks personnalisés
   const { stockStats, loading, error, lastUpdate, refreshData } = useStockStatistics();
-
   const { isExporting, exportStockStatisticsToPDF } = useAdvancedPDFExport();
 
   /**
@@ -141,11 +141,20 @@ const ReportsPage = () => {
           {/* Métriques principales */}
           <StockMetrics stats={stockStats} />
 
-          {/* Répartition par TVA */}
-          <TaxBreakdown breakdown={stockStats.financial.tax_breakdown} />
+          {/* 🆕 NOUVEAU : Graphique de répartition des catégories */}
+          <div className="mb-8">
+            <StockCategoryChart />
+          </div>
 
-          {/* Résumé final */}
-          <ReportSummary summary={stockStats.summary} financial={stockStats.financial} />
+          {/* 🔥 FIX : Répartition par TVA sur une ligne complète */}
+          <div className="mb-8">
+            <TaxBreakdown breakdown={stockStats.financial.tax_breakdown} />
+          </div>
+
+          {/* 🔥 FIX : Résumé final sur une ligne complète */}
+          <div className="mb-8">
+            <ReportSummary summary={stockStats.summary} financial={stockStats.financial} />
+          </div>
         </>
       )}
 
