@@ -61,17 +61,6 @@ const GeneralOptions = ({ exportOptions, setExportOptions }) => {
             description="Ajoute des visualisations graphiques des données dans le rapport de synthèse"
           />
         )}
-
-        {/* Option pour rapport détaillé avec groupement */}
-        {exportOptions.reportType === 'detailed' && exportOptions.groupByCategory && (
-          <CheckboxOption
-            id="includeUncategorized"
-            checked={exportOptions.includeUncategorized}
-            onChange={(e) => updateBooleanOption('includeUncategorized', e.target.checked)}
-            label="Inclure les produits sans catégorie"
-            description="Ajoute une section pour les produits qui ne sont assignés à aucune catégorie"
-          />
-        )}
       </div>
     </div>
   );

@@ -214,11 +214,11 @@ class ProductStockController extends BaseController {
       // Génération du contenu HTML
       const htmlContent = await this.generateHTMLContent(params, stockStats, productsInStock);
 
-      // Configuration et génération du PDF
-      const pdfBuffer = await this.generatePDFBuffer(htmlContent, params.reportType);
+      // 🔥 CORRECTION : Passer params à generatePDFBuffer
+      const pdfBuffer = await this.generatePDFBuffer(htmlContent, params.reportType, params);
 
       // Envoi de la réponse
-      this.sendPDFResponse(res, pdfBuffer, params.reportType);
+      this.sendPDFResponse(res, pdfBuffer, params.reportType, params);
     } catch (error) {
       console.error('❌ Erreur export PDF:', error);
       return ResponseHandler.error(res, {
@@ -241,7 +241,8 @@ class ProductStockController extends BaseController {
   }
 
   extractPDFParams(body) {
-    return {
+    // 🔥 AJOUT de isSimplified
+    const params = {
       companyInfo: body.companyInfo || {},
       reportType: body.reportType || 'summary',
       includeCompanyInfo: body.includeCompanyInfo !== false,
@@ -251,7 +252,18 @@ class ProductStockController extends BaseController {
       groupByCategory: body.groupByCategory || false,
       selectedCategories: body.selectedCategories || [],
       includeUncategorized: body.includeUncategorized !== false,
+      isSimplified: body.isSimplified || false, // 🔥 NOUVELLE OPTION
     };
+
+    // 🔥 DEBUG LOG
+    console.log('📋 === OPTIONS REÇUES PAR LE CONTRÔLEUR ===');
+    console.log('  reportType:', params.reportType);
+    console.log('  groupByCategory:', params.groupByCategory);
+    console.log('  🔥 isSimplified:', params.isSimplified);
+    console.log('  selectedCategories:', params.selectedCategories.length, 'catégories');
+    console.log('=============================================');
+
+    return params;
   }
 
   async getProductsForPDF() {
@@ -277,6 +289,7 @@ class ProductStockController extends BaseController {
       groupByCategory: params.groupByCategory,
       selectedCategories: params.selectedCategories,
       includeUncategorized: params.includeUncategorized,
+      isSimplified: params.isSimplified, // 🔥 AJOUT
     };
 
     if (params.reportType === 'detailed') {
@@ -302,15 +315,21 @@ class ProductStockController extends BaseController {
       return htmlContent;
     }
   }
-
-  async generatePDFBuffer(htmlContent, reportType) {
+  async generatePDFBuffer(htmlContent, reportType, params = {}) {
     const pdf = require('html-pdf');
+
+    // 🔥 Orientation adaptative selon isSimplified
+    let orientation = 'portrait';
+    if (reportType === 'detailed') {
+      // Portrait si simplifié, sinon paysage
+      orientation = params.isSimplified ? 'portrait' : 'landscape';
+    }
 
     const options = {
       format: 'A4',
-      orientation: reportType === 'detailed' ? 'landscape' : 'portrait',
+      orientation: orientation, // 🔥 DYNAMIQUE
       border:
-        reportType === 'detailed'
+        orientation === 'landscape'
           ? { top: '12mm', right: '8mm', bottom: '12mm', left: '8mm' }
           : { top: '15mm', right: '12mm', bottom: '15mm', left: '12mm' },
       type: 'pdf',
@@ -324,7 +343,11 @@ class ProductStockController extends BaseController {
       },
     };
 
-    console.log('📋 Génération PDF avec html-pdf...');
+    console.log(`📋 Génération PDF:`);
+    console.log(`   - Type: ${reportType}`);
+    console.log(`   - Orientation: ${orientation}`);
+    console.log(`   - 🔥 isSimplified: ${params.isSimplified || false}`);
+    console.log(`   - groupByCategory: ${params.groupByCategory || false}`);
 
     return new Promise((resolve, reject) => {
       pdf.create(htmlContent, options).toBuffer((err, buffer) => {
@@ -339,14 +362,26 @@ class ProductStockController extends BaseController {
     });
   }
 
-  sendPDFResponse(res, pdfBuffer, reportType) {
-    const filename = `rapport_stock_${reportType}_${new Date().toISOString().split('T')[0]}.pdf`;
+  sendPDFResponse(res, pdfBuffer, reportType, params = {}) {
+    // 🔥 Nom de fichier adaptatif avec isSimplified
+    let filename = `rapport_stock_${reportType}`;
+
+    if (params.isSimplified) {
+      filename += '_simplifie';
+    }
+
+    if (params.groupByCategory) {
+      filename += '_categories';
+    }
+
+    filename += `_${new Date().toISOString().split('T')[0]}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', pdfBuffer.length);
 
     console.log(`📁 Taille du PDF: ${pdfBuffer.length} bytes`);
+    console.log(`📄 Nom du fichier: ${filename}`);
     res.send(pdfBuffer);
     console.log('✅ PDF envoyé avec succès');
   }

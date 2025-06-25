@@ -18,18 +18,14 @@ class GroupedStockReportTemplate {
       includeCompanyInfo = true,
       selectedCategories = [],
       includeUncategorized = true,
+      isSimplified = false, // 🔥 NOUVELLE OPTION
     } = options;
 
-    // 🔥 AJOUT DU DEBUG
     console.log(`🚀 generateGroupedStockReportHTML appelée`);
-    console.log(`📊 options.selectedCategories:`, selectedCategories);
-    console.log(`📦 productsInStock.length:`, productsInStock.length);
-    console.log(`🔧 includeUncategorized:`, includeUncategorized);
+    console.log(`🔥 Mode simplifié:`, isSimplified);
+    console.log(`📂 Catégories sélectionnées:`, selectedCategories.length);
 
     try {
-      // 🔥 DEBUG SUPPLÉMENTAIRE
-      this.debugCategorySelection(selectedCategories, productsInStock);
-
       const groupedProducts = await this.groupProductsByCategory(
         productsInStock,
         selectedCategories,
@@ -37,44 +33,42 @@ class GroupedStockReportTemplate {
       );
 
       const groupEntries = Object.entries(groupedProducts);
-
-      // 🔥 VÉRIFICATION FINALE
-      console.log(
-        `📋 Groupes créés pour le rendu:`,
-        groupEntries.map(([key]) => key)
-      );
+      console.log(`📋 ${groupEntries.length} groupes créés pour le rendu`);
 
       return `
-      <!DOCTYPE html>
-      <html lang="fr">
-      <head>
-          <meta charset="UTF-8">
-          <title>Rapport de Stock par Catégories</title>
-          <style>
-              ${this.helpers.getStylesFor('grouped', { landscape: true })}
-          </style>
-      </head>
-      <body>
-          <div class="page">
-              ${this.renderHeader('Rapport de Stock par Catégories', selectedCategories.length)}
-              ${includeCompanyInfo ? this.renderCompanyInfo(companyInfo) : ''}
-              
-              <!-- 🔥 SYNTHÈSE EN PREMIÈRE PAGE -->
-              ${this.renderCategorySummary(stockStats, groupEntries, selectedCategories)}
-              
-              <!-- 🔥 SAUT DE PAGE AVANT LES TABLES -->
-              <div style="page-break-before: always;">
-                  ${this.renderCategoryGroups(groupEntries)}
-              </div>
-          </div>
-      </body>
-      </html>
-      `;
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <title>Rapport de Stock par Catégories${isSimplified ? ' (Simplifié)' : ''}</title>
+        <style>
+            ${this.helpers.getStylesFor('grouped', {
+              landscape: !isSimplified,
+              fontSize: isSimplified ? 'normal' : 'small',
+            })}
+            ${isSimplified ? this.getSimplifiedStyles() : ''}
+        </style>
+    </head>
+    <body>
+        <div class="page">
+            ${this.renderHeader('Rapport de Stock par Catégories' + (isSimplified ? ' (Simplifié)' : ''), selectedCategories.length)}
+            ${includeCompanyInfo ? this.renderCompanyInfo(companyInfo) : ''}
+            
+            ${this.renderCategorySummary(stockStats, groupEntries, selectedCategories, isSimplified)}
+            
+            ${
+              isSimplified
+                ? this.renderSimplifiedCategoryGroups(groupEntries)
+                : `<div style="page-break-before: always;">${this.renderCategoryGroups(groupEntries)}</div>`
+            }
+        </div>
+    </body>
+    </html>
+    `;
     } catch (error) {
       console.error('❌ Erreur génération rapport groupé:', error);
-      console.error("❌ selectedCategories au moment de l'erreur:", selectedCategories);
 
-      // Fallback vers le template standard
+      // Fallback
       const DetailedTemplate = require('./detailedStockReportTemplate');
       const detailedTemplate = new DetailedTemplate();
       return detailedTemplate.generateStandardDetailedReportHTML(
@@ -83,6 +77,250 @@ class GroupedStockReportTemplate {
         options
       );
     }
+  }
+
+  /**
+   * 🔥 RENDU SIMPLIFIÉ - Seulement les totaux par catégorie racine
+   */
+  renderSimplifiedCategoryGroups(groupEntries) {
+    console.log('🔥 renderSimplifiedCategoryGroups appelée avec', groupEntries.length, 'groupes');
+
+    // Regrouper par catégorie racine
+    const rootCategories = this.groupByRootCategory(groupEntries);
+
+    const simplifiedRows = Object.entries(rootCategories)
+      .map(([rootName, categories]) => {
+        // Calculer les totaux pour cette catégorie racine
+        const totals = categories.reduce(
+          (acc, [key, group]) => {
+            acc.productCount += group.stats.productCount;
+            acc.totalStock += group.stats.totalStock;
+            acc.totalValue += group.stats.totalValue;
+            acc.totalTax += group.stats.totalTax;
+            return acc;
+          },
+          { productCount: 0, totalStock: 0, totalValue: 0, totalTax: 0 }
+        );
+
+        return `
+      <tr>
+          <td><strong>${this.helpers.escapeHtml(rootName)}</strong></td>
+          <td>${this.helpers.formatNumber(totals.productCount)}</td>
+          <td>${this.helpers.formatNumber(totals.totalStock)}</td>
+          <td class="currency-cell">${this.helpers.formatCurrency(totals.totalValue)}</td>
+          <td class="currency-cell">${this.helpers.formatCurrency(totals.totalTax)}</td>
+      </tr>
+      `;
+      })
+      .join('');
+
+    // Calculer le total général
+    const grandTotals = Object.values(rootCategories)
+      .flat()
+      .reduce(
+        (acc, [key, group]) => {
+          acc.productCount += group.stats.productCount;
+          acc.totalStock += group.stats.totalStock;
+          acc.totalValue += group.stats.totalValue;
+          acc.totalTax += group.stats.totalTax;
+          return acc;
+        },
+        { productCount: 0, totalStock: 0, totalValue: 0, totalTax: 0 }
+      );
+
+    return `
+    <div class="simplified-summary">
+      <h2 class="category-title">Synthèse par Catégorie Racine</h2>
+      
+      <table class="data-table simplified-table">
+          <thead>
+              <tr>
+                  <th>Catégorie Racine</th>
+                  <th>Nb Produits</th>
+                  <th>Stock Total</th>
+                  <th>Valeur Stock</th>
+                  <th>TVA Collectée</th>
+              </tr>
+          </thead>
+          <tbody>
+              ${simplifiedRows}
+              <tr class="final-totals-row">
+                  <td><strong>TOTAL GÉNÉRAL</strong></td>
+                  <td><strong>${this.helpers.formatNumber(grandTotals.productCount)}</strong></td>
+                  <td><strong>${this.helpers.formatNumber(grandTotals.totalStock)}</strong></td>
+                  <td class="currency-cell"><strong>${this.helpers.formatCurrency(grandTotals.totalValue)}</strong></td>
+                  <td class="currency-cell"><strong>${this.helpers.formatCurrency(grandTotals.totalTax)}</strong></td>
+              </tr>
+          </tbody>
+      </table>
+      
+      <div class="page-info">
+        Rapport simplifié établi le ${this.helpers.formatShortDate()} à ${this.helpers.formatTime()}
+      </div>
+    </div>
+  `;
+  }
+
+  /**
+   * 🔥 REGROUPEMENT par catégorie racine
+   */
+  groupByRootCategory(groupEntries) {
+    const rootCategories = {};
+
+    groupEntries.forEach(([categoryKey, group]) => {
+      // Extraire la catégorie racine du chemin
+      const rootName = group.categoryInfo.path[0] || categoryKey;
+
+      if (!rootCategories[rootName]) {
+        rootCategories[rootName] = [];
+      }
+
+      rootCategories[rootName].push([categoryKey, group]);
+    });
+
+    console.log('🔥 Catégories racines regroupées:', Object.keys(rootCategories));
+    return rootCategories;
+  }
+
+  /**
+   * 🔥 STYLES CSS spécifiques pour le rapport simplifié
+   */
+  getSimplifiedStyles() {
+    return `
+    .simplified-summary {
+      margin-top: 6mm;
+    }
+    
+    .simplified-table {
+      font-size: 12pt;
+      table-layout: fixed;
+    }
+    
+    .simplified-table th,
+    .simplified-table td {
+      padding: 3mm 2mm;
+      text-align: center;
+      word-wrap: break-word;
+      overflow: hidden;
+    }
+    
+    .simplified-table th:first-child,
+    .simplified-table td:first-child {
+      text-align: left;
+      width: 40%;
+    }
+    
+    .simplified-table th:nth-child(2),
+    .simplified-table td:nth-child(2),
+    .simplified-table th:nth-child(3),
+    .simplified-table td:nth-child(3) {
+      width: 15%;
+    }
+    
+    .simplified-table th:nth-child(4),
+    .simplified-table td:nth-child(4),
+    .simplified-table th:nth-child(5),
+    .simplified-table td:nth-child(5) {
+      width: 15%;
+    }
+    
+    .simplified-table .currency-cell {
+      font-family: 'Courier New', monospace;
+      font-size: 11pt;
+      white-space: nowrap;
+      text-align: right;
+    }
+    
+    .simplified-table .final-totals-row {
+      background: #f0f0f0 !important;
+      font-weight: bold;
+      border-top: 3px solid #000 !important;
+      font-size: 13pt;
+    }
+    
+    .simplified-table .final-totals-row .currency-cell {
+      font-size: 12pt;
+      font-weight: bold;
+    }
+  `;
+  }
+
+  /**
+   * 🔥 MISE À JOUR renderCategorySummary avec isSimplified
+   */
+  renderCategorySummary(stockStats, groupEntries, selectedCategories, isSimplified = false) {
+    const selectedProductsCount = groupEntries.reduce((total, [key, group]) => {
+      return total + group.stats.productCount;
+    }, 0);
+
+    const selectedInventoryValue = groupEntries.reduce((total, [key, group]) => {
+      return total + group.stats.totalValue;
+    }, 0);
+
+    const selectedRetailValue = groupEntries.reduce((total, [key, group]) => {
+      return (
+        total +
+        group.products.reduce((subTotal, product) => {
+          const stock = product.stock || 0;
+          const salePrice = product.price || 0;
+          return subTotal + stock * salePrice;
+        }, 0)
+      );
+    }, 0);
+
+    const percentageProducts =
+      stockStats.summary.products_in_stock > 0
+        ? ((selectedProductsCount / stockStats.summary.products_in_stock) * 100).toFixed(1)
+        : 0;
+
+    const percentageValue =
+      stockStats.financial.inventory_value > 0
+        ? ((selectedInventoryValue / stockStats.financial.inventory_value) * 100).toFixed(1)
+        : 0;
+
+    const selectionMode = selectedCategories.length > 0;
+    const reportTypeText = isSimplified ? ' (Version Simplifiée)' : '';
+
+    return `
+  <section class="summary">
+      <h3>Synthèse par Catégories${selectionMode ? ' (Sélection)' : ''}${reportTypeText}</h3>
+      <p>
+          Ce rapport présente <span class="highlight">${this.helpers.formatNumber(selectedProductsCount)} produits</span> 
+          dans ${groupEntries.length > 1 ? 'les catégories' : 'la catégorie'} ${selectionMode ? 'sélectionnée(s)' : 'analysée(s)'}.
+      </p>
+      <p>
+          Cette ${selectionMode ? 'sélection' : 'analyse'} représente <span class="highlight">${percentageProducts}%</span> du stock total 
+          (${this.helpers.formatNumber(selectedProductsCount)} sur ${this.helpers.formatNumber(stockStats.summary.products_in_stock)} produits)
+          pour une valeur de <span class="highlight">${this.helpers.formatCurrency(selectedInventoryValue)}</span> 
+          soit <span class="highlight">${percentageValue}%</span> de la valeur totale du stock.
+      </p>
+      <p>
+          Potentiel commercial total : <span class="highlight">${this.helpers.formatCurrency(selectedRetailValue)}</span> 
+          (marge potentielle : <span class="highlight">${this.helpers.formatCurrency(selectedRetailValue - selectedInventoryValue)}</span>)
+      </p>
+      ${
+        isSimplified
+          ? `
+      <p style="margin-top: 4mm; font-size: 9pt; color: #666; font-style: italic;">
+          <strong>Mode simplifié :</strong> Ce rapport ne présente que les totaux par catégorie racine, sans le détail des produits individuels.
+      </p>
+      `
+          : ''
+      }
+      ${
+        selectionMode
+          ? `
+      <p style="margin-top: 6mm; font-size: 8pt; color: #666; font-style: italic;">
+          Note: Ce rapport ne présente que les catégories sélectionnées (${selectedCategories.length} sur le total disponible) et leurs sous-catégories.
+      </p>
+      `
+          : ''
+      }
+      <p style="margin-top: 6mm; font-size: 8pt; color: #666;">
+          Rapport établi le ${this.helpers.formatShortDate()} à ${this.helpers.formatTime()} par APPPOS.
+      </p>
+  </section>
+  `;
   }
 
   /**

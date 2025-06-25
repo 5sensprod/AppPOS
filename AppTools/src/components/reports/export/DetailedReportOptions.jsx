@@ -41,43 +41,6 @@ const SortingOptions = ({ sortBy, sortOrder, onSortByChange, onSortOrderChange }
 );
 
 /**
- * Composant pour l'aperçu des colonnes
- */
-const ColumnsPreview = () => (
-  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-    <h4 className="font-medium text-gray-900 dark:text-white mb-2">
-      Colonnes du tableau détaillé :
-    </h4>
-    <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-      <div>
-        • <strong>SKU</strong> - Référence produit
-      </div>
-      <div>
-        • <strong>Désignation</strong> - Nom du produit
-      </div>
-      <div>
-        • <strong>PA HT</strong> - Prix d'achat hors taxes
-      </div>
-      <div>
-        • <strong>PV TTC</strong> - Prix de vente toutes taxes comprises
-      </div>
-      <div>
-        • <strong>Stock</strong> - Quantité en stock
-      </div>
-      <div>
-        • <strong>TVA %</strong> - Taux de TVA
-      </div>
-      <div>
-        • <strong>Valeur Stock</strong> - PA HT × Stock
-      </div>
-      <div>
-        • <strong>Montant TVA</strong> - TVA calculée sur la valeur de vente
-      </div>
-    </div>
-  </div>
-);
-
-/**
  * Composant principal pour les options du rapport détaillé
  */
 const DetailedReportOptions = ({
@@ -158,11 +121,6 @@ const DetailedReportOptions = ({
         onSortByChange={(value) => updateOption('sortBy', value)}
         onSortOrderChange={(value) => updateOption('sortOrder', value)}
       />
-
-      {/* Aperçu des colonnes */}
-      <div className="mt-4">
-        <ColumnsPreview />
-      </div>
     </div>
   );
 };

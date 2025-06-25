@@ -227,24 +227,46 @@ const CategoryTreeSelector = ({
         </div>
       )}
 
-      {/* Option pour inclure les produits sans catégorie */}
+      {/* Options supplémentaires */}
       <div className="mt-3 pt-2 border-t border-blue-200 dark:border-blue-700">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={exportOptions.includeUncategorized}
-            onChange={(e) =>
-              setExportOptions((prev) => ({
-                ...prev,
-                includeUncategorized: e.target.checked,
-              }))
-            }
-            className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <span className="text-xs text-gray-700 dark:text-gray-300">
-            Inclure les produits sans catégorie
-          </span>
-        </label>
+        <div className="space-y-2">
+          {/* Option inclure produits sans catégorie */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={exportOptions.includeUncategorized}
+              onChange={(e) =>
+                setExportOptions((prev) => ({
+                  ...prev,
+                  includeUncategorized: e.target.checked,
+                }))
+              }
+              className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <span className="text-xs text-gray-700 dark:text-gray-300">
+              Inclure les produits sans catégorie
+            </span>
+          </label>
+
+          {/* 🔥 NOUVELLE OPTION : Rapport simplifié */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={exportOptions.isSimplified || false}
+              onChange={(e) =>
+                setExportOptions((prev) => ({
+                  ...prev,
+                  isSimplified: e.target.checked,
+                }))
+              }
+              className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <span className="text-xs text-gray-700 dark:text-gray-300">Rapport simplifié</span>
+          </label>
+          <div className="text-xs text-gray-500 italic mt-1">
+            Affiche uniquement les totaux par catégorie racine (sans le détail des produits)
+          </div>
+        </div>
       </div>
 
       {/* Aperçu de la sélection */}
