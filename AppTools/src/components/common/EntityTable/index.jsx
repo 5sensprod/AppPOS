@@ -55,7 +55,8 @@ const EntityTable = ({
   onSearch,
   onFilter,
   searchFields = ['name'],
-  filters = [], // GARDÉ pour rétrocompatibilité mais sera ignoré si enableUnifiedFilters = true
+  searchPlaceholder,
+  filters = [],
   searchProcessor,
   paginationEntityId = 'default',
   externalActiveFilters = [],
@@ -89,10 +90,10 @@ const EntityTable = ({
     useTableFilter(
       sortedData,
       searchFields,
-      enableUnifiedFilters ? [] : filters, // Utiliser filters legacy seulement si UnifiedFilterBar désactivé
+      enableUnifiedFilters ? [] : filters, // ✅ filters en 3ème position
       onSearch,
       onFilter,
-      searchProcessor,
+      searchProcessor, // ✅ searchProcessor en 6ème position
       paginationEntityId
     );
 
@@ -244,6 +245,7 @@ const EntityTable = ({
                 searchTerm={searchTerm}
                 onSearchChange={handleSearchChange}
                 entityNamePlural={entityNamePlural}
+                customPlaceholder={searchPlaceholder}
               />
             </div>
 

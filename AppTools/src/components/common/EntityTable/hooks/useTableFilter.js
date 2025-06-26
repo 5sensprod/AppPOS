@@ -59,7 +59,8 @@ export const useTableFilter = (
       // Réinitialiser la pagination lors d'une recherche
       resetPagination(entityName);
 
-      if (callbacksRef.current.onSearch) {
+      // CORRECTION: Vérifier que onSearch existe ET est une fonction
+      if (callbacksRef.current.onSearch && typeof callbacksRef.current.onSearch === 'function') {
         callbacksRef.current.onSearch(value, searchFields);
       }
     },
@@ -87,7 +88,8 @@ export const useTableFilter = (
       // Sauvegarder dans le store
       saveActiveFilters(entityName, newFilters);
 
-      if (callbacksRef.current.onFilter) {
+      // CORRECTION: Vérifier que onFilter existe ET est une fonction
+      if (callbacksRef.current.onFilter && typeof callbacksRef.current.onFilter === 'function') {
         callbacksRef.current.onFilter(newFilters);
       }
     },
@@ -137,7 +139,7 @@ export const useTableFilter = (
 
     // Utiliser le processeur de recherche personnalisé s'il est fourni
     if (searchProcessor && typeof searchProcessor === 'function') {
-      return searchProcessor(dataAfterFilters, searchTerm);
+      return searchProcessor(dataAfterFilters, searchTerm, searchFields);
     }
 
     // Comportement de recherche par défaut

@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 
-export const SearchBar = ({ searchTerm, onSearchChange, entityNamePlural }) => {
+export const SearchBar = ({ searchTerm, onSearchChange, entityNamePlural, customPlaceholder }) => {
   const inputRef = useRef(null);
 
   // Se concentrer sur l'input si un terme de recherche existe déjà
@@ -20,7 +20,7 @@ export const SearchBar = ({ searchTerm, onSearchChange, entityNamePlural }) => {
       <input
         ref={inputRef}
         type="text"
-        placeholder={`Rechercher ${entityNamePlural || 'éléments'}...`}
+        placeholder={customPlaceholder || `Rechercher ${entityNamePlural || 'éléments'}...`}
         value={searchTerm || ''}
         onChange={onSearchChange}
         className="w-full lg:w-72 h-9 pl-9 pr-8 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"

@@ -14,6 +14,7 @@ import { useWebCapture } from '../hooks/useWebCapture';
 import StockModal from '../../../components/common/EntityTable/components/BatchActions/components/StockModal';
 import ToastContainer from '../../../components/common/EntityTable/components/BatchActions/components/ToastContainer';
 import { useActionToasts } from '../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
+import { productSearchProcessor } from '../../../utils/productSearchProcessor';
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct, updateProduct } = useProduct();
@@ -55,15 +56,11 @@ function ProductTable(props) {
     entityType: 'product',
     fetchEntities: fetchProducts, // ✅ WebSocket store
     deleteEntity: async (id) => {
-      console.log(`🗑️ [ProductTable] Suppression du produit #${id}`);
       await deleteProduct(id); // ✅ Entity store
-      console.log(`✅ [ProductTable] Produit #${id} supprimé`);
     },
     syncEntity: syncEnabled
       ? async (id) => {
-          console.log(`🔄 [ProductTable] Synchronisation du produit #${id}`);
           await syncProduct(id);
-          console.log(`✅ [ProductTable] Produit #${id} synchronisé`);
         }
       : undefined,
     // ✅ Pas besoin de batchDeleteEntities/batchSyncEntities custom
@@ -220,7 +217,6 @@ function ProductTable(props) {
 
   // Fonction pour gérer l'action de stock depuis le dropdown
   const handleStockAction = async (selectedItems, stockAction) => {
-    console.log('handleStockAction appelé avec selectedItems:', selectedItems);
     try {
       setStockModalItems([...selectedItems]);
       setShowStockModal(true);
@@ -293,6 +289,8 @@ function ProductTable(props) {
         entityNamePlural="produits"
         baseRoute="/products"
         searchFields={['name', 'sku', 'designation', 'category']}
+        searchProcessor={productSearchProcessor} // 🆕 Processeur personnalisé pour code-barre
+        searchPlaceholder="Rechercher par nom, référence, désignation, catégorie ou code-barre..." // 🆕 Placeholder personnalisé
         // NOUVELLES PROPS UnifiedFilterBar
         enableUnifiedFilters={true}
         unifiedFilterOptions={filterOptions}
