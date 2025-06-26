@@ -290,7 +290,7 @@ function ProductTable(props) {
         baseRoute="/products"
         searchFields={['name', 'sku', 'designation', 'category']}
         searchProcessor={productSearchProcessor} // 🆕 Processeur personnalisé pour code-barre
-        searchPlaceholder="Rechercher par nom, référence, désignation, catégorie ou code-barre..." // 🆕 Placeholder personnalisé
+        searchPlaceholder="Rechercher produit" // 🆕 Placeholder personnalisé
         // NOUVELLES PROPS UnifiedFilterBar
         enableUnifiedFilters={true}
         unifiedFilterOptions={filterOptions}
