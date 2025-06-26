@@ -1,116 +1,100 @@
-// src/hooks/useCategoryTree.js - VERSION FINALE ZUSTAND
+// src/hooks/useCategoryTree.js - VERSION STORES DIRECTS SIMPLE
 import { useState, useCallback, useMemo } from 'react';
-import useReportsStore from '../stores/useReportsStore';
+import { useProductDataStore } from '../features/products/stores/productStore';
+import { useHierarchicalCategories } from '../features/categories/stores/categoryHierarchyStore';
 
 /**
- * Hook personnalisé pour gérer l'arbre de catégories avec stock - VERSION ZUSTAND
- * 🚀 Plus d'appels API séparés - utilise les données du store
+ * Hook personnalisé pour gérer l'arbre de catégories avec stock - VERSION SIMPLE
+ * 🚀 Utilise directement les stores optimisés
  */
 export const useCategoryTree = () => {
   const [expandedCategories, setExpandedCategories] = useState(new Set());
 
-  // 🚀 ZUSTAND : Utiliser les données du store (déjà chargées)
-  const { categories, products, loading, fetchCategories, fetchProducts, fetchAllReportsData } =
-    useReportsStore();
+  // 🚀 STORES DIRECTS
+  const { products, loading: loadingProducts, fetchProducts } = useProductDataStore();
+  const {
+    hierarchicalCategories,
+    loading: loadingCategories,
+    fetchHierarchicalCategories,
+  } = useHierarchicalCategories();
 
   /**
-   * 🚀 CONSTRUCTION OPTIMISÉE : Arbre depuis les données du store
+   * 🚀 CONSTRUCTION OPTIMISÉE : Arbre depuis les stores directs
    */
   const categoryTree = useMemo(() => {
-    if (!categories || !products) return [];
+    if (!hierarchicalCategories || !products) return [];
 
-    console.log('🔄 Construction arbre depuis store...');
+    console.log('🔄 Construction arbre depuis stores directs...');
 
-    // Map des produits avec stock
-    const productsMap = {};
-    products.forEach((product) => {
-      if (product.type === 'simple' && (product.stock || 0) > 0) {
-        productsMap[product._id] = { ...product, hasStock: true };
-      }
+    // Produits simples en stock
+    const productsInStock = products.filter((product) => {
+      return (product.type === 'simple' || !product.type) && (product.stock || 0) > 0;
     });
 
-    // Construction de l'arbre hiérarchique
-    const categoryMap = {};
+    // Fonction pour enrichir une catégorie avec les comptages
+    const enrichCategory = (category) => {
+      // Produits directs dans cette catégorie
+      const directProducts = productsInStock.filter((product) => {
+        const productCategories = product.categories || [product.categoryId].filter(Boolean);
+        return productCategories.includes(category._id);
+      });
 
-    // Créer la map des catégories
-    categories.forEach((cat) => {
-      categoryMap[cat._id] = {
-        ...cat,
-        children: [],
-        productsInStock: [],
-        productsInStockCount: 0,
-        totalProductsInStock: 0,
-      };
-    });
+      // Enrichir les enfants récursivement
+      const enrichedChildren = category.children ? category.children.map(enrichCategory) : [];
 
-    // Construire la hiérarchie
-    const rootCategories = [];
-    categories.forEach((cat) => {
-      if (cat.parent_id && categoryMap[cat.parent_id]) {
-        categoryMap[cat.parent_id].children.push(categoryMap[cat._id]);
-      } else {
-        rootCategories.push(categoryMap[cat._id]);
-      }
-    });
-
-    // Calculer les produits en stock récursivement
-    const calculateProductsInStock = (category) => {
-      // Produits directs de cette catégorie
-      const directProducts = products.filter(
-        (product) => product.categories?.includes(category._id) && productsMap[product._id]
+      // Total produits (directs + sous-catégories)
+      const totalFromChildren = enrichedChildren.reduce(
+        (sum, child) => sum + child.totalProductsInStock,
+        0
       );
+      const totalProductsInStock = directProducts.length + totalFromChildren;
 
-      category.productsInStock = directProducts;
-      category.productsInStockCount = directProducts.length;
-      category.totalProductsInStock = directProducts.length;
-
-      // Ajouter récursivement les produits des enfants
-      if (category.children) {
-        category.children.forEach((child) => {
-          calculateProductsInStock(child);
-          category.totalProductsInStock += child.totalProductsInStock;
-        });
-      }
-
-      return category.totalProductsInStock;
+      return {
+        ...category,
+        children: enrichedChildren,
+        productsInStock: directProducts,
+        productsInStockCount: directProducts.length,
+        totalProductsInStock,
+      };
     };
 
-    // Calculer pour toutes les catégories racines
-    rootCategories.forEach(calculateProductsInStock);
+    // Enrichir toutes les catégories racines et filtrer celles avec stock
+    const enrichedTree = hierarchicalCategories
+      .map(enrichCategory)
+      .filter((cat) => cat.totalProductsInStock > 0);
 
-    // Filtrer pour ne garder que celles avec du stock
-    const filteredTree = rootCategories.filter((cat) => cat.totalProductsInStock > 0);
-
-    console.log(`✅ ${filteredTree.length} catégories avec stock (depuis store)`);
-    return filteredTree;
-  }, [categories, products]);
+    console.log(`✅ ${enrichedTree.length} catégories avec stock (depuis stores directs)`);
+    return enrichedTree;
+  }, [hierarchicalCategories, products]);
 
   /**
-   * 🚀 CHARGEMENT OPTIMISÉ : Utilise le store
+   * 🚀 CHARGEMENT OPTIMISÉ : Utilise les stores directs
    */
   const fetchCategoriesWithStock = useCallback(async () => {
     try {
-      // Si on a déjà les données, pas besoin de recharger
-      if (categories && products) {
-        console.log('✅ Données déjà dans le store - pas de rechargement');
-        return;
+      console.log('🔄 Chargement données depuis stores directs...');
+
+      // Charger en parallèle depuis les stores directs
+      const promises = [];
+
+      if (!hierarchicalCategories || hierarchicalCategories.length === 0) {
+        promises.push(fetchHierarchicalCategories());
       }
 
-      console.log('🔄 Chargement données pour arbre...');
+      if (!products || products.length === 0) {
+        promises.push(fetchProducts());
+      }
 
-      // Charger via le store (données partagées)
-      await fetchAllReportsData();
+      if (promises.length > 0) {
+        await Promise.all(promises);
+        console.log('✅ Données chargées depuis stores directs');
+      } else {
+        console.log('✅ Données déjà disponibles dans les stores');
+      }
     } catch (err) {
-      console.error('❌ Erreur chargement:', err);
-
-      // Fallback : charger séparément
-      try {
-        await Promise.all([fetchCategories(), fetchProducts()]);
-      } catch (fallbackErr) {
-        console.error('❌ Erreur fallback:', fallbackErr);
-      }
+      console.error('❌ Erreur chargement stores directs:', err);
     }
-  }, [categories, products, fetchAllReportsData, fetchCategories, fetchProducts]);
+  }, [hierarchicalCategories, products, fetchHierarchicalCategories, fetchProducts]);
 
   /**
    * Bascule l'expansion d'une catégorie
@@ -168,6 +152,8 @@ export const useCategoryTree = () => {
    */
   const getSelectedProductsCount = useCallback(
     (selectedCategories) => {
+      if (!selectedCategories || selectedCategories.length === 0) return 0;
+
       const calculateTotal = (categories) => {
         return categories.reduce((total, cat) => {
           let catTotal = 0;
@@ -208,13 +194,26 @@ export const useCategoryTree = () => {
     [collectAllCategoryIds]
   );
 
+  /**
+   * 📊 STATISTIQUES DES CATÉGORIES (pour compatibility)
+   */
+  const getCategoryStats = useCallback(() => {
+    return categoryTree.reduce((stats, category) => {
+      stats[category._id] = {
+        productCount: category.productsInStockCount,
+        totalProductCount: category.totalProductsInStock,
+      };
+      return stats;
+    }, {});
+  }, [categoryTree]);
+
   return {
-    // État - API identique à l'ancienne version
+    // État - API compatible
     categoryTree,
-    loadingCategories: loading.categories || loading.products,
+    loadingCategories: loadingCategories || loadingProducts,
     expandedCategories,
 
-    // Actions - API identique
+    // Actions - API compatible
     fetchCategoriesWithStock,
     toggleCategoryExpansion,
     expandAllCategories,
@@ -224,6 +223,14 @@ export const useCategoryTree = () => {
     handleCategorySelection,
     collectAllCategoryIds,
     getSelectedProductsCount,
+    getCategoryStats,
+
+    // Données brutes pour useAdvancedPDFExport
+    rawData: {
+      hierarchicalCategories,
+      products,
+      productsInStock: products ? products.filter((p) => (p.stock || 0) > 0) : [],
+    },
   };
 };
 

@@ -64,8 +64,30 @@ async function initializeServer() {
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(
+  express.json({
+    limit: '10mb', // Augmenter de 1mb (défaut) à 10mb
+    parameterLimit: 50000, // Augmenter le nombre de paramètres
+    extended: true,
+  })
+);
+
+app.use(
+  express.urlencoded({
+    limit: '10mb', // Même limite pour les formulaires
+    extended: true,
+    parameterLimit: 50000,
+  })
+);
+
 app.use('/public', express.static(pathManager.getPublicPath()));
+
+app.use(
+  '/api/products/stock/statistics/export-pdf',
+  express.json({
+    limit: '15mb', // Limite encore plus élevée pour cette route spécifique
+  })
+);
 
 // Routes...
 const authRoutes = require('./routes/authRoutes');

@@ -1,4 +1,4 @@
-// src/pages/ReportsPage.jsx - MISE À JOUR
+// src/pages/ReportsPage.jsx - VERSION FINALE SIMPLE
 
 import React, { useState } from 'react';
 import { RefreshCw, FileText } from 'lucide-react';
@@ -7,10 +7,10 @@ import { RefreshCw, FileText } from 'lucide-react';
 import StockMetrics from '../components/reports/StockMetrics';
 import TaxBreakdown from '../components/reports/TaxBreakdown';
 import ReportSummary from '../components/reports/ReportSummary';
-import StockCategoryChart from '../components/reports/StockCategoryChart'; // 🆕 NOUVEAU
+import StockCategoryChart from '../components/reports/StockCategoryChart';
 import ExportModal from '../components/reports/export/ExportModal';
 
-// Hooks
+// Hooks simplifiés
 import { useStockStatistics } from '../hooks/useStockStatistics';
 import { useAdvancedPDFExport } from '../hooks/useAdvancedPDFExport';
 
@@ -75,13 +75,13 @@ const PageHeader = ({ lastUpdate, onRefresh, onExport, isExporting, hasData }) =
 );
 
 /**
- * Composant principal de la page des rapports
+ * Composant principal de la page des rapports - VERSION FINALE SIMPLE
  */
 const ReportsPage = () => {
   // État local
   const [showExportModal, setShowExportModal] = useState(false);
 
-  // Hooks personnalisés
+  // 🚀 HOOKS SIMPLIFIÉS
   const { stockStats, loading, error, lastUpdate, refreshData } = useStockStatistics();
   const { isExporting, exportStockStatisticsToPDF } = useAdvancedPDFExport();
 
@@ -141,17 +141,17 @@ const ReportsPage = () => {
           {/* Métriques principales */}
           <StockMetrics stats={stockStats} />
 
-          {/* 🆕 NOUVEAU : Graphique de répartition des catégories */}
+          {/* Graphique de répartition des catégories */}
           <div className="mb-8">
             <StockCategoryChart />
           </div>
 
-          {/* 🔥 FIX : Répartition par TVA sur une ligne complète */}
+          {/* Répartition par TVA */}
           <div className="mb-8">
             <TaxBreakdown breakdown={stockStats.financial.tax_breakdown} />
           </div>
 
-          {/* 🔥 FIX : Résumé final sur une ligne complète */}
+          {/* Résumé final */}
           <div className="mb-8">
             <ReportSummary summary={stockStats.summary} financial={stockStats.financial} />
           </div>

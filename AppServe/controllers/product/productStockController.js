@@ -1,3 +1,5 @@
+// AppServe/controllers/productStockController.js - MODIFICATION HYBRIDE
+
 const BaseController = require('../base/BaseController');
 const Product = require('../../models/Product');
 const productWooCommerceService = require('../../services/ProductWooCommerceService');
@@ -17,6 +19,7 @@ class ProductStockController extends BaseController {
   }
 
   async updateStock(req, res) {
+    // ... méthode inchangée
     try {
       const { id } = req.params;
       const { stock, reason = 'manual_adjustment' } = req.body;
@@ -47,6 +50,7 @@ class ProductStockController extends BaseController {
   }
 
   async getStockStatistics(req, res) {
+    // ... méthode inchangée
     try {
       const allProducts = await this.model.findAll();
       const simpleProducts = allProducts.filter((p) => p.type === 'simple');
@@ -59,6 +63,7 @@ class ProductStockController extends BaseController {
   }
 
   buildStatistics(productsInStock, allProducts, simpleProducts) {
+    // ... méthode inchangée (déjà optimale)
     const stats = {
       summary: {
         total_products: allProducts.length,
@@ -148,6 +153,7 @@ class ProductStockController extends BaseController {
   }
 
   sortProducts(products, sortBy, sortOrder) {
+    // ... méthode inchangée
     const getSortValue = (product, key) => {
       switch (key) {
         case 'sku':
@@ -170,11 +176,15 @@ class ProductStockController extends BaseController {
     });
   }
 
+  // 🚀 MÉTHODE MODIFIÉE : Support données pré-filtrées
   async exportStockStatisticsToPDF(req, res) {
     try {
       const pdf = require('html-pdf');
       const params = this.extractPDFParams(req.body);
-      const { productsInStock, stockStats } = await this.getProductsForPDF();
+
+      // 🔥 NOUVEAUTÉ : Utiliser données front-end si disponibles
+      const { productsInStock, stockStats } = await this.getOptimizedProductsForPDF(req.body);
+
       const htmlContent = await this.generateHTMLContent(params, stockStats, productsInStock);
       const pdfBuffer = await this.generatePDFBuffer(htmlContent, params.reportType, params, pdf);
       this.sendPDFResponse(res, pdfBuffer, params.reportType, params);
@@ -187,6 +197,7 @@ class ProductStockController extends BaseController {
   }
 
   extractPDFParams(body) {
+    // ... méthode inchangée
     return {
       companyInfo: body.companyInfo || {},
       reportType: body.reportType || 'summary',
@@ -201,7 +212,36 @@ class ProductStockController extends BaseController {
     };
   }
 
+  // 🚀 NOUVELLE MÉTHODE : Support hybride optimisé
+  async getOptimizedProductsForPDF(body) {
+    const { preFilteredData } = body;
+
+    // 🔥 MODE OPTIMISÉ : Utiliser données depuis front-end stores
+    if (preFilteredData && preFilteredData.products && preFilteredData.statistics) {
+      console.log('🚀 OPTIMISATION: Utilisation données pré-filtrées depuis stores front-end');
+      console.log(
+        `📊 Produits: ${preFilteredData.products.length}, Source: ${preFilteredData.dataSource}`
+      );
+
+      // Validation des données reçues
+      if (preFilteredData.products.length === 0) {
+        throw new Error('Aucun produit dans les données pré-filtrées');
+      }
+
+      return {
+        productsInStock: preFilteredData.products,
+        stockStats: preFilteredData.statistics,
+        dataSource: 'frontend_stores_optimized',
+      };
+    }
+
+    // 🔄 MODE FALLBACK : Logique originale (compatibilité totale)
+    console.log('📊 FALLBACK: Utilisation logique backend classique');
+    return this.getProductsForPDF();
+  }
+
   async getProductsForPDF() {
+    // ... méthode inchangée (fallback)
     const allProducts = await this.model.findAll();
     const simpleProducts = allProducts.filter((p) => p.type === 'simple');
     const productsInStock = simpleProducts.filter((p) => (p.stock || 0) > 0);
@@ -215,6 +255,7 @@ class ProductStockController extends BaseController {
   }
 
   async generateHTMLContent(params, stockStats, productsInStock) {
+    // ... méthode inchangée
     const templateOptions = {
       companyInfo: params.companyInfo,
       includeCompanyInfo: params.includeCompanyInfo,
@@ -240,6 +281,7 @@ class ProductStockController extends BaseController {
   }
 
   async generatePDFBuffer(htmlContent, reportType, params, pdf) {
+    // ... méthode inchangée
     const orientation =
       reportType === 'detailed' && !params.isSimplified ? 'landscape' : 'portrait';
     const options = {
@@ -268,6 +310,7 @@ class ProductStockController extends BaseController {
   }
 
   sendPDFResponse(res, pdfBuffer, reportType, params) {
+    // ... méthode inchangée
     let filename = `rapport_stock_${reportType}`;
     if (params.isSimplified) filename += '_simplifie';
     if (params.groupByCategory) filename += '_categories';

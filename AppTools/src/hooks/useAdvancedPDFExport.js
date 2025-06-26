@@ -1,5 +1,6 @@
-// src/hooks/useAdvancedPDFExport.js - VERSION OPTIMISÉE
+// src/hooks/useAdvancedPDFExport.js - VERSION FINALE OPTIMISÉE
 import { useState, useCallback } from 'react';
+import { useCategoryTree } from './useCategoryTree';
 import apiService from '../services/api';
 
 export const useAdvancedPDFExport = () => {
@@ -9,6 +10,9 @@ export const useAdvancedPDFExport = () => {
     fileName: null,
     downloadUrl: null,
   });
+
+  // 🚀 DONNÉES OPTIMISÉES depuis stores (pour preFilteredData)
+  const { rawData } = useCategoryTree();
 
   const resetState = useCallback(() => {
     setExportState({
@@ -49,7 +53,6 @@ export const useAdvancedPDFExport = () => {
       } = options;
 
       try {
-        // 🚀 SIMPLIFICATION : Un seul état "exporting"
         setExportState((prev) => ({
           ...prev,
           status: 'exporting',
@@ -58,7 +61,8 @@ export const useAdvancedPDFExport = () => {
 
         const endpoint = '/api/products/stock/statistics/export-pdf';
 
-        const requestData = {
+        // 🚀 OPTIMISATION : Préparer preFilteredData si disponible
+        let requestData = {
           companyInfo,
           reportType,
           includeCharts,
@@ -71,13 +75,39 @@ export const useAdvancedPDFExport = () => {
           isSimplified,
         };
 
-        // 🚀 SIMPLIFICATION : Appel direct sans simulation
+        // 🎯 AJOUT CONDITIONNEL : preFilteredData si stores disponibles
+        if (rawData.products && rawData.products.length > 0) {
+          console.log('🚀 Optimisation: Envoi preFilteredData au backend');
+
+          // Filtrer les produits selon les options
+          let filteredProducts =
+            rawData.productsInStock || rawData.products.filter((p) => (p.stock || 0) > 0);
+
+          // Appliquer filtrage catégories si nécessaire
+          if (selectedCategories.length > 0) {
+            filteredProducts = filteredProducts.filter((product) => {
+              const productCategories = product.categories || [product.categoryId].filter(Boolean);
+              const hasSelectedCategory = productCategories.some((catId) =>
+                selectedCategories.includes(catId)
+              );
+              const isUncategorized = productCategories.length === 0;
+              return hasSelectedCategory || (includeUncategorized && isUncategorized);
+            });
+          }
+
+          requestData.preFilteredData = {
+            products: filteredProducts,
+            categories: rawData.hierarchicalCategories || [],
+            dataSource: 'frontend_stores_optimized',
+            timestamp: new Date().toISOString(),
+          };
+        }
+
         const response = await apiService.post(endpoint, requestData, {
           responseType: 'blob',
           timeout: 30000,
         });
 
-        // 🚀 SIMPLIFICATION : Génération directe du fichier
         const fileName =
           customFileName ||
           `rapport_stock_${reportType}${groupByCategory ? '_categories' : ''}${isSimplified ? '_simplifie' : ''}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -91,7 +121,6 @@ export const useAdvancedPDFExport = () => {
           downloadUrl = window.URL.createObjectURL(blob);
         }
 
-        // ✅ Succès immédiat
         setExportState({
           status: 'success',
           error: null,
@@ -105,11 +134,11 @@ export const useAdvancedPDFExport = () => {
           downloadUrl,
           blob,
           size: blob.size,
+          dataSource: requestData.preFilteredData ? 'hybrid_optimized' : 'backend_classic',
         };
       } catch (error) {
         console.error('❌ Erreur export:', error);
 
-        // 🚀 SIMPLIFICATION : Gestion d'erreur basique
         let errorMessage = "Erreur lors de l'export du PDF";
 
         if (error.code === 'ECONNABORTED') {
@@ -132,10 +161,8 @@ export const useAdvancedPDFExport = () => {
         throw new Error(errorMessage);
       }
     },
-    [downloadFile]
+    [downloadFile, rawData]
   );
-
-  // 🚀 SIMPLIFICATION : Export CSV retiré (pas utilisé selon le code fourni)
 
   const manualDownload = useCallback(() => {
     if (exportState.downloadUrl && exportState.fileName) {
@@ -182,7 +209,7 @@ export const useAdvancedPDFExport = () => {
   );
 
   return {
-    // État simplifié
+    // État
     exportState,
     isExporting: exportState.status === 'exporting',
     isSuccess: exportState.status === 'success',
@@ -195,7 +222,7 @@ export const useAdvancedPDFExport = () => {
     manualDownload,
     resetState,
 
-    // Helpers simplifiés
+    // Helpers
     getStatusText: () => {
       switch (exportState.status) {
         case 'exporting':

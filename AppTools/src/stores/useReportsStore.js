@@ -1,4 +1,4 @@
-// src/stores/useReportsStore.js
+// src/stores/useReportsStore.js - VERSION SIMPLIFIÉE MAIS AVEC LOGIQUE ORIGINALE
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import apiService from '../services/api';
@@ -7,7 +7,6 @@ const useReportsStore = create(
   devtools(
     (set, get) => ({
       // ===== ÉTAT =====
-      stockStats: null,
       categories: null,
       products: null,
       categoryAnalytics: null,
@@ -15,58 +14,23 @@ const useReportsStore = create(
 
       // États de chargement
       loading: {
-        stockStats: false,
         categories: false,
         products: false,
       },
 
       // Erreurs
       errors: {
-        stockStats: null,
         categories: null,
         products: null,
       },
 
       // Métadonnées
       lastUpdate: {
-        stockStats: null,
         categories: null,
         products: null,
       },
 
       // ===== ACTIONS =====
-
-      /**
-       * Récupération des statistiques de stock
-       */
-      fetchStockStats: async () => {
-        const state = get();
-        if (state.loading.stockStats) return;
-
-        set((state) => ({
-          loading: { ...state.loading, stockStats: true },
-          errors: { ...state.errors, stockStats: null },
-        }));
-
-        try {
-          const response = await apiService.get('/api/products/stock/statistics');
-          const data = response.data?.success ? response.data.data : response.data;
-
-          set((state) => ({
-            stockStats: data,
-            loading: { ...state.loading, stockStats: false },
-            lastUpdate: { ...state.lastUpdate, stockStats: new Date() },
-          }));
-
-          return data;
-        } catch (error) {
-          set((state) => ({
-            loading: { ...state.loading, stockStats: false },
-            errors: { ...state.errors, stockStats: error.message },
-          }));
-          throw error;
-        }
-      },
 
       /**
        * Récupération des catégories
@@ -133,24 +97,6 @@ const useReportsStore = create(
       },
 
       /**
-       * Récupération de toutes les données nécessaires
-       */
-      fetchAllReportsData: async () => {
-        const { fetchStockStats, fetchCategories, fetchProducts } = get();
-
-        try {
-          // Récupération parallèle pour optimiser
-          await Promise.all([fetchStockStats(), fetchCategories(), fetchProducts()]);
-
-          // Recalculer les analytics après avoir toutes les données
-          get().calculateCategoryAnalytics();
-        } catch (error) {
-          console.error('Erreur récupération données rapports:', error);
-          throw error;
-        }
-      },
-
-      /**
        * Calcul des analytics de catégories (logique métier centralisée)
        */
       calculateCategoryAnalytics: () => {
@@ -160,7 +106,6 @@ const useReportsStore = create(
           return null;
         }
 
-        // === LOGIQUE MÉTIER CENTRALISÉE ===
         const rootCategories = {};
         let totalValue = 0;
         let totalProducts = 0;
@@ -256,59 +201,8 @@ const useReportsStore = create(
       },
 
       /**
-       * Obtenir les données pour un graphique spécifique
+       * Calcul de toutes les données de chart pré-formatées
        */
-      getChartData: (mode = 'value', limit = 12) => {
-        const { categoryAnalytics } = get();
-
-        if (!categoryAnalytics) {
-          return { chartData: [], totals: { totalValue: 0, totalProducts: 0, totalMargin: 0 } };
-        }
-
-        const { rootCategories, totals } = categoryAnalytics;
-
-        const chartData = rootCategories
-          .filter((cat) => {
-            if (mode === 'value') return cat.value > 0;
-            if (mode === 'products') return cat.products > 0;
-            if (mode === 'margin') return cat.margin > 0;
-            return false;
-          })
-          .map((cat) => {
-            let value, formattedValue, percentage;
-
-            if (mode === 'value') {
-              value = cat.value;
-              formattedValue = `${value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`;
-              percentage =
-                totals.totalValue > 0 ? ((value / totals.totalValue) * 100).toFixed(1) : 0;
-            } else if (mode === 'products') {
-              value = cat.products;
-              formattedValue = `${value} produits`;
-              percentage =
-                totals.totalProducts > 0 ? ((value / totals.totalProducts) * 100).toFixed(1) : 0;
-            } else if (mode === 'margin') {
-              value = cat.margin;
-              formattedValue = `${value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`;
-              percentage =
-                totals.totalMargin > 0 ? ((value / totals.totalMargin) * 100).toFixed(1) : 0;
-            }
-
-            return {
-              name: cat.name,
-              value: value,
-              formattedValue: formattedValue,
-              percentage: percentage,
-              products: cat.products,
-              stockValue: cat.value,
-              margin: cat.margin,
-            };
-          })
-          .slice(0, limit);
-
-        return { chartData, totals };
-      },
-
       calculateAllChartData: () => {
         const { categoryAnalytics } = get();
 
@@ -390,7 +284,7 @@ const useReportsStore = create(
       },
 
       /**
-       * 🚀 NOUVEAU : Getter ultra-rapide pour les données de graphique
+       * Getter ultra-rapide pour les données de graphique
        */
       getOptimizedChartData: (mode = 'value') => {
         const { preCalculatedChartData, calculateAllChartData } = get();
@@ -418,19 +312,16 @@ const useReportsStore = create(
       },
 
       /**
-       * Rafraîchir toutes les données
+       * Sélecteurs pour l'état de chargement global
        */
-      refreshAll: async () => {
-        // Réinitialiser les données
-        set({
-          stockStats: null,
-          categories: null,
-          products: null,
-          categoryAnalytics: null,
-        });
+      isLoading: () => {
+        const { loading } = get();
+        return loading.categories || loading.products;
+      },
 
-        // Recharger tout
-        return get().fetchAllReportsData();
+      hasErrors: () => {
+        const { errors } = get();
+        return errors.categories || errors.products;
       },
 
       /**
@@ -439,37 +330,15 @@ const useReportsStore = create(
       clearErrors: () => {
         set({
           errors: {
-            stockStats: null,
             categories: null,
             products: null,
           },
         });
       },
-
-      /**
-       * Sélecteurs pour l'état de chargement global
-       */
-      isLoading: () => {
-        const { loading } = get();
-        return loading.stockStats || loading.categories || loading.products;
-      },
-
-      hasErrors: () => {
-        const { errors } = get();
-        return errors.stockStats || errors.categories || errors.products;
-      },
-
-      getLastUpdate: () => {
-        const { lastUpdate } = get();
-        const updates = Object.values(lastUpdate).filter(Boolean);
-        return updates.length > 0 ? new Date(Math.max(...updates.map((d) => d.getTime()))) : null;
-      },
     }),
     {
       name: 'reports-store',
       partialize: (state) => ({
-        // Persister seulement les données, pas les états de chargement
-        stockStats: state.stockStats,
         categories: state.categories,
         products: state.products,
         categoryAnalytics: state.categoryAnalytics,

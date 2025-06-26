@@ -1,53 +1,69 @@
-// src/hooks/useStockStatistics.js - VERSION MIGRÉE AVEC ZUSTAND
-import { useEffect } from 'react';
-import useReportsStore from '../stores/useReportsStore';
+// src/hooks/useStockStatistics.js - VERSION SIMPLE API DIRECTE
+import { useState, useEffect, useCallback } from 'react';
+import apiService from '../services/api';
 
 /**
- * Hook personnalisé pour gérer les statistiques de stock - VERSION ZUSTAND
- * 🚀 Compatible à 100% avec l'ancienne version
- *
- * @returns {Object} État et fonctions de gestion des statistiques (API identique)
+ * Hook personnalisé pour gérer les statistiques de stock - VERSION SIMPLIFIÉE
+ * 🚀 Appel API direct, pas de store intermédiaire
  */
 export const useStockStatistics = () => {
-  // 🚀 ZUSTAND : Utilisation du store centralisé
-  const { stockStats, loading, errors, lastUpdate, fetchStockStats, isLoading, getLastUpdate } =
-    useReportsStore();
+  const [stockStats, setStockStats] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
   /**
-   * Actualise les données - API identique à l'ancienne version
+   * Récupération des statistiques
    */
-  const refreshData = () => {
-    fetchStockStats();
-  };
+  const fetchStockStatistics = useCallback(async () => {
+    if (loading) return;
 
-  /**
-   * Wrapper pour fetchStockStatistics - compatibilité API
-   */
-  const fetchStockStatistics = () => {
-    return fetchStockStats();
-  };
+    setLoading(true);
+    setError(null);
 
-  // 🚀 Chargement automatique au montage (comportement identique)
-  useEffect(() => {
-    // Charger seulement si pas déjà de données récentes
-    if (!stockStats) {
-      fetchStockStats();
+    try {
+      const response = await apiService.get('/api/products/stock/statistics');
+      const data = response.data?.success ? response.data.data : response.data;
+
+      setStockStats(data);
+      setLastUpdate(new Date());
+      setError(null);
+
+      return data;
+    } catch (err) {
+      console.error('❌ Erreur récupération stats:', err);
+      setError(err.message || 'Erreur lors du chargement des statistiques');
+      throw err;
+    } finally {
+      setLoading(false);
     }
-  }, [stockStats, fetchStockStats]);
+  }, [loading]);
 
-  // 🚀 RETOUR : API 100% identique à l'ancienne version
+  /**
+   * Alias pour compatibilité
+   */
+  const refreshData = useCallback(() => {
+    return fetchStockStatistics();
+  }, [fetchStockStatistics]);
+
+  // 🚀 Chargement automatique au montage
+  useEffect(() => {
+    if (!stockStats) {
+      fetchStockStatistics();
+    }
+  }, [stockStats, fetchStockStatistics]);
+
   return {
-    // État - noms identiques
+    // État
     stockStats,
-    loading: loading.stockStats || isLoading(), // Compatibilité avec l'ancien loading
-    error: errors.stockStats, // Compatibilité avec l'ancien error
-    lastUpdate: lastUpdate.stockStats || getLastUpdate(), // Compatibilité avec lastUpdate
+    loading,
+    error,
+    lastUpdate,
 
-    // Actions - noms identiques
+    // Actions
     fetchStockStatistics,
     refreshData,
   };
 };
 
-// 🔥 EXPORT PAR DÉFAUT (compatibilité)
 export default useStockStatistics;
