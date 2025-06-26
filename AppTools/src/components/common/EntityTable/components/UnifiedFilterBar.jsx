@@ -257,7 +257,63 @@ const UnifiedFilterBar = ({
         <div className="px-3 py-2 text-sm text-gray-500">Chargement des catégories...</div>
       )}
 
-      {/* Filtres actifs */}
+      {/* Bouton d'ajout de filtre - DÉPLACÉ EN PREMIER */}
+      {!isAddingFilter && availableTypes.length > 0 && (
+        <div className="relative">
+          <Select
+            options={availableTypes}
+            onChange={handleTypeSelect}
+            placeholder={
+              <div className="flex items-center gap-1.5 text-gray-500">
+                <Filter className="w-3.5 h-3.5" />
+                <span>Ajouter un filtre</span>
+              </div>
+            }
+            classNamePrefix="react-select"
+            className="w-64" // ✅ CHANGÉ : taille fixe au lieu de w-full lg:w-96
+            styles={modernSelectStyles}
+            menuPortalTarget={document.body}
+            menuPlacement="auto"
+            isSearchable={false}
+            components={{
+              DropdownIndicator: ({ innerProps }) => (
+                <div {...innerProps}>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </div>
+              ),
+            }}
+          />
+        </div>
+      )}
+
+      {/* Sélecteur de valeur (quand un type est sélectionné) - DÉPLACÉ EN DEUXIÈME */}
+      {isAddingFilter && newFilterType && (
+        <div ref={valueSelectRef} className="relative">
+          <Select
+            options={getOptionsForType(newFilterType)}
+            onChange={handleValueSelect}
+            placeholder={`Choisir ${filterTypeLabels[newFilterType]?.toLowerCase()}`}
+            isMulti={['supplier', 'brand', 'category'].includes(newFilterType)}
+            classNamePrefix="react-select"
+            className="w-64" // ✅ CHANGÉ : taille fixe au lieu de min-w-[180px]
+            styles={modernSelectStyles}
+            autoFocus
+            menuIsOpen={true}
+            menuPortalTarget={document.body}
+            menuPlacement="auto"
+            onMenuClose={() => {
+              setIsAddingFilter(false);
+              setNewFilterType(null);
+            }}
+            onBlur={() => {
+              setIsAddingFilter(false);
+              setNewFilterType(null);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Filtres actifs - MAINTENANT APRÈS LES SELECTS */}
       {selectedFilters.map((filter, idx) => (
         <div
           key={`${filter.type}-${filter.value}-${idx}`}
@@ -283,67 +339,11 @@ const UnifiedFilterBar = ({
         </div>
       ))}
 
-      {/* Bouton d'ajout de filtre */}
-      {!isAddingFilter && availableTypes.length > 0 && (
-        <div className="relative">
-          <Select
-            options={availableTypes}
-            onChange={handleTypeSelect}
-            placeholder={
-              <div className="flex items-center gap-1.5 text-gray-500">
-                <Filter className="w-3.5 h-3.5" />
-                <span>Ajouter un filtre</span>
-              </div>
-            }
-            classNamePrefix="react-select"
-            className="min-w-[140px]"
-            styles={modernSelectStyles}
-            menuPortalTarget={document.body}
-            menuPlacement="auto"
-            isSearchable={false}
-            components={{
-              DropdownIndicator: ({ innerProps }) => (
-                <div {...innerProps}>
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                </div>
-              ),
-            }}
-          />
-        </div>
-      )}
-
-      {/* Sélecteur de valeur (quand un type est sélectionné) */}
-      {isAddingFilter && newFilterType && (
-        <div ref={valueSelectRef} className="relative">
-          <Select
-            options={getOptionsForType(newFilterType)}
-            onChange={handleValueSelect}
-            placeholder={`Choisir ${filterTypeLabels[newFilterType]?.toLowerCase()}`}
-            isMulti={['supplier', 'brand', 'category'].includes(newFilterType)}
-            classNamePrefix="react-select"
-            className="min-w-[180px]"
-            styles={modernSelectStyles}
-            autoFocus
-            menuIsOpen={true}
-            menuPortalTarget={document.body}
-            menuPlacement="auto"
-            onMenuClose={() => {
-              setIsAddingFilter(false);
-              setNewFilterType(null);
-            }}
-            onBlur={() => {
-              setIsAddingFilter(false);
-              setNewFilterType(null);
-            }}
-          />
-        </div>
-      )}
-
       {/* Bouton tout effacer - Version icône trash harmonisée */}
       {selectedFilters.length > 0 && (
         <button
           onClick={handleClearAll}
-          className="flex items-center justify-center h-9 w-9 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md border border-red-200 dark:border-red-700 transition-colors"
+          className="flex items-center justify-center h-7 w-7 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md border border-red-200 dark:border-red-700 transition-colors"
           title="Effacer tous les filtres"
         >
           <Trash2 className="w-4 h-4" />
