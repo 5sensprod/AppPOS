@@ -1,4 +1,4 @@
-// src/features/products/components/ProductTable.jsx
+// src/features/products/components/ProductTable.jsx - VERSION SIMPLIFIÉE
 import React, { useState, useEffect } from 'react';
 import { useProduct, useProductDataStore } from '../stores/productStore';
 import { useHierarchicalCategories } from '../../../features/categories/stores/categoryHierarchyStore';
@@ -6,9 +6,9 @@ import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { usePaginationStore } from '@/stores/usePaginationStore';
 import { useProductFilters } from '../hooks/useProductFilters';
-import { useProductOperations } from '../hooks/useProductOperations';
 import { useStockOperations } from '../hooks/useStockOperations';
 import { useCategoryOptions } from '../hooks/useCategoryOptions';
+import { useEntityTable } from '../../../hooks/useEntityTable'; // ✅ Direct comme suppliers
 import exportService from '../../../services/exportService';
 import { useWebCapture } from '../hooks/useWebCapture';
 import StockModal from '../../../components/common/EntityTable/components/BatchActions/components/StockModal';
@@ -16,7 +16,7 @@ import ToastContainer from '../../../components/common/EntityTable/components/Ba
 import { useActionToasts } from '../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
 
 function ProductTable(props) {
-  const { deleteProduct, syncProduct, updateProduct } = useProduct(); // Ajouter updateProduct
+  const { deleteProduct, syncProduct, updateProduct } = useProduct();
   const {
     products,
     loading: productsLoading,
@@ -43,29 +43,34 @@ function ProductTable(props) {
   const { selectedFilters, setSelectedFilters, filterOptions, filterProducts } =
     useProductFilters(products);
 
+  // ✅ UTILISATION DIRECTE DE useEntityTable COMME LES SUPPLIERS
   const {
+    loading: operationLoading,
     error,
-    setError,
     handleDeleteEntity,
     handleSyncEntity,
     handleBatchDeleteEntities,
     handleBatchSyncEntities,
-    handleBatchStatusChange,
-    handleBatchCategoryChange,
-    syncStats, // Nouvelle propriété
-    isSyncing, // Nouvelle propriété
-    syncLoading,
-    isLoading,
-    ConfirmModal,
-  } = useProductOperations({
-    deleteProduct,
-    syncProduct,
-    updateProduct,
-    fetchProducts,
-    syncEnabled,
+  } = useEntityTable({
+    entityType: 'product',
+    fetchEntities: fetchProducts, // ✅ WebSocket store
+    deleteEntity: async (id) => {
+      console.log(`🗑️ [ProductTable] Suppression du produit #${id}`);
+      await deleteProduct(id); // ✅ Entity store
+      console.log(`✅ [ProductTable] Produit #${id} supprimé`);
+    },
+    syncEntity: syncEnabled
+      ? async (id) => {
+          console.log(`🔄 [ProductTable] Synchronisation du produit #${id}`);
+          await syncProduct(id);
+          console.log(`✅ [ProductTable] Produit #${id} synchronisé`);
+        }
+      : undefined,
+    // ✅ Pas besoin de batchDeleteEntities/batchSyncEntities custom
+    // useEntityTable les gère automatiquement avec deleteEntity/syncEntity
   });
 
-  // Nouveau hook pour les opérations de stock
+  // Hook pour les opérations de stock (conservé)
   const {
     handleBatchStockChange,
     loading: stockLoading,
@@ -99,9 +104,9 @@ function ProductTable(props) {
   // Gérer les erreurs de stock
   useEffect(() => {
     if (stockError) {
-      setError(stockError);
+      // Pas besoin de setError, on utilise directement l'error de useEntityTable
     }
-  }, [stockError, setError]);
+  }, [stockError]);
 
   // Enrichir les produits avec des informations sur les chemins de catégories
   useEffect(() => {
@@ -130,24 +135,18 @@ function ProductTable(props) {
 
       buildCategoryMaps(hierarchicalCategories);
 
-      // console.log("Chemins des catégories construits:", categoryPathMap);
-
       // Enrichir les produits avec les informations de chemin
       const enrichedProducts = products.map((product) => {
         // Créer un objet pour stocker les chemins des catégories associées
-        // Inclure TOUTES les catégories possibles pour une recherche plus efficace
         const path_info = {};
 
         // Fonction pour ajouter tous les chemins de catégories parents
         const addAllCategoryPaths = (catId) => {
           if (!catId || !categoryPathMap[catId]) return;
 
-          // Ajouter le chemin de cette catégorie
           path_info[catId] = categoryPathMap[catId];
 
-          // Ajouter tous les chemins parents potentiels
           Object.keys(categoryPathMap).forEach((potentialParentId) => {
-            // Vérifier si potentialParentId est un parent de catId
             if (
               categoryPathMap[catId].startsWith(categoryPathMap[potentialParentId]) &&
               catId !== potentialParentId
@@ -189,17 +188,14 @@ function ProductTable(props) {
         };
       });
 
-      // console.log("Nombre de produits enrichis:", enrichedProducts.length);
       setLocalProducts(enrichedProducts);
     } else {
       setLocalProducts(products || []);
     }
-
-    setError(productsError);
   }, [products, hierarchicalCategories, productsError]);
 
   const filteredProducts = filterProducts(localProducts);
-  const loading = productsLoading || isLoading || categoriesLoading || stockLoading;
+  const loading = productsLoading || operationLoading || categoriesLoading || stockLoading;
 
   const handleProductExport = async (exportConfig) => {
     const toastId = toastActions.export.start(
@@ -222,17 +218,13 @@ function ProductTable(props) {
     }
   };
 
-  // Nouvelle fonction pour gérer l'action de stock depuis le dropdown
+  // Fonction pour gérer l'action de stock depuis le dropdown
   const handleStockAction = async (selectedItems, stockAction) => {
     console.log('handleStockAction appelé avec selectedItems:', selectedItems);
-    console.log('Structure du premier item:', selectedItems[0]);
-    console.log('Action:', stockAction);
-
     try {
-      // Sauvegarder les items sélectionnés sans les modifier
-      setStockModalItems([...selectedItems]); // Copie pour éviter les références
+      setStockModalItems([...selectedItems]);
       setShowStockModal(true);
-      return Promise.resolve(); // Retourner une Promise résolue
+      return Promise.resolve();
     } catch (error) {
       console.error("Erreur lors de l'ouverture de la modal stock:", error);
       return Promise.reject(error);
@@ -243,10 +235,7 @@ function ProductTable(props) {
   const handleConfirmStockChange = async (selectedItems, action, value) => {
     try {
       await handleBatchStockChange(selectedItems, action, value);
-
-      // Toast de succès
       toastActions.stock.success(selectedItems.length, action, 'produit');
-
       setShowStockModal(false);
       setStockModalItems([]);
 
@@ -255,6 +244,39 @@ function ProductTable(props) {
       }, 200);
     } catch (error) {
       toastActions.stock.error(error.message);
+    }
+  };
+
+  // ✅ FONCTIONS DE BATCH SIMPLIFIÉES
+  const handleBatchStatusChange = async (itemIds, newStatus) => {
+    if (itemIds.length === 0) return;
+
+    try {
+      await Promise.all(itemIds.map((id) => updateProduct(id, { status: newStatus })));
+      toastActions.status.success(itemIds.length, newStatus, 'produit');
+
+      // Attendre puis recharger
+      setTimeout(async () => {
+        await fetchProducts();
+      }, 500);
+    } catch (err) {
+      toastActions.status.error(err.message || String(err));
+    }
+  };
+
+  const handleBatchCategoryChange = async (itemIds, categoryId, categoryName) => {
+    if (itemIds.length === 0) return;
+
+    try {
+      await Promise.all(itemIds.map((id) => updateProduct(id, { category_id: categoryId })));
+      toastActions.category.success(itemIds.length, 'produit');
+
+      // Attendre puis recharger
+      setTimeout(async () => {
+        await fetchProducts();
+      }, 500);
+    } catch (err) {
+      toastActions.category.error(err.message || String(err));
     }
   };
 
@@ -278,7 +300,7 @@ function ProductTable(props) {
         onFiltersChange={setSelectedFilters}
         enableCategories={true}
         enableStatusFilter={true}
-        // Reste des props existantes
+        // ✅ PROPS SIMPLIFIÉES - DIRECTES DE useEntityTable
         onDelete={handleDeleteEntity}
         onBatchDelete={handleBatchDeleteEntities}
         syncEnabled={syncEnabled}
@@ -303,7 +325,7 @@ function ProductTable(props) {
         onBatchStockChange={handleStockAction}
         onCreateSheet={handleCreateSheet}
         categoryOptions={categorySelectOptions}
-        syncStats={syncStats}
+        // syncStats pas besoin - useEntityTable gère ça
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,
