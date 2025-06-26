@@ -1,11 +1,11 @@
-// src/components/reports/StockMetrics.jsx
+// src/components/reports/StockMetrics.jsx - VERSION CORRIGÉE
 
 import React from 'react';
 import { Package, Calculator, TrendingUp, PieChart } from 'lucide-react';
 import { formatCurrency, formatNumber, formatPercentage } from '../../utils/formatters';
 
 /**
- * Composant individuel pour une métrique
+ * Composant individuel pour une métrique - VERSION CORRIGÉE
  */
 const MetricCard = ({ icon: Icon, title, value, subtitle, extra, color, extraColor = 'red' }) => {
   const colorClasses = {
@@ -21,23 +21,41 @@ const MetricCard = ({ icon: Icon, title, value, subtitle, extra, color, extraCol
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-      <div className="flex items-center gap-3 mb-3">
-        <Icon className={`w-8 h-8 ${colorClasses[color]}`} />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-gray-700 min-h-[140px] flex flex-col">
+      {/* En-tête avec icône et titre */}
+      <div className="flex items-center gap-3 mb-3 flex-shrink-0">
+        <Icon className={`w-6 h-6 sm:w-8 sm:h-8 ${colorClasses[color]} flex-shrink-0`} />
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight">
+          {title}
+        </h3>
       </div>
 
-      <div className={`text-3xl font-bold ${colorClasses[color]} mb-2`}>{value}</div>
+      {/* Valeur principale - RESPONSIVE ET SANS DÉBORDEMENT */}
+      <div
+        className={`text-xl sm:text-2xl lg:text-3xl font-bold ${colorClasses[color]} mb-2 break-words leading-tight flex-shrink-0`}
+      >
+        {value}
+      </div>
 
-      <div className="text-sm text-gray-600 dark:text-gray-400">{subtitle}</div>
+      {/* Sous-titre */}
+      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-tight flex-shrink-0">
+        {subtitle}
+      </div>
 
-      {extra && <div className={`text-xs ${extraColorClasses[extraColor]} mt-1`}>{extra}</div>}
+      {/* Information supplémentaire */}
+      {extra && (
+        <div
+          className={`text-xs ${extraColorClasses[extraColor]} mt-1 leading-tight flex-shrink-0`}
+        >
+          {extra}
+        </div>
+      )}
     </div>
   );
 };
 
 /**
- * Composant principal pour afficher les 4 métriques de stock
+ * Composant principal pour afficher les 4 métriques de stock - VERSION CORRIGÉE
  */
 const StockMetrics = ({ stats }) => {
   if (!stats) {
@@ -84,7 +102,7 @@ const StockMetrics = ({ stats }) => {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
       {metrics.map((metric, index) => (
         <MetricCard key={index} {...metric} />
       ))}
