@@ -58,18 +58,29 @@ function notifyCategoryTreeChangedIfNeeded(changed = false) {
 
 // ----- COMPTEURS -----
 async function updateBrandAndSupplierCount(oldBrandId, newBrandId, oldSupplierId, newSupplierId) {
+  const supplierEvents = getEntityEventService('suppliers');
+  const brandEvents = getEntityEventService('brands');
+
   if (oldBrandId && oldBrandId !== newBrandId) {
     await Brand.updateProductCount(oldBrandId);
+    const brand = await Brand.findById(oldBrandId);
+    brandEvents.updated(oldBrandId, brand); // ✅
   }
   if (newBrandId && newBrandId !== oldBrandId) {
     await Brand.updateProductCount(newBrandId);
+    const brand = await Brand.findById(newBrandId);
+    brandEvents.updated(newBrandId, brand); // ✅
   }
 
   if (oldSupplierId && oldSupplierId !== newSupplierId) {
     await Supplier.updateProductCount(oldSupplierId);
+    const supplier = await Supplier.findById(oldSupplierId);
+    supplierEvents.updated(oldSupplierId, supplier); // ✅
   }
   if (newSupplierId && newSupplierId !== oldSupplierId) {
     await Supplier.updateProductCount(newSupplierId);
+    const supplier = await Supplier.findById(newSupplierId);
+    supplierEvents.updated(newSupplierId, supplier); // ✅
   }
 }
 
