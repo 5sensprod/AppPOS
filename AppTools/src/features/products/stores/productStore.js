@@ -1,4 +1,4 @@
-// src/features/products/stores/productStore.js - VERSION OPTIMISÉE AVEC WEBSOCKET
+// src/features/products/stores/productStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { ENTITY_CONFIG } from '../constants';

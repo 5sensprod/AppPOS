@@ -1,4 +1,4 @@
-// src/services/api.js - NETTOYAGE ADAPTATIF
+// src/services/api.js
 import axios from 'axios';
 import apiConfigService from './apiConfig';
 
