@@ -1,10 +1,23 @@
-// src/features/categories/stores/categoryStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
+import { createCacheReducers } from '../../../utils/createCacheReducers';
+import { withCacheSupport } from '../../../utils/withCacheSupport';
 import apiService from '../../../services/api';
 import { ENTITY_CONFIG as CATEGORY_CONFIG } from '../constants';
 
-// Actions personnalisées
+// ✅ REDUCERS GÉNÉRIQUES + custom sync
+const customReducers = {
+  ...createCacheReducers('category'),
+  SYNC_CATEGORY: (state, action) => ({
+    ...state,
+    items: state.items.map((item) =>
+      item._id === action.payload.id ? { ...item, ...action.payload.data } : item
+    ),
+    loading: false,
+    lastUpdated: Date.now(),
+  }),
+};
+
 const customActions = {
   SYNC_CATEGORY: 'SYNC_CATEGORY',
   SET_CACHE_TIMESTAMP: 'SET_CACHE_TIMESTAMP',
@@ -14,70 +27,7 @@ const customActions = {
   WEBSOCKET_DELETE: 'WEBSOCKET_DELETE',
 };
 
-// Reducers personnalisés
-const customReducers = {
-  SYNC_CATEGORY: (state, action) => ({
-    ...state,
-    items: state.items.map((item) =>
-      item._id === action.payload.id ? { ...item, ...action.payload.data } : item
-    ),
-    loading: false,
-    lastUpdated: Date.now(),
-  }),
-  SET_CACHE_TIMESTAMP: (state, action) => ({
-    ...state,
-    lastFetched: action.payload.timestamp,
-  }),
-  CLEAR_CACHE: (state) => ({
-    ...state,
-    items: [],
-    lastFetched: null,
-    lastUpdated: null,
-  }),
-  WEBSOCKET_UPDATE: (state, action) => {
-    console.log('🔄 WebSocket: Mise à jour catégorie reçue', action.payload);
-    return {
-      ...state,
-      categories: state.categories.map((category) =>
-        category._id === action.payload._id ? { ...category, ...action.payload } : category
-      ),
-      lastUpdated: Date.now(),
-    };
-  },
-  WEBSOCKET_CREATE: (state, action) => {
-    console.log('🆕 WebSocket: Nouvelle catégorie reçue', action.payload);
-    const existingIndex = state.categories.findIndex((c) => c._id === action.payload._id);
-    if (existingIndex >= 0) {
-      return {
-        ...state,
-        categories: state.categories.map((category) =>
-          category._id === action.payload._id ? { ...category, ...action.payload } : category
-        ),
-        lastUpdated: Date.now(),
-      };
-    } else {
-      return {
-        ...state,
-        categories: [...state.categories, action.payload],
-        lastUpdated: Date.now(),
-      };
-    }
-  },
-  WEBSOCKET_DELETE: (state, action) => {
-    console.log('🗑️ WebSocket: Suppression catégorie reçue', action.payload);
-    const categoryId = action.payload.entityId || action.payload.id || action.payload;
-    return {
-      ...state,
-      categories: state.categories.filter((category) => category._id !== categoryId),
-      lastUpdated: Date.now(),
-    };
-  },
-};
-
-// Configuration cache (3 minutes pour les catégories - plus stable que les produits)
-const CACHE_DURATION = 3 * 60 * 1000;
-
-// Créer le store avec la factory
+// Store avec factory
 const { useCategory: useCategoryBase, useEntityStore: useCategoryStore } = createEntityStore({
   ...CATEGORY_CONFIG,
   customActions,
@@ -89,7 +39,7 @@ const { useCategory: useCategoryBase, useEntityStore: useCategoryStore } = creat
   },
 });
 
-// Store WebSocket avec cache
+// ✅ STORE WEBSOCKET SIMPLIFIÉ
 export const useCategoryDataStore = createWebSocketStore({
   entityName: 'category',
   apiEndpoint: '/api/categories',
@@ -101,124 +51,33 @@ export const useCategoryDataStore = createWebSocketStore({
       handler: (get) => (data) => {
         console.log('[CATEGORIES] Événement tree.changed reçu', data);
         get().clearCache();
-        setTimeout(() => {
-          get().fetchCategories(true);
-        }, 500);
+        setTimeout(() => get().fetchCategories(true), 500);
       },
     },
     {
       event: 'categories.updated',
       handler: (get) => (data) => {
-        console.log('[CATEGORIES] WebSocket: Catégorie mise à jour', data);
-        get().dispatch?.({
-          type: 'WEBSOCKET_UPDATE',
-          payload: data.data || data,
-        });
+        get().dispatch?.({ type: 'WEBSOCKET_UPDATE', payload: data.data || data });
       },
     },
     {
       event: 'categories.created',
       handler: (get) => (data) => {
-        console.log('[CATEGORIES] WebSocket: Nouvelle catégorie créée', data);
-        get().dispatch?.({
-          type: 'WEBSOCKET_CREATE',
-          payload: data.data || data,
-        });
+        get().dispatch?.({ type: 'WEBSOCKET_CREATE', payload: data.data || data });
       },
     },
     {
       event: 'categories.deleted',
       handler: (get) => (data) => {
-        console.log('[CATEGORIES] WebSocket: Catégorie supprimée', data);
-        get().dispatch?.({
-          type: 'WEBSOCKET_DELETE',
-          payload: data,
-        });
+        get().dispatch?.({ type: 'WEBSOCKET_DELETE', payload: data });
       },
     },
   ],
-  customMethods: (set, get) => ({
-    dispatch: (action) => {
-      const state = get();
-      const reducer = customReducers[action.type];
-      if (reducer) {
-        set(reducer(state, action));
-      } else {
-        console.warn(`[CATEGORIES] Action non trouvée: ${action.type}`);
-      }
-    },
-
-    fetchCategories: async (forceRefresh = false) => {
-      const state = get();
-      const now = Date.now();
-
-      // Vérifier cache
-      if (
-        !forceRefresh &&
-        state.categories?.length > 0 &&
-        state.lastFetched &&
-        now - state.lastFetched < CACHE_DURATION
-      ) {
-        console.log('📦 Utilisation du cache des catégories');
-        return state.categories;
-      }
-
-      try {
-        set({ loading: true, error: null });
-        console.log("🔄 Fetch des catégories depuis l'API...");
-
-        const response = await apiService.get('/api/categories');
-        const categories = response.data.data || [];
-
-        set({
-          categories,
-          loading: false,
-          error: null,
-          lastFetched: now,
-        });
-
-        console.log(`✅ ${categories.length} catégories chargées et mises en cache`);
-        return categories;
-      } catch (error) {
-        console.error('❌ Erreur lors du fetch des catégories:', error);
-        set({
-          error: error.response?.data?.message || error.message || 'Erreur de chargement',
-          loading: false,
-        });
-        throw error;
-      }
-    },
-
-    refreshCategories: async () => {
-      console.log('🔄 Refresh forcé des catégories...');
-      return get().fetchCategories(true);
-    },
-
-    isCacheValid: () => {
-      const state = get();
-      const now = Date.now();
-      return state.lastFetched && now - state.lastFetched < CACHE_DURATION;
-    },
-
-    clearCache: () => {
-      console.log('🗑️ Cache des catégories nettoyé');
-      set({
-        categories: [],
-        lastFetched: null,
-        lastUpdated: null,
-      });
-    },
-
-    invalidateCache: () => {
-      console.log('❌ Cache des catégories invalidé');
-      set({
-        lastFetched: null,
-      });
-    },
-  }),
+  // ✅ MÉTHODES CACHE GÉNÉRIQUES
+  customMethods: withCacheSupport('category', '/api/categories'),
 });
 
-// Wrapper useCategory avec WebSocket intégré
+// ✅ WRAPPER AVEC SYNC SPÉCIFIQUE
 export function useCategory() {
   const categoryStore = useCategoryBase();
   const store = useCategoryStore();
@@ -259,9 +118,7 @@ export function useCategory() {
 export { useCategoryStore };
 
 export function useCategoryExtras() {
-  const store = useCategoryStore();
   const { syncCategory } = useCategory();
-
   return {
     ...useCategory(),
     syncCategory,
