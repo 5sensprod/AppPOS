@@ -12,7 +12,6 @@ function SuppliersPage() {
       description="Gérez votre liste de fournisseurs"
       addButtonLabel="Ajouter un fournisseur"
       addButtonPath="/products/suppliers/new"
-      // Plus besoin de Provider avec Zustand
       contentComponent={SupplierTable}
     />
   );

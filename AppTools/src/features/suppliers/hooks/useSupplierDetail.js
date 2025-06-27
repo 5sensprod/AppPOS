@@ -1,9 +1,7 @@
 // src/features/suppliers/hooks/useSupplierDetail.js
-// COPIE EXACTE du pattern useProductDetail.js qui fonctionne
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { useSupplier, useSupplierExtras } from '../stores/supplierStore';
-import { useSupplierDataStore } from '../stores/supplierStore';
+import { useSupplierDataStore, useSupplier, useSupplierExtras } from '../stores/supplierStore';
 import { useBrand } from '../../brands/stores/brandStore';
 import { getSupplierValidationSchema } from '../components/validationSchema/getValidationSchema';
 import imageProxyService from '../../../services/imageProxyService';
@@ -30,16 +28,14 @@ export default function useSupplierDetail() {
   const supplierWsStore = useSupplierDataStore();
   const { fetchBrands } = useBrand();
 
-  // WebSocket init pour les mises à jour de fournisseurs (COPIE du pattern product)
+  // WebSocket init pour les mises à jour de fournisseurs
   useEffect(() => {
-    // Initialisation du WebSocket principal via le store existant
     let cleanup = () => {};
 
     if (supplierWsStore?.initWebSocket) {
       cleanup = supplierWsStore.initWebSocket();
     }
 
-    // Importation directe du service WebSocket (même pattern que product)
     import('../../../services/websocketService')
       .then((module) => {
         const websocketService = module.default;
@@ -92,7 +88,7 @@ export default function useSupplierDetail() {
     };
   }, [currentId, paramId, getSupplierById, supplierWsStore]);
 
-  // Fetch all data (brands) - PATTERN IDENTIQUE à products
+  // Fetch all data (brands)
   useEffect(() => {
     if (dataFetched) return;
 
@@ -117,7 +113,7 @@ export default function useSupplierDetail() {
     fetchAll();
   }, [dataFetched, fetchBrands]);
 
-  // Load supplier if not new - PATTERN IDENTIQUE
+  // Load supplier if not new
   useEffect(() => {
     if (isNew) {
       setSupplier(defaultValues);
@@ -136,7 +132,7 @@ export default function useSupplierDetail() {
       .finally(() => setLoading(false));
   }, [paramId, isNew, getSupplierById]);
 
-  // Utils: option builders - PATTERN IDENTIQUE
+  // Utils: option builders
   const toOptions = (items, includeRelations = false) =>
     items.map((i) => ({
       value: i._id,
@@ -155,7 +151,7 @@ export default function useSupplierDetail() {
     [brandOptions]
   );
 
-  // Submission - PATTERN SIMILAIRE à products
+  // Submission
   const preprocessData = useCallback((data) => {
     const d = { ...data };
 
@@ -231,7 +227,6 @@ export default function useSupplierDetail() {
     }
   };
 
-  // PATTERN EXACT de ProductDetail pour la suppression
   const handleDelete = async () => {
     try {
       setLoading(true);
@@ -248,7 +243,7 @@ export default function useSupplierDetail() {
     navigate(isNew ? '/products/suppliers' : `/products/suppliers/${paramId}`);
   };
 
-  // Fonctions d'images - PATTERN IDENTIQUE à products
+  // Fonctions d'images
   const handleUploadImage = async (entityId, file) => {
     try {
       setLoading(true);
@@ -296,14 +291,13 @@ export default function useSupplierDetail() {
     handleCancel,
     validationSchema: getSupplierValidationSchema(isNew),
     defaultValues,
-    // Exposer les fonctions d'images
     uploadImage: handleUploadImage,
     deleteImage: handleDeleteImage,
     specialFields,
   };
 }
 
-// Valeurs par défaut - PATTERN IDENTIQUE
+// Valeurs par défaut
 const defaultValues = {
   name: '',
   supplier_code: '',

@@ -1,4 +1,4 @@
-// src/features/products/stores/productStore.js
+// src/features/products/stores/productStore.js - VERSION OPTIMISÉE AVEC WEBSOCKET
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import { ENTITY_CONFIG } from '../constants';
@@ -10,7 +10,13 @@ const customActions = {
   SET_MAIN_IMAGE: 'SET_MAIN_IMAGE',
   UPLOAD_GALLERY_IMAGE: 'UPLOAD_GALLERY_IMAGE',
   DELETE_GALLERY_IMAGE: 'DELETE_GALLERY_IMAGE',
-  SYNC_PRODUCT: 'SYNC_PRODUCT', // Nouvelle action pour la synchronisation
+  SYNC_PRODUCT: 'SYNC_PRODUCT',
+  // ✅ ACTIONS POUR LE CACHE AVEC WEBSOCKET
+  SET_CACHE_TIMESTAMP: 'SET_CACHE_TIMESTAMP',
+  CLEAR_CACHE: 'CLEAR_CACHE',
+  WEBSOCKET_UPDATE: 'WEBSOCKET_UPDATE',
+  WEBSOCKET_CREATE: 'WEBSOCKET_CREATE',
+  WEBSOCKET_DELETE: 'WEBSOCKET_DELETE',
 };
 
 // Reducers personnalisés spécifiques aux produits
@@ -22,6 +28,7 @@ const customReducers = {
         item._id === action.payload.id ? { ...item, stock: action.payload.stock } : item
       ),
       loading: false,
+      lastUpdated: Date.now(),
     };
   },
   SET_MAIN_IMAGE: (state, action) => {
@@ -31,6 +38,7 @@ const customReducers = {
         item._id === action.payload.id ? { ...item, ...action.payload.data } : item
       ),
       loading: false,
+      lastUpdated: Date.now(),
     };
   },
   UPLOAD_GALLERY_IMAGE: (state, action) => {
@@ -47,6 +55,7 @@ const customReducers = {
         return item;
       }),
       loading: false,
+      lastUpdated: Date.now(),
     };
   },
   DELETE_GALLERY_IMAGE: (state, action) => {
@@ -65,6 +74,7 @@ const customReducers = {
         return item;
       }),
       loading: false,
+      lastUpdated: Date.now(),
     };
   },
   SYNC_PRODUCT: (state, action) => {
@@ -74,15 +84,81 @@ const customReducers = {
         item._id === action.payload.id ? { ...item, ...action.payload.data } : item
       ),
       loading: false,
+      lastUpdated: Date.now(),
+    };
+  },
+  // ✅ REDUCERS POUR LE CACHE
+  SET_CACHE_TIMESTAMP: (state, action) => {
+    return {
+      ...state,
+      lastFetched: action.payload.timestamp,
+    };
+  },
+  CLEAR_CACHE: (state) => {
+    return {
+      ...state,
+      items: [],
+      lastFetched: null,
+      lastUpdated: null,
+    };
+  },
+  // ✅ REDUCERS WEBSOCKET QUI MAINTIENNENT LE CACHE
+  WEBSOCKET_UPDATE: (state, action) => {
+    console.log('🔄 WebSocket: Mise à jour produit reçue', action.payload);
+    return {
+      ...state,
+      products: state.products.map((product) =>
+        product._id === action.payload._id ? { ...product, ...action.payload } : product
+      ),
+      lastUpdated: Date.now(), // ✅ Marquer comme mis à jour sans invalider le cache
+    };
+  },
+  WEBSOCKET_CREATE: (state, action) => {
+    console.log('🆕 WebSocket: Nouveau produit reçu', action.payload);
+    // Vérifier si le produit existe déjà
+    const existingIndex = state.products.findIndex((p) => p._id === action.payload._id);
+    if (existingIndex >= 0) {
+      // Mettre à jour le produit existant
+      return {
+        ...state,
+        products: state.products.map((product) =>
+          product._id === action.payload._id ? { ...product, ...action.payload } : product
+        ),
+        lastUpdated: Date.now(),
+      };
+    } else {
+      // Ajouter le nouveau produit
+      return {
+        ...state,
+        products: [...state.products, action.payload],
+        lastUpdated: Date.now(),
+      };
+    }
+  },
+  WEBSOCKET_DELETE: (state, action) => {
+    console.log('🗑️ WebSocket: Suppression produit reçue', action.payload);
+    const productId = action.payload.entityId || action.payload.id || action.payload;
+    return {
+      ...state,
+      products: state.products.filter((product) => product._id !== productId),
+      lastUpdated: Date.now(),
     };
   },
 };
+
+// ✅ CONFIGURATION DU CACHE (5 minutes par défaut)
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Créer le store avec la factory
 const { useProduct: useProductBase, useEntityStore: useProductStore } = createEntityStore({
   ...ENTITY_CONFIG,
   customActions,
   customReducers,
+  initialState: {
+    ...ENTITY_CONFIG.initialState,
+    lastFetched: null,
+    lastUpdated: null,
+  },
 });
 
 // Créer le store WebSocket avec la factory
@@ -96,25 +172,141 @@ export const useProductDataStore = createWebSocketStore({
       event: 'categories.tree.changed',
       handler: (get) => (data) => {
         console.log('[PRODUCTS] Événement categories.tree.changed reçu', data);
-        // Ajouter un délai court pour s'assurer que le serveur a terminé ses mises à jour
+        // ✅ Invalider le cache quand les catégories changent
+        get().clearCache();
         setTimeout(() => {
-          get().fetchProducts();
+          get().fetchProducts(true); // Force refresh
         }, 500);
+      },
+    },
+    // ✅ GESTION EXPLICITE DES ÉVÉNEMENTS WEBSOCKET PRODUITS
+    {
+      event: 'products.updated',
+      handler: (get) => (data) => {
+        console.log('[PRODUCTS] WebSocket: Produit mis à jour', data);
+        get().dispatch?.({
+          type: 'WEBSOCKET_UPDATE',
+          payload: data.data || data,
+        });
+      },
+    },
+    {
+      event: 'products.created',
+      handler: (get) => (data) => {
+        console.log('[PRODUCTS] WebSocket: Nouveau produit créé', data);
+        get().dispatch?.({
+          type: 'WEBSOCKET_CREATE',
+          payload: data.data || data,
+        });
+      },
+    },
+    {
+      event: 'products.deleted',
+      handler: (get) => (data) => {
+        console.log('[PRODUCTS] WebSocket: Produit supprimé', data);
+        get().dispatch?.({
+          type: 'WEBSOCKET_DELETE',
+          payload: data,
+        });
       },
     },
   ],
   customMethods: (set, get) => ({
+    // ✅ DISPATCH POUR LES REDUCERS PERSONNALISÉS
+    dispatch: (action) => {
+      const state = get();
+      const reducer = customReducers[action.type];
+      if (reducer) {
+        set(reducer(state, action));
+      } else {
+        console.warn(`[PRODUCTS] Action non trouvée: ${action.type}`);
+      }
+    },
+
+    // ✅ FETCHPRODUCTS OPTIMISÉ AVEC CACHE ET WEBSOCKET
+    fetchProducts: async (forceRefresh = false) => {
+      const state = get();
+      const now = Date.now();
+
+      // ✅ VÉRIFIER SI LE CACHE EST ENCORE VALIDE
+      if (
+        !forceRefresh &&
+        state.products?.length > 0 &&
+        state.lastFetched &&
+        now - state.lastFetched < CACHE_DURATION
+      ) {
+        console.log('📦 Utilisation du cache des produits (encore frais)');
+        return state.products;
+      }
+
+      try {
+        set({ loading: true, error: null });
+        console.log("🔄 Fetch des produits depuis l'API...");
+
+        const response = await apiService.get('/api/products');
+        const products = response.data.data || [];
+
+        set({
+          products,
+          loading: false,
+          error: null,
+          lastFetched: now, // ✅ Marquer le timestamp du fetch
+        });
+
+        console.log(`✅ ${products.length} produits chargés et mis en cache`);
+        return products;
+      } catch (error) {
+        console.error('❌ Erreur lors du fetch des produits:', error);
+        set({
+          error: error.response?.data?.message || error.message || 'Erreur de chargement',
+          loading: false,
+        });
+        throw error;
+      }
+    },
+
+    // ✅ REFRESH FORCÉ
+    refreshProducts: async () => {
+      console.log('🔄 Refresh forcé des produits...');
+      return get().fetchProducts(true);
+    },
+
+    // ✅ VÉRIFICATION DE LA VALIDITÉ DU CACHE
+    isCacheValid: () => {
+      const state = get();
+      const now = Date.now();
+      return state.lastFetched && now - state.lastFetched < CACHE_DURATION;
+    },
+
+    // ✅ NETTOYAGE DU CACHE
+    clearCache: () => {
+      console.log('🗑️ Cache des produits nettoyé');
+      set({
+        products: [],
+        lastFetched: null,
+        lastUpdated: null,
+      });
+    },
+
+    // ✅ MÉTHODE POUR INVALIDER LE CACHE (utile après certaines opérations)
+    invalidateCache: () => {
+      console.log('❌ Cache des produits invalidé');
+      set({
+        lastFetched: null, // Invalider sans vider les données
+      });
+    },
+
     updateProductsStatus: async (productIds, newStatus) => {
       try {
         set({ loading: true, error: null });
 
-        // Appel API pour mettre à jour le statut de plusieurs produits
         const response = await apiService.post('/api/products/batch-status', {
           productIds,
           status: newStatus,
         });
 
         if (response.data.success) {
+          // ✅ MISE À JOUR LOCALE + CACHE MAINTENU
           set((state) => {
             const updatedProducts = state.products.map((product) => {
               if (productIds.includes(product._id)) {
@@ -131,6 +323,7 @@ export const useProductDataStore = createWebSocketStore({
               ...state,
               products: updatedProducts,
               loading: false,
+              lastUpdated: Date.now(), // ✅ Maintenir le cache mais marquer la MAJ
             };
           });
         } else {
@@ -154,22 +347,19 @@ export const useProductDataStore = createWebSocketStore({
   }),
 });
 
-// Étendre useProduct avec l'initWebSocket direct plutôt que la redirection
+// ✅ WRAPPER POUR useProduct AVEC WEBSOCKET INTÉGRÉ
 export function useProduct() {
   const productStore = useProductBase();
   const store = useProductStore();
 
-  // Fonction explicite de synchronisation
   const syncProduct = async (productId) => {
     console.log(`🔄 Synchronisation du produit #${productId}`);
     store.dispatch({ type: 'FETCH_START' });
 
     try {
-      // Appel API explicite pour synchroniser
       const response = await apiService.post(`/api/products/${productId}/sync`);
       console.log(`✅ Produit synchronisé avec succès:`, response.data);
 
-      // Mettre à jour le store avec les données reçues
       store.dispatch({
         type: customActions.SYNC_PRODUCT,
         payload: { id: productId, data: response.data.data || {} },
@@ -185,23 +375,23 @@ export function useProduct() {
 
   return {
     ...productStore,
-    syncProduct, // Ajouter explicitement la fonction de synchronisation
+    syncProduct,
+    // ✅ INITIALISATION WEBSOCKET SIMPLIFIÉE
     initWebSocketListeners: () => {
-      const cleanup = useProductDataStore.getState().initWebSocket();
+      const wsStore = useProductDataStore.getState();
+      const cleanup = wsStore.initWebSocket();
+      console.log('🔌 WebSocket listeners initialisés pour les produits');
       return cleanup;
     },
   };
 }
 
-// Réexporter useProductStore pour maintenir la compatibilité
 export { useProductStore };
 
-// Fonction pour exposer des méthodes supplémentaires spécifiques aux produits
 export function useProductExtras() {
   const store = useProductStore();
-  const { syncProduct } = useProduct(); // Récupérer la fonction syncProduct
+  const { syncProduct } = useProduct();
 
-  // Définir l'image principale d'un produit
   const setMainImage = async (productId, imageIndex) => {
     store.dispatch({ type: 'FETCH_START' });
     try {
@@ -220,7 +410,6 @@ export function useProductExtras() {
     }
   };
 
-  // Télécharger une image pour la galerie d'un produit
   const uploadGalleryImage = async (productId, imageFile) => {
     store.dispatch({ type: 'FETCH_START' });
     try {
@@ -246,23 +435,17 @@ export function useProductExtras() {
     }
   };
 
-  // Supprimer une image de la galerie d'un produit
   const deleteGalleryImage = async (productId, imageIndex) => {
     store.dispatch({ type: 'FETCH_START' });
     try {
-      // Obtenir le produit actuel
       const response = await apiService.get(`/api/products/${productId}`);
       const product = response.data.data;
 
-      // Vérifier que l'image existe
       if (!product.gallery_images || !product.gallery_images[imageIndex]) {
         throw new Error('Image non trouvée');
       }
 
-      // Extraire l'ID de l'image
       const imageId = product.gallery_images[imageIndex]._id;
-
-      // Supprimer l'image avec son ID réel
       await apiService.delete(`/api/products/${productId}/gallery/${imageId}`);
 
       store.dispatch({
@@ -278,10 +461,9 @@ export function useProductExtras() {
     }
   };
 
-  // Retourne toutes les fonctionnalités standard du useProduct + les extras
   return {
     ...useProduct(),
-    syncProduct, // Ajouter explicitement la fonction de synchronisation
+    syncProduct,
     setMainImage,
     uploadGalleryImage,
     deleteGalleryImage,
