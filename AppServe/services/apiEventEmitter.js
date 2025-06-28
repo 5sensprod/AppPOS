@@ -62,6 +62,11 @@ class ApiEventEmitter extends EventEmitter {
     console.log(`[EVENT] Émission de lcd.connection.failed pour port ${data.port}`);
     this.emit('lcd.connection.failed', data);
   }
+
+  stockStatisticsChanged(data) {
+    console.log(`[EVENT] Émission de stock.statistics.changed`);
+    this.emit('stock.statistics.changed', { data, timestamp: Date.now() });
+  }
 }
 
 const apiEventEmitter = new ApiEventEmitter();

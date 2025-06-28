@@ -103,6 +103,11 @@ function initializeWebSocketEventBridge() {
     websocketManager.notifyLCDConnectionFailed(payload);
   });
 
+  apiEventEmitter.on('stock.statistics.changed', (payload) => {
+    console.log(`[EVENT-WS] Statistiques de stock mises à jour relayées vers WebSocket`);
+    websocketManager.notifyStockStatisticsChanged(payload);
+  });
+
   console.log('[EVENT-WS] Bridge initialisé entre Event Emitter et WebSocket Manager');
   console.log('[EVENT-WS] ✅ Événements sessions caisse et LCD ajoutés');
 }

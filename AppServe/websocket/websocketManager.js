@@ -268,6 +268,16 @@ class WebSocketManager {
     console.log(`[WS-LCD] Échec reconnexion LCD ${payload.port} diffusée`);
   }
 
+  notifyStockStatisticsChanged(payload) {
+    const eventData = {
+      data: payload.data,
+      timestamp: payload.timestamp,
+    };
+
+    this.broadcast('stock.statistics.changed', eventData);
+    console.log(`[WS-STOCK] Statistiques de stock mises à jour diffusées`);
+  }
+
   // ✅ MÉTHODES UTILITAIRES
   sendToClient(client, type, payload) {
     if (client.readyState === WebSocket.OPEN) {

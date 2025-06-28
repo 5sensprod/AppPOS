@@ -5,6 +5,7 @@ const Brand = require('../models/Brand');
 const Supplier = require('../models/Supplier');
 const { getEntityEventService } = require('../services/events/entityEvents');
 const brandService = require('./BrandWooCommerceService');
+const stockStatisticsService = require('./stockStatisticsService');
 
 // ----- VALIDATION -----
 async function validateCategories(categoryIds = [], { enforceWooSync = false } = {}) {
@@ -109,7 +110,14 @@ async function createProduct(data) {
   notifyCategoryTreeChangedIfNeeded(categories.length > 0);
   productEvents.created(newProduct);
 
-  return Product.findByIdWithCategoryInfo(newProduct._id);
+  const result = await Product.findByIdWithCategoryInfo(newProduct._id);
+
+  // 🚀 NOUVEAU: Recalculer les statistiques après création
+  setImmediate(() => {
+    stockStatisticsService.recalculateAndEmit().catch(console.error);
+  });
+
+  return result;
 }
 
 async function updateProduct(id, updateData) {
@@ -162,6 +170,11 @@ async function updateProduct(id, updateData) {
   notifyCategoryTreeChangedIfNeeded(categoryChanged);
 
   getEntityEventService('products').updated(id, updated);
+
+  setImmediate(() => {
+    stockStatisticsService.recalculateAndEmit().catch(console.error);
+  });
+
   return updated;
 }
 
@@ -174,6 +187,10 @@ async function deleteProduct(product) {
 
   await Product.delete(_id);
   productEvents.deleted(_id);
+
+  setImmediate(() => {
+    stockStatisticsService.recalculateAndEmit().catch(console.error);
+  });
 
   return { message: 'Produit supprimé avec succès' };
 }

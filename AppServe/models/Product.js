@@ -21,6 +21,7 @@ class Product extends BaseModel {
       sales_count: 0,
       last_sold_at: null,
       revenue_total: 0,
+      type: 'simple',
     };
   }
 
