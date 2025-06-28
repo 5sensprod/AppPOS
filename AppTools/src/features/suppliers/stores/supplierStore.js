@@ -109,33 +109,72 @@ export const useSupplierDataStore = createWebSocketStore({
   additionalChannels: [],
   additionalEvents: [
     {
-      event: 'suppliers.updated',
-      handler: (get) => (data) => {
-        console.log('[SUPPLIERS] WebSocket: Fournisseur mis à jour', data);
+      event: 'entity.updated', // ← CHANGER ICI
+      handler: (get) => (eventData) => {
+        if (eventData.entityType !== 'suppliers') return;
+
+        console.log('[SUPPLIERS] WebSocket: Fournisseur mis à jour', eventData);
+
+        let supplierData;
+        if (eventData.data && eventData.id) {
+          supplierData = { ...eventData.data, _id: eventData.id };
+        } else {
+          console.warn('[SUPPLIERS] Format de données WebSocket non reconnu:', eventData);
+          return;
+        }
+
         get().dispatch?.({
           type: 'WEBSOCKET_UPDATE',
-          payload: data.data || data,
+          payload: supplierData,
         });
       },
     },
     {
-      event: 'suppliers.created',
-      handler: (get) => (data) => {
-        console.log('[SUPPLIERS] WebSocket: Nouveau fournisseur créé', data);
+      event: 'entity.created',
+      handler: (get) => (eventData) => {
+        if (eventData.entityType !== 'suppliers') return;
+
+        console.log('[SUPPLIERS] WebSocket: Nouveau fournisseur créé', eventData);
+
+        let supplierData;
+        if (eventData.data && eventData.data._id) {
+          supplierData = eventData.data;
+        } else {
+          console.warn('[SUPPLIERS] Format de données WebSocket non reconnu:', eventData);
+          return;
+        }
+
         get().dispatch?.({
           type: 'WEBSOCKET_CREATE',
-          payload: data.data || data,
+          payload: supplierData,
         });
       },
     },
     {
-      event: 'suppliers.deleted',
-      handler: (get) => (data) => {
-        console.log('[SUPPLIERS] WebSocket: Fournisseur supprimé', data);
+      event: 'entity.deleted',
+      handler: (get) => (eventData) => {
+        if (eventData.entityType !== 'suppliers') return;
+
+        console.log('[SUPPLIERS] WebSocket: Fournisseur supprimé', eventData);
+
+        const supplierId = eventData.id || eventData.entityId;
+
         get().dispatch?.({
           type: 'WEBSOCKET_DELETE',
-          payload: data,
+          payload: supplierId,
         });
+      },
+    },
+    // 🚀 BONUS : Écouter suppliers.tree.changed
+    {
+      event: 'suppliers.tree.changed',
+      handler: (get) => (eventData) => {
+        console.log('[SUPPLIERS] Tree changed → invalidation cache');
+        get().clearCache();
+        // Optionnel : refetch automatique
+        setTimeout(() => {
+          get().fetchSuppliers(true);
+        }, 500);
       },
     },
   ],

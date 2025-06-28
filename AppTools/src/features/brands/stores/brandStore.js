@@ -87,32 +87,61 @@ export const useBrandDataStore = createWebSocketStore({
   additionalChannels: [],
   additionalEvents: [
     {
-      event: 'brands.updated',
-      handler: (get) => (data) => {
-        console.log('[BRANDS] WebSocket: Marque mise à jour', data);
+      event: 'entity.updated', // ← CHANGER ICI
+      handler: (get) => (eventData) => {
+        // Vérifier que c'est bien pour les brands
+        if (eventData.entityType !== 'brands') return;
+
+        console.log('[BRANDS] WebSocket: Marque mise à jour', eventData);
+
+        let brandData;
+        if (eventData.data && eventData.id) {
+          // Format entity.updated: { entityType: "brands", id: "...", data: {...} }
+          brandData = { ...eventData.data, _id: eventData.id };
+        } else {
+          console.warn('[BRANDS] Format de données WebSocket non reconnu:', eventData);
+          return;
+        }
+
         get().dispatch?.({
           type: 'WEBSOCKET_UPDATE',
-          payload: data.data || data,
+          payload: brandData,
         });
       },
     },
     {
-      event: 'brands.created',
-      handler: (get) => (data) => {
-        console.log('[BRANDS] WebSocket: Nouvelle marque créée', data);
+      event: 'entity.created', // ← CHANGER ICI
+      handler: (get) => (eventData) => {
+        if (eventData.entityType !== 'brands') return;
+
+        console.log('[BRANDS] WebSocket: Nouvelle marque créée', eventData);
+
+        let brandData;
+        if (eventData.data && eventData.data._id) {
+          brandData = eventData.data;
+        } else {
+          console.warn('[BRANDS] Format de données WebSocket non reconnu:', eventData);
+          return;
+        }
+
         get().dispatch?.({
           type: 'WEBSOCKET_CREATE',
-          payload: data.data || data,
+          payload: brandData,
         });
       },
     },
     {
-      event: 'brands.deleted',
-      handler: (get) => (data) => {
-        console.log('[BRANDS] WebSocket: Marque supprimée', data);
+      event: 'entity.deleted', // ← CHANGER ICI
+      handler: (get) => (eventData) => {
+        if (eventData.entityType !== 'brands') return;
+
+        console.log('[BRANDS] WebSocket: Marque supprimée', eventData);
+
+        const brandId = eventData.id || eventData.entityId;
+
         get().dispatch?.({
           type: 'WEBSOCKET_DELETE',
-          payload: data,
+          payload: brandId,
         });
       },
     },
