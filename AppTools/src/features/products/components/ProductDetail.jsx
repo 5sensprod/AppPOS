@@ -170,6 +170,7 @@ function ProductDetail() {
       editable={editable}
       validationSchema={validationSchema}
       defaultValues={defaultValues}
+      title={isNew ? 'Nouveau Produit' : `Modifier « ${product?.name || ''} »`}
     />
   );
 }
