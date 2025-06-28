@@ -1,179 +1,135 @@
-// src/stores/useReportsStore.js - VERSION COMPLÈTE AVEC WEBSOCKET
+// src/stores/useReportsStore.js - VERSION HYBRIDE
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import apiService from '../services/api';
 import websocketService from '../services/websocketService';
+import { useProductDataStore } from '../features/products/stores/productStore';
+import { useCategoryDataStore } from '../features/categories/stores/categoryStore';
 
 const useReportsStore = create(
   devtools(
     (set, get) => ({
-      // ===== ÉTAT =====
-      categories: null,
-      products: null,
+      // ===== ÉTAT MINIMAL =====
       categoryAnalytics: null,
       preCalculatedChartData: null,
-
-      // États de chargement
-      loading: {
-        categories: false,
-        products: false,
-      },
-
-      // Erreurs
-      errors: {
-        categories: null,
-        products: null,
-      },
-
-      // Métadonnées
-      lastUpdate: {
-        categories: null,
-        products: null,
-      },
-
-      // 🚀 NOUVEAU : WebSocket
       websocketInitialized: false,
+      lastCalculated: null,
+      loading: false,
+      error: null,
 
-      // ===== ACTIONS =====
-
-      /**
-       * Récupération des catégories
-       */
-      fetchCategories: async () => {
-        const state = get();
-        if (state.loading.categories) return state.categories;
-
-        set((state) => ({
-          loading: { ...state.loading, categories: true },
-          errors: { ...state.errors, categories: null },
-        }));
-
-        try {
-          const response = await apiService.get('/api/categories');
-          const data = response.data?.success ? response.data.data : response.data;
-
-          set((state) => ({
-            categories: data,
-            loading: { ...state.loading, categories: false },
-            lastUpdate: { ...state.lastUpdate, categories: new Date() },
-          }));
-
-          return data;
-        } catch (error) {
-          set((state) => ({
-            loading: { ...state.loading, categories: false },
-            errors: { ...state.errors, categories: error.message },
-          }));
-          throw error;
-        }
-      },
+      // ===== GETTERS INTELLIGENTS =====
 
       /**
-       * Récupération des produits
+       * 📊 Récupère les données depuis les stores existants + les charge si nécessaire
        */
-      fetchProducts: async () => {
-        const state = get();
-        if (state.loading.products) return state.products;
+      ensureDataLoaded: async () => {
+        const productStore = useProductDataStore.getState();
+        const categoryStore = useCategoryDataStore.getState();
 
-        set((state) => ({
-          loading: { ...state.loading, products: true },
-          errors: { ...state.errors, products: null },
-        }));
+        console.log('🔍 [REPORTS] Vérification des données stores...');
+        console.log(
+          'Products:',
+          productStore.products?.length || 0,
+          'Categories:',
+          categoryStore.categories?.length || 0
+        );
 
-        try {
-          const response = await apiService.get('/api/products');
-          const data = response.data?.success ? response.data.data : response.data;
+        const promises = [];
 
-          set((state) => ({
-            products: data,
-            loading: { ...state.loading, products: false },
-            lastUpdate: { ...state.lastUpdate, products: new Date() },
-          }));
-
-          return data;
-        } catch (error) {
-          set((state) => ({
-            loading: { ...state.loading, products: false },
-            errors: { ...state.errors, products: error.message },
-          }));
-          throw error;
-        }
-      },
-
-      /**
-       * Calcul des analytics de catégories (logique métier centralisée)
-       */
-      calculateCategoryAnalytics: () => {
-        const { categories, products } = get();
-
-        if (!categories || !products) {
-          return null;
+        // Charger produits si nécessaire
+        if (!productStore.products || productStore.products.length === 0) {
+          console.log('📦 [REPORTS] Chargement des produits...');
+          promises.push(productStore.fetchProducts?.());
         }
 
-        const rootCategories = {};
-        let totalValue = 0;
-        let totalProducts = 0;
-        let totalMargin = 0;
+        // Charger catégories si nécessaire
+        if (!categoryStore.categories || categoryStore.categories.length === 0) {
+          console.log('📁 [REPORTS] Chargement des catégories...');
+          promises.push(categoryStore.fetchCategories?.());
+        }
 
-        // Map des catégories pour navigation rapide
-        const categoryMap = {};
-        categories.forEach((cat) => {
-          categoryMap[cat._id] = cat;
-        });
-
-        // Fonction pour trouver la catégorie racine
-        const findRootCategory = (categoryId) => {
-          if (!categoryId || !categoryMap[categoryId]) return null;
-
-          let current = categoryMap[categoryId];
-          while (current.parent_id && categoryMap[current.parent_id]) {
-            current = categoryMap[current.parent_id];
+        if (promises.length > 0) {
+          set({ loading: true });
+          try {
+            await Promise.all(promises);
+            console.log('✅ [REPORTS] Données chargées');
+          } catch (error) {
+            console.error('❌ [REPORTS] Erreur chargement:', error);
+            set({ error: error.message });
+          } finally {
+            set({ loading: false });
           }
-          return current;
+        }
+
+        return {
+          products: useProductDataStore.getState().products || [],
+          categories: useCategoryDataStore.getState().categories || [],
         };
+      },
 
-        // Traiter chaque produit
-        products.forEach((product) => {
-          const stock = product.stock || 0;
-          if (stock <= 0) return; // Seulement les produits en stock
+      /**
+       * 🧮 Calcul des analytics (simplifié mais robuste)
+       */
+      calculateCategoryAnalytics: async () => {
+        try {
+          // S'assurer que les données sont chargées
+          const { products, categories } = await get().ensureDataLoaded();
 
-          const purchasePrice = product.purchase_price || 0;
-          const salePrice = product.price || 0;
+          if (!categories.length || !products.length) {
+            console.log('⚠️ [REPORTS] Données insuffisantes après chargement');
+            return null;
+          }
 
-          const productValue = stock * purchasePrice;
-          const productMargin = stock * (salePrice - purchasePrice);
+          console.log(
+            `🧮 [REPORTS] Calcul analytics: ${products.length} produits, ${categories.length} catégories`
+          );
 
-          const productCategories = product.categories || [];
+          const rootCategories = {};
+          let totalValue = 0;
+          let totalProducts = 0;
+          let totalMargin = 0;
 
-          if (productCategories.length > 0) {
-            const primaryCategoryId = productCategories[0];
-            const rootCategory = findRootCategory(primaryCategoryId);
+          // Map des catégories
+          const categoryMap = {};
+          categories.forEach((cat) => {
+            categoryMap[cat._id] = cat;
+          });
 
-            if (rootCategory) {
-              const rootName = rootCategory.name || 'Sans nom';
-
-              if (!rootCategories[rootName]) {
-                rootCategories[rootName] = {
-                  id: rootCategory._id,
-                  name: rootName,
-                  value: 0,
-                  products: 0,
-                  margin: 0,
-                };
-              }
-
-              rootCategories[rootName].value += productValue;
-              rootCategories[rootName].products += 1;
-              rootCategories[rootName].margin += productMargin;
+          // Trouver catégorie racine
+          const findRootCategory = (categoryId) => {
+            if (!categoryId || !categoryMap[categoryId]) return null;
+            let current = categoryMap[categoryId];
+            while (current.parent_id && categoryMap[current.parent_id]) {
+              current = categoryMap[current.parent_id];
             }
-          } else {
-            // Produit sans catégorie
-            const rootName = 'Sans catégorie';
+            return current;
+          };
+
+          // Traiter produits en stock
+          products.forEach((product) => {
+            const stock = product.stock || 0;
+            if (stock <= 0 || (product.type && product.type !== 'simple')) return;
+
+            const purchasePrice = product.purchase_price || 0;
+            const salePrice = product.price || 0;
+            const productValue = stock * purchasePrice;
+            const productMargin = stock * (salePrice - purchasePrice);
+            const productCategories = product.categories || [];
+
+            let rootName = 'Sans catégorie';
+            let rootId = null;
+
+            if (productCategories.length > 0) {
+              const rootCategory = findRootCategory(productCategories[0]);
+              if (rootCategory) {
+                rootName = rootCategory.name || 'Sans nom';
+                rootId = rootCategory._id;
+              }
+            }
 
             if (!rootCategories[rootName]) {
               rootCategories[rootName] = {
-                id: null,
+                id: rootId,
                 name: rootName,
                 value: 0,
                 products: 0,
@@ -184,128 +140,129 @@ const useReportsStore = create(
             rootCategories[rootName].value += productValue;
             rootCategories[rootName].products += 1;
             rootCategories[rootName].margin += productMargin;
-          }
 
-          totalValue += productValue;
-          totalProducts += 1;
-          totalMargin += productMargin;
-        });
+            totalValue += productValue;
+            totalProducts += 1;
+            totalMargin += productMargin;
+          });
 
-        const analytics = {
-          rootCategories: Object.values(rootCategories).sort((a, b) => b.value - a.value),
-          totals: {
-            totalValue,
-            totalProducts,
-            totalMargin,
-          },
-          lastCalculated: new Date(),
-        };
+          const analytics = {
+            rootCategories: Object.values(rootCategories).sort((a, b) => b.value - a.value),
+            totals: { totalValue, totalProducts, totalMargin },
+            lastCalculated: new Date(),
+          };
 
-        set({ categoryAnalytics: analytics });
-        return analytics;
+          set({
+            categoryAnalytics: analytics,
+            lastCalculated: Date.now(),
+            error: null,
+          });
+
+          console.log(
+            `✅ [REPORTS] Analytics calculées: ${analytics.rootCategories.length} catégories`
+          );
+          return analytics;
+        } catch (error) {
+          console.error('❌ [REPORTS] Erreur calcul analytics:', error);
+          set({ error: error.message });
+          return null;
+        }
       },
 
       /**
-       * Calcul de toutes les données de chart pré-formatées
+       * 🎨 Calcul chart data (inchangé)
        */
       calculateAllChartData: () => {
         const { categoryAnalytics } = get();
-
-        if (!categoryAnalytics) {
-          return null;
-        }
+        if (!categoryAnalytics) return null;
 
         const { rootCategories, totals } = categoryAnalytics;
-
-        // Pré-calculer les 3 modes en une seule fois
-        const allModes = {
-          value: [],
-          products: [],
-          margin: [],
-        };
+        const allModes = { value: [], products: [], margin: [] };
 
         rootCategories.forEach((cat) => {
+          const baseData = {
+            name: cat.name,
+            products: cat.products,
+            stockValue: cat.value,
+            margin: cat.margin,
+          };
+
           // Mode valeur
           if (cat.value > 0) {
             allModes.value.push({
-              name: cat.name,
+              ...baseData,
               value: cat.value,
-              formattedValue: `${cat.value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`,
+              formattedValue: cat.value.toLocaleString('fr-FR', {
+                style: 'currency',
+                currency: 'EUR',
+              }),
               percentage:
                 totals.totalValue > 0 ? ((cat.value / totals.totalValue) * 100).toFixed(1) : 0,
-              products: cat.products,
-              stockValue: cat.value,
-              margin: cat.margin,
             });
           }
 
           // Mode produits
           if (cat.products > 0) {
             allModes.products.push({
-              name: cat.name,
+              ...baseData,
               value: cat.products,
               formattedValue: `${cat.products} produits`,
               percentage:
                 totals.totalProducts > 0
                   ? ((cat.products / totals.totalProducts) * 100).toFixed(1)
                   : 0,
-              products: cat.products,
-              stockValue: cat.value,
-              margin: cat.margin,
             });
           }
 
           // Mode marge
           if (cat.margin > 0) {
             allModes.margin.push({
-              name: cat.name,
+              ...baseData,
               value: cat.margin,
-              formattedValue: `${cat.margin.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`,
+              formattedValue: cat.margin.toLocaleString('fr-FR', {
+                style: 'currency',
+                currency: 'EUR',
+              }),
               percentage:
                 totals.totalMargin > 0 ? ((cat.margin / totals.totalMargin) * 100).toFixed(1) : 0,
-              products: cat.products,
-              stockValue: cat.value,
-              margin: cat.margin,
             });
           }
         });
 
-        // Trier et limiter chaque mode
+        // Trier et limiter
         Object.keys(allModes).forEach((mode) => {
           allModes[mode] = allModes[mode].sort((a, b) => b.value - a.value).slice(0, 12);
         });
 
-        // Stocker les données pré-calculées
-        set((state) => ({
-          ...state,
-          preCalculatedChartData: {
-            ...allModes,
-            totals,
-            lastCalculated: new Date(),
-          },
-        }));
+        set({
+          preCalculatedChartData: { ...allModes, totals, lastCalculated: new Date() },
+          lastCalculated: Date.now(),
+        });
 
+        console.log('✅ [REPORTS] Chart data calculées');
         return allModes;
       },
 
       /**
-       * Getter ultra-rapide pour les données de graphique
+       * 🚀 Getter optimisé
        */
       getOptimizedChartData: (mode = 'value') => {
-        const { preCalculatedChartData, calculateAllChartData } = get();
+        const { preCalculatedChartData } = get();
 
-        // Si pas de données pré-calculées, les calculer UNE SEULE FOIS
         if (!preCalculatedChartData) {
-          calculateAllChartData();
-          // Récupérer directement les données fraîchement calculées
-          const freshData = get().preCalculatedChartData;
+          // Déclencher le calcul en arrière-plan
+          get()
+            .calculateCategoryAnalytics()
+            .then(() => {
+              get().calculateAllChartData();
+            });
+
           return {
-            chartData: freshData?.[mode] || [],
-            totals: freshData?.totals || { totalValue: 0, totalProducts: 0, totalMargin: 0 },
+            chartData: [],
+            totals: { totalValue: 0, totalProducts: 0, totalMargin: 0 },
           };
         }
 
-        // Données déjà disponibles, les retourner directement
         return {
           chartData: preCalculatedChartData[mode] || [],
           totals: preCalculatedChartData.totals || {
@@ -317,72 +274,64 @@ const useReportsStore = create(
       },
 
       /**
-       * 🚀 NOUVELLE MÉTHODE : Initialisation WebSocket
+       * 🔌 WebSocket (inchangé)
        */
       initWebSocketListeners: () => {
         const state = get();
+        if (state.websocketInitialized) return;
 
-        if (state.websocketInitialized) {
-          console.log('🔌 [REPORTS] WebSocket déjà initialisé');
-          return;
-        }
+        console.log('🔌 [REPORTS] Init WebSocket...');
 
-        console.log('🔌 [REPORTS] Initialisation WebSocket...');
-
-        // 🎯 ÉCOUTER L'ÉVÉNEMENT SPÉCIFIQUE DU SERVEUR
         websocketService.on('category.chart.updated', (eventData) => {
-          console.log('📊 [REPORTS] Chart data reçues du serveur:', eventData);
+          console.log('📊 [REPORTS] Recalcul depuis serveur');
 
-          if (eventData && eventData.data) {
-            // Utiliser directement les données calculées côté serveur
+          if (eventData?.data) {
             set({
               categoryAnalytics: eventData.data,
-              preCalculatedChartData: null, // Force recalcul du chart data
+              preCalculatedChartData: null,
+              lastCalculated: Date.now(),
             });
-
-            // Recalculer le chart data avec les nouvelles analytics
             get().calculateAllChartData();
-
-            console.log('✅ [REPORTS] Chart mis à jour depuis serveur');
           }
         });
 
         set({ websocketInitialized: true });
-        console.log('✅ [REPORTS] WebSocket listeners configurés');
       },
 
-      /**
-       * Sélecteurs pour l'état de chargement global
-       */
+      // ===== HELPERS =====
       isLoading: () => {
-        const { loading } = get();
-        return loading.categories || loading.products;
+        const state = get();
+        return (
+          state.loading ||
+          useProductDataStore.getState().loading ||
+          useCategoryDataStore.getState().loading
+        );
       },
 
       hasErrors: () => {
-        const { errors } = get();
-        return errors.categories || errors.products;
+        const state = get();
+        return (
+          state.error ||
+          useProductDataStore.getState().error ||
+          useCategoryDataStore.getState().error
+        );
       },
 
       /**
-       * Reset des erreurs
+       * 🔄 Recalcul manuel
        */
-      clearErrors: () => {
-        set({
-          errors: {
-            categories: null,
-            products: null,
-          },
-        });
+      recalculate: async () => {
+        console.log('🔄 [REPORTS] Recalcul manuel...');
+        await get().calculateCategoryAnalytics();
+        get().calculateAllChartData();
       },
     }),
     {
-      name: 'reports-store',
+      name: 'reports-store-hybrid',
       partialize: (state) => ({
-        categories: state.categories,
-        products: state.products,
         categoryAnalytics: state.categoryAnalytics,
-        lastUpdate: state.lastUpdate,
+        preCalculatedChartData: state.preCalculatedChartData,
+        lastCalculated: state.lastCalculated,
       }),
     }
   )
