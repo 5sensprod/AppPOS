@@ -2,6 +2,7 @@
 
 const Product = require('../models/Product');
 const apiEventEmitter = require('./apiEventEmitter');
+const Category = require('../models/Category');
 
 class StockStatisticsService {
   /**
@@ -14,11 +15,16 @@ class StockStatisticsService {
       // Récupérer toutes les statistiques mises à jour
       const stats = await this.calculateStockStatistics();
 
-      // Émettre l'événement
+      // 🚀 NOUVEAU : Calculer aussi les données de chart
+      const chartData = await this.calculateCategoryChartData();
+
+      // Émettre l'événement existant
       apiEventEmitter.stockStatisticsChanged(stats);
 
-      console.log('[STOCK-STATS] Statistiques recalculées et événement émis');
+      // 🚀 NOUVEAU : Émettre l'événement chart
+      apiEventEmitter.categoryChartUpdated(chartData);
 
+      console.log('[STOCK-STATS] Statistiques recalculées et événement émis');
       return stats;
     } catch (error) {
       console.error('[STOCK-STATS] Erreur lors du recalcul:', error);
@@ -27,42 +33,121 @@ class StockStatisticsService {
   }
 
   /**
+   * 🚀 NOUVELLE MÉTHODE : Calculer les données de chart de catégories
+   */
+  async calculateCategoryChartData() {
+    const allCategories = await Category.findAll();
+    const products = await Product.findAll();
+
+    const rootCategories = {};
+    let totalValue = 0;
+    let totalProducts = 0;
+    let totalMargin = 0;
+
+    // Map des catégories pour navigation rapide
+    const categoryMap = {};
+    allCategories.forEach((cat) => {
+      categoryMap[cat._id] = cat;
+    });
+
+    // Fonction pour trouver la catégorie racine
+    const findRootCategory = (categoryId) => {
+      if (!categoryId || !categoryMap[categoryId]) return null;
+      let current = categoryMap[categoryId];
+      while (current.parent_id && categoryMap[current.parent_id]) {
+        current = categoryMap[current.parent_id];
+      }
+      return current;
+    };
+
+    // Traiter chaque produit
+    products.forEach((product) => {
+      const stock = product.stock || 0;
+      if (stock <= 0 || product.type !== 'simple') return;
+
+      const purchasePrice = product.purchase_price || 0;
+      const salePrice = product.price || 0;
+      const productValue = stock * purchasePrice;
+      const productMargin = stock * (salePrice - purchasePrice);
+      const productCategories = product.categories || [];
+
+      if (productCategories.length > 0) {
+        const primaryCategoryId = productCategories[0];
+        const rootCategory = findRootCategory(primaryCategoryId);
+
+        if (rootCategory) {
+          const rootName = rootCategory.name || 'Sans nom';
+          if (!rootCategories[rootName]) {
+            rootCategories[rootName] = {
+              id: rootCategory._id,
+              name: rootName,
+              value: 0,
+              products: 0,
+              margin: 0,
+            };
+          }
+          rootCategories[rootName].value += productValue;
+          rootCategories[rootName].products += 1;
+          rootCategories[rootName].margin += productMargin;
+        }
+      } else {
+        const rootName = 'Sans catégorie';
+        if (!rootCategories[rootName]) {
+          rootCategories[rootName] = {
+            id: null,
+            name: rootName,
+            value: 0,
+            products: 0,
+            margin: 0,
+          };
+        }
+        rootCategories[rootName].value += productValue;
+        rootCategories[rootName].products += 1;
+        rootCategories[rootName].margin += productMargin;
+      }
+
+      totalValue += productValue;
+      totalProducts += 1;
+      totalMargin += productMargin;
+    });
+
+    return {
+      rootCategories: Object.values(rootCategories).sort((a, b) => b.value - a.value),
+      totals: { totalValue, totalProducts, totalMargin },
+      lastCalculated: new Date(),
+    };
+  }
+
+  /**
    * Calcule les statistiques de stock
    * (Copie de votre logique existante du controller)
    */
   async calculateStockStatistics() {
     const products = await Product.findAll();
-
     // Filtrer uniquement les produits physiques (type: 'simple')
     const simpleProducts = products.filter(
       (product) => product.type === 'simple' || (!product.type && product.sku && product.name)
     );
-
     // Produits avec stock > 0
     const productsInStock = simpleProducts.filter(
       (product) => product.stock > 0 && product.purchase_price > 0 && product.price > 0
     );
-
     // Calculs financiers
     let inventoryValue = 0;
     let retailValue = 0;
     let taxAmount = 0;
     const taxBreakdown = {};
-
     productsInStock.forEach((product) => {
       const stock = product.stock || 0;
       const purchasePrice = product.purchase_price || 0;
       const salePrice = product.price || 0;
       const taxRate = product.tax_rate || 20;
-
       // Valeurs
       inventoryValue += stock * purchasePrice;
       retailValue += stock * salePrice;
-
       // TVA
       const productTaxAmount = (stock * salePrice * taxRate) / (100 + taxRate);
       taxAmount += productTaxAmount;
-
       // Répartition par taux
       const rateKey = `rate_${taxRate}`;
       if (!taxBreakdown[rateKey]) {
@@ -74,16 +159,13 @@ class StockStatisticsService {
           tax_amount: 0,
         };
       }
-
       taxBreakdown[rateKey].product_count++;
       taxBreakdown[rateKey].inventory_value += stock * purchasePrice;
       taxBreakdown[rateKey].retail_value += stock * salePrice;
       taxBreakdown[rateKey].tax_amount += productTaxAmount;
     });
-
     const potentialMargin = retailValue - inventoryValue;
     const marginPercentage = inventoryValue > 0 ? (potentialMargin / inventoryValue) * 100 : 0;
-
     return {
       summary: {
         total_products: products.length,

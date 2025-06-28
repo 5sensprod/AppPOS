@@ -108,6 +108,11 @@ function initializeWebSocketEventBridge() {
     websocketManager.notifyStockStatisticsChanged(payload);
   });
 
+  apiEventEmitter.on('category.chart.updated', (payload) => {
+    console.log(`[EVENT-WS] Charts de catégories mis à jour relayés vers WebSocket`);
+    websocketManager.notifyCategoryChartUpdated(payload);
+  });
+
   console.log('[EVENT-WS] Bridge initialisé entre Event Emitter et WebSocket Manager');
   console.log('[EVENT-WS] ✅ Événements sessions caisse et LCD ajoutés');
 }

@@ -1,7 +1,9 @@
-// src/stores/useReportsStore.js - VERSION SIMPLIFIÉE MAIS AVEC LOGIQUE ORIGINALE
+// src/stores/useReportsStore.js - VERSION COMPLÈTE AVEC WEBSOCKET
+
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import apiService from '../services/api';
+import websocketService from '../services/websocketService';
 
 const useReportsStore = create(
   devtools(
@@ -29,6 +31,9 @@ const useReportsStore = create(
         categories: null,
         products: null,
       },
+
+      // 🚀 NOUVEAU : WebSocket
+      websocketInitialized: false,
 
       // ===== ACTIONS =====
 
@@ -309,6 +314,41 @@ const useReportsStore = create(
             totalMargin: 0,
           },
         };
+      },
+
+      /**
+       * 🚀 NOUVELLE MÉTHODE : Initialisation WebSocket
+       */
+      initWebSocketListeners: () => {
+        const state = get();
+
+        if (state.websocketInitialized) {
+          console.log('🔌 [REPORTS] WebSocket déjà initialisé');
+          return;
+        }
+
+        console.log('🔌 [REPORTS] Initialisation WebSocket...');
+
+        // 🎯 ÉCOUTER L'ÉVÉNEMENT SPÉCIFIQUE DU SERVEUR
+        websocketService.on('category.chart.updated', (eventData) => {
+          console.log('📊 [REPORTS] Chart data reçues du serveur:', eventData);
+
+          if (eventData && eventData.data) {
+            // Utiliser directement les données calculées côté serveur
+            set({
+              categoryAnalytics: eventData.data,
+              preCalculatedChartData: null, // Force recalcul du chart data
+            });
+
+            // Recalculer le chart data avec les nouvelles analytics
+            get().calculateAllChartData();
+
+            console.log('✅ [REPORTS] Chart mis à jour depuis serveur');
+          }
+        });
+
+        set({ websocketInitialized: true });
+        console.log('✅ [REPORTS] WebSocket listeners configurés');
       },
 
       /**

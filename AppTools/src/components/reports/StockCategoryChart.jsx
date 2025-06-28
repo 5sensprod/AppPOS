@@ -1,25 +1,26 @@
-// src/components/reports/StockCategoryChart.jsx - UX AMÉLIORÉE
+// StockCategoryChart.jsx - VERSION COMPLÈTE CORRIGÉE
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { TrendingUp, Package, DollarSign, BarChart3 } from 'lucide-react';
-import useReportsStore from '../../stores/useReportsStore';
+import useReportsStore from '../../stores/useReportsStore'; // ← IMPORTANT
 
 /**
  * Palette de couleurs pour le camembert
  */
 const COLORS = [
-  '#3B82F6', // Bleu
-  '#10B981', // Vert
-  '#F59E0B', // Orange
-  '#EF4444', // Rouge
-  '#8B5CF6', // Violet
-  '#06B6D4', // Cyan
-  '#F97316', // Orange foncé
-  '#84CC16', // Vert lime
-  '#EC4899', // Rose
-  '#6B7280', // Gris
-  '#14B8A6', // Teal
-  '#F43F5E', // Rose rouge
+  '#3B82F6',
+  '#10B981',
+  '#F59E0B',
+  '#EF4444',
+  '#8B5CF6',
+  '#06B6D4',
+  '#F97316',
+  '#84CC16',
+  '#EC4899',
+  '#6B7280',
+  '#14B8A6',
+  '#F43F5E',
 ];
 
 /**
@@ -42,7 +43,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 /**
- * Composant de légende personnalisée avec animations
+ * Composant de légende personnalisée
  */
 const CustomLegend = ({ payload, viewMode }) => {
   return (
@@ -51,7 +52,7 @@ const CustomLegend = ({ payload, viewMode }) => {
         <div
           key={index}
           className="flex items-center gap-1 px-2 py-1 transition-opacity duration-300 ease-in-out"
-          style={{ opacity: 1 }} // Toujours visible
+          style={{ opacity: 1 }}
         >
           <div
             className="w-3 h-3 rounded-full transition-all duration-200"
@@ -67,13 +68,16 @@ const CustomLegend = ({ payload, viewMode }) => {
 };
 
 /**
- * Composant principal du camembert des catégories - UX AMÉLIORÉE
+ * Composant principal du camembert des catégories
  */
 const StockCategoryChart = ({ className = '' }) => {
   const [viewMode, setViewMode] = useState('value');
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Store Zustand optimisé
+  // 🔧 RÉCUPÉRATION SÉCURISÉE DU STORE
+  const storeState = useReportsStore();
+
+  // Destructurer les propriétés disponibles
   const {
     categories,
     products,
@@ -88,22 +92,27 @@ const StockCategoryChart = ({ className = '' }) => {
     getOptimizedChartData,
     isLoading,
     hasErrors,
-  } = useReportsStore();
+  } = storeState;
+
+  // 🔧 RÉCUPÉRATION SÉCURISÉE DES PROPRIÉTÉS WEBSOCKET
+  const websocketInitialized = storeState.websocketInitialized || false;
+  const initWebSocketListeners = storeState.initWebSocketListeners;
 
   /**
-   * 🎯 GESTION DE TRANSITION SMOOTH lors du changement de mode
+   * 🔌 INITIALISATION WEBSOCKET SÉCURISÉE
    */
-  const handleViewModeChange = (newMode) => {
-    if (newMode === viewMode) return;
-
-    setIsTransitioning(true);
-
-    // Transition d'opacité
-    setTimeout(() => {
-      setViewMode(newMode);
-      setIsTransitioning(false);
-    }, 150); // 150ms de transition
-  };
+  useEffect(() => {
+    if (!websocketInitialized && typeof initWebSocketListeners === 'function') {
+      console.log('🔌 [CHART] Initialisation WebSocket...');
+      try {
+        initWebSocketListeners();
+      } catch (error) {
+        console.error('❌ [CHART] Erreur initialisation WebSocket:', error);
+      }
+    } else if (!initWebSocketListeners) {
+      console.warn('⚠️ [CHART] initWebSocketListeners non disponible dans le store');
+    }
+  }, [websocketInitialized, initWebSocketListeners]);
 
   /**
    * Chargement intelligent des données
@@ -116,14 +125,14 @@ const StockCategoryChart = ({ className = '' }) => {
       }
 
       try {
-        if (!categories) await fetchCategories();
-        if (!products) await fetchProducts();
+        if (!categories && fetchCategories) await fetchCategories();
+        if (!products && fetchProducts) await fetchProducts();
 
-        if (categories && products && !categoryAnalytics) {
+        if (categories && products && !categoryAnalytics && calculateCategoryAnalytics) {
           calculateCategoryAnalytics();
         }
 
-        if (categoryAnalytics && !preCalculatedChartData) {
+        if (categoryAnalytics && !preCalculatedChartData && calculateAllChartData) {
           calculateAllChartData();
           console.log('✅ Données chart pré-calculées');
         }
@@ -133,19 +142,43 @@ const StockCategoryChart = ({ className = '' }) => {
     };
 
     loadData();
-  }, [categories, products, categoryAnalytics, preCalculatedChartData]);
+  }, [
+    categories,
+    products,
+    categoryAnalytics,
+    preCalculatedChartData,
+    fetchCategories,
+    fetchProducts,
+    calculateCategoryAnalytics,
+    calculateAllChartData,
+  ]);
 
   useEffect(() => {
-    if (categoryAnalytics && !preCalculatedChartData) {
+    if (categoryAnalytics && !preCalculatedChartData && calculateAllChartData) {
       calculateAllChartData();
     }
   }, [categoryAnalytics, preCalculatedChartData, calculateAllChartData]);
 
   /**
+   * Gestion de transition
+   */
+  const handleViewModeChange = (newMode) => {
+    if (newMode === viewMode) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setViewMode(newMode);
+      setIsTransitioning(false);
+    }, 150);
+  };
+
+  /**
    * Données optimisées du graphique
    */
   const { chartData, totals } = useMemo(() => {
-    return getOptimizedChartData(viewMode);
+    if (getOptimizedChartData) {
+      return getOptimizedChartData(viewMode);
+    }
+    return { chartData: [], totals: { totalValue: 0, totalProducts: 0, totalMargin: 0 } };
   }, [getOptimizedChartData, viewMode, preCalculatedChartData]);
 
   /**
@@ -153,18 +186,9 @@ const StockCategoryChart = ({ className = '' }) => {
    */
   const chartConfig = useMemo(() => {
     const configs = {
-      value: {
-        title: 'Répartition par Valeur de Stock',
-        icon: DollarSign,
-      },
-      products: {
-        title: 'Répartition par Nombre de Produits',
-        icon: Package,
-      },
-      margin: {
-        title: 'Répartition par Marge Potentielle',
-        icon: TrendingUp,
-      },
+      value: { title: 'Répartition par Valeur de Stock', icon: DollarSign },
+      products: { title: 'Répartition par Nombre de Produits', icon: Package },
+      margin: { title: 'Répartition par Marge Potentielle', icon: TrendingUp },
     };
     return configs[viewMode] || configs.value;
   }, [viewMode]);
@@ -174,16 +198,24 @@ const StockCategoryChart = ({ className = '' }) => {
    */
   const handleRetry = async () => {
     try {
-      await Promise.all([fetchCategories(), fetchProducts()]);
-      calculateCategoryAnalytics();
-      calculateAllChartData();
+      const promises = [];
+      if (fetchCategories) promises.push(fetchCategories());
+      if (fetchProducts) promises.push(fetchProducts());
+
+      await Promise.all(promises);
+
+      if (calculateCategoryAnalytics) calculateCategoryAnalytics();
+      if (calculateAllChartData) calculateAllChartData();
     } catch (error) {
       console.error('Erreur retry:', error);
     }
   };
 
   // États de chargement
-  if (isLoading() && !chartData.length) {
+  const isCurrentlyLoading = isLoading ? isLoading() : loading?.categories || loading?.products;
+  const hasCurrentErrors = hasErrors ? hasErrors() : errors?.categories || errors?.products;
+
+  if (isCurrentlyLoading && !chartData.length) {
     return (
       <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 ${className}`}>
         <div className="flex items-center justify-center h-80">
@@ -193,8 +225,8 @@ const StockCategoryChart = ({ className = '' }) => {
     );
   }
 
-  if (hasErrors() && !chartData.length) {
-    const errorMessage = errors.categories || errors.products || 'Erreur de chargement';
+  if (hasCurrentErrors && !chartData.length) {
+    const errorMessage = errors?.categories || errors?.products || 'Erreur de chargement';
 
     return (
       <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 ${className}`}>
@@ -237,7 +269,16 @@ const StockCategoryChart = ({ className = '' }) => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="flex items-center gap-2 mb-4 sm:mb-0">
           <IconComponent className="w-5 h-5 text-blue-600" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {title}
+            {/* Indicateur WebSocket */}
+            {websocketInitialized && (
+              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                <span className="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span>
+                Temps réel
+              </span>
+            )}
+          </h3>
         </div>
 
         <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
@@ -257,11 +298,9 @@ const StockCategoryChart = ({ className = '' }) => {
         </div>
       </div>
 
-      {/* Statistiques rapides avec transition */}
+      {/* Statistiques rapides */}
       <div
-        className={`grid grid-cols-3 gap-4 mb-6 transition-opacity duration-300 ${
-          isTransitioning ? 'opacity-50' : 'opacity-100'
-        }`}
+        className={`grid grid-cols-3 gap-4 mb-6 transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`}
       >
         <div className="text-center">
           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
@@ -291,12 +330,10 @@ const StockCategoryChart = ({ className = '' }) => {
         </div>
       </div>
 
-      {/* Graphique camembert avec transitions et sans highlights */}
+      {/* Graphique camembert */}
       <div
         style={{ width: '100%', height: '400px' }}
-        className={`transition-opacity duration-300 ${
-          isTransitioning ? 'opacity-30' : 'opacity-100'
-        }`}
+        className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-30' : 'opacity-100'}`}
       >
         <ResponsiveContainer>
           <PieChart>
@@ -305,18 +342,15 @@ const StockCategoryChart = ({ className = '' }) => {
               cx="50%"
               cy="50%"
               labelLine={false}
-              // 🎯 FIX: Labels flottants avec transition CSS intégrée
               label={({ name, percentage }) => `${name} (${percentage}%)`}
               outerRadius={120}
               fill="#8884d8"
               dataKey="value"
-              // 🎯 FIX 1: Désactivation des highlights mais garder tooltip
               activeIndex={undefined}
               activeShape={null}
               onMouseEnter={undefined}
               onMouseLeave={undefined}
               onClick={undefined}
-              // 🎯 FIX 2: Animation smooth des labels flottants
               animationBegin={0}
               animationDuration={300}
               animationEasing="ease-out"
@@ -325,72 +359,22 @@ const StockCategoryChart = ({ className = '' }) => {
                 <Cell
                   key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}
-                  // 🎯 FIX: Garder les events pour le tooltip mais sans highlight visuel
                   style={{ cursor: 'default' }}
                 />
               ))}
             </Pie>
-            <Tooltip
-              content={<CustomTooltip />}
-              // 🎯 FIX: Réactiver le tooltip mais sans curseur
-              cursor={false}
-              animationDuration={150}
-            />
-            {/* 🎯 FIX 2: Légende avec transition */}
+            <Tooltip content={<CustomTooltip />} cursor={false} animationDuration={150} />
             <Legend
               content={<CustomLegend viewMode={viewMode} />}
-              wrapperStyle={{
-                transition: 'opacity 300ms ease-in-out',
-              }}
+              wrapperStyle={{ transition: 'opacity 300ms ease-in-out' }}
             />
           </PieChart>
         </ResponsiveContainer>
       </div>
 
-      {/* 🎯 CSS standard pour les labels flottants + suppression highlights */}
-      <style>
-        {`
-          .recharts-pie-label-text {
-            transition: all 300ms ease-in-out !important;
-            opacity: ${isTransitioning ? '0.3' : '1'} !important;
-          }
-          .recharts-pie-label-line {
-            transition: all 300ms ease-in-out !important;
-            opacity: ${isTransitioning ? '0.3' : '1'} !important;
-          }
-          /* Supprimer les highlights mais garder les hovers pour tooltip */
-          .recharts-sector:focus {
-            outline: none !important;
-          }
-          .recharts-pie {
-            outline: none !important;
-          }
-          .recharts-surface {
-            outline: none !important;
-          }
-          /* Désactiver les effets visuels de highlight */
-          .recharts-active-shape {
-            opacity: 0 !important;
-            display: none !important;
-          }
-          /* Supprimer highlight du canvas au clic */
-          .recharts-wrapper {
-            outline: none !important;
-          }
-          .recharts-wrapper:focus {
-            outline: none !important;
-          }
-          svg:focus {
-            outline: none !important;
-          }
-        `}
-      </style>
-
-      {/* Note explicative avec transition */}
+      {/* Note explicative */}
       <div
-        className={`mt-4 text-center transition-opacity duration-300 ${
-          isTransitioning ? 'opacity-50' : 'opacity-100'
-        }`}
+        className={`mt-4 text-center transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`}
       >
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Affichage des {chartData.length} principales catégories racines
@@ -398,6 +382,7 @@ const StockCategoryChart = ({ className = '' }) => {
           {preCalculatedChartData?.lastCalculated && (
             <span className="block mt-1">
               Données calculées: {preCalculatedChartData.lastCalculated.toLocaleTimeString('fr-FR')}
+              {websocketInitialized && <span className="text-green-500"> • Temps réel</span>}
             </span>
           )}
         </p>

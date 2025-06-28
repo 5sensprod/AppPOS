@@ -278,6 +278,16 @@ class WebSocketManager {
     console.log(`[WS-STOCK] Statistiques de stock mises à jour diffusées`);
   }
 
+  notifyCategoryChartUpdated(payload) {
+    const eventData = {
+      data: payload.data,
+      timestamp: payload.timestamp,
+    };
+
+    this.broadcast('category.chart.updated', eventData);
+    console.log(`[WS-CHART] Charts de catégories mis à jour diffusés`);
+  }
+
   // ✅ MÉTHODES UTILITAIRES
   sendToClient(client, type, payload) {
     if (client.readyState === WebSocket.OPEN) {

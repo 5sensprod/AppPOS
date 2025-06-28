@@ -67,6 +67,11 @@ class ApiEventEmitter extends EventEmitter {
     console.log(`[EVENT] Émission de stock.statistics.changed`);
     this.emit('stock.statistics.changed', { data, timestamp: Date.now() });
   }
+
+  categoryChartUpdated(data) {
+    console.log(`[EVENT] Émission de category.chart.updated`);
+    this.emit('category.chart.updated', { data, timestamp: Date.now() });
+  }
 }
 
 const apiEventEmitter = new ApiEventEmitter();
