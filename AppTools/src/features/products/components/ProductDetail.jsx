@@ -41,7 +41,7 @@ function ProductDetail() {
           return (
             <GeneralInfoTab
               entity={entity}
-              fields={['designation', 'sku']} // Suppression de 'status'
+              fields={['designation', 'sku']}
               editable={editable}
               additionalSection={
                 <ProductPriceSection
@@ -49,8 +49,8 @@ function ProductDetail() {
                   editable={editable}
                   register={register}
                   errors={errors}
-                  setValue={setValue} // 🆕 AJOUT
-                  watch={watch} // 🆕 AJOUT
+                  setValue={setValue}
+                  watch={watch}
                 />
               }
             />
@@ -65,9 +65,11 @@ function ProductDetail() {
               watch={watch}
               errors={errors}
               entityId={currentId}
-              uploadImage={uploadImage}
-              deleteImage={deleteImage}
-              setMainImage={setMainImage}
+              // ✅ UTILISER LES HANDLERS DU FORMULAIRE si disponibles (mode édition)
+              // Sinon utiliser les handlers originaux (mode lecture)
+              uploadImage={formProps.onUploadImage || uploadImage}
+              deleteImage={formProps.onDeleteImage || deleteImage}
+              setMainImage={formProps.onSetMainImage || setMainImage}
               isLoading={loading}
               error={error}
             />
@@ -111,7 +113,7 @@ function ProductDetail() {
               onSync={handleSync}
               editable={editable}
               showStatus={true}
-              enableTitleGeneration={true} // Explicitement activer la génération de titre pour les produits
+              enableTitleGeneration={true}
             />
           );
         default:
@@ -137,10 +139,8 @@ function ProductDetail() {
   let visibleTabs = [];
 
   if (isNew) {
-    // En mode création, afficher uniquement l'onglet Général
     visibleTabs = [{ id: 'general', label: 'Général', icon: 'info' }];
   } else {
-    // En mode édition, afficher tous les onglets
     visibleTabs = [
       { id: 'general', label: 'Général', icon: 'info' },
       { id: 'product', label: 'Produit', icon: 'package' },
@@ -164,6 +164,10 @@ function ProductDetail() {
       onSubmit={handleSubmit}
       onCancel={handleCancel}
       onSync={handleSync}
+      // ✅ AJOUTER les handlers d'images
+      onUploadImage={uploadImage}
+      onDeleteImage={deleteImage}
+      onSetMainImage={setMainImage}
       isLoading={loading}
       error={error}
       success={success}

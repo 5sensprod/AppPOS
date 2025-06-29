@@ -55,8 +55,10 @@ function BrandDetail() {
             entityId={id}
             entityType="brand"
             galleryMode={false}
-            onUploadImage={uploadImage}
-            onDeleteImage={deleteImage}
+            // ✅ UTILISER LES HANDLERS DU FORMULAIRE si disponibles (mode édition)
+            // Sinon utiliser les handlers originaux (mode lecture)
+            onUploadImage={formProps.onUploadImage || uploadImage}
+            onDeleteImage={formProps.onDeleteImage || deleteImage}
             isLoading={loading}
             error={error}
             editable={editable}
@@ -69,8 +71,8 @@ function BrandDetail() {
             entityType="brand"
             onSync={handleSync}
             editable={editable}
-            showStatus={false} // Explicitement cacher le statut pour les marques
-            enableTitleGeneration={false} // Désactiver la génération de titre pour les marques
+            showStatus={false}
+            enableTitleGeneration={false}
           />
         );
       default:
@@ -96,6 +98,8 @@ function BrandDetail() {
       isLoading={loading}
       error={error}
       success={success}
+      onUploadImage={uploadImage} // ✅ AJOUTER
+      onDeleteImage={deleteImage}
       editable={isEditMode}
       validationSchema={validationSchema}
       defaultValues={defaultValues}

@@ -30,6 +30,9 @@ const EntityDetail = ({
   syncEnabled = false,
   // Handlers
   onDelete,
+  onUploadImage,
+  onDeleteImage,
+  onSetMainImage,
   title,
   onSync,
   onSubmit,
@@ -56,6 +59,52 @@ const EntityDetail = ({
 
   // État pour suivre si le formulaire a été modifié
   const [formDirty, setFormDirty] = useState(false);
+  const markFormAsDirty = () => {
+    if (editable) {
+      setFormDirty(true);
+      console.log('📝 Formulaire marqué comme modifié suite à upload/suppression image');
+    }
+  };
+
+  // ✅ WRAPPERS pour déclencher formDirty après actions d'images
+  const handleImageUpload = async (entityId, file) => {
+    try {
+      if (onUploadImage) {
+        const result = await onUploadImage(entityId, file);
+        markFormAsDirty(); // ✅ Marquer le formulaire comme modifié
+        return result;
+      }
+    } catch (error) {
+      console.error('Erreur upload image:', error);
+      throw error;
+    }
+  };
+
+  const handleImageDelete = async (entityId) => {
+    try {
+      if (onDeleteImage) {
+        const result = await onDeleteImage(entityId);
+        markFormAsDirty(); // ✅ Marquer le formulaire comme modifié
+        return result;
+      }
+    } catch (error) {
+      console.error('Erreur suppression image:', error);
+      throw error;
+    }
+  };
+
+  const handleSetMainImage = async (entityId, imageId, imageIndex) => {
+    try {
+      if (onSetMainImage) {
+        const result = await onSetMainImage(entityId, imageId, imageIndex);
+        markFormAsDirty(); // ✅ Marquer le formulaire comme modifié
+        return result;
+      }
+    } catch (error) {
+      console.error('Erreur définition image principale:', error);
+      throw error;
+    }
+  };
 
   // Surveiller les changements dans le formulaire
   useEffect(() => {
@@ -83,8 +132,17 @@ const EntityDetail = ({
   // Mettre à jour le formulaire si l'entité change
   useEffect(() => {
     if (editable && entity) {
+      const currentFormDirty = formDirty; // ✅ Sauvegarder l'état actuel
+
       formMethods.reset({ ...defaultValues, ...entity });
-      setFormDirty(false);
+
+      // ✅ Restaurer formDirty si il était à true (évite le reset après upload)
+      if (currentFormDirty) {
+        setFormDirty(true);
+        console.log('🔄 Entité mise à jour via WebSocket, formDirty préservé');
+      } else {
+        setFormDirty(false);
+      }
     }
   }, [entity, editable, defaultValues, formMethods]);
 
@@ -323,10 +381,8 @@ const EntityDetail = ({
         {tabs.length > 1 && (
           <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
         )}
-
         {/* Contenu des onglets */}
         {editable ? (
-          // En mode édition, on encapsule dans FormProvider
           <FormProvider {...formMethods}>
             <form onSubmit={formMethods.handleSubmit(handleFormSubmit)}>
               <div className="p-6">
@@ -340,14 +396,22 @@ const EntityDetail = ({
                     watch: formMethods.watch,
                     getValues: formMethods.getValues,
                     formState: formMethods.formState,
+                    onUploadImage: handleImageUpload,
+                    onDeleteImage: handleImageDelete,
+                    onSetMainImage: handleSetMainImage, // ✅ AJOUTER
                   })}
               </div>
             </form>
           </FormProvider>
         ) : (
-          // En mode lecture, pas besoin de FormProvider
           <div className="p-6">
-            {renderTabContent && renderTabContent(entity, activeTab, { editable: false })}
+            {renderTabContent &&
+              renderTabContent(entity, activeTab, {
+                editable: false,
+                onUploadImage,
+                onDeleteImage,
+                onSetMainImage, // ✅ AJOUTER
+              })}
           </div>
         )}
         <ConfirmModal />

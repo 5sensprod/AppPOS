@@ -57,8 +57,10 @@ function SupplierDetail() {
               entityId={currentId}
               entityType="supplier"
               galleryMode={false}
-              onUploadImage={uploadImage}
-              onDeleteImage={deleteImage}
+              // ✅ UTILISER LES HANDLERS DU FORMULAIRE si disponibles (mode édition)
+              // Sinon utiliser les handlers originaux (mode lecture)
+              onUploadImage={formProps.onUploadImage || uploadImage}
+              onDeleteImage={formProps.onDeleteImage || deleteImage}
               isLoading={loading}
               error={error}
               editable={editable}
@@ -101,6 +103,8 @@ function SupplierDetail() {
       onDelete={handleDelete}
       onSubmit={handleSubmit}
       onCancel={handleCancel}
+      onUploadImage={uploadImage}
+      onDeleteImage={deleteImage}
       isLoading={loading}
       error={error}
       success={success}

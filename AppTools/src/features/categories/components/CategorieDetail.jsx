@@ -93,8 +93,9 @@ function CategorieDetail() {
               entityId={id}
               entityType="category"
               galleryMode={false}
-              onUploadImage={handleUploadImage}
-              onDeleteImage={handleDeleteImage}
+              // ✅ CORRIGER : utiliser les handlers du hook
+              onUploadImage={formProps.onUploadImage || handleUploadImage}
+              onDeleteImage={formProps.onDeleteImage || handleDeleteImage}
               isLoading={loading}
               error={error}
               editable={editable}
@@ -108,8 +109,8 @@ function CategorieDetail() {
               entityType="category"
               onSync={handleSync}
               editable={editable}
-              showStatus={false} // Explicitement cacher le statut pour les catégories
-              enableTitleGeneration={false} // Désactiver la génération de titre pour les catégories
+              showStatus={false}
+              enableTitleGeneration={false}
             />
           );
 
@@ -145,6 +146,9 @@ function CategorieDetail() {
       onDelete={handleDelete}
       onSubmit={handleSubmit}
       onCancel={handleCancel}
+      // ✅ CORRIGER : utiliser les handlers du hook
+      onUploadImage={handleUploadImage}
+      onDeleteImage={handleDeleteImage}
       onSync={handleSync}
       isLoading={loading}
       error={error}

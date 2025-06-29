@@ -14,16 +14,19 @@ const ImagesTab = ({
   error,
   // Ajout de la prop editable
   editable = false,
+  ...formProps
 }) => {
   // Passez simplement toutes les props à EntityImageManager, y compris editable
+  const effectiveUploadHandler = formProps.onUploadImage || onUploadImage;
+  const effectiveDeleteHandler = formProps.onDeleteImage || onDeleteImage;
   return (
     <EntityImageManager
       entity={entity}
       entityId={entityId}
       entityType={entityType}
       galleryMode={galleryMode}
-      onUploadImage={onUploadImage}
-      onDeleteImage={onDeleteImage}
+      onUploadImage={effectiveUploadHandler}
+      onDeleteImage={effectiveDeleteHandler}
       onSetMainImage={onSetMainImage}
       isLoading={isLoading}
       error={error}
