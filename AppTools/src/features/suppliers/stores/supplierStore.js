@@ -1,3 +1,4 @@
+//AppTools\src\features\suppliers\stores\supplierStore.js
 import { createEntityStore } from '../../../factories/createEntityStore';
 import { createWebSocketStore } from '../../../factories/createWebSocketStore';
 import apiService from '../../../services/api';
@@ -109,7 +110,7 @@ export const useSupplierDataStore = createWebSocketStore({
   additionalChannels: [],
   additionalEvents: [
     {
-      event: 'entity.updated', // ← CHANGER ICI
+      event: 'entity.updated',
       handler: (get) => (eventData) => {
         if (eventData.entityType !== 'suppliers') return;
 
