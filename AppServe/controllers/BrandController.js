@@ -114,6 +114,11 @@ class BrandController extends BaseController {
 
       const updated = await updateBrand(req.params.id, req.body);
 
+      // ✅ AJOUT : Déclencher l'événement imageUpdated si nécessaire
+      if (req.body.image || req.body.image_metadata) {
+        this.eventService.imageUpdated(req.params.id, updated);
+      }
+
       const syncResponse = await this.syncIfNeeded([updated], res);
       if (syncResponse) return syncResponse;
 

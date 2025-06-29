@@ -10,6 +10,8 @@ const customActions = {
   WEBSOCKET_UPDATE: 'WEBSOCKET_UPDATE',
   WEBSOCKET_CREATE: 'WEBSOCKET_CREATE',
   WEBSOCKET_DELETE: 'WEBSOCKET_DELETE',
+  UPLOAD_IMAGE: 'UPLOAD_IMAGE',
+  DELETE_IMAGE: 'DELETE_IMAGE',
 };
 
 // Reducers personnalisés
@@ -62,6 +64,34 @@ const customReducers = {
       lastUpdated: Date.now(),
     };
   },
+  // ✅ NOUVEAUX REDUCERS POUR LES IMAGES
+  UPLOAD_IMAGE: (state, action) => {
+    const { id, image } = action.payload;
+    return {
+      ...state,
+      brands: state.brands.map((brand) => (brand._id === id ? { ...brand, image } : brand)),
+      lastUpdated: Date.now(),
+    };
+  },
+  DELETE_IMAGE: (state, action) => {
+    const { id } = action.payload;
+    return {
+      ...state,
+      brands: state.brands.map((brand) => (brand._id === id ? { ...brand, image: null } : brand)),
+      lastUpdated: Date.now(),
+    };
+  },
+  // ✅ ÉTATS DE CHARGEMENT
+  FETCH_START: (state) => ({
+    ...state,
+    loading: true,
+    error: null,
+  }),
+  FETCH_ERROR: (state, action) => ({
+    ...state,
+    loading: false,
+    error: action.payload,
+  }),
 };
 
 // Configuration cache (10 minutes pour les marques - très stable)
@@ -86,31 +116,112 @@ export const useBrandDataStore = createWebSocketStore({
   apiService,
   additionalChannels: [],
   additionalEvents: [
+    // ✅ ÉVÉNEMENT SPÉCIFIQUE AUX BRANDS
     {
-      event: 'entity.updated', // ← CHANGER ICI
+      event: 'brands.updated',
+      handler: (get) => (eventData) => {
+        console.log('[BRANDS] WebSocket: Mise à jour directe brand', eventData);
+
+        // ✅ VÉRIFICATION DES DONNÉES
+        if (!eventData || (!eventData._id && !eventData.entityId)) {
+          console.warn('[BRANDS] Événement WebSocket sans ID:', eventData);
+          return;
+        }
+
+        // ✅ GÉRER LE CAS OÙ data = 1 (nombre de docs modifiés)
+        if (eventData.data === 1 || typeof eventData.data === 'number') {
+          console.log('[BRANDS] Données numériques reçues, fetch individuel nécessaire');
+          const brandId = eventData.entityId || eventData._id;
+          if (brandId) {
+            // Utiliser la méthode fetchSingleItem de createWebSocketStore
+            const { fetchSingleItem } = get();
+            if (fetchSingleItem) {
+              fetchSingleItem(brandId).catch((err) => {
+                console.error('[BRANDS] Erreur fetch individuel:', err);
+              });
+            }
+          }
+          return;
+        }
+
+        // ✅ EXTRACTION DES DONNÉES
+        let brandData;
+        if (eventData._id) {
+          brandData = eventData;
+        } else if (eventData.data && eventData.data._id) {
+          brandData = eventData.data;
+        } else if (eventData.entityId && eventData.data && typeof eventData.data === 'object') {
+          brandData = { ...eventData.data, _id: eventData.entityId };
+        } else {
+          console.warn('[BRANDS] Format WebSocket non reconnu:', eventData);
+          return;
+        }
+
+        // ✅ MISE À JOUR CORRECTE AVEC SET()
+        const currentBrands = get().brands || [];
+        const updatedBrands = currentBrands.map((brand) =>
+          brand._id === brandData._id ? { ...brand, ...brandData } : brand
+        );
+
+        if (updatedBrands.some((b) => b._id === brandData._id)) {
+          // ✅ UTILISER SET() DIRECTEMENT (pas get().set())
+          const { set } = get();
+          set({
+            brands: updatedBrands,
+            lastUpdate: Date.now(),
+          });
+          console.log(`✅ [BRANDS] Brand mis à jour: ${brandData._id}`);
+        } else {
+          console.log(`⚠️ [BRANDS] Brand ${brandData._id} non trouvé dans le store local`);
+        }
+      },
+    },
+    {
+      event: 'entity.updated',
       handler: (get) => (eventData) => {
         // Vérifier que c'est bien pour les brands
         if (eventData.entityType !== 'brands') return;
 
-        console.log('[BRANDS] WebSocket: Marque mise à jour', eventData);
+        console.log('[BRANDS] WebSocket: Marque mise à jour (entité générique)', eventData);
+
+        // ✅ GÉRER LE CAS data = 1
+        if (eventData.data === 1 || typeof eventData.data === 'number') {
+          console.log('[BRANDS] Données numériques reçues (entity.updated), fetch individuel');
+          const brandId = eventData.id || eventData.entityId;
+          if (brandId) {
+            const { fetchSingleItem } = get();
+            if (fetchSingleItem) {
+              fetchSingleItem(brandId).catch((err) => {
+                console.error('[BRANDS] Erreur fetch individuel (entity):', err);
+              });
+            }
+          }
+          return;
+        }
 
         let brandData;
         if (eventData.data && eventData.id) {
-          // Format entity.updated: { entityType: "brands", id: "...", data: {...} }
           brandData = { ...eventData.data, _id: eventData.id };
         } else {
           console.warn('[BRANDS] Format de données WebSocket non reconnu:', eventData);
           return;
         }
 
-        get().dispatch?.({
-          type: 'WEBSOCKET_UPDATE',
-          payload: brandData,
+        const currentBrands = get().brands || [];
+        const updatedBrands = currentBrands.map((brand) =>
+          brand._id === brandData._id ? { ...brand, ...brandData } : brand
+        );
+
+        // ✅ CORRECTION SET()
+        const { set } = get();
+        set({
+          brands: updatedBrands,
+          lastUpdate: Date.now(),
         });
       },
     },
     {
-      event: 'entity.created', // ← CHANGER ICI
+      event: 'entity.created',
       handler: (get) => (eventData) => {
         if (eventData.entityType !== 'brands') return;
 
@@ -124,24 +235,33 @@ export const useBrandDataStore = createWebSocketStore({
           return;
         }
 
-        get().dispatch?.({
-          type: 'WEBSOCKET_CREATE',
-          payload: brandData,
-        });
+        const currentBrands = get().brands || [];
+        const exists = currentBrands.some((b) => b._id === brandData._id);
+
+        if (!exists) {
+          const { set } = get();
+          set({
+            brands: [...currentBrands, brandData],
+            lastUpdate: Date.now(),
+          });
+        }
       },
     },
     {
-      event: 'entity.deleted', // ← CHANGER ICI
+      event: 'entity.deleted',
       handler: (get) => (eventData) => {
         if (eventData.entityType !== 'brands') return;
 
         console.log('[BRANDS] WebSocket: Marque supprimée', eventData);
 
         const brandId = eventData.id || eventData.entityId;
+        const currentBrands = get().brands || [];
+        const filteredBrands = currentBrands.filter((brand) => brand._id !== brandId);
 
-        get().dispatch?.({
-          type: 'WEBSOCKET_DELETE',
-          payload: brandId,
+        const { set } = get();
+        set({
+          brands: filteredBrands,
+          lastUpdate: Date.now(),
         });
       },
     },
@@ -260,11 +380,67 @@ export function useBrand() {
 
 export { useBrandStore };
 
+// ✅ FONCTION ENRICHIE AVEC GESTION D'IMAGES
 export function useBrandExtras() {
-  const { syncBrand } = useBrandBase();
+  const brandStore = useBrand();
+
+  const uploadImage = async (brandId, file) => {
+    const wsStore = useBrandDataStore.getState();
+
+    try {
+      wsStore.dispatch({ type: 'FETCH_START' });
+
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await apiService.post(
+        `${BRAND_CONFIG.apiEndpoint}/${brandId}/image`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      wsStore.dispatch({
+        type: customActions.UPLOAD_IMAGE,
+        payload: { id: brandId, image: response.data.data?.image },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Erreur lors de l'upload d'image:", error);
+      wsStore.dispatch({ type: 'FETCH_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const deleteImage = async (brandId) => {
+    const wsStore = useBrandDataStore.getState();
+
+    try {
+      wsStore.dispatch({ type: 'FETCH_START' });
+
+      const response = await apiService.delete(`${BRAND_CONFIG.apiEndpoint}/${brandId}/image`);
+
+      wsStore.dispatch({
+        type: customActions.DELETE_IMAGE,
+        payload: { id: brandId },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Erreur lors de la suppression d'image:", error);
+      wsStore.dispatch({ type: 'FETCH_ERROR', payload: error.message });
+      throw error;
+    }
+  };
 
   return {
-    ...useBrand(),
-    syncBrand,
+    ...brandStore,
+    uploadImage,
+    deleteImage,
+    syncBrand: brandStore.syncBrand,
   };
 }

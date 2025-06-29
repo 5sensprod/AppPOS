@@ -109,12 +109,85 @@ export const useSupplierDataStore = createWebSocketStore({
   apiService,
   additionalChannels: [],
   additionalEvents: [
+    // ✅ NOUVEAUX ÉVÉNEMENTS SPÉCIFIQUES AUX IMAGES
+    {
+      event: 'suppliers.updated',
+      handler: (get) => (eventData) => {
+        console.log('[SUPPLIERS] WebSocket: Mise à jour directe supplier', eventData);
+
+        // ✅ VÉRIFICATION DES DONNÉES
+        if (!eventData || (!eventData._id && !eventData.entityId)) {
+          console.warn('[SUPPLIERS] Événement WebSocket sans ID:', eventData);
+          return;
+        }
+
+        // ✅ GÉRER LE CAS OÙ data = 1 (nombre de docs modifiés)
+        if (eventData.data === 1 || typeof eventData.data === 'number') {
+          console.log('[SUPPLIERS] Données numériques reçues, fetch individuel nécessaire');
+          const supplierId = eventData.entityId || eventData._id;
+          if (supplierId) {
+            const { fetchSingleItem } = get();
+            if (fetchSingleItem) {
+              fetchSingleItem(supplierId).catch((err) => {
+                console.error('[SUPPLIERS] Erreur fetch individuel:', err);
+              });
+            }
+          }
+          return;
+        }
+
+        // Extraire les données du supplier
+        let supplierData;
+        if (eventData._id) {
+          supplierData = eventData;
+        } else if (eventData.data && eventData.data._id) {
+          supplierData = eventData.data;
+        } else if (eventData.entityId && eventData.data && typeof eventData.data === 'object') {
+          supplierData = { ...eventData.data, _id: eventData.entityId };
+        } else {
+          console.warn('[SUPPLIERS] Format WebSocket non reconnu:', eventData);
+          return;
+        }
+
+        // ✅ CORRECTION SET()
+        const currentSuppliers = get().suppliers || [];
+        const updatedSuppliers = currentSuppliers.map((supplier) =>
+          supplier._id === supplierData._id ? { ...supplier, ...supplierData } : supplier
+        );
+
+        if (updatedSuppliers.some((s) => s._id === supplierData._id)) {
+          const { set } = get();
+          set({
+            suppliers: updatedSuppliers,
+            lastUpdate: Date.now(),
+          });
+          console.log(`✅ [SUPPLIERS] Supplier mis à jour: ${supplierData._id}`);
+        } else {
+          console.log(`⚠️ [SUPPLIERS] Supplier ${supplierData._id} non trouvé dans le store local`);
+        }
+      },
+    },
     {
       event: 'entity.updated',
       handler: (get) => (eventData) => {
         if (eventData.entityType !== 'suppliers') return;
 
-        console.log('[SUPPLIERS] WebSocket: Fournisseur mis à jour', eventData);
+        console.log('[SUPPLIERS] WebSocket: Fournisseur mis à jour (entité générique)', eventData);
+
+        // ✅ GÉRER LE CAS data = 1
+        if (eventData.data === 1 || typeof eventData.data === 'number') {
+          console.log('[SUPPLIERS] Données numériques reçues (entity.updated), fetch individuel');
+          const supplierId = eventData.id || eventData.entityId;
+          if (supplierId) {
+            const { fetchSingleItem } = get();
+            if (fetchSingleItem) {
+              fetchSingleItem(supplierId).catch((err) => {
+                console.error('[SUPPLIERS] Erreur fetch individuel (entity):', err);
+              });
+            }
+          }
+          return;
+        }
 
         let supplierData;
         if (eventData.data && eventData.id) {
@@ -124,9 +197,15 @@ export const useSupplierDataStore = createWebSocketStore({
           return;
         }
 
-        get().dispatch?.({
-          type: 'WEBSOCKET_UPDATE',
-          payload: supplierData,
+        const currentSuppliers = get().suppliers || [];
+        const updatedSuppliers = currentSuppliers.map((supplier) =>
+          supplier._id === supplierData._id ? { ...supplier, ...supplierData } : supplier
+        );
+
+        const { set } = get();
+        set({
+          suppliers: updatedSuppliers,
+          lastUpdate: Date.now(),
         });
       },
     },
@@ -145,10 +224,15 @@ export const useSupplierDataStore = createWebSocketStore({
           return;
         }
 
-        get().dispatch?.({
-          type: 'WEBSOCKET_CREATE',
-          payload: supplierData,
-        });
+        const currentSuppliers = get().suppliers || [];
+        const exists = currentSuppliers.some((s) => s._id === supplierData._id);
+
+        if (!exists) {
+          get().set({
+            suppliers: [...currentSuppliers, supplierData],
+            lastUpdate: Date.now(),
+          });
+        }
       },
     },
     {
@@ -159,10 +243,14 @@ export const useSupplierDataStore = createWebSocketStore({
         console.log('[SUPPLIERS] WebSocket: Fournisseur supprimé', eventData);
 
         const supplierId = eventData.id || eventData.entityId;
+        const currentSuppliers = get().suppliers || [];
+        const filteredSuppliers = currentSuppliers.filter(
+          (supplier) => supplier._id !== supplierId
+        );
 
-        get().dispatch?.({
-          type: 'WEBSOCKET_DELETE',
-          payload: supplierId,
+        get().set({
+          suppliers: filteredSuppliers,
+          lastUpdate: Date.now(),
         });
       },
     },

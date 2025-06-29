@@ -37,6 +37,11 @@ class SupplierController extends BaseController {
         await Brand.updateProductCount(brandId);
       }
 
+      // ✅ AJOUT : Déclencher l'événement imageUpdated si nécessaire
+      if (req.body.image || req.body.image_metadata) {
+        this.eventService.imageUpdated(req.params.id, updated);
+      }
+
       // Ajout des refs marques enrichies
       if (updated.brands?.length) {
         const brands = await Brand.find({ _id: { $in: updated.brands } });
