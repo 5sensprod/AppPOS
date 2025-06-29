@@ -1,8 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-// Si vous avez des problèmes avec l'import direct de JsBarcode
-// vous pouvez essayer cette approche alternative
-// et vous assurer que jsbarcode est correctement installé avec:
-// npm install jsbarcode
 
 const BarcodeDisplay = ({
   value,
