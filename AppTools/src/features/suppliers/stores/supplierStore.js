@@ -109,7 +109,6 @@ export const useSupplierDataStore = createWebSocketStore({
   apiService,
   additionalChannels: [],
   additionalEvents: [
-    // ✅ NOUVEAUX ÉVÉNEMENTS SPÉCIFIQUES AUX IMAGES
     {
       event: 'suppliers.updated',
       handler: (get) => (eventData) => {
@@ -149,15 +148,16 @@ export const useSupplierDataStore = createWebSocketStore({
           return;
         }
 
-        // ✅ CORRECTION SET()
-        const currentSuppliers = get().suppliers || [];
+        // ✅ UTILISER LA MÊME APPROCHE QUE LES CATÉGORIES
+        const currentState = get();
+        const currentSuppliers = currentState.suppliers || [];
         const updatedSuppliers = currentSuppliers.map((supplier) =>
           supplier._id === supplierData._id ? { ...supplier, ...supplierData } : supplier
         );
 
         if (updatedSuppliers.some((s) => s._id === supplierData._id)) {
-          const { set } = get();
-          set({
+          // ✅ UTILISER useSupplierDataStore.setState directement
+          useSupplierDataStore.setState({
             suppliers: updatedSuppliers,
             lastUpdate: Date.now(),
           });
@@ -197,13 +197,14 @@ export const useSupplierDataStore = createWebSocketStore({
           return;
         }
 
-        const currentSuppliers = get().suppliers || [];
+        const currentState = get();
+        const currentSuppliers = currentState.suppliers || [];
         const updatedSuppliers = currentSuppliers.map((supplier) =>
           supplier._id === supplierData._id ? { ...supplier, ...supplierData } : supplier
         );
 
-        const { set } = get();
-        set({
+        // ✅ UTILISER useSupplierDataStore.setState
+        useSupplierDataStore.setState({
           suppliers: updatedSuppliers,
           lastUpdate: Date.now(),
         });
@@ -224,11 +225,12 @@ export const useSupplierDataStore = createWebSocketStore({
           return;
         }
 
-        const currentSuppliers = get().suppliers || [];
+        const currentState = get();
+        const currentSuppliers = currentState.suppliers || [];
         const exists = currentSuppliers.some((s) => s._id === supplierData._id);
 
         if (!exists) {
-          get().set({
+          useSupplierDataStore.setState({
             suppliers: [...currentSuppliers, supplierData],
             lastUpdate: Date.now(),
           });
@@ -243,26 +245,28 @@ export const useSupplierDataStore = createWebSocketStore({
         console.log('[SUPPLIERS] WebSocket: Fournisseur supprimé', eventData);
 
         const supplierId = eventData.id || eventData.entityId;
-        const currentSuppliers = get().suppliers || [];
+        const currentState = get();
+        const currentSuppliers = currentState.suppliers || [];
         const filteredSuppliers = currentSuppliers.filter(
           (supplier) => supplier._id !== supplierId
         );
 
-        get().set({
+        useSupplierDataStore.setState({
           suppliers: filteredSuppliers,
           lastUpdate: Date.now(),
         });
       },
     },
-    // 🚀 BONUS : Écouter suppliers.tree.changed
     {
       event: 'suppliers.tree.changed',
       handler: (get) => (eventData) => {
         console.log('[SUPPLIERS] Tree changed → invalidation cache');
-        get().clearCache();
+        const { clearCache } = get();
+        clearCache();
         // Optionnel : refetch automatique
         setTimeout(() => {
-          get().fetchSuppliers(true);
+          const { fetchSuppliers } = get();
+          fetchSuppliers(true);
         }, 500);
       },
     },

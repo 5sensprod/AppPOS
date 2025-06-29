@@ -157,16 +157,16 @@ export const useBrandDataStore = createWebSocketStore({
           return;
         }
 
-        // ✅ MISE À JOUR CORRECTE AVEC SET()
-        const currentBrands = get().brands || [];
+        // ✅ UTILISER LA MÊME APPROCHE QUE LES CATÉGORIES
+        const currentState = get();
+        const currentBrands = currentState.brands || [];
         const updatedBrands = currentBrands.map((brand) =>
           brand._id === brandData._id ? { ...brand, ...brandData } : brand
         );
 
         if (updatedBrands.some((b) => b._id === brandData._id)) {
-          // ✅ UTILISER SET() DIRECTEMENT (pas get().set())
-          const { set } = get();
-          set({
+          // ✅ UTILISER useBrandDataStore.setState directement
+          useBrandDataStore.setState({
             brands: updatedBrands,
             lastUpdate: Date.now(),
           });
