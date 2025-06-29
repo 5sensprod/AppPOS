@@ -22,34 +22,35 @@ const supplierConfig = {
               required: true,
               placeholder: 'Nom du fournisseur...',
             },
-            {
-              name: 'supplier_code',
-              label: 'Code fournisseur',
-              type: 'text',
-              placeholder: 'Code interne...',
-            },
-            {
-              name: 'customer_code',
-              label: 'Code client',
-              type: 'text',
-              placeholder: 'Code chez le fournisseur...',
-            },
+            // ✂️ Temporairement commenté pour test
+            // {
+            //   name: 'supplier_code',
+            //   label: 'Code fournisseur',
+            //   type: 'text',
+            //   placeholder: 'Code interne...'
+            // },
+            // {
+            //   name: 'customer_code',
+            //   label: 'Code client',
+            //   type: 'text',
+            //   placeholder: 'Code chez le fournisseur...'
+            // }
           ],
         },
-        {
-          title: 'Relations',
-          fields: [
-            {
-              name: 'brands',
-              label: 'Marques',
-              type: 'multiselect',
-              showImages: true,
-              placeholder: 'Sélectionner des marques...',
-              // Les options seront injectées dynamiquement via _specialFields
-              options: [],
-            },
-          ],
-        },
+        // ✂️ Section Relations temporairement commentée
+        // {
+        //   title: 'Relations',
+        //   fields: [
+        //     {
+        //       name: 'brands',
+        //       label: 'Marques',
+        //       type: 'multiselect',
+        //       showImages: true,
+        //       placeholder: 'Sélectionner des marques...',
+        //       options: []
+        //     }
+        //   ]
+        // }
       ],
     },
     {
@@ -145,10 +146,13 @@ const supplierConfig = {
       icon: Image,
       sections: [
         {
-          title: 'Gestion des images',
+          title: 'Image principale',
           fields: [
-            // Ce tab sera géré spécialement par ImagesTab component
-            // Pas besoin de fields ici
+            {
+              name: 'image',
+              label: 'Logo du fournisseur',
+              type: 'image',
+            },
           ],
         },
       ],

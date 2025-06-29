@@ -6,8 +6,17 @@ import SelectInput from '../components/atoms/SelectInput';
 import EmailInput from '../components/atoms/EmailInput';
 import NumberInput from '../components/atoms/NumberInput';
 import MultiSelectInput from '../components/atoms/MultiSelectInput';
+import ImageUpload from '../components/atoms/ImageUpload';
+import ImageDisplay from '../components/atoms/ImageDisplay';
 
 const FieldRenderer = ({ fieldConfig, editable, entity = {} }) => {
+  console.log('🐛 [FIELD_RENDERER] Debug:', {
+    fieldConfig,
+    editable,
+    entity,
+    entityKeys: entity ? Object.keys(entity) : null,
+  });
+
   const {
     name,
     label,
@@ -30,12 +39,23 @@ const FieldRenderer = ({ fieldConfig, editable, entity = {} }) => {
     for (const key of keys) {
       value = value?.[key];
     }
+    console.log(`🔍 [FIELD_RENDERER] Valeur pour "${name}":`, value);
     return value;
   };
 
   // Mode lecture - Affichage optimisé par type
   if (!editable) {
     const value = getValue();
+
+    // Gestion spéciale pour le type image en mode lecture
+    if (type === 'image') {
+      return (
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
+          <ImageDisplay image={value} alt={label} size="medium" editable={false} showInfo={true} />
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-1">
@@ -120,6 +140,56 @@ const FieldRenderer = ({ fieldConfig, editable, entity = {} }) => {
     case 'multiselect':
       return <MultiSelectInput {...commonProps} options={options} showImages={showImages} />;
 
+    case 'image':
+      const currentImage = getValue();
+      return (
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+
+          {/* Affichage de l'image actuelle */}
+          {currentImage?.src && (
+            <ImageDisplay
+              image={currentImage}
+              alt={label}
+              size="large"
+              editable={true}
+              onDelete={() => {
+                // Utiliser la fonction globale passée par SupplierDetailV2
+                if (window.deleteEntityImage) {
+                  window.deleteEntityImage(entity._id);
+                } else {
+                  console.warn('Fonction deleteEntityImage non disponible');
+                }
+              }}
+              showInfo={true}
+            />
+          )}
+
+          {/* Upload d'une nouvelle image */}
+          <ImageUpload
+            onUpload={(file) => {
+              // Utiliser la fonction globale passée par SupplierDetailV2
+              if (window.uploadEntityImage) {
+                return window.uploadEntityImage(entity._id, file);
+              } else {
+                console.warn('Fonction uploadEntityImage non disponible');
+                return Promise.reject(new Error('Fonction upload non disponible'));
+              }
+            }}
+            onError={(error) => {
+              console.error('Erreur upload image:', error);
+              // Optionnel : vous pouvez ajouter une notification d'erreur ici
+            }}
+            buttonText={currentImage?.src ? "Remplacer l'image" : 'Ajouter une image'}
+            acceptedTypes={['image/jpeg', 'image/png', 'image/gif', 'image/webp']}
+            maxFileSize={5 * 1024 * 1024} // 5MB
+          />
+        </div>
+      );
+
     default:
       return (
         <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
@@ -127,7 +197,7 @@ const FieldRenderer = ({ fieldConfig, editable, entity = {} }) => {
             ⚠️ Type de champ non supporté : <strong>{type}</strong>
           </p>
           <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
-            Types disponibles : text, email, textarea, number, select, multiselect
+            Types disponibles : text, email, textarea, number, select, multiselect, image
           </p>
         </div>
       );
