@@ -262,19 +262,68 @@ const EntityTable = ({
     toastActions, // ✅ AJOUT - Dépendance pour les toasts
   ]);
 
-  const handleBatchSync = useCallback(() => {
+  const handleBatchSync = useCallback(async () => {
     if (selectedItems.length === 0) return;
 
-    if (hasBatchSync) {
-      onBatchSync(selectedItems).catch((err) =>
-        console.error(`Erreur de synchronisation par lot:`, err)
-      );
-    } else if (hasSync) {
-      Promise.all(selectedItems.map((id) => onSync(id))).catch((err) =>
-        console.error(`Erreur de synchronisation:`, err)
-      );
+    // 1. Récupérer entités pour noms
+    const selectedEntities = selectedItems
+      .map((id) => filteredData.find((item) => item._id === id))
+      .filter(Boolean);
+
+    // 2. Construire noms pour modal
+    const entityNames = selectedEntities
+      .map((entity) => entity._originalName || entity.name || entity.designation || entity._id)
+      .slice(0, 3)
+      .join(', ');
+    const moreText =
+      selectedEntities.length > 3 ? ` et ${selectedEntities.length - 3} autre(s)` : '';
+    const displayNames = `${entityNames}${moreText}`;
+
+    try {
+      // 3. Modal de confirmation
+      const confirmed = await confirm({
+        title: 'Confirmer la synchronisation',
+        message: `Synchroniser ${selectedEntities.length === 1 ? 'cette' : 'ces'} ${
+          selectedEntities.length === 1 ? entityName : entityNamePlural
+        } ?\n\n${displayNames}`,
+        confirmText: 'Synchroniser',
+        cancelText: 'Annuler',
+        variant: 'primary',
+      });
+
+      if (!confirmed) return;
+
+      // 4. Toast de démarrage
+      toastActions.sync.start(selectedEntities.length, entityName);
+
+      // 5. Appel API
+      if (hasBatchSync) {
+        await onBatchSync(selectedItems);
+      } else if (hasSync) {
+        await Promise.all(selectedItems.map((id) => onSync(id)));
+      }
+
+      // 6. Toast de succès avec noms
+      toastActions.sync.success(selectedEntities.length, entityName);
+
+      setSelectedItems([]);
+    } catch (err) {
+      console.error('❌ Erreur synchronisation:', err);
+      toastActions.sync.error(err.message, entityName);
     }
-  }, [selectedItems, hasBatchSync, hasSync, onBatchSync, onSync]);
+  }, [
+    selectedItems,
+    filteredData,
+    entityName,
+    entityNamePlural,
+    hasBatchSync,
+    hasSync,
+    onBatchSync,
+    onSync,
+    setSelectedItems,
+    confirm,
+    toastActions,
+  ]);
 
   const handleBatchExport = () => setExportModalOpen(true);
 
