@@ -119,12 +119,27 @@ const EntityTable = ({
   const handleBatchDelete = useCallback(async () => {
     if (selectedItems.length === 0) return;
 
+    // ✅ GARDER - Récupération des objets pour la modal
+    const selectedEntities = selectedItems
+      .map((id) => filteredData.find((item) => item._id === id))
+      .filter(Boolean);
+
+    // ✅ GARDER - Construction du message avec noms
+    const entityNames = selectedEntities
+      .map((entity) => entity.name || entity.designation || entity._id)
+      .slice(0, 3)
+      .join(', ');
+
+    const moreText =
+      selectedEntities.length > 3 ? ` et ${selectedEntities.length - 3} autre(s)` : '';
+    const displayNames = `${entityNames}${moreText}`;
+
     try {
       const confirmed = await confirm({
         title: 'Confirmer la suppression par lot',
-        message: `Êtes-vous sûr de vouloir supprimer ces ${selectedItems.length} ${
-          selectedItems.length === 1 ? entityName : entityNamePlural
-        } ? Cette action est irréversible.`,
+        message: `Êtes-vous sûr de vouloir supprimer ${selectedEntities.length === 1 ? 'cette' : 'ces'} ${
+          selectedEntities.length === 1 ? entityName : entityNamePlural
+        } ?\n\n${displayNames}\n\nCette action est irréversible.`,
         confirmText: 'Supprimer tout',
         cancelText: 'Annuler',
         variant: 'danger',
@@ -133,9 +148,11 @@ const EntityTable = ({
       if (!confirmed) return;
 
       if (hasBatchDelete) {
+        // ✅ CORRECTION - Passer selectedItems (IDs) au lieu de selectedEntities
         await onBatchDelete(selectedItems);
         setSelectedItems([]);
       } else if (typeof onDelete === 'function') {
+        // ✅ GARDER - Passer les IDs individuellement
         await Promise.all(selectedItems.map((id) => onDelete(id)));
         setSelectedItems([]);
       }
@@ -144,6 +161,7 @@ const EntityTable = ({
     }
   }, [
     selectedItems,
+    filteredData,
     entityName,
     entityNamePlural,
     hasBatchDelete,
