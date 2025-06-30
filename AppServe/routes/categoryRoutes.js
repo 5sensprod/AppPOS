@@ -7,16 +7,18 @@ const { createCategorySchema, updateCategorySchema } = require('../validation/sc
 const categoryImageRoutes = require('./image/categoryImageRoutes');
 const wooSyncMiddleware = require('../middleware/wooSyncMiddleware');
 const Category = require('../models/Category');
-// Ajouter cette ligne pour importer ResponseHandler
 const ResponseHandler = require('../handlers/ResponseHandler');
+const { categoryDependencyValidation } = require('../middleware/dependencyValidationMiddleware');
 
 // Routes principales des catégories
 router.get('/', categoryController.getAll);
-router.get('/hierarchical', categoryController.getHierarchicalCategories); // Nouvelle route
+router.get('/hierarchical', categoryController.getHierarchicalCategories);
 router.get('/:id', categoryController.getById);
 router.post('/', validateSchema(createCategorySchema), categoryController.create);
 router.put('/:id', validateSchema(updateCategorySchema), categoryController.update);
-router.delete('/:id', categoryController.delete);
+
+router.delete('/:id', categoryDependencyValidation, categoryController.delete);
+
 router.post(
   '/:id/sync',
   (req, res, next) => {
@@ -25,6 +27,7 @@ router.post(
   },
   wooSyncMiddleware({ forceSync: true, manualSync: true })
 );
+
 router.get('/:id/path', async (req, res) => {
   try {
     const pathInfo = await Category.getCategoryPath(req.params.id);

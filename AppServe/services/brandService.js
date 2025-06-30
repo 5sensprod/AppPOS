@@ -1,7 +1,6 @@
-//AppServe\services\brandService.js
+// services/brandService.js - VERSION REFACTORISÉE
 const Brand = require('../models/Brand');
 const Supplier = require('../models/Supplier');
-const db = require('../config/database');
 const { getEntityEventService } = require('../services/events/entityEvents');
 
 // ------- VALIDATION EXISTANTE -------
@@ -42,7 +41,6 @@ async function removeBrandFromSuppliers(brandId, supplierIds = []) {
 }
 
 // ------- MÉTIER --------
-
 async function createBrand(data) {
   const { suppliers = [], supplier_id } = data;
   const brandEvents = getEntityEventService('brands');
@@ -96,17 +94,12 @@ async function updateBrand(id, updateData) {
   return Brand.findById(id);
 }
 
+// VERSION SIMPLIFIÉE SANS VALIDATION (fait par le middleware)
 async function deleteBrand(brand) {
   const { _id, suppliers = [] } = brand;
   const brandEvents = getEntityEventService('brands');
 
-  // 🔒 Vérifie s'il y a encore des produits liés à cette marque
-  const productCount = await db.products.count({ brand_id: _id });
-  if (productCount > 0) {
-    throw new Error(
-      `Impossible de supprimer cette marque : ${productCount} produit(s) encore lié(s)`
-    );
-  }
+  // ✅ Plus besoin de vérifier les produits - fait par le middleware
 
   // ➡️ Supprimer les relations avec les fournisseurs
   await removeBrandFromSuppliers(_id, suppliers);

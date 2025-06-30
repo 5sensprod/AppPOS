@@ -128,15 +128,7 @@ async function deleteCategory(category) {
   const { _id, woo_id } = category;
   const categoryEvents = getEntityEventService('categories');
 
-  const hasChildrenCat = await hasChildren(_id);
-  if (hasChildrenCat) {
-    throw new Error(`Impossible de supprimer la catégorie : des sous-catégories existent`);
-  }
-
-  const linkedProducts = await getLinkedProducts(_id);
-  if (linkedProducts.length > 0) {
-    throw new Error(`Impossible de supprimer : ${linkedProducts.length} produit(s) lié(s)`);
-  }
+  // ✅ Plus besoin de vérifier - fait par le middleware
 
   await removeCategoryFromProducts(_id);
   await Category.delete(_id);

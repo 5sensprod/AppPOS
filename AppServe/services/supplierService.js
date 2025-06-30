@@ -93,13 +93,7 @@ async function deleteSupplier(supplier) {
   const { _id, brands = [] } = supplier;
   const supplierEvents = getEntityEventService('suppliers');
 
-  // 🔒 Vérifie s'il y a encore des produits liés à ce fournisseur
-  const linkedProducts = await db.products.find({ supplier_id: _id });
-  if (linkedProducts.length > 0) {
-    throw new Error(
-      `Impossible de supprimer ce fournisseur : ${linkedProducts.length} produit(s) encore lié(s)`
-    );
-  }
+  // ✅ Plus besoin de vérifier les produits - fait par le middleware
 
   // ➡️ On supprime les relations avec les marques
   await removeSupplierFromBrands(_id, brands);
