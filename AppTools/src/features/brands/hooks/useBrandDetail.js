@@ -6,6 +6,7 @@ import { useBrandDataStore } from '../stores/brandStore';
 import { useSupplier } from '../../suppliers/stores/supplierStore';
 import getValidationSchema from '../components/validationSchema/getValidationSchema';
 import apiService from '../../../services/api';
+import { useActionToasts } from '../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
 
 export default function useBrandDetail(id, isNew) {
   const navigate = useNavigate();
@@ -22,6 +23,8 @@ export default function useBrandDetail(id, isNew) {
   const { uploadImage, deleteImage, syncBrand } = useBrandExtras();
   const brandWsStore = useBrandDataStore();
   const supplierStore = useSupplier();
+
+  const { toastActions } = useActionToasts();
 
   useEffect(() => {
     const loadSuppliers = async () => {
@@ -139,14 +142,49 @@ export default function useBrandDetail(id, isNew) {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (brandId) => {
     try {
       setLoading(true);
-      await deleteBrand(id);
+
+      const response = await apiService.delete(`/api/brands/${brandId}`);
+
+      toastActions.deletion.success(1, 'Marque');
       navigate('/products/brands');
+
+      return { success: true, dependency: false };
     } catch (err) {
       console.error('Erreur suppression:', err);
-      setError(`Erreur suppression: ${err.message}`);
+
+      const isDependendencyError =
+        err.response?.status === 400 && err.response?.data?.details?.linkedProducts;
+
+      if (isDependendencyError) {
+        const errorData = err.response.data;
+        const linkedProducts = errorData.details.linkedProducts;
+        const productCount = linkedProducts.length;
+
+        // ✅ TOAST ENRICHI AVEC LISTE DES PRODUITS
+        const productList = linkedProducts
+          .slice(0, 5) // Limiter à 5 produits pour pas surcharger
+          .map((p) => `• ${p.name}${p.sku ? ` (${p.sku})` : ''}`)
+          .join('\n');
+
+        const moreText = productCount > 5 ? `\n... et ${productCount - 5} autre(s)` : '';
+
+        toastActions.deletion.error(
+          `${errorData.error}\n\nProduits concernés :\n${productList}${moreText}`,
+          'marque'
+        );
+
+        return { success: false, dependency: true, data: errorData };
+      }
+
+      // Autres erreurs
+      const errorMessage = err.response?.data?.error || err.message || 'Erreur inconnue';
+      setError(`Erreur suppression: ${errorMessage}`);
+      toastActions.deletion.error(errorMessage, 'marque');
+
+      throw err;
     } finally {
       setLoading(false);
     }

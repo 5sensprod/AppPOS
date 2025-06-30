@@ -5,6 +5,8 @@ import { useSupplierDataStore, useSupplier, useSupplierExtras } from '../stores/
 import { useBrand } from '../../brands/stores/brandStore';
 import { getSupplierValidationSchema } from '../components/validationSchema/getValidationSchema';
 import imageProxyService from '../../../services/imageProxyService';
+import { useActionToasts } from '../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
+import apiService from '../../../services/api';
 
 export default function useSupplierDetail() {
   const { id: paramId } = useParams();
@@ -27,6 +29,8 @@ export default function useSupplierDetail() {
 
   const supplierWsStore = useSupplierDataStore();
   const { fetchBrands } = useBrand();
+
+  const { toastActions } = useActionToasts();
 
   // WebSocket init pour les mises à jour de fournisseurs
   useEffect(() => {
@@ -227,13 +231,84 @@ export default function useSupplierDetail() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (supplierId) => {
     try {
       setLoading(true);
-      await deleteSupplier(paramId);
+
+      // Appel direct à l'API au lieu du store pour gérer les erreurs 400
+      const response = await apiService.delete(`/api/suppliers/${supplierId}`);
+
+      // Si on arrive ici, la suppression a réussi
+      toastActions.deletion.success(1, 'Fournisseur');
       navigate('/products/suppliers');
+
+      // Retourner le succès pour EntityDetail
+      return { success: true, dependency: false };
     } catch (err) {
-      setError(err.message);
+      console.error('Erreur suppression:', err);
+
+      // ✅ Vérifier si c'est une erreur de dépendance (400 avec linkedProducts)
+      if (err.response?.status === 400 && err.response?.data?.details?.linkedProducts) {
+        const errorData = err.response.data;
+        const linkedProducts = errorData.details.linkedProducts;
+        const productCount = linkedProducts.length;
+
+        // ✅ TOAST ENRICHI AVEC LISTE DES PRODUITS
+        const productList = linkedProducts
+          .slice(0, 5) // Limiter à 5 produits pour pas surcharger
+          .map((p) => `• ${p.name}${p.sku ? ` (${p.sku})` : ''}`)
+          .join('\n');
+
+        const moreText = productCount > 5 ? `\n... et ${productCount - 5} autre(s)` : '';
+
+        toastActions.deletion.error(
+          `${errorData.error}\n\nProduits concernés :\n${productList}${moreText}`,
+          'fournisseur'
+        );
+
+        // NE PAS naviguer, rester sur la page
+        return { success: false, dependency: true, data: errorData };
+      }
+
+      // ✅ Vérifier les erreurs de dépendance avec marques (spécifique aux suppliers)
+      if (err.response?.status === 400 && err.response?.data?.details?.brandsWithProducts) {
+        const errorData = err.response.data;
+        const brandsWithProducts = errorData.details.brandsWithProducts;
+
+        // Compter le total de produits
+        const totalProducts = brandsWithProducts.reduce(
+          (sum, brand) => sum + brand.productCount,
+          0
+        );
+
+        // Construire la liste des marques avec produits
+        const brandList = brandsWithProducts
+          .slice(0, 3) // Limiter à 3 marques
+          .map(
+            (brand) =>
+              `• ${brand.name} (${brand.productCount} produit${brand.productCount > 1 ? 's' : ''})`
+          )
+          .join('\n');
+
+        const moreBrands =
+          brandsWithProducts.length > 3
+            ? `\n... et ${brandsWithProducts.length - 3} autre(s) marque(s)`
+            : '';
+
+        toastActions.deletion.error(
+          `${errorData.error}\n\nMarques concernées :\n${brandList}${moreBrands}\n\nTotal : ${totalProducts} produit(s)`,
+          'fournisseur'
+        );
+
+        return { success: false, dependency: true, data: errorData };
+      }
+
+      // Autres erreurs (réseau, 500, etc.)
+      const errorMessage = err.response?.data?.error || err.message || 'Erreur inconnue';
+      setError(`Erreur suppression: ${errorMessage}`);
+      toastActions.deletion.error(errorMessage, 'fournisseur');
+
+      return { success: false, dependency: false };
     } finally {
       setLoading(false);
     }

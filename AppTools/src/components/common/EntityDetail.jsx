@@ -158,7 +158,6 @@ const EntityDetail = ({
   // Gérer la suppression de l'entité
   const handleDelete = async () => {
     try {
-      // Utiliser la modal React au lieu de window.confirm
       const confirmed = await confirm({
         title: 'Confirmer la suppression',
         message: `Êtes-vous sûr de vouloir supprimer ${entityName ? `ce ${entityName}` : 'cet élément'} ? Cette action est irréversible.`,
@@ -169,8 +168,18 @@ const EntityDetail = ({
 
       if (!confirmed) return;
 
-      console.log('🗑️ Début de suppression (sans window.confirm)');
-      await onDelete(entityId);
+      console.log('🗑️ Début de suppression');
+
+      // ✅ MODIFICATION: Attendre le résultat et vérifier le type d'erreur
+      const result = await onDelete(entityId);
+
+      // Si le résultat indique une dépendance, ne pas naviguer
+      if (result?.dependency) {
+        console.log('⚠️ Suppression bloquée par dépendance - rester sur la page');
+        return; // Rester sur la page
+      }
+
+      // Si succès ou pas de résultat spécial, naviguer
       navigate(baseRoute);
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);

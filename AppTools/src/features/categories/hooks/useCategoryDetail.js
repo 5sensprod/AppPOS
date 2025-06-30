@@ -10,6 +10,8 @@ import {
   formatCategoryData,
   extractCategoryId,
 } from '../services/categoryService';
+import { useActionToasts } from '../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
+import apiService from '../../../services/api';
 
 export default function useCategoryDetail() {
   const { id: paramId } = useParams();
@@ -28,6 +30,8 @@ export default function useCategoryDetail() {
 
   const { getCategoryById, createCategory, updateCategory, deleteCategory } = useCategory();
   const { uploadImage, deleteImage, syncCategory } = useCategoryExtras();
+
+  const { toastActions } = useActionToasts();
 
   const {
     hierarchicalCategories,
@@ -124,13 +128,66 @@ export default function useCategoryDetail() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (categoryId) => {
     try {
       setLoading(true);
-      await deleteCategory(currentId || paramId);
+
+      const response = await apiService.delete(`/api/categories/${categoryId}`);
+
+      toastActions.deletion.success(1, 'Catégorie');
       navigate('/products/categories');
+
+      return { success: true, dependency: false };
     } catch (err) {
-      setError(`Erreur suppression: ${err.message}`);
+      console.error('Erreur suppression:', err);
+
+      // Erreur de dépendance - sous-catégories
+      if (err.response?.status === 400 && err.response?.data?.details?.children) {
+        const errorData = err.response.data;
+        const children = errorData.details.children;
+
+        const childList = children
+          .slice(0, 5)
+          .map((child) => `• ${child.name}`)
+          .join('\n');
+
+        const moreText = children.length > 5 ? `\n... et ${children.length - 5} autre(s)` : '';
+
+        toastActions.deletion.error(
+          `${errorData.error}\n\nSous-catégories :\n${childList}${moreText}`,
+          'catégorie'
+        );
+
+        return { success: false, dependency: true, data: errorData };
+      }
+
+      // Erreur de dépendance - produits liés
+      if (err.response?.status === 400 && err.response?.data?.details?.linkedProducts) {
+        const errorData = err.response.data;
+        const linkedProducts = errorData.details.linkedProducts;
+        const productCount = linkedProducts.length;
+
+        const productList = linkedProducts
+          .slice(0, 5)
+          .map((p) => `• ${p.name}${p.sku ? ` (${p.sku})` : ''}`)
+          .join('\n');
+
+        const moreText = productCount > 5 ? `\n... et ${productCount - 5} autre(s)` : '';
+
+        toastActions.deletion.error(
+          `${errorData.error}\n\nProduits concernés :\n${productList}${moreText}`,
+          'catégorie'
+        );
+
+        return { success: false, dependency: true, data: errorData };
+      }
+
+      // Autres erreurs
+      const errorMessage = err.response?.data?.error || err.message || 'Erreur inconnue';
+      setError(`Erreur suppression: ${errorMessage}`);
+      toastActions.deletion.error(errorMessage, 'catégorie');
+
+      return { success: false, dependency: false };
     } finally {
       setLoading(false);
     }

@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import Sidebar from './Sidebar';
 import BottomNavigation from './BottomNavigation';
 import TopNavbar from './TopNavbar';
+import ToastContainer from '../common/EntityTable/components/BatchActions/components/ToastContainer';
 import { AccessibilityProvider } from '../../contexts/AccessibilityProvider';
 import ZoneNavigationHandler from '../accessibility/ZoneNavigationHandler';
 
@@ -61,6 +62,9 @@ const MainLayout = ({ children }) => {
           {/* Bottom Navigation Mobile */}
           <BottomNavigation />
         </div>
+
+        {/* ✅ TOAST CONTAINER GLOBAL */}
+        <ToastContainer />
       </div>
     </AccessibilityProvider>
   );

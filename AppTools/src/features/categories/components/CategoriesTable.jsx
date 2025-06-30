@@ -56,32 +56,14 @@ function CategoriesTable(props) {
   const {
     loading: operationLoading,
     error,
-    executeOperation,
+    handleDeleteEntity,
+    handleSyncEntity,
   } = useEntityTable({
+    entityType: 'category',
+    fetchEntities: refreshCategories,
     deleteEntity: deleteCategory,
     syncEntity: sync ? syncCategory : undefined,
   });
-
-  const handleDeleteEntity = useCallback(
-    async (id) => {
-      if (!window.confirm(`Êtes-vous sûr de vouloir supprimer cette catégorie ?`)) return;
-      return executeOperation(async () => {
-        await deleteCategory(id);
-        await refreshCategories?.();
-      });
-    },
-    [executeOperation, deleteCategory, refreshCategories]
-  );
-
-  const handleSyncEntity = useCallback(
-    async (id) => {
-      return executeOperation(async () => {
-        await syncCategory(id);
-        await refreshCategories?.();
-      });
-    },
-    [executeOperation, syncCategory, refreshCategories]
-  );
 
   const toggleCategory = useCallback((categoryId) => {
     setExpandedCategories((prev) => ({
