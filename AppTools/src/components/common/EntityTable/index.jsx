@@ -297,11 +297,33 @@ const EntityTable = ({
       const toastId = toastActions.sync.start(selectedEntities.length, entityName);
 
       try {
-        // 5. Appel API
+        // 5. Appel API avec progression
         if (hasBatchSync) {
-          await onBatchSync(selectedItems);
+          // Sync une par une avec progression même si on a batchSync
+          let completed = 0;
+          for (const id of selectedItems) {
+            await onSync(id); // Utiliser onSync individuel pour la progression
+            completed++;
+            toastActions.sync.updateProgress(toastId, completed, selectedItems.length);
+          }
         } else if (hasSync) {
-          await Promise.all(selectedItems.map((id) => onSync(id)));
+          // ✅ SYNC UNE PAR UNE AVEC PROGRESSION
+          let completed = 0;
+
+          for (const id of selectedItems) {
+            try {
+              await onSync(id);
+              completed++;
+
+              // ✅ METTRE À JOUR LA PROGRESSION
+              toastActions.sync.updateProgress(toastId, completed, selectedItems.length);
+            } catch (syncErr) {
+              console.error(`Erreur sync ${id}:`, syncErr);
+              // Continuer même en cas d'erreur individuelle
+              completed++;
+              toastActions.sync.updateProgress(toastId, completed, selectedItems.length);
+            }
+          }
         }
 
         // ✅ SUPPRIMER le toast de progression
@@ -320,7 +342,6 @@ const EntityTable = ({
       }
     } catch (err) {
       console.error('❌ Erreur synchronisation générale:', err);
-      // Si pas de toastId (erreur avant API), pas besoin de removeToast
       toastActions.sync.error(err.message, entityName);
     }
   }, [
@@ -335,9 +356,8 @@ const EntityTable = ({
     setSelectedItems,
     confirm,
     toastActions,
-    removeToast, // ✅ AJOUTER dans les dépendances
+    removeToast,
   ]);
-
   const handleBatchExport = () => setExportModalOpen(true);
 
   const handleExportConfirm = async (exportConfig) => {

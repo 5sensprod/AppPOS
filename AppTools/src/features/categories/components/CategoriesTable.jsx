@@ -64,6 +64,15 @@ function CategoriesTable(props) {
     fetchEntities: refreshCategories,
     deleteEntity: deleteCategory,
     syncEntity: sync ? syncCategory : undefined,
+    // ✅ AJOUTER CECI :
+    batchSyncEntities: sync
+      ? async (ids) => {
+          // Synchroniser chaque catégorie individuellement
+          for (const id of ids) {
+            await syncCategory(id);
+          }
+        }
+      : undefined,
   });
 
   const toggleCategory = useCallback((categoryId) => {
