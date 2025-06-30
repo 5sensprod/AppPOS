@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// rc\components\common\EntityImageManager.jsx
+import React, { useState } from 'react';
 import { Upload, X, CheckCircle, Image as ImageIcon, RefreshCw, Trash, Plus } from 'lucide-react';
 import imageProxyService from '../../services/imageProxyService';
 
@@ -161,26 +162,28 @@ const EntityImageManager = ({
   };
 
   const handleDeleteMainImage = async () => {
-    if (!editable || !window.confirm("Êtes-vous sûr de vouloir supprimer l'image principale ?"))
-      return;
+    if (!editable) return;
 
+    // ✅ SIMPLE: Pas de window.confirm, action directe
     try {
       await onDeleteImage(entityId);
+      // ✅ Pas de toast ici - géré par EntityDetail via formDirty
     } catch (error) {
       console.error("Erreur lors de la suppression de l'image :", error);
+      // ✅ L'erreur sera gérée par le formulaire parent
     }
   };
 
   const handleDeleteGalleryImage = async (index) => {
-    if (!editable || !window.confirm('Êtes-vous sûr de vouloir supprimer cette image ?')) return;
+    if (!editable) return;
 
+    // ✅ SIMPLE: Action directe
     try {
       await onDeleteImage(entityId, index, true);
     } catch (error) {
       console.error("Erreur lors de la suppression de l'image de galerie :", error);
     }
   };
-
   const getImageUrl = (src) => (src ? imageProxyService.getImageUrl(src) : null);
 
   const renderContent = () => {
