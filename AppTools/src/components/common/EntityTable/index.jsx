@@ -12,6 +12,7 @@ import { useTableSort } from './hooks/useTableSort';
 import { useTableFilter } from './hooks/useTableFilter';
 import { useTablePagination } from './hooks/useTablePagination';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
+import { useActionToasts } from './components/BatchActions/hooks/useActionToasts';
 
 const EntityTable = ({
   data = [],
@@ -105,6 +106,8 @@ const EntityTable = ({
     preserveSelectionOnNextDataChange,
   } = useTableSelection(data, filteredData);
 
+  const { toastActions } = useActionToasts();
+
   const {
     currentPage,
     pageSize,
@@ -126,10 +129,12 @@ const EntityTable = ({
 
     // ✅ GARDER - Construction du message avec noms
     const entityNames = selectedEntities
-      .map((entity) => entity.name || entity.designation || entity._id)
+      .map((entity) => {
+        // ✅ SPÉCIAL POUR CATÉGORIES - Utiliser _originalName si name est du JSX
+        return entity._originalName || entity.name || entity.designation || entity._id;
+      })
       .slice(0, 3)
       .join(', ');
-
     const moreText =
       selectedEntities.length > 3 ? ` et ${selectedEntities.length - 3} autre(s)` : '';
     const displayNames = `${entityNames}${moreText}`;
@@ -148,16 +153,101 @@ const EntityTable = ({
       if (!confirmed) return;
 
       if (hasBatchDelete) {
-        // ✅ CORRECTION - Passer selectedItems (IDs) au lieu de selectedEntities
         await onBatchDelete(selectedItems);
+
+        // ✅ TOAST ENRICHI AVEC NOMS (adapter pour catégories)
+        if (selectedEntities.length === 1) {
+          // ✅ UTILISER _originalName pour les catégories
+          const entityDisplayName =
+            selectedEntities[0]._originalName ||
+            selectedEntities[0].name ||
+            selectedEntities[0].designation ||
+            selectedEntities[0]._id;
+          toastActions.deletion.success(1, `${entityName} "${entityDisplayName}"`);
+        } else {
+          // ✅ UTILISER _originalName pour les catégories
+          const toastEntityNames = selectedEntities
+            .slice(0, 3)
+            .map(
+              (entity) => entity._originalName || entity.name || entity.designation || entity._id
+            )
+            .join(', ');
+          const toastMoreText =
+            selectedEntities.length > 3 ? ` et ${selectedEntities.length - 3} autre(s)` : '';
+
+          toastActions.generic.success(
+            `${selectedEntities.length} ${entityNamePlural} supprimés : ${toastEntityNames}${toastMoreText}`,
+            'Suppression terminée'
+          );
+        }
+
         setSelectedItems([]);
       } else if (typeof onDelete === 'function') {
-        // ✅ GARDER - Passer les IDs individuellement
-        await Promise.all(selectedItems.map((id) => onDelete(id)));
+        // ✅ FALLBACK - Suppression individuelle avec toasts enrichis
+        let successCount = 0;
+        let failedEntities = [];
+
+        for (const entity of selectedEntities) {
+          try {
+            await onDelete(entity._id);
+            successCount++;
+          } catch (error) {
+            failedEntities.push(entity);
+            // ✅ CORRECTION - Utiliser _originalName
+            const entityName = entity._originalName || entity.name || entity._id;
+            console.error(`Erreur suppression ${entityName}:`, error);
+          }
+        }
+
+        // ✅ TOASTS SELON RÉSULTATS
+        if (successCount > 0) {
+          if (successCount === 1 && selectedEntities.length === 1) {
+            const entityDisplayName =
+              selectedEntities[0].name ||
+              selectedEntities[0].designation ||
+              selectedEntities[0]._id;
+            toastActions.deletion.success(1, `${entityName} "${entityDisplayName}"`);
+          } else {
+            const successEntities = selectedEntities.filter((e) => !failedEntities.includes(e));
+            const successNames = successEntities
+              .slice(0, 3)
+              .map(
+                (entity) => entity._originalName || entity.name || entity.designation || entity._id
+              )
+              .join(', ');
+            const successMoreText =
+              successEntities.length > 3 ? ` et ${successEntities.length - 3} autre(s)` : '';
+
+            toastActions.generic.success(
+              `${successCount} ${successCount === 1 ? entityName : entityNamePlural} supprimés : ${successNames}${successMoreText}`,
+              'Suppression terminée'
+            );
+          }
+        }
+
+        if (failedEntities.length > 0) {
+          const failedNames = failedEntities
+            .slice(0, 2)
+            .map(
+              (entity) => entity._originalName || entity.name || entity.designation || entity._id
+            ) // ✅ AJOUT _originalName
+            .join(', ');
+          const failedMoreText =
+            failedEntities.length > 2 ? ` et ${failedEntities.length - 2} autre(s)` : '';
+
+          toastActions.deletion.error(
+            `Échec suppression : ${failedNames}${failedMoreText}`,
+            entityName
+          );
+        }
+
         setSelectedItems([]);
       }
     } catch (err) {
       console.error(`❌ Erreur de suppression par lot:`, err);
+
+      // ✅ TOAST D'ERREUR ENRICHI
+      toastActions.deletion.error(`Erreur lors de la suppression : ${err.message}`, entityName);
     }
   }, [
     selectedItems,
@@ -169,6 +259,7 @@ const EntityTable = ({
     onDelete,
     setSelectedItems,
     confirm,
+    toastActions, // ✅ AJOUT - Dépendance pour les toasts
   ]);
 
   const handleBatchSync = useCallback(() => {

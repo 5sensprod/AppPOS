@@ -59,7 +59,7 @@ function CategoriesTable(props) {
     handleDeleteEntity,
     handleSyncEntity,
   } = useEntityTable({
-    entityType: 'Catégorie',
+    entityType: 'catégorie',
     fetchEntities: refreshCategories,
     deleteEntity: deleteCategory,
     syncEntity: sync ? syncCategory : undefined,

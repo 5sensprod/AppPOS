@@ -78,8 +78,8 @@ export const useEntityTable = ({
 
         await functionsRef.current.deleteEntity(id);
 
-        // Si on arrive ici, suppression réussie
-        toastActions.deletion.success(1, entityType);
+        // ✅ SUPPRIMÉ - Plus de toast ici
+        // toastActions.deletion.success(1, entityType);
 
         // Recharger les données
         if (typeof functionsRef.current.fetchEntities === 'function') {
@@ -88,31 +88,32 @@ export const useEntityTable = ({
       } catch (err) {
         console.error('Erreur suppression:', err);
 
-        // ✅ GESTION SPÉCIALE DES ERREURS DE DÉPENDANCE
+        // ✅ GESTION SPÉCIALE DES ERREURS DE DÉPENDANCE (garder pour la vue detail)
         if (err.response?.status === 400 && err.response?.data?.details?.linkedProducts) {
           const errorData = err.response.data;
           const productCount = errorData.details.linkedProducts.length;
 
-          // Toast informatif au lieu d'erreur
+          // Toast informatif au lieu d'erreur (pour la vue detail)
           toastActions.deletion.error(
             `${errorData.error}\n\n${productCount} produit(s) concerné(s)`,
             entityType
           );
 
-          // Ne pas propager l'erreur (pas de setError)
           return { success: false, dependency: true, data: errorData };
         }
+
+        // ✅ SUPPRIMÉ - Plus de toasts d'erreur ici pour vue table
+        // toastActions.deletion.error(errorMessage, entityType);
 
         // Autres erreurs (réseau, 500, etc.)
         const errorMessage = err.response?.data?.error || err.message || 'Erreur inconnue';
         setError(errorMessage);
-        toastActions.deletion.error(errorMessage, entityType);
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [executeOperation, entityType, toastActions]
+    [entityType, toastActions] // ✅ Garder toastActions pour les erreurs de dépendance
   );
 
   const handleSyncEntity = useCallback(
@@ -133,8 +134,6 @@ export const useEntityTable = ({
     async (ids) => {
       console.log(`🗑️ Suppression par lot de ${ids.length} ${entityType}s`);
 
-      const toastId = toastActions.deletion.start(ids.length, entityType);
-
       try {
         setLoading(true);
         setError(null);
@@ -145,55 +144,8 @@ export const useEntityTable = ({
         }
         // Sinon, fallback sur la suppression élément par élément
         else if (functionsRef.current.deleteEntity) {
-          let successCount = 0;
-          let failureCount = 0;
-          const errors = [];
-
           for (const id of ids) {
-            try {
-              await functionsRef.current.deleteEntity(id);
-              successCount++;
-            } catch (err) {
-              failureCount++;
-
-              // Vérifier si c'est une erreur de dépendance
-              if (err.response?.status === 400 && err.response?.data?.details?.linkedProducts) {
-                errors.push({
-                  id,
-                  type: 'dependency',
-                  message: err.response.data.error,
-                  productCount: err.response.data.details.linkedProducts.length,
-                });
-              } else {
-                errors.push({
-                  id,
-                  type: 'error',
-                  message: err.response?.data?.error || err.message,
-                });
-              }
-            }
-          }
-
-          // Gestion des résultats mixtes
-          if (errors.length > 0) {
-            const dependencyErrors = errors.filter((e) => e.type === 'dependency');
-            const otherErrors = errors.filter((e) => e.type === 'error');
-
-            if (dependencyErrors.length > 0) {
-              toastActions.generic.warning(
-                `${successCount} supprimé(s), ${dependencyErrors.length} bloqué(s) par des produits liés`,
-                'Suppression partielle'
-              );
-            }
-
-            if (otherErrors.length > 0) {
-              toastActions.deletion.error(
-                `${otherErrors.length} erreur(s) technique(s)`,
-                entityType
-              );
-            }
-          } else {
-            toastActions.deletion.success(successCount, entityType);
+            await functionsRef.current.deleteEntity(id);
           }
         }
 
@@ -203,13 +155,13 @@ export const useEntityTable = ({
         }
       } catch (err) {
         console.error('Erreur suppression par lot:', err);
-        toastActions.deletion.error(err.message, entityType);
+        // ✅ Laisser EntityTable gérer l'erreur et les toasts
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [entityType, toastActions]
+    [entityType] // ✅ SUPPRIMÉ toastActions des dépendances
   );
 
   // Nouvelle fonction pour la synchronisation par lot
