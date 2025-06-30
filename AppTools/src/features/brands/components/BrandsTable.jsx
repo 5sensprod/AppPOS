@@ -33,6 +33,15 @@ function BrandsTable(props) {
           await syncBrand(id);
         }
       : undefined,
+    // ✅ AJOUTER CECI :
+    batchSyncEntities: syncEnabled
+      ? async (ids) => {
+          // Le hook fera le fallback automatiquement
+          for (const id of ids) {
+            await syncBrand(id);
+          }
+        }
+      : undefined,
   });
 
   const isLoading = brandsLoading || operationLoading;

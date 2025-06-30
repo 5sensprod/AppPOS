@@ -1,4 +1,4 @@
-// components/ui/ConfirmModal.jsx
+// components/ui/ConfirmModal.jsx - CORRECTION
 import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -10,7 +10,7 @@ const ConfirmModal = ({
   message = 'Êtes-vous sûr ?',
   confirmText = 'Confirmer',
   cancelText = 'Annuler',
-  variant = 'danger', // danger, warning, info
+  variant = 'danger', // danger, warning, info, primary
 }) => {
   if (!isOpen) return null;
 
@@ -30,9 +30,16 @@ const ConfirmModal = ({
       icon: 'text-blue-600 dark:text-blue-400',
       confirmBtn: 'bg-blue-600 hover:bg-blue-700 text-white',
     },
+    // ✅ AJOUTER primary
+    primary: {
+      container: 'border-blue-200 dark:border-blue-800',
+      icon: 'text-blue-600 dark:text-blue-400',
+      confirmBtn: 'bg-blue-600 hover:bg-blue-700 text-white',
+    },
   };
 
-  const styles = variantStyles[variant];
+  // ✅ FALLBACK si variant invalide
+  const styles = variantStyles[variant] || variantStyles.info;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -53,7 +60,7 @@ const ConfirmModal = ({
         </div>
 
         <div className="p-4">
-          <p className="text-gray-600 dark:text-gray-300">{message}</p>
+          <p className="text-gray-600 dark:text-gray-300 whitespace-pre-line">{message}</p>
         </div>
 
         <div className="flex justify-end space-x-3 p-4 border-t border-gray-200 dark:border-gray-700">

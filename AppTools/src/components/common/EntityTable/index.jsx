@@ -106,7 +106,7 @@ const EntityTable = ({
     preserveSelectionOnNextDataChange,
   } = useTableSelection(data, filteredData);
 
-  const { toastActions } = useActionToasts();
+  const { toastActions, removeToast } = useActionToasts();
 
   const {
     currentPage,
@@ -294,21 +294,33 @@ const EntityTable = ({
       if (!confirmed) return;
 
       // 4. Toast de démarrage
-      toastActions.sync.start(selectedEntities.length, entityName);
+      const toastId = toastActions.sync.start(selectedEntities.length, entityName);
 
-      // 5. Appel API
-      if (hasBatchSync) {
-        await onBatchSync(selectedItems);
-      } else if (hasSync) {
-        await Promise.all(selectedItems.map((id) => onSync(id)));
+      try {
+        // 5. Appel API
+        if (hasBatchSync) {
+          await onBatchSync(selectedItems);
+        } else if (hasSync) {
+          await Promise.all(selectedItems.map((id) => onSync(id)));
+        }
+
+        // ✅ SUPPRIMER le toast de progression
+        removeToast(toastId);
+
+        // 6. Toast de succès
+        toastActions.sync.success(selectedEntities.length, entityName);
+
+        setSelectedItems([]);
+      } catch (apiErr) {
+        // ✅ SUPPRIMER le toast de progression en cas d'erreur API
+        removeToast(toastId);
+
+        console.error('❌ Erreur synchronisation API:', apiErr);
+        toastActions.sync.error(apiErr.message, entityName);
       }
-
-      // 6. Toast de succès avec noms
-      toastActions.sync.success(selectedEntities.length, entityName);
-
-      setSelectedItems([]);
     } catch (err) {
-      console.error('❌ Erreur synchronisation:', err);
+      console.error('❌ Erreur synchronisation générale:', err);
+      // Si pas de toastId (erreur avant API), pas besoin de removeToast
       toastActions.sync.error(err.message, entityName);
     }
   }, [
@@ -323,6 +335,7 @@ const EntityTable = ({
     setSelectedItems,
     confirm,
     toastActions,
+    removeToast, // ✅ AJOUTER dans les dépendances
   ]);
 
   const handleBatchExport = () => setExportModalOpen(true);
