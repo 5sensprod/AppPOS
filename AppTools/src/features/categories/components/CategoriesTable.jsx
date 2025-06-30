@@ -58,6 +58,7 @@ function CategoriesTable(props) {
     error,
     handleDeleteEntity,
     handleSyncEntity,
+    handleBatchSyncEntities,
   } = useEntityTable({
     entityType: 'catégorie',
     fetchEntities: refreshCategories,
@@ -298,6 +299,7 @@ function CategoriesTable(props) {
         batchActions={['delete', 'sync']}
         showActions={false}
         onSync={handleSyncEntity}
+        onBatchSync={handleBatchSyncEntities}
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 5,

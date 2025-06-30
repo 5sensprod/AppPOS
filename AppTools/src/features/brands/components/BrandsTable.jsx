@@ -21,8 +21,9 @@ function BrandsTable(props) {
     error,
     handleDeleteEntity,
     handleSyncEntity,
+    handleBatchSyncEntities,
   } = useEntityTable({
-    entityType: 'Marque',
+    entityType: 'marque',
     fetchEntities: fetchBrands,
     deleteEntity: async (id) => {
       await deleteBrand(id);
@@ -96,7 +97,6 @@ function BrandsTable(props) {
         entityNamePlural="marques"
         baseRoute="/products/brands"
         searchFields={['name', 'description']}
-        // NOUVELLES PROPS UnifiedFilterBar
         enableUnifiedFilters={true}
         unifiedFilterOptions={filterOptions}
         selectedFilters={selectedFilters}
@@ -105,6 +105,7 @@ function BrandsTable(props) {
         enableStatusFilter={false}
         onDelete={handleDeleteEntity}
         onSync={handleSyncEntity}
+        onBatchSync={handleBatchSyncEntities}
         syncEnabled={syncEnabled}
         actions={['view', 'edit', 'delete', 'sync']}
         batchActions={['delete', 'sync']}
