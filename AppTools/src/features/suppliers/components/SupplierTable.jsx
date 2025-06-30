@@ -37,7 +37,7 @@ function SupplierTable(props) {
     handleDeleteEntity,
     handleSyncEntity,
   } = useEntityTable({
-    entityType: 'supplier',
+    entityType: 'Fournisseur',
     fetchEntities: fetchSuppliers,
     deleteEntity: async (id) => {
       await deleteSupplier(id);

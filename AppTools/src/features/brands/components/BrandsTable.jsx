@@ -22,7 +22,7 @@ function BrandsTable(props) {
     handleDeleteEntity,
     handleSyncEntity,
   } = useEntityTable({
-    entityType: 'brand',
+    entityType: 'Marque',
     fetchEntities: fetchBrands,
     deleteEntity: async (id) => {
       await deleteBrand(id);
