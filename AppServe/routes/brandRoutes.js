@@ -5,6 +5,7 @@ const brandController = require('../controllers/BrandController');
 const validateSchema = require('../validation/validation');
 const { createBrandSchema, updateBrandSchema } = require('../validation/schemas');
 const brandImageRoutes = require('./image/brandImageRoutes');
+const Brand = require('../models/Brand');
 const wooSyncMiddleware = require('../middleware/wooSyncMiddleware');
 const { brandDependencyValidation } = require('../middleware/dependencyValidationMiddleware');
 
