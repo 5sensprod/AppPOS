@@ -158,9 +158,11 @@ const EntityDetail = ({
   // Gérer la suppression de l'entité
   const handleDelete = async () => {
     try {
+      const entityDisplayName = entity?.name || entity?.designation || entityName;
+
       const confirmed = await confirm({
         title: 'Confirmer la suppression',
-        message: `Êtes-vous sûr de vouloir supprimer ${entityName ? `ce ${entityName}` : 'cet élément'} ? Cette action est irréversible.`,
+        message: `Êtes-vous sûr de vouloir supprimer la ${entityName} "${entityDisplayName}" ? Cette action est irréversible.`,
         confirmText: 'Supprimer',
         cancelText: 'Annuler',
         variant: 'danger',
@@ -170,16 +172,13 @@ const EntityDetail = ({
 
       console.log('🗑️ Début de suppression');
 
-      // ✅ MODIFICATION: Attendre le résultat et vérifier le type d'erreur
       const result = await onDelete(entityId);
 
-      // Si le résultat indique une dépendance, ne pas naviguer
       if (result?.dependency) {
         console.log('⚠️ Suppression bloquée par dépendance - rester sur la page');
-        return; // Rester sur la page
+        return;
       }
 
-      // Si succès ou pas de résultat spécial, naviguer
       navigate(baseRoute);
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);

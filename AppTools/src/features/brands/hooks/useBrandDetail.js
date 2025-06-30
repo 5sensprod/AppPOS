@@ -148,7 +148,7 @@ export default function useBrandDetail(id, isNew) {
 
       const response = await apiService.delete(`/api/brands/${brandId}`);
 
-      toastActions.deletion.success(1, 'Marque');
+      toastActions.deletion.success(1, `Marque "${brand.name}"`);
       navigate('/products/brands');
 
       return { success: true, dependency: false };

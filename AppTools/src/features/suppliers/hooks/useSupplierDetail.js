@@ -239,7 +239,7 @@ export default function useSupplierDetail() {
       const response = await apiService.delete(`/api/suppliers/${supplierId}`);
 
       // Si on arrive ici, la suppression a réussi
-      toastActions.deletion.success(1, 'Fournisseur');
+      toastActions.deletion.success(1, `Fournisseur "${supplier.name}"`);
       navigate('/products/suppliers');
 
       // Retourner le succès pour EntityDetail

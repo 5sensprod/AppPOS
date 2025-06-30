@@ -134,7 +134,7 @@ export default function useCategoryDetail() {
 
       const response = await apiService.delete(`/api/categories/${categoryId}`);
 
-      toastActions.deletion.success(1, 'Catégorie');
+      toastActions.deletion.success(1, `Catégorie "${category.name}"`);
       navigate('/products/categories');
 
       return { success: true, dependency: false };
