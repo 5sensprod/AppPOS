@@ -123,6 +123,9 @@ app.use('/api/reports', authMiddleware, require('./routes/reportsRoutes'));
 
 app.use('/api/wordpress/menu', authMiddleware, wordpressMenuRoutes);
 
+const dataCopyRoutes = require('./routes/dataCopyRoutes');
+app.use('/api/data-copy', authMiddleware, dataCopyRoutes);
+
 // ✅ ROUTE D'INFO SERVEUR AVEC ID D'AUTH
 app.get('/api/server-info', (req, res) => {
   const ipAddress = getLocalIpAddress();
