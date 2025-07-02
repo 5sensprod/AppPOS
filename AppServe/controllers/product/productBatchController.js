@@ -98,14 +98,11 @@ class ProductBatchController extends BaseController {
 
   async batchUpdateCategory(req, res) {
     try {
-      const { productIds, categoryId } = req.body;
+      const { productIds, categoryId, replace = false } = req.body;
 
       // Validation
       if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
-        return ResponseHandler.badRequest(
-          res,
-          'IDs de produits requis et doivent être un tableau non vide'
-        );
+        return ResponseHandler.badRequest(res, 'IDs de produits requis');
       }
 
       if (!categoryId) {
@@ -127,19 +124,22 @@ class ProductBatchController extends BaseController {
           const product = await this.model.findById(productId);
 
           if (!product) {
-            errors.push({
-              productId,
-              message: 'Produit non trouvé',
-            });
+            errors.push({ productId, message: 'Produit non trouvé' });
             continue;
           }
 
-          const currentCategories = product.categories || [];
-          let newCategories = [categoryId];
-
-          for (const catId of currentCategories) {
-            if (catId !== categoryId) {
-              newCategories.push(catId);
+          // 🎯 LA SEULE DIFFÉRENCE : replace ou add
+          let newCategories;
+          if (replace) {
+            newCategories = [categoryId]; // Remplacer complètement
+          } else {
+            // Logique existante : ajouter sans doublons
+            const currentCategories = product.categories || [];
+            newCategories = [categoryId];
+            for (const catId of currentCategories) {
+              if (catId !== categoryId) {
+                newCategories.push(catId);
+              }
             }
           }
 
@@ -162,10 +162,7 @@ class ProductBatchController extends BaseController {
 
           updatedProducts.push(productId);
         } catch (error) {
-          console.error(
-            `Erreur lors de la mise à jour de la catégorie du produit ${productId}:`,
-            error
-          );
+          console.error(`Erreur produit ${productId}:`, error);
           errors.push({
             productId,
             message: error.message || 'Erreur de mise à jour',
@@ -175,7 +172,7 @@ class ProductBatchController extends BaseController {
 
       const result = {
         success: updatedProducts.length > 0,
-        message: `${updatedProducts.length} produits mis à jour avec succès${errors.length > 0 ? `, ${errors.length} erreurs` : ''}`,
+        message: `${updatedProducts.length} produit(s) mis à jour avec succès${errors.length > 0 ? `, ${errors.length} erreur(s)` : ''}`,
         updatedProducts,
       };
 
@@ -185,7 +182,7 @@ class ProductBatchController extends BaseController {
 
       return ResponseHandler.success(res, result);
     } catch (error) {
-      console.error('Erreur lors de la mise à jour par lot des catégories:', error);
+      console.error('Erreur batch update category:', error);
       return ResponseHandler.error(res, error);
     }
   }

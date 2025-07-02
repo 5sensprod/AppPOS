@@ -264,9 +264,17 @@ function ProductTable(props) {
     if (itemIds.length === 0) return;
 
     try {
-      await Promise.all(itemIds.map((id) => updateProduct(id, { category_id: categoryId })));
-      toastActions.category.success(itemIds.length, 'produit');
+      // Utiliser updateProduct mais avec écrasement complet
+      await Promise.all(
+        itemIds.map((id) =>
+          updateProduct(id, {
+            category_id: categoryId,
+            categories: [categoryId], // 🎯 Écraser complètement les catégories
+          })
+        )
+      );
 
+      toastActions.category.success(itemIds.length, 'produit');
       // Attendre puis recharger
       setTimeout(async () => {
         await fetchProducts();
