@@ -1,4 +1,4 @@
-// src/components/menu/initializeMenus.js
+// src/components/menu/initializeMenus.js - Ajout du menu WordPress
 import React from 'react';
 import { menuRegistry } from './MenuRegistry';
 import {
@@ -13,6 +13,7 @@ import {
   Monitor,
   Printer,
   Cog,
+  Globe, // ✅ NOUVELLE ICÔNE POUR WORDPRESS
 } from 'lucide-react';
 
 export function initializeMenus() {
@@ -64,6 +65,22 @@ export function initializeMenus() {
     icon: <ShoppingCart className="h-6 w-6" />,
     label: 'Ventes',
     path: '/sales',
+  });
+
+  // ✅ NOUVEAU : Section WordPress
+  menuRegistry.addSidebarItem({
+    id: 'wordpress',
+    icon: <Globe className="h-6 w-6" />,
+    label: 'WordPress',
+    path: '/wordpress',
+    children: [
+      {
+        id: 'wp-menu',
+        icon: <Folder className="h-5 w-5" />,
+        label: 'Menu Principal',
+        path: '/wordpress/menu',
+      },
+    ],
   });
 
   menuRegistry.addSidebarItem({

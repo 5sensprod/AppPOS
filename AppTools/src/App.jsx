@@ -1,8 +1,8 @@
-// src/App.jsx - Mise à jour avec les nouvelles routes + SESSION ZUSTAND
+// src/App.jsx - Ajout de la route Menu WordPress
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
-import { SessionProvider } from './components/SessionSync'; // ✅ NOUVEAU : Provider Zustand
+import { SessionProvider } from './components/SessionSync';
 import { initializeServices } from './services/initServices';
 import MainLayout from './components/layout/MainLayout';
 import NetworkAccess from './components/NetworkAccess';
@@ -22,6 +22,9 @@ import CategorieDetail from './features/categories/components/CategorieDetail';
 import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
 import CashierPage from './features/pos/CashierPage';
+
+// Pages WordPress
+import WordPressMenuPage from './features/wordpress/WordPressMenuPage'; // ✅ NOUVELLE PAGE
 
 // Pages de configuration
 import SettingsPage from './pages/SettingsPage';
@@ -99,7 +102,6 @@ function AppRoutes() {
   if (isAuthenticated && initializing) return <Loader message="Initialisation des services..." />;
 
   return (
-    // ✅ WRAPPER AVEC SESSION ZUSTAND
     <SessionProvider>
       <Routes>
         <Route path="/login" element={<Login theme="dark" />} />
@@ -115,13 +117,25 @@ function AppRoutes() {
           }
         />
 
-        {/* ✅ ROUTE CAISSE AVEC SESSION ZUSTAND */}
+        {/* ✅ ROUTE CAISSE */}
         <Route
           path="/caisse"
           element={
             <ProtectedRoute>
               <MainLayout>
                 <CashierPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ✅ NOUVELLE ROUTE MENU WORDPRESS */}
+        <Route
+          path="/wordpress/menu"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <WordPressMenuPage />
               </MainLayout>
             </ProtectedRoute>
           }
@@ -200,7 +214,6 @@ function AppRoutes() {
           }
         />
 
-        {/* Routes individuelles pour accès direct (optionnel) */}
         <Route
           path="/settings/lcd"
           element={
@@ -229,7 +242,6 @@ function AppRoutes() {
   );
 }
 
-// ✅ DASHBOARD AVEC LOGS POUR DEBUG
 const Dashboard = () => {
   useEffect(() => {
     console.log('📊 [DASHBOARD] Rendu du tableau de bord');
@@ -247,7 +259,6 @@ const Dashboard = () => {
   );
 };
 
-// ✅ COMPOSANT PRINCIPAL AVEC SESSION PROVIDER
 function App() {
   console.log("🚀 [APP] Démarrage de l'application avec Zustand Session");
   return <AppRoutes />;

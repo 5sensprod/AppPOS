@@ -9,7 +9,7 @@ const { getLocalIpAddress } = require('./utils/network');
 // Importer les utilitaires
 const { setupServerWithHttp } = require('./utils/server-setup');
 const { authMiddleware } = require('./utils/auth');
-const { getServerStartupId } = require('./utils/auth'); // 🔧 NOUVEAU
+const { getServerStartupId } = require('./utils/auth');
 const pathManager = require('./utils/PathManager');
 
 // WebSocket Manager
@@ -105,6 +105,8 @@ const saleRoutes = require('./routes/saleRoutes');
 const timeRoutes = require('./routes/timeRoutes');
 const backupRoutes = require('./routes/backupRoutes');
 
+const wordpressMenuRoutes = require('./routes/wordpress/menuRoutes');
+
 // Protection des routes API avec le middleware d'authentification
 app.use('/api/categories', authMiddleware, categoryRoutes);
 app.use('/api/products', authMiddleware, productRoutes);
@@ -118,6 +120,8 @@ app.use('/api/cashier', require('./routes/cashierSessionRoutes'));
 app.use('/api/time', timeRoutes);
 app.use('/api/backup', authMiddleware, backupRoutes);
 app.use('/api/reports', authMiddleware, require('./routes/reportsRoutes'));
+
+app.use('/api/wordpress/menu', authMiddleware, wordpressMenuRoutes);
 
 // ✅ ROUTE D'INFO SERVEUR AVEC ID D'AUTH
 app.get('/api/server-info', (req, res) => {
