@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import Select from 'react-select';
 
@@ -13,8 +13,13 @@ const BrandSelectField = ({ name = 'brands', options = [], editable = false, val
   const { control, watch } = useFormContext() || {};
   const selected = watch?.(name) || value || [];
 
+  // ✅ Tri alphabétique des options
+  const sortedOptions = useMemo(() => {
+    return [...options].sort((a, b) => a.label.localeCompare(b.label));
+  }, [options]);
+
   if (!editable) {
-    const selectedOptions = options.filter((opt) => selected.includes(opt.value));
+    const selectedOptions = sortedOptions.filter((opt) => selected.includes(opt.value));
     return (
       <div className="space-y-1">
         {selectedOptions.length === 0 ? (
@@ -41,8 +46,8 @@ const BrandSelectField = ({ name = 'brands', options = [], editable = false, val
         <Select
           {...field}
           isMulti
-          options={options}
-          value={options.filter((opt) => field.value?.includes(opt.value))}
+          options={sortedOptions} // ✅ Utiliser les options triées
+          value={sortedOptions.filter((opt) => field.value?.includes(opt.value))}
           onChange={(selected) => field.onChange(selected.map((opt) => opt.value))}
           formatOptionLabel={formatOptionLabel}
           placeholder="Sélectionner des marques..."

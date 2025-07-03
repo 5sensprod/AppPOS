@@ -147,16 +147,19 @@ export default function useProductDetail() {
       .finally(() => setLoading(false));
   }, [paramId, isNew, getProductById]);
 
-  // Utils: option builders
+  // Utils: option builders avec tri alphabétique
   const toOptions = (items, includeRelations = false) =>
-    items.map((i) => ({
-      value: i._id,
-      label: i.name,
-      ...(includeRelations && {
-        suppliers: i.suppliers || [],
-        brands: i.brands || [],
-      }),
-    }));
+    items
+      .map((i) => ({
+        value: i._id,
+        label: i.name,
+        ...(includeRelations && {
+          suppliers: i.suppliers || [],
+          brands: i.brands || [],
+        }),
+      }))
+      // ✅ TRI ALPHABÉTIQUE ajouté
+      .sort((a, b) => a.label.localeCompare(b.label));
 
   const categoryOptions = useMemo(() => {
     const transform = (cats, prefix = '') => {
@@ -168,6 +171,7 @@ export default function useProductDetail() {
     return transform(hierarchicalCategories);
   }, [hierarchicalCategories]);
 
+  // ✅ Options triées alphabétiquement
   const brandOptions = useMemo(() => toOptions(relatedData.brands, true), [relatedData.brands]);
 
   const supplierOptions = useMemo(
