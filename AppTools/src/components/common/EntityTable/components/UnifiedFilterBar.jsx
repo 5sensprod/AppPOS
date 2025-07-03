@@ -1,11 +1,9 @@
-// UnifiedFilterBar.jsx - Version finale avec CategorySelector et useClickOutside
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
 import { X, Filter, ChevronDown, Trash2 } from 'lucide-react';
-import { useHierarchicalCategories } from '../../../../features/categories/stores/categoryHierarchyStore';
 import CategorySelector from '../../../common/CategorySelector';
 import { useClickOutside } from './BatchActions/hooks/useClickOutside';
+import { useCategoryUtils } from '../../../hooks/useCategoryUtils';
 
 const UnifiedFilterBar = ({
   filterOptions = [],
@@ -18,6 +16,15 @@ const UnifiedFilterBar = ({
   const [newFilterType, setNewFilterType] = useState(null);
   const [selectedCategoriesForFilter, setSelectedCategoriesForFilter] = useState([]);
   const valueSelectRef = useRef(null);
+  const filterButtonRef = useRef(null);
+
+  const {
+    hierarchicalCategories,
+    categoriesLoading,
+    fetchHierarchicalCategories,
+    getCategoryName,
+    isReady: categoriesReady,
+  } = useCategoryUtils();
 
   const closeFilterDropdown = () => {
     setIsAddingFilter(false);
@@ -27,37 +34,32 @@ const UnifiedFilterBar = ({
 
   useClickOutside(valueSelectRef, isAddingFilter, closeFilterDropdown);
 
-  const {
-    hierarchicalCategories,
-    loading: categoriesLoading,
-    fetchHierarchicalCategories,
-  } = useHierarchicalCategories();
-
   useEffect(() => {
-    if (
-      enableCategories &&
-      (!hierarchicalCategories || hierarchicalCategories.length === 0) &&
-      !categoriesLoading
-    ) {
+    if (enableCategories && !categoriesLoading && hierarchicalCategories.length === 0) {
       fetchHierarchicalCategories();
     }
-  }, [hierarchicalCategories, categoriesLoading, fetchHierarchicalCategories, enableCategories]);
+  }, [
+    enableCategories,
+    categoriesLoading,
+    hierarchicalCategories.length,
+    fetchHierarchicalCategories,
+  ]);
 
   useEffect(() => {
     if (
       newFilterType === 'category' &&
       enableCategories &&
-      (!hierarchicalCategories || hierarchicalCategories.length === 0) &&
-      !categoriesLoading
+      !categoriesLoading &&
+      hierarchicalCategories.length === 0
     ) {
       fetchHierarchicalCategories();
     }
   }, [
     newFilterType,
-    hierarchicalCategories,
-    categoriesLoading,
-    fetchHierarchicalCategories,
     enableCategories,
+    categoriesLoading,
+    hierarchicalCategories.length,
+    fetchHierarchicalCategories,
   ]);
 
   const allFilterOptions = useMemo(() => {
@@ -96,7 +98,7 @@ const UnifiedFilterBar = ({
         value: type,
       }));
 
-    if (enableCategories && hierarchicalCategories.length > 0) {
+    if (enableCategories && categoriesReady) {
       if (!baseTypes.find((type) => type.value === 'category')) {
         baseTypes.push({
           label: filterTypeLabels.category,
@@ -109,7 +111,7 @@ const UnifiedFilterBar = ({
       const order = ['woo', 'status', 'image', 'description', 'category', 'brand', 'supplier'];
       return order.indexOf(a.value) - order.indexOf(b.value);
     });
-  }, [filterGroups, selectedTypes, enableCategories, hierarchicalCategories]);
+  }, [filterGroups, selectedTypes, enableCategories, categoriesReady]);
 
   const handleTypeSelect = (selected) => {
     setNewFilterType(selected?.value || null);
@@ -171,13 +173,16 @@ const UnifiedFilterBar = ({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div
+      className="flex flex-wrap items-center gap-2"
+      style={{ position: 'relative', zIndex: 1000 }}
+    >
       {isAddingFilter && newFilterType === 'category' && categoriesLoading && (
         <div className="px-3 py-2 text-sm text-gray-500">Chargement des catégories...</div>
       )}
 
       {!isAddingFilter && availableTypes.length > 0 && (
-        <div className="relative">
+        <div ref={filterButtonRef} className="relative">
           <Select
             options={availableTypes}
             onChange={handleTypeSelect}
@@ -191,7 +196,11 @@ const UnifiedFilterBar = ({
             className="w-64"
             menuPortalTarget={document.body}
             menuPlacement="auto"
+            menuPosition="fixed"
             isSearchable={false}
+            styles={{
+              menuPortal: (base) => ({ ...base, zIndex: 99999 }),
+            }}
             components={{
               DropdownIndicator: ({ innerProps }) => (
                 <div {...innerProps}>
@@ -204,30 +213,15 @@ const UnifiedFilterBar = ({
       )}
 
       {isAddingFilter && newFilterType === 'category' && !categoriesLoading && (
-        <div ref={valueSelectRef} className="relative z-[9999]">
-          <div className="w-80">
+        <div ref={valueSelectRef} className="relative">
+          <div className="w-80" style={{ position: 'relative', zIndex: 99999 }}>
             <CategorySelector
               mode="single"
               hierarchicalData={hierarchicalCategories}
               value={''}
               onChange={(selectedCategoryId) => {
                 if (selectedCategoryId) {
-                  const findCategoryName = (categories, id) => {
-                    if (!categories || categories.length === 0) return null;
-
-                    for (const cat of categories) {
-                      if (cat._id === id) {
-                        return cat.name;
-                      }
-                      if (cat.children && cat.children.length > 0) {
-                        const found = findCategoryName(cat.children, id);
-                        if (found) return found;
-                      }
-                    }
-                    return null;
-                  };
-
-                  let categoryName = findCategoryName(hierarchicalCategories, selectedCategoryId);
+                  let categoryName = getCategoryName(selectedCategoryId);
 
                   if (!categoryName) {
                     const existingFilter = selectedFilters.find(
@@ -237,12 +231,7 @@ const UnifiedFilterBar = ({
                   }
 
                   if (!categoryName) {
-                    console.warn(
-                      'Catégorie non trouvée:',
-                      selectedCategoryId,
-                      'dans',
-                      hierarchicalCategories
-                    );
+                    console.warn('Catégorie non trouvée:', selectedCategoryId);
                     categoryName = `Catégorie ${selectedCategoryId.slice(-6)}`;
                   }
 
@@ -282,12 +271,12 @@ const UnifiedFilterBar = ({
             menuIsOpen={true}
             menuPortalTarget={document.body}
             menuPlacement="auto"
-            onMenuClose={() => {
-              closeFilterDropdown();
+            menuPosition="fixed"
+            styles={{
+              menuPortal: (base) => ({ ...base, zIndex: 99999 }),
             }}
-            onBlur={() => {
-              closeFilterDropdown();
-            }}
+            onMenuClose={closeFilterDropdown}
+            onBlur={closeFilterDropdown}
           />
         </div>
       )}

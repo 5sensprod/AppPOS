@@ -1,7 +1,5 @@
-// BatchActions.jsx - Version avec gestion du stock
 import React, { useState, useEffect } from 'react';
-import { useHierarchicalCategories } from '../../../../../features/categories/stores/categoryHierarchyStore';
-
+import { useCategoryUtils } from '../../../../hooks/useCategoryUtils'; // ✅ HOOK CENTRALISÉ
 import { createActionsConfig } from './config/batchActionsConfig';
 import ActionButton from './components/ActionButton';
 
@@ -9,14 +7,13 @@ export const BatchActions = ({
   selectedItems = [],
   entityName = '',
   entityNamePlural = '',
-  // Ordre modifié : status, stock et category en premier
   batchActions = ['status', 'stock', 'category', 'delete', 'sync', 'export', 'createSheet'],
   onBatchDelete,
   onBatchSync,
   onBatchExport,
   onBatchStatusChange,
   onBatchCategoryChange,
-  onBatchStockChange, // Nouveau callback pour la gestion du stock
+  onBatchStockChange,
   onCreateSheet,
   categoryOptions = [],
   syncStats,
@@ -26,13 +23,21 @@ export const BatchActions = ({
 
   const {
     hierarchicalCategories,
-    loading: categoriesLoading,
+    categoriesLoading,
     fetchHierarchicalCategories,
-  } = useHierarchicalCategories();
+    isReady: categoriesReady,
+  } = useCategoryUtils();
 
-  // Injection des styles et chargement des catégories
+  useEffect(() => {
+    if (
+      batchActions.includes('category') &&
+      !categoriesLoading &&
+      hierarchicalCategories.length === 0
+    ) {
+      fetchHierarchicalCategories();
+    }
+  }, [batchActions, categoriesLoading, hierarchicalCategories.length, fetchHierarchicalCategories]);
 
-  // Animation de visibilité
   useEffect(() => {
     if (selectedItems.length > 0) {
       const timer = setTimeout(() => setIsVisible(true), 50);
@@ -45,7 +50,6 @@ export const BatchActions = ({
   const selectedCount = selectedItems.length;
   const itemLabel = selectedCount === 1 ? entityName : entityNamePlural;
 
-  // Configuration des actions avec callbacks
   const callbacks = {
     selectedItems,
     onBatchDelete,
@@ -88,7 +92,7 @@ export const BatchActions = ({
               openDropdown={openDropdown}
               setOpenDropdown={setOpenDropdown}
               hierarchicalData={hierarchicalCategories}
-              syncStats={syncStats} // Passer syncStats
+              syncStats={syncStats}
             />
           );
         })}
