@@ -1,3 +1,4 @@
+//AppTools\src\features\categories\components\CategoriesTable.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useCategory } from '../stores/categoryStore';
 import { useHierarchicalCategories } from '../stores/categoryHierarchyStore';
