@@ -21,49 +21,39 @@ const MainLayout = ({ children }) => {
 
   return (
     <AccessibilityProvider>
-      <div className="flex flex-col h-screen bg-white dark:bg-gray-900">
+      <div className="flex h-screen bg-white dark:bg-gray-900">
         {instructionsA11y}
         <ZoneNavigationHandler />
 
-        {/* Desktop Layout - Seulement pour les grands écrans */}
-        <div className="hidden lg:flex h-full">
-          {/* Sidebar Desktop */}
-          <Sidebar />
+        {/* ✅ Sidebar - Masquée sur mobile avec CSS */}
+        <Sidebar className="hidden lg:flex" />
 
-          {/* Contenu principal Desktop */}
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <TopNavbar />
-            <main
-              id="main-content"
-              className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800 transition-colors duration-200"
-              tabIndex="-1"
-              role="main"
-            >
-              {children}
-            </main>
-          </div>
-        </div>
-
-        {/* Mobile Layout - Pour tablettes et mobiles */}
-        <div className="flex flex-col h-full lg:hidden">
-          {/* TopNavbar Mobile */}
+        {/* ✅ Contenu principal - S'adapte automatiquement */}
+        <div className="flex flex-col flex-1 min-w-0">
+          {/* ✅ TopNavbar - Toujours visible */}
           <TopNavbar />
 
-          {/* Contenu principal Mobile */}
+          {/* ✅ Main content - UNE SEULE INSTANCE */}
           <main
             id="main-content"
-            className="flex-1 overflow-y-auto p-4 pb-20 bg-gray-50 dark:bg-gray-800 transition-colors duration-200"
+            className={`
+              flex-1 overflow-y-auto p-4 
+              bg-gray-50 dark:bg-gray-800 
+              transition-colors duration-200
+              pb-4
+              lg:pb-4
+            `}
             tabIndex="-1"
             role="main"
           >
             {children}
           </main>
 
-          {/* Bottom Navigation Mobile */}
-          <BottomNavigation />
+          {/* ✅ Bottom Navigation - Visible uniquement sur mobile */}
+          <BottomNavigation className="lg:hidden" />
         </div>
 
-        {/* ✅ TOAST CONTAINER GLOBAL */}
+        {/* ✅ Toast Container Global */}
         <ToastContainer />
       </div>
     </AccessibilityProvider>

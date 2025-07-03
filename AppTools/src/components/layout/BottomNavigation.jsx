@@ -1,11 +1,11 @@
 // src/components/layout/BottomNavigation.jsx
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronUp, X } from 'lucide-react';
+import { ChevronUp, X, Home } from 'lucide-react';
 import { useMenu } from '../menu/useMenu';
 import BottomSubMenu from './BottomSubMenu';
 
-const BottomNavigation = () => {
+const BottomNavigation = ({ className = '' }) => {
   const { sidebarItems } = useMenu();
   const location = useLocation();
   const [activeSubmenu, setActiveSubmenu] = useState(null);
@@ -22,32 +22,67 @@ const BottomNavigation = () => {
     setActiveSubmenu(activeSubmenu === itemId ? null : itemId);
   };
 
+  // ✅ CORRECTION: Définir closeSubmenu
   const closeSubmenu = () => setActiveSubmenu(null);
+
+  // Fermer le sous-menu en cliquant ailleurs
+  React.useEffect(() => {
+    const handleOutsideClick = (e) => {
+      // Fermer seulement si on clique en dehors de la navigation
+      if (!e.target.closest('nav') && !e.target.closest('[data-submenu]')) {
+        closeSubmenu();
+      }
+    };
+
+    if (activeSubmenu) {
+      document.addEventListener('click', handleOutsideClick);
+      return () => document.removeEventListener('click', handleOutsideClick);
+    }
+  }, [activeSubmenu]);
+
+  // Render sécurisé des icônes
+  const renderIcon = (icon, iconProps = {}) => {
+    if (!icon) {
+      return <Home {...iconProps} />;
+    }
+
+    if (React.isValidElement(icon)) {
+      return React.cloneElement(icon, iconProps);
+    }
+
+    if (typeof icon === 'function') {
+      const IconComponent = icon;
+      return <IconComponent {...iconProps} />;
+    }
+
+    console.warn('Icône non valide détectée:', icon);
+    return <Home {...iconProps} />;
+  };
 
   return (
     <>
-      {/* Overlay pour fermer le sous-menu */}
-      {activeSubmenu && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={closeSubmenu}
-          aria-hidden="true"
-        />
-      )}
+      {/* ✅ SUPPRESSION de l'overlay */}
 
-      {/* Sous-menu */}
+      {/* Dropdown vertical sans overlay */}
       {activeSubmenu && (
         <BottomSubMenu
           items={sidebarItems.find((item) => item.id === activeSubmenu)?.children || []}
           parentItem={sidebarItems.find((item) => item.id === activeSubmenu)}
           onClose={closeSubmenu}
           currentPath={location.pathname}
+          parentIndex={sidebarItems.findIndex((item) => item.id === activeSubmenu)}
         />
       )}
 
       {/* Bottom Navigation */}
       <nav
-        className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-30"
+        className={`
+          fixed bottom-0 left-0 right-0 
+          bg-white dark:bg-gray-800 
+          border-t border-gray-200 dark:border-gray-700 
+          z-30
+          ${className}
+        `}
         role="navigation"
         aria-label="Navigation principale"
       >
@@ -73,7 +108,7 @@ const BottomNavigation = () => {
                       aria-label={item.label}
                     >
                       <div className="relative">
-                        {React.cloneElement(item.icon, {
+                        {renderIcon(item.icon, {
                           className: 'h-6 w-6',
                           'aria-hidden': 'true',
                         })}
@@ -113,7 +148,7 @@ const BottomNavigation = () => {
                     }`}
                     aria-current={active ? 'page' : undefined}
                   >
-                    {React.cloneElement(item.icon, {
+                    {renderIcon(item.icon, {
                       className: 'h-6 w-6',
                       'aria-hidden': 'true',
                     })}

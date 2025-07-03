@@ -6,7 +6,8 @@ import SidebarMenuItem from '../menu/SidebarMenuItem';
 import { useAccessibility } from '../../contexts/AccessibilityProvider';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
 
-const Sidebar = () => {
+const Sidebar = ({ className = '' }) => {
+  // ✅ AJOUT: Support className
   const [collapsed, setCollapsed] = useState(false);
   const { sidebarItems } = useMenu();
   const { handleExpandMenu, handleCollapseMenu, handleActivateMenu, setActiveZone } =
@@ -25,9 +26,12 @@ const Sidebar = () => {
 
   return (
     <aside
-      className={`flex flex-col transition-all duration-300 ease-in-out ${
-        collapsed ? 'w-16' : 'w-64'
-      } bg-gray-800 dark:bg-gray-900 text-white`}
+      className={`
+        flex flex-col transition-all duration-300 ease-in-out 
+        ${collapsed ? 'w-16' : 'w-64'} 
+        bg-gray-800 dark:bg-gray-900 text-white
+        ${className}
+      `} // ✅ AJOUT: Merge className
       role="navigation"
       aria-label="Menu principal"
     >
