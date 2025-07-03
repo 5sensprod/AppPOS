@@ -4,7 +4,7 @@ import EntityDetail from '../../../components/common/EntityDetail';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
-import HierarchicalParentSelector from '../../../components/common/HierarchicalParentSelector';
+import CategorySelector from '../../../components/common/CategorySelector'; // ✅ NOUVEAU
 import { Controller } from 'react-hook-form';
 import { ENTITY_CONFIG } from '../constants';
 import useCategoryDetail from '../hooks/useCategoryDetail';
@@ -15,7 +15,7 @@ function CategorieDetail() {
     currentId,
     isNew,
     editable,
-    parentCategories,
+    parentCategories, // Plus nécessaire - sera supprimé
     hierarchicalCategories,
     handleSubmit,
     handleDelete,
@@ -54,19 +54,23 @@ function CategorieDetail() {
               </div>
 
               <div>
-                {/* Parent */}
+                {/* ✅ NOUVEAU : Sélecteur unifié en mode single */}
                 <label className="text-sm font-medium">Catégorie parente</label>
                 {control && (
                   <Controller
                     name="parent_id"
                     control={control}
                     render={({ field }) => (
-                      <HierarchicalParentSelector
+                      <CategorySelector
+                        mode="single"
                         hierarchicalData={hierarchicalCategories}
                         value={field.value}
                         onChange={field.onChange}
                         currentCategoryId={isNew ? null : id}
                         placeholder="Sélectionner une catégorie parent"
+                        allowRootSelection={true}
+                        showSearch={true}
+                        showCounts={true}
                       />
                     )}
                   />
@@ -93,7 +97,6 @@ function CategorieDetail() {
               entityId={id}
               entityType="category"
               galleryMode={false}
-              // ✅ CORRIGER : utiliser les handlers du hook
               onUploadImage={formProps.onUploadImage || handleUploadImage}
               onDeleteImage={formProps.onDeleteImage || handleDeleteImage}
               isLoading={loading}
@@ -146,7 +149,6 @@ function CategorieDetail() {
       onDelete={handleDelete}
       onSubmit={handleSubmit}
       onCancel={handleCancel}
-      // ✅ CORRIGER : utiliser les handlers du hook
       onUploadImage={handleUploadImage}
       onDeleteImage={handleDeleteImage}
       onSync={handleSync}

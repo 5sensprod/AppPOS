@@ -5,6 +5,7 @@ import { Star } from 'lucide-react';
 import ModernCategorySelector from '../../../../components/common/ModernCategorySelector';
 import BrandSelectField from '../../../../components/common/fields/BrandSelectField';
 import SupplierSelectField from '../../../../components/common/fields/SupplierSelectField';
+import CategorySelector from '../../../../components/common/CategorySelector';
 
 // ===== UTILITAIRES DE CATÉGORIES (logique ProductTable.jsx) =====
 
@@ -309,12 +310,15 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
             Catégories du produit
           </label>
 
-          <ModernCategorySelector
+          <CategorySelector
+            mode="multiple"
             hierarchicalData={hierarchicalCategories}
             selectedCategories={selectedCategories}
             primaryCategoryId={selectedCategoryId}
-            onChange={handleCategoryChange}
+            onMultipleChange={handleCategoryChange}
             placeholder="Ajouter des catégories au produit"
+            showSearch={true}
+            showCounts={true}
           />
 
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
