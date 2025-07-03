@@ -2,13 +2,6 @@ import React, { useMemo } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import Select from 'react-select';
 
-const formatOptionLabel = ({ label, image }) => (
-  <div className="flex items-center gap-2">
-    {image?.src && <img src={image.src} alt={label} className="w-6 h-6 object-cover rounded" />}
-    <span>{label}</span>
-  </div>
-);
-
 // ✅ Styles modernes tirés de CategoriesSection
 const modernSelectStyles = {
   control: (provided, state) => ({
@@ -62,9 +55,6 @@ const BrandSelectField = ({ name = 'brand_id', options = [], editable = false, v
         ) : (
           selectedOptions.map((opt) => (
             <div key={opt.value} className="flex items-center gap-2">
-              {opt.image?.src && (
-                <img src={opt.image.src} alt={opt.label} className="w-6 h-6 object-cover rounded" />
-              )}
               <span>{opt.label}</span>
             </div>
           ))
@@ -87,9 +77,9 @@ const BrandSelectField = ({ name = 'brand_id', options = [], editable = false, v
           isClearable
           className="react-select-container"
           classNamePrefix="react-select"
-          menuPlacement="top" // ✅ Placement vers le haut comme CategoriesSection
-          menuPortalTarget={document.body} // ✅ Portal pour éviter overflow
-          styles={modernSelectStyles} // ✅ Styles modernes
+          menuPlacement="top"
+          menuPortalTarget={document.body}
+          styles={modernSelectStyles}
         />
       )}
     />

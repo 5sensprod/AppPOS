@@ -114,6 +114,21 @@ const InfoBox = ({ children, isEmpty = false }) => (
   </div>
 );
 
+const ServiceChip = ({ service, color = 'purple' }) => {
+  const colorClasses = {
+    purple:
+      'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-700',
+    green:
+      'bg-green-50 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-700',
+  };
+
+  return (
+    <div className={`inline-flex items-center px-3 py-2 rounded-lg border ${colorClasses[color]}`}>
+      <span className="font-medium">{service}</span>
+    </div>
+  );
+};
+
 const HierarchyPreview = ({ categoryGroup, selectedCategoryId, selectedCategories }) => (
   <div className="flex flex-wrap gap-1 items-center">
     {categoryGroup.hierarchy.map((cat, index) => {
@@ -205,22 +220,14 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
           )}
         </div>
 
-        {/* ✅ Services avec BrandSelectField et SupplierSelectField */}
+        {/* ✅ Services - Affichage simple sans BrandSelectField/SupplierSelectField */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               Marque
             </label>
             {product.brand_ref?.name ? (
-              <div className="flex items-center gap-2">
-                {/* ✅ Utiliser BrandSelectField en lecture seule pour les images */}
-                <BrandSelectField
-                  name="brand_id"
-                  options={[]} // Pas besoin d'options en lecture seule
-                  editable={false}
-                  value={product?.brand_id ? [product.brand_id] : []}
-                />
-              </div>
+              <ServiceChip service={product.brand_ref.name} color="purple" />
             ) : (
               <InfoBox isEmpty>Aucune marque</InfoBox>
             )}
@@ -231,15 +238,7 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
               Fournisseur
             </label>
             {product.supplier_ref?.name ? (
-              <div className="flex items-center gap-2">
-                {/* ✅ Utiliser SupplierSelectField en lecture seule pour les images */}
-                <SupplierSelectField
-                  name="supplier_id"
-                  options={[]} // Pas besoin d'options en lecture seule
-                  editable={false}
-                  value={product?.supplier_id ? [product.supplier_id] : []}
-                />
-              </div>
+              <ServiceChip service={product.supplier_ref.name} color="green" />
             ) : (
               <InfoBox isEmpty>Aucun fournisseur</InfoBox>
             )}

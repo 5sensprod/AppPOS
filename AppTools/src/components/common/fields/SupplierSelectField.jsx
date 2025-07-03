@@ -2,20 +2,6 @@
 import React, { useMemo } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import Select from 'react-select';
-import imageProxyService from '../../../services/imageProxyService';
-
-const formatOptionLabel = ({ label, image }) => (
-  <div className="flex items-center gap-2">
-    {image?.src && (
-      <img
-        src={imageProxyService.getImageUrl(image.src)}
-        alt={label}
-        className="w-6 h-6 object-cover rounded"
-      />
-    )}
-    <span>{label}</span>
-  </div>
-);
 
 // ✅ Styles modernes tirés de CategoriesSection
 const modernSelectStyles = {
@@ -70,9 +56,6 @@ const SupplierSelectField = ({ name = 'supplier_id', options = [], editable = fa
         ) : (
           selectedOptions.map((opt) => (
             <div key={opt.value} className="flex items-center gap-2">
-              {opt.image?.src && (
-                <img src={opt.image.src} alt={opt.label} className="w-6 h-6 object-cover rounded" />
-              )}
               <span>{opt.label}</span>
             </div>
           ))
@@ -95,9 +78,9 @@ const SupplierSelectField = ({ name = 'supplier_id', options = [], editable = fa
           isClearable
           className="react-select-container"
           classNamePrefix="react-select"
-          menuPlacement="top" // ✅ Placement vers le haut comme CategoriesSection
-          menuPortalTarget={document.body} // ✅ Portal pour éviter overflow
-          styles={modernSelectStyles} // ✅ Styles modernes
+          menuPlacement="top"
+          menuPortalTarget={document.body}
+          styles={modernSelectStyles}
         />
       )}
     />
