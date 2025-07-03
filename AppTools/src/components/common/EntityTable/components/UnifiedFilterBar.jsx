@@ -1,10 +1,12 @@
-// UnifiedFilterBar.jsx - Version moderne et compacte
+// UnifiedFilterBar.jsx - Version finale avec CategorySelector et useClickOutside
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
 import { X, Filter, ChevronDown, Trash2 } from 'lucide-react';
 import { useHierarchicalCategories } from '../../../../features/categories/stores/categoryHierarchyStore';
+import CategorySelector from '../../../common/CategorySelector';
+import { useClickOutside } from './BatchActions/hooks/useClickOutside'; // ✅ AJOUTÉ
 
-// Styles modernes pour react-select
+// Styles modernes pour react-select (conservés pour les autres filtres)
 const modernSelectStyles = {
   control: (provided, state) => ({
     ...provided,
@@ -76,7 +78,17 @@ const UnifiedFilterBar = ({
 }) => {
   const [isAddingFilter, setIsAddingFilter] = useState(false);
   const [newFilterType, setNewFilterType] = useState(null);
-  const valueSelectRef = useRef(null); // Ajout de la ref
+  const [selectedCategoriesForFilter, setSelectedCategoriesForFilter] = useState([]);
+  const valueSelectRef = useRef(null);
+
+  const closeFilterDropdown = () => {
+    setIsAddingFilter(false);
+    setNewFilterType(null);
+    setSelectedCategoriesForFilter([]);
+  };
+
+  // ✅  Utiliser useClickOutside pour gérer la fermeture
+  useClickOutside(valueSelectRef, isAddingFilter, closeFilterDropdown);
 
   const {
     hierarchicalCategories,
@@ -113,51 +125,12 @@ const UnifiedFilterBar = ({
     enableCategories,
   ]);
 
-  // Gestion du clic extérieur comme dans l'original
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        isAddingFilter &&
-        valueSelectRef.current &&
-        !valueSelectRef.current.contains(event.target)
-      ) {
-        setIsAddingFilter(false);
-        setNewFilterType(null);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isAddingFilter]);
-
-  // Options de catégories avec debug
-  const categoryOptions = useMemo(() => {
-    const transform = (cats, path = '') => {
-      return cats.flatMap((cat) => {
-        const option = {
-          value: `category_${cat._id}`,
-          label: `${path}${cat.name}`,
-          type: 'category',
-        };
-
-        const children = cat.children ? transform(cat.children, `${path}${cat.name} > `) : [];
-        return [option, ...children];
-      });
-    };
-
-    const options = transform(hierarchicalCategories);
-    return options;
-  }, [hierarchicalCategories, enableCategories]);
-
-  // Toutes les options disponibles avec debug
+  // Toutes les options disponibles (sans les catégories car elles sont gérées différemment)
   const allFilterOptions = useMemo(() => {
-    const combined = [...filterOptions, ...categoryOptions];
-    return combined;
-  }, [filterOptions, categoryOptions]);
+    return filterOptions; // Juste les options non-catégories
+  }, [filterOptions]);
 
-  // Grouper par type
+  // Grouper par type (sans les catégories)
   const filterGroups = useMemo(() => {
     return allFilterOptions.reduce((acc, option) => {
       if (!acc[option.type]) acc[option.type] = [];
@@ -182,30 +155,49 @@ const UnifiedFilterBar = ({
 
   // Types disponibles pour ajout
   const availableTypes = useMemo(() => {
-    return Object.entries(filterGroups)
+    const baseTypes = Object.entries(filterGroups)
       .filter(([type]) => {
-        const allowMultiple = ['supplier', 'brand', 'category'].includes(type);
+        const allowMultiple = ['supplier', 'brand', 'category'].includes(type); // ✅ AJOUTÉ category pour permettre multiples
         return allowMultiple || !selectedTypes.has(type);
       })
       .map(([type]) => ({
         label: filterTypeLabels[type] || type,
         value: type,
-      }))
-      .sort((a, b) => {
-        const order = ['woo', 'status', 'image', 'description', 'category', 'brand', 'supplier'];
-        return order.indexOf(a.value) - order.indexOf(b.value);
-      });
-  }, [filterGroups, selectedTypes]);
+      }));
+
+    // ✅ Ajouter category si activé et qu'on a des données - TOUJOURS disponible maintenant
+    if (enableCategories && hierarchicalCategories.length > 0) {
+      // On vérifie si category n'est pas déjà dans baseTypes pour éviter les doublons
+      if (!baseTypes.find((type) => type.value === 'category')) {
+        baseTypes.push({
+          label: filterTypeLabels.category,
+          value: 'category',
+        });
+      }
+    }
+
+    return baseTypes.sort((a, b) => {
+      const order = ['woo', 'status', 'image', 'description', 'category', 'brand', 'supplier'];
+      return order.indexOf(a.value) - order.indexOf(b.value);
+    });
+  }, [filterGroups, selectedTypes, enableCategories, hierarchicalCategories]);
 
   const handleTypeSelect = (selected) => {
     setNewFilterType(selected?.value || null);
     setIsAddingFilter(true);
+    setSelectedCategoriesForFilter([]);
+
+    // ✅ Pour les catégories, on ouvre directement sans étape intermédiaire
+    if (selected?.value === 'category') {
+      // Le CategorySelector s'ouvrira automatiquement avec autoFocusOpen
+    }
   };
 
+  // ✅ Handler pour les autres types (non-catégories)
   const handleValueSelect = (selected) => {
-    if (!newFilterType || !selected) return;
+    if (!newFilterType || !selected || newFilterType === 'category') return; // ✅ Exclure category
 
-    const isMulti = ['supplier', 'brand', 'category'].includes(newFilterType);
+    const isMulti = ['supplier', 'brand'].includes(newFilterType); // ✅ category supprimée
     const selectedValuesList = Array.isArray(selected) ? selected : [selected];
 
     const newFilters = selectedValuesList
@@ -213,7 +205,7 @@ const UnifiedFilterBar = ({
       .map((s) => ({
         type: newFilterType,
         value: s.value,
-        label: s.label, // MODIFICATION: Juste le label sans préfixe
+        label: s.label,
       }));
 
     let updatedFilters;
@@ -224,8 +216,7 @@ const UnifiedFilterBar = ({
     }
 
     onChange(updatedFilters);
-    setIsAddingFilter(false);
-    setNewFilterType(null);
+    closeFilterDropdown();
   };
 
   const handleRemoveFilter = (filterToRemove) => {
@@ -238,18 +229,18 @@ const UnifiedFilterBar = ({
 
   const handleClearAll = () => {
     onChange([]);
-    setIsAddingFilter(false);
-    setNewFilterType(null);
+    closeFilterDropdown();
   };
 
   const getOptionsForType = (type) => {
+    if (type === 'category') return [];
     const selectedFilterValues = selectedFilters.filter((f) => f.type === type).map((f) => f.value);
     const options = (filterGroups[type] || []).map((opt) => ({
       ...opt,
       isDisabled: selectedFilterValues.includes(opt.value),
     }));
 
-    // ✅ Tri alphabétique pour les marques ET les fournisseurs
+    // Tri alphabétique pour les marques ET les fournisseurs
     if (type === 'brand' || type === 'supplier') {
       return options.sort((a, b) => a.label.localeCompare(b.label));
     }
@@ -264,7 +255,7 @@ const UnifiedFilterBar = ({
         <div className="px-3 py-2 text-sm text-gray-500">Chargement des catégories...</div>
       )}
 
-      {/* Bouton d'ajout de filtre - DÉPLACÉ EN PREMIER */}
+      {/* Bouton d'ajout de filtre */}
       {!isAddingFilter && availableTypes.length > 0 && (
         <div className="relative">
           <Select
@@ -277,7 +268,7 @@ const UnifiedFilterBar = ({
               </div>
             }
             classNamePrefix="react-select"
-            className="w-64" // ✅ CHANGÉ : taille fixe au lieu de w-full lg:w-96
+            className="w-64"
             styles={modernSelectStyles}
             menuPortalTarget={document.body}
             menuPlacement="auto"
@@ -293,34 +284,107 @@ const UnifiedFilterBar = ({
         </div>
       )}
 
-      {/* Sélecteur de valeur (quand un type est sélectionné) - DÉPLACÉ EN DEUXIÈME */}
-      {isAddingFilter && newFilterType && (
+      {/* ✅ MODIFIÉ : Sélecteur de catégories - Version directe avec z-index élevé */}
+      {isAddingFilter && newFilterType === 'category' && !categoriesLoading && (
+        <div ref={valueSelectRef} className="relative z-[9999]">
+          <div className="w-80">
+            <CategorySelector
+              mode="single"
+              hierarchicalData={hierarchicalCategories}
+              value={''}
+              onChange={(selectedCategoryId) => {
+                if (selectedCategoryId) {
+                  // ✅ AMÉLIORÉ : Fonction de recherche plus robuste
+                  const findCategoryName = (categories, id) => {
+                    if (!categories || categories.length === 0) return null;
+
+                    for (const cat of categories) {
+                      if (cat._id === id) {
+                        return cat.name;
+                      }
+                      if (cat.children && cat.children.length > 0) {
+                        const found = findCategoryName(cat.children, id);
+                        if (found) return found;
+                      }
+                    }
+                    return null;
+                  };
+
+                  // ✅ AMÉLIORÉ : Recherche avec fallback
+                  let categoryName = findCategoryName(hierarchicalCategories, selectedCategoryId);
+
+                  // ✅ NOUVEAU : Fallback si pas trouvé dans hierarchicalCategories
+                  if (!categoryName) {
+                    // Chercher dans les filtres existants au cas où
+                    const existingFilter = selectedFilters.find(
+                      (f) => f.type === 'category' && f.value === selectedCategoryId
+                    );
+                    categoryName = existingFilter?.label;
+                  }
+
+                  // ✅ NOUVEAU : Dernier fallback avec l'ID
+                  if (!categoryName) {
+                    console.warn(
+                      'Catégorie non trouvée:',
+                      selectedCategoryId,
+                      'dans',
+                      hierarchicalCategories
+                    );
+                    categoryName = `Catégorie ${selectedCategoryId.slice(-6)}`; // Utiliser les 6 derniers caractères de l'ID
+                  }
+
+                  // Ajouter directement le filtre
+                  const newFilter = {
+                    type: 'category',
+                    value: selectedCategoryId,
+                    label: categoryName,
+                  };
+
+                  // Vérifier qu'il n'existe pas déjà
+                  if (!selectedValues.has(`category:${selectedCategoryId}`)) {
+                    onChange([...selectedFilters, newFilter]);
+                  }
+                }
+
+                // Fermer après sélection
+                closeFilterDropdown(); // ✅ SIMPLIFIÉ
+              }}
+              placeholder="Sélectionner une catégorie"
+              allowRootSelection={false}
+              showSearch={true}
+              showCounts={true}
+              autoFocusOpen={true}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Sélecteur de valeur pour les autres types (non-catégories) */}
+      {isAddingFilter && newFilterType && newFilterType !== 'category' && (
         <div ref={valueSelectRef} className="relative">
           <Select
             options={getOptionsForType(newFilterType)}
             onChange={handleValueSelect}
             placeholder={`Choisir ${filterTypeLabels[newFilterType]?.toLowerCase()}`}
-            isMulti={['supplier', 'brand', 'category'].includes(newFilterType)}
+            isMulti={['supplier', 'brand'].includes(newFilterType)} // ✅ category supprimée
             classNamePrefix="react-select"
-            className="w-64" // ✅ CHANGÉ : taille fixe au lieu de min-w-[180px]
+            className="w-64"
             styles={modernSelectStyles}
             autoFocus
             menuIsOpen={true}
             menuPortalTarget={document.body}
             menuPlacement="auto"
             onMenuClose={() => {
-              setIsAddingFilter(false);
-              setNewFilterType(null);
+              closeFilterDropdown(); // ✅ SIMPLIFIÉ
             }}
             onBlur={() => {
-              setIsAddingFilter(false);
-              setNewFilterType(null);
+              closeFilterDropdown(); // ✅ SIMPLIFIÉ
             }}
           />
         </div>
       )}
 
-      {/* Filtres actifs - MAINTENANT APRÈS LES SELECTS */}
+      {/* Filtres actifs */}
       {selectedFilters.map((filter, idx) => (
         <div
           key={`${filter.type}-${filter.value}-${idx}`}
@@ -332,6 +396,10 @@ const UnifiedFilterBar = ({
             onClick={() => {
               setNewFilterType(filter.type);
               setIsAddingFilter(true);
+              // ✅ NOUVEAU : Pour les catégories, pré-sélectionner la catégorie actuelle
+              if (filter.type === 'category') {
+                setSelectedCategoriesForFilter([filter.value]);
+              }
             }}
           >
             {filter.label}
@@ -346,7 +414,7 @@ const UnifiedFilterBar = ({
         </div>
       ))}
 
-      {/* Bouton tout effacer - Version icône trash harmonisée */}
+      {/* Bouton tout effacer */}
       {selectedFilters.length > 0 && (
         <button
           onClick={handleClearAll}
