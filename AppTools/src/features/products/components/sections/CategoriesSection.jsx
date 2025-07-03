@@ -1,8 +1,7 @@
 // src/features/products/components/sections/CategoriesSection.jsx
 import React, { useMemo, useEffect } from 'react';
-import { useFormContext, Controller } from 'react-hook-form';
+import { useFormContext } from 'react-hook-form';
 import { Star } from 'lucide-react';
-import Select from 'react-select';
 import ModernCategorySelector from '../../../../components/common/ModernCategorySelector';
 import BrandSelectField from '../../../../components/common/fields/BrandSelectField';
 import SupplierSelectField from '../../../../components/common/fields/SupplierSelectField';
@@ -362,67 +361,13 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
           </div>
         )}
 
-        {/* ✅ Services avec react-select moderne (sans images) */}
+        {/* ✅ Services avec tes composants (qui ont déjà des Controllers) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Marque
             </label>
-            <Controller
-              name="brand_id"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  {...field}
-                  options={filteredBrands} // ✅ Pas d'option "Aucune marque" en double
-                  value={filteredBrands.find((opt) => opt.value === field.value) || null}
-                  onChange={(selected) => field.onChange(selected?.value || '')}
-                  placeholder="Aucune marque"
-                  isClearable
-                  className="react-select-container"
-                  classNamePrefix="react-select"
-                  menuPlacement="top" // ✅ Forcer vers le haut
-                  menuPortalTarget={document.body}
-                  styles={{
-                    control: (provided, state) => ({
-                      ...provided,
-                      minHeight: '38px',
-                      borderColor: state.isFocused ? '#3B82F6' : '#D1D5DB',
-                      boxShadow: state.isFocused ? '0 0 0 1px #3B82F6' : 'none',
-                      '&:hover': {
-                        borderColor: '#9CA3AF',
-                      },
-                    }),
-                    valueContainer: (provided) => ({
-                      ...provided,
-                      padding: '2px 8px',
-                    }),
-                    option: (provided, state) => ({
-                      ...provided,
-                      backgroundColor: state.isSelected
-                        ? '#3B82F6'
-                        : state.isFocused
-                          ? '#F3F4F6'
-                          : 'white',
-                      color: state.isSelected ? 'white' : '#374151',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      ':active': {
-                        backgroundColor: '#3B82F6',
-                      },
-                    }),
-                    menuPortal: (base) => ({
-                      ...base,
-                      zIndex: 9999,
-                    }),
-                    menu: (provided) => ({
-                      ...provided,
-                      zIndex: 9999,
-                    }),
-                  }}
-                />
-              )}
-            />
+            <BrandSelectField name="brand_id" options={filteredBrands} editable={true} />
             {errors?.brand_id && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-500">
                 {errors.brand_id.message}
@@ -434,61 +379,7 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Fournisseur
             </label>
-            <Controller
-              name="supplier_id"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  {...field}
-                  options={filteredSuppliers} // ✅ Pas d'option "Aucun fournisseur" en double
-                  value={filteredSuppliers.find((opt) => opt.value === field.value) || null}
-                  onChange={(selected) => field.onChange(selected?.value || '')}
-                  placeholder="Aucun fournisseur"
-                  isClearable
-                  className="react-select-container"
-                  classNamePrefix="react-select"
-                  menuPlacement="top" // ✅ Forcer vers le haut
-                  menuPortalTarget={document.body}
-                  styles={{
-                    control: (provided, state) => ({
-                      ...provided,
-                      minHeight: '38px',
-                      borderColor: state.isFocused ? '#3B82F6' : '#D1D5DB',
-                      boxShadow: state.isFocused ? '0 0 0 1px #3B82F6' : 'none',
-                      '&:hover': {
-                        borderColor: '#9CA3AF',
-                      },
-                    }),
-                    valueContainer: (provided) => ({
-                      ...provided,
-                      padding: '2px 8px',
-                    }),
-                    option: (provided, state) => ({
-                      ...provided,
-                      backgroundColor: state.isSelected
-                        ? '#3B82F6'
-                        : state.isFocused
-                          ? '#F3F4F6'
-                          : 'white',
-                      color: state.isSelected ? 'white' : '#374151',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      ':active': {
-                        backgroundColor: '#3B82F6',
-                      },
-                    }),
-                    menuPortal: (base) => ({
-                      ...base,
-                      zIndex: 9999,
-                    }),
-                    menu: (provided) => ({
-                      ...provided,
-                      zIndex: 9999,
-                    }),
-                  }}
-                />
-              )}
-            />
+            <SupplierSelectField name="supplier_id" options={filteredSuppliers} editable={true} />
             {errors?.supplier_id && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-500">
                 {errors.supplier_id.message}

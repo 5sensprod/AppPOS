@@ -9,7 +9,42 @@ const formatOptionLabel = ({ label, image }) => (
   </div>
 );
 
-const BrandSelectField = ({ name = 'brands', options = [], editable = false, value }) => {
+// ✅ Styles modernes tirés de CategoriesSection
+const modernSelectStyles = {
+  control: (provided, state) => ({
+    ...provided,
+    minHeight: '38px',
+    borderColor: state.isFocused ? '#3B82F6' : '#D1D5DB',
+    boxShadow: state.isFocused ? '0 0 0 1px #3B82F6' : 'none',
+    '&:hover': {
+      borderColor: '#9CA3AF',
+    },
+  }),
+  valueContainer: (provided) => ({
+    ...provided,
+    padding: '2px 8px',
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isSelected ? '#3B82F6' : state.isFocused ? '#F3F4F6' : 'white',
+    color: state.isSelected ? 'white' : '#374151',
+    padding: '8px 12px',
+    fontSize: '14px',
+    ':active': {
+      backgroundColor: '#3B82F6',
+    },
+  }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: 9999,
+  }),
+  menu: (provided) => ({
+    ...provided,
+    zIndex: 9999,
+  }),
+};
+
+const BrandSelectField = ({ name = 'brand_id', options = [], editable = false, value }) => {
   const { control, watch } = useFormContext() || {};
   const selected = watch?.(name) || value || [];
 
@@ -45,14 +80,16 @@ const BrandSelectField = ({ name = 'brands', options = [], editable = false, val
       render={({ field }) => (
         <Select
           {...field}
-          isMulti
-          options={sortedOptions} // ✅ Utiliser les options triées
-          value={sortedOptions.filter((opt) => field.value?.includes(opt.value))}
-          onChange={(selected) => field.onChange(selected.map((opt) => opt.value))}
-          formatOptionLabel={formatOptionLabel}
-          placeholder="Sélectionner des marques..."
+          options={sortedOptions}
+          value={sortedOptions.find((opt) => opt.value === field.value) || null}
+          onChange={(selected) => field.onChange(selected?.value || '')}
+          placeholder="Aucune marque"
+          isClearable
           className="react-select-container"
           classNamePrefix="react-select"
+          menuPlacement="top" // ✅ Placement vers le haut comme CategoriesSection
+          menuPortalTarget={document.body} // ✅ Portal pour éviter overflow
+          styles={modernSelectStyles} // ✅ Styles modernes
         />
       )}
     />
