@@ -244,10 +244,17 @@ const UnifiedFilterBar = ({
 
   const getOptionsForType = (type) => {
     const selectedFilterValues = selectedFilters.filter((f) => f.type === type).map((f) => f.value);
-    return (filterGroups[type] || []).map((opt) => ({
+    const options = (filterGroups[type] || []).map((opt) => ({
       ...opt,
       isDisabled: selectedFilterValues.includes(opt.value),
     }));
+
+    // ✅ Tri alphabétique pour les marques ET les fournisseurs
+    if (type === 'brand' || type === 'supplier') {
+      return options.sort((a, b) => a.label.localeCompare(b.label));
+    }
+
+    return options;
   };
 
   return (
