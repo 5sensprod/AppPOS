@@ -292,7 +292,6 @@ function CategoriesTable(props) {
         searchFields={['_originalName', 'description']}
         searchProcessor={searchProcessor}
         onSearch={handleSearch}
-        // NOUVELLES PROPS UnifiedFilterBar
         enableUnifiedFilters={true}
         unifiedFilterOptions={[
           { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },

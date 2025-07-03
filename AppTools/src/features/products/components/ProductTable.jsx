@@ -63,8 +63,6 @@ function ProductTable(props) {
           await syncProduct(id);
         }
       : undefined,
-    // ✅ Pas besoin de batchDeleteEntities/batchSyncEntities custom
-    // useEntityTable les gère automatiquement avec deleteEntity/syncEntity
   });
 
   // Hook pour les opérations de stock (conservé)
@@ -243,7 +241,6 @@ function ProductTable(props) {
     }
   };
 
-  // ✅ FONCTIONS DE BATCH SIMPLIFIÉES
   const handleBatchStatusChange = async (itemIds, newStatus) => {
     if (itemIds.length === 0) return;
 
@@ -275,7 +272,6 @@ function ProductTable(props) {
       );
 
       toastActions.category.success(itemIds.length, 'produit');
-      // Attendre puis recharger
       setTimeout(async () => {
         await fetchProducts();
       }, 500);
@@ -297,16 +293,14 @@ function ProductTable(props) {
         entityNamePlural="produits"
         baseRoute="/products"
         searchFields={['name', 'sku', 'designation', 'category']}
-        searchProcessor={productSearchProcessor} // 🆕 Processeur personnalisé pour code-barre
-        searchPlaceholder="Rechercher produit" // 🆕 Placeholder personnalisé
-        // NOUVELLES PROPS UnifiedFilterBar
+        searchProcessor={productSearchProcessor}
+        searchPlaceholder="Rechercher produit"
         enableUnifiedFilters={true}
         unifiedFilterOptions={filterOptions}
         selectedFilters={selectedFilters}
         onFiltersChange={setSelectedFilters}
         enableCategories={true}
         enableStatusFilter={true}
-        // ✅ PROPS SIMPLIFIÉES - DIRECTES DE useEntityTable
         onDelete={handleDeleteEntity}
         onBatchDelete={handleBatchDeleteEntities}
         syncEnabled={syncEnabled}
@@ -331,7 +325,6 @@ function ProductTable(props) {
         onBatchStockChange={handleStockAction}
         onCreateSheet={handleCreateSheet}
         categoryOptions={categorySelectOptions}
-        // syncStats pas besoin - useEntityTable gère ça
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,
