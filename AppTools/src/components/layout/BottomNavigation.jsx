@@ -25,6 +25,16 @@ const BottomNavigation = ({ className = '' }) => {
   // ✅ CORRECTION: Définir closeSubmenu
   const closeSubmenu = () => setActiveSubmenu(null);
 
+  // ✅ AJOUT: Fermer le sous-menu au changement de breakpoint
+  React.useEffect(() => {
+    const handleResize = () => {
+      setActiveSubmenu(null); // Fermer au resize
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Fermer le sous-menu en cliquant ailleurs
   React.useEffect(() => {
     const handleOutsideClick = (e) => {

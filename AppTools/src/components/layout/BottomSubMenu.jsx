@@ -9,29 +9,27 @@ const BottomSubMenu = ({ items, parentItem, onClose, currentPath, parentIndex = 
     if (!icon) {
       return <Home {...iconProps} />;
     }
-
     if (React.isValidElement(icon)) {
       return React.cloneElement(icon, iconProps);
     }
-
     if (typeof icon === 'function') {
       const IconComponent = icon;
       return <IconComponent {...iconProps} />;
     }
-
     return <Home {...iconProps} />;
   };
 
   const isActive = (path) =>
     path === currentPath || (path !== '/' && currentPath.startsWith(path + '/'));
 
-  // Position centrée sur le bouton parent
-  const leftPosition = `${parentIndex * 20}%`;
+  // ✅ Position exactement au centre du bouton parent
+  // Chaque bouton occupe 20% de la largeur, on veut le centre à 10% du début
+  const leftPosition = `${parentIndex * 20 + 10}%`;
 
   return (
     <div
       className="fixed z-30"
-      data-submenu // ✅ AJOUT pour éviter la fermeture au clic
+      data-submenu // ✅ Ajout pour éviter fermeture au clic
       style={{
         bottom: '70px', // Juste au-dessus de la bottom nav
         left: leftPosition,
@@ -42,14 +40,13 @@ const BottomSubMenu = ({ items, parentItem, onClose, currentPath, parentIndex = 
       <div className="flex flex-col-reverse gap-1 animate-in slide-in-from-bottom-2 fade-in duration-200">
         {items.map((item, index) => {
           const active = isActive(item.path);
-
           return (
             <Link
               key={item.id}
               to={item.path}
               onClick={onClose}
               className={`
-                relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 min-w-[140px]
+                relative flex flex-col items-center p-3 rounded-lg transition-all duration-200 min-w-[80px]
                 ${
                   active
                     ? 'bg-blue-600 text-white shadow-lg'
@@ -62,24 +59,21 @@ const BottomSubMenu = ({ items, parentItem, onClose, currentPath, parentIndex = 
               }}
               aria-current={active ? 'page' : undefined}
             >
-              {/* Icône */}
+              {/* ✅ Icône centrée */}
               {renderIcon(item.icon, {
-                className: `w-5 h-5 flex-shrink-0 ${active ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`,
+                className: `w-6 h-6 ${active ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`,
               })}
 
-              {/* Label */}
-              <span className="text-sm font-medium truncate">{item.label}</span>
+              {/* ✅ Label sous l'icône comme dans la nav principale */}
+              <span className="text-xs mt-1 text-center leading-tight font-medium">
+                {item.label}
+              </span>
 
               {/* Badge optionnel */}
               {item.badge && (
-                <span className="ml-auto px-2 py-0.5 text-xs bg-red-500 text-white rounded-full min-w-[1rem] text-center">
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full min-w-[1rem] text-center">
                   {item.badge}
                 </span>
-              )}
-
-              {/* Indicateur actif */}
-              {active && (
-                <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-6 bg-white/50 rounded-full" />
               )}
             </Link>
           );
