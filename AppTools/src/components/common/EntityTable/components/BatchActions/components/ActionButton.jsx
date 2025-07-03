@@ -1,11 +1,9 @@
 // components/ActionButton.jsx
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { useResponsiveDropdown } from '../hooks/useResponsiveDropdown';
-import { useDropdownItemAnimation } from '../hooks/useDropdownItemAnimation';
-import { injectDropdownStyles } from '../styles/dropdownStyles';
-import HierarchicalCategorySelector from './HierarchicalCategorySelector';
+import CategorySelector from '../../../../CategorySelector';
 
 const ActionButton = ({
   action,
@@ -22,9 +20,6 @@ const ActionButton = ({
   const { buttonRef, buttonRect, updateButtonPosition, isVisible, shouldRender } =
     useResponsiveDropdown(isOpen);
 
-  // Hook pour l'animation des items (seulement pour le dropdown simple)
-  const { getItemAnimation } = useDropdownItemAnimation(isVisible, cfg.options?.length || 0);
-
   // Fonction pour fermer le dropdown
   const closeDropdown = useCallback(() => {
     setOpenDropdown(null);
@@ -40,11 +35,6 @@ const ActionButton = ({
 
   // Utiliser useClickOutside
   useClickOutside(dropdownRef, isOpen, closeDropdown, buttonRef);
-
-  // Injecter les styles d'animation au montage du composant
-  useEffect(() => {
-    injectDropdownStyles();
-  }, []);
 
   // Si un composant personnalisé est défini, l'utiliser
   if (cfg.customComponent) {
@@ -96,37 +86,20 @@ const ActionButton = ({
               minWidth: `${Math.max(buttonRect.width, 200)}px`,
             }}
           >
-            {cfg.isHierarchical ? (
-              <HierarchicalCategorySelector
-                hierarchicalData={hierarchicalData}
-                onSelect={cfg.onSelect}
-                isOpen={isVisible}
-                onToggle={toggleOpen}
-                placeholder="Sélectionner une catégorie"
-              />
-            ) : (
-              <div className="rounded-md shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <div className="py-1 max-h-64 overflow-y-auto">
-                  {cfg.options.map((opt, index) => {
-                    const animation = getItemAnimation(index, {
-                      baseClasses: `w-full text-left px-4 py-2 text-sm ${opt.color}`,
-                      hoverClasses: 'hover:bg-gray-50 dark:hover:bg-gray-700',
-                    });
-
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => cfg.onSelect(opt.value)}
-                        className={animation.className}
-                        style={animation.style}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            <CategorySelector
+              mode="single"
+              hierarchicalData={hierarchicalData}
+              value={''} // Pas de valeur initiale car on ne garde pas l’état ici
+              onChange={(val) => {
+                cfg.onSelect(val);
+                toggleOpen(); // Fermer après sélection
+              }}
+              placeholder="Sélectionner une catégorie"
+              allowRootSelection={true}
+              showSearch={true}
+              showCounts={true}
+              autoFocusOpen={true}
+            />
           </div>,
           document.body
         )}

@@ -1,7 +1,7 @@
 // BatchActions.jsx - Version avec gestion du stock
 import React, { useState, useEffect } from 'react';
 import { useHierarchicalCategories } from '../../../../../features/categories/stores/categoryHierarchyStore';
-import { injectDropdownStyles } from './styles/dropdownStyles';
+
 import { createActionsConfig } from './config/batchActionsConfig';
 import ActionButton from './components/ActionButton';
 
@@ -31,13 +31,6 @@ export const BatchActions = ({
   } = useHierarchicalCategories();
 
   // Injection des styles et chargement des catégories
-  useEffect(() => {
-    injectDropdownStyles();
-
-    if (hierarchicalCategories.length === 0 && !categoriesLoading) {
-      fetchHierarchicalCategories();
-    }
-  }, [hierarchicalCategories, categoriesLoading, fetchHierarchicalCategories]);
 
   // Animation de visibilité
   useEffect(() => {

@@ -5,8 +5,8 @@ import { ChevronRight, ChevronDown, Plus, X, Star, Search, Check } from 'lucide-
 /**
  * Composant unifié pour la sélection de catégories
  * Supporte deux modes :
- * - single : Sélection d'une seule catégorie (remplace HierarchicalParentSelector)
- * - multiple : Sélection multiple avec catégorie principale (remplace ModernCategorySelector)
+ * - single : Sélection d'une seule catégorie
+ * - multiple : Sélection multiple avec catégorie principale
  */
 const CategorySelector = ({
   // Données
@@ -33,6 +33,7 @@ const CategorySelector = ({
   showSearch = true,
   showCounts = true,
   allowRootSelection = true, // Permet de sélectionner "Aucune" en mode single
+  autoFocusOpen = false,
   variant = 'default', // 'default' | 'compact' | 'modern'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -196,6 +197,12 @@ const CategorySelector = ({
 
     expandPathToValue(hierarchicalData);
   }, [mode, value, hierarchicalData]);
+
+  useEffect(() => {
+    if (autoFocusOpen && !disabled) {
+      setIsOpen(true);
+    }
+  }, [autoFocusOpen, disabled]);
 
   // ========================================
   // LOGIQUE SPÉCIFIQUE - Mode multiple

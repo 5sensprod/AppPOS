@@ -2,7 +2,7 @@
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Controller } from 'react-hook-form';
-import HierarchicalParentSelector from '../../common/HierarchicalParentSelector';
+import CategorySelector from '../../common/CategorySelector';
 import BrandSelectField from '../fields/BrandSelectField';
 import imageProxyService from '../../../services/imageProxyService';
 import SupplierSelectField from '../fields/SupplierSelectField';
@@ -130,12 +130,16 @@ const GeneralInfoTab = ({
           name={field}
           control={formContext.control}
           render={({ field: controllerField }) => (
-            <HierarchicalParentSelector
+            <CategorySelector
+              mode="single"
               hierarchicalData={formContext.getValues('_hierarchicalCategories') || []}
               value={controllerField.value}
               onChange={controllerField.onChange}
-              disabled={false}
               currentCategoryId={formContext.getValues('_id')}
+              placeholder="Sélectionner une catégorie parente"
+              allowRootSelection={true}
+              showSearch={true}
+              showCounts={true}
             />
           )}
         />

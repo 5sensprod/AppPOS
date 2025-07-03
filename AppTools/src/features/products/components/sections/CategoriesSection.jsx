@@ -2,7 +2,6 @@
 import React, { useMemo, useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Star } from 'lucide-react';
-import ModernCategorySelector from '../../../../components/common/ModernCategorySelector';
 import BrandSelectField from '../../../../components/common/fields/BrandSelectField';
 import SupplierSelectField from '../../../../components/common/fields/SupplierSelectField';
 import CategorySelector from '../../../../components/common/CategorySelector';
