@@ -2,7 +2,10 @@
 import React, { useMemo, useEffect } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import { Star } from 'lucide-react';
+import Select from 'react-select';
 import ModernCategorySelector from '../../../../components/common/ModernCategorySelector';
+import BrandSelectField from '../../../../components/common/fields/BrandSelectField';
+import SupplierSelectField from '../../../../components/common/fields/SupplierSelectField';
 
 // ===== UTILITAIRES DE CATÉGORIES (logique ProductTable.jsx) =====
 
@@ -112,21 +115,6 @@ const InfoBox = ({ children, isEmpty = false }) => (
   </div>
 );
 
-const ServiceChip = ({ service, color = 'purple' }) => {
-  const colorClasses = {
-    purple:
-      'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-700',
-    green:
-      'bg-green-50 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-700',
-  };
-
-  return (
-    <div className={`inline-flex items-center px-3 py-2 rounded-lg border ${colorClasses[color]}`}>
-      <span className="font-medium">{service}</span>
-    </div>
-  );
-};
-
 const HierarchyPreview = ({ categoryGroup, selectedCategoryId, selectedCategories }) => (
   <div className="flex flex-wrap gap-1 items-center">
     {categoryGroup.hierarchy.map((cat, index) => {
@@ -206,11 +194,6 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
                 })}
               </div>
 
-              {/* <InfoBox>
-                {displayCategories.length} catégorie{displayCategories.length > 1 ? 's' : ''}{' '}
-                associée{displayCategories.length > 1 ? 's' : ''}
-              </InfoBox> */}
-
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 <div className="flex items-center">
                   <Star className="h-3 w-3 mr-1 text-yellow-500 fill-current" />
@@ -223,14 +206,22 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
           )}
         </div>
 
-        {/* Services */}
+        {/* ✅ Services avec BrandSelectField et SupplierSelectField */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               Marque
             </label>
             {product.brand_ref?.name ? (
-              <ServiceChip service={product.brand_ref.name} color="purple" />
+              <div className="flex items-center gap-2">
+                {/* ✅ Utiliser BrandSelectField en lecture seule pour les images */}
+                <BrandSelectField
+                  name="brand_id"
+                  options={[]} // Pas besoin d'options en lecture seule
+                  editable={false}
+                  value={product?.brand_id ? [product.brand_id] : []}
+                />
+              </div>
             ) : (
               <InfoBox isEmpty>Aucune marque</InfoBox>
             )}
@@ -241,7 +232,15 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
               Fournisseur
             </label>
             {product.supplier_ref?.name ? (
-              <ServiceChip service={product.supplier_ref.name} color="green" />
+              <div className="flex items-center gap-2">
+                {/* ✅ Utiliser SupplierSelectField en lecture seule pour les images */}
+                <SupplierSelectField
+                  name="supplier_id"
+                  options={[]} // Pas besoin d'options en lecture seule
+                  editable={false}
+                  value={product?.supplier_id ? [product.supplier_id] : []}
+                />
+              </div>
             ) : (
               <InfoBox isEmpty>Aucun fournisseur</InfoBox>
             )}
@@ -363,23 +362,67 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
           </div>
         )}
 
-        {/* Services */}
+        {/* ✅ Services avec react-select moderne (sans images) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Marque
             </label>
-            <select
-              {...register('brand_id')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-              <option value="">Sélectionner une marque</option>
-              {filteredBrands.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="brand_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  {...field}
+                  options={filteredBrands} // ✅ Pas d'option "Aucune marque" en double
+                  value={filteredBrands.find((opt) => opt.value === field.value) || null}
+                  onChange={(selected) => field.onChange(selected?.value || '')}
+                  placeholder="Aucune marque"
+                  isClearable
+                  className="react-select-container"
+                  classNamePrefix="react-select"
+                  menuPlacement="top" // ✅ Forcer vers le haut
+                  menuPortalTarget={document.body}
+                  styles={{
+                    control: (provided, state) => ({
+                      ...provided,
+                      minHeight: '38px',
+                      borderColor: state.isFocused ? '#3B82F6' : '#D1D5DB',
+                      boxShadow: state.isFocused ? '0 0 0 1px #3B82F6' : 'none',
+                      '&:hover': {
+                        borderColor: '#9CA3AF',
+                      },
+                    }),
+                    valueContainer: (provided) => ({
+                      ...provided,
+                      padding: '2px 8px',
+                    }),
+                    option: (provided, state) => ({
+                      ...provided,
+                      backgroundColor: state.isSelected
+                        ? '#3B82F6'
+                        : state.isFocused
+                          ? '#F3F4F6'
+                          : 'white',
+                      color: state.isSelected ? 'white' : '#374151',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      ':active': {
+                        backgroundColor: '#3B82F6',
+                      },
+                    }),
+                    menuPortal: (base) => ({
+                      ...base,
+                      zIndex: 9999,
+                    }),
+                    menu: (provided) => ({
+                      ...provided,
+                      zIndex: 9999,
+                    }),
+                  }}
+                />
+              )}
+            />
             {errors?.brand_id && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-500">
                 {errors.brand_id.message}
@@ -388,20 +431,64 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Fournisseur
             </label>
-            <select
-              {...register('supplier_id')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-              <option value="">Sélectionner un fournisseur</option>
-              {filteredSuppliers.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="supplier_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  {...field}
+                  options={filteredSuppliers} // ✅ Pas d'option "Aucun fournisseur" en double
+                  value={filteredSuppliers.find((opt) => opt.value === field.value) || null}
+                  onChange={(selected) => field.onChange(selected?.value || '')}
+                  placeholder="Aucun fournisseur"
+                  isClearable
+                  className="react-select-container"
+                  classNamePrefix="react-select"
+                  menuPlacement="top" // ✅ Forcer vers le haut
+                  menuPortalTarget={document.body}
+                  styles={{
+                    control: (provided, state) => ({
+                      ...provided,
+                      minHeight: '38px',
+                      borderColor: state.isFocused ? '#3B82F6' : '#D1D5DB',
+                      boxShadow: state.isFocused ? '0 0 0 1px #3B82F6' : 'none',
+                      '&:hover': {
+                        borderColor: '#9CA3AF',
+                      },
+                    }),
+                    valueContainer: (provided) => ({
+                      ...provided,
+                      padding: '2px 8px',
+                    }),
+                    option: (provided, state) => ({
+                      ...provided,
+                      backgroundColor: state.isSelected
+                        ? '#3B82F6'
+                        : state.isFocused
+                          ? '#F3F4F6'
+                          : 'white',
+                      color: state.isSelected ? 'white' : '#374151',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      ':active': {
+                        backgroundColor: '#3B82F6',
+                      },
+                    }),
+                    menuPortal: (base) => ({
+                      ...base,
+                      zIndex: 9999,
+                    }),
+                    menu: (provided) => ({
+                      ...provided,
+                      zIndex: 9999,
+                    }),
+                  }}
+                />
+              )}
+            />
             {errors?.supplier_id && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-500">
                 {errors.supplier_id.message}

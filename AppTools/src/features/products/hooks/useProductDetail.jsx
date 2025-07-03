@@ -147,12 +147,14 @@ export default function useProductDetail() {
       .finally(() => setLoading(false));
   }, [paramId, isNew, getProductById]);
 
-  // Utils: option builders avec tri alphabétique
+  // Utils: option builders avec tri alphabétique et support des images
   const toOptions = (items, includeRelations = false) =>
     items
       .map((i) => ({
         value: i._id,
         label: i.name,
+        // ✅ Ajouter les images pour BrandSelectField et SupplierSelectField
+        image: i.image ? { src: i.image } : null,
         ...(includeRelations && {
           suppliers: i.suppliers || [],
           brands: i.brands || [],
