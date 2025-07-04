@@ -1,24 +1,45 @@
 // src/features/products/components/tabs/InventoryTab.jsx
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
+import StockSection from '../sections/StockSection';
+import BarcodeSection from '../sections/BarcodeSection';
 import CategoriesSection from '../sections/CategoriesSection';
 import BrandsSuppliersSection from '../sections/BrandsSuppliersSection';
 
 const InventoryTab = ({ product, editable, errors, specialFields }) => {
-  // ✅ Utiliser useFormContext pour les champs additionnels
-  const { register } = useFormContext() || {};
+  // ✅ Utiliser useFormContext pour les sections qui en ont besoin
+  const formContext = useFormContext();
+  const { register, control, setValue, watch } = formContext || {};
 
   return (
     <div className="space-y-8">
-      {/* ✅ Section Catégories */}
-      <CategoriesSection
-        product={product}
-        editable={editable}
-        errors={errors}
-        specialFields={specialFields}
-      />
+      {/* ✅ Section Gestion des stocks */}
+      <StockSection product={product} editable={editable} register={register} errors={errors} />
 
-      {/* ✅ Section Marques et Fournisseurs unifiée */}
+      {/* ✅ Section Codes d'identification */}
+      <div className="border-t border-gray-200 dark:border-gray-600 pt-8">
+        <BarcodeSection
+          product={product}
+          editable={editable}
+          register={register}
+          control={control}
+          errors={errors}
+          setValue={setValue}
+          watch={watch}
+        />
+      </div>
+
+      {/* ✅ Section Classification et catégories */}
+      <div className="border-t border-gray-200 dark:border-gray-600 pt-8">
+        <CategoriesSection
+          product={product}
+          editable={editable}
+          errors={errors}
+          specialFields={specialFields}
+        />
+      </div>
+
+      {/* ✅ Section Marques et fournisseurs */}
       <div className="border-t border-gray-200 dark:border-gray-600 pt-8">
         <BrandsSuppliersSection
           product={product}
@@ -33,10 +54,53 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
         <div className="border-t border-gray-200 dark:border-gray-600 pt-8">
           <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-              Résumé de l'organisation
+              Résumé de l'inventaire
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Stock */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Gestion des stocks
+                </h4>
+                <div className="space-y-2">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Stock actuel: <span className="font-medium">{product.stock || 0}</span>
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Min: <span className="font-medium">{product.min_stock || 'Non défini'}</span>
+                  </div>
+                  <div>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        product.manage_stock
+                          ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+                      }`}
+                    >
+                      {product.manage_stock ? 'Géré' : 'Non géré'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Identification */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Identification
+                </h4>
+                <div className="space-y-2">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Code-barres:{' '}
+                    {product.meta_data?.find((m) => m.key === 'barcode')?.value ? (
+                      <span className="font-medium">Défini</span>
+                    ) : (
+                      <span className="text-gray-500 italic">Non défini</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Catégorisation */}
               <div>
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -54,35 +118,28 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
                 </div>
               </div>
 
-              {/* Approvisionnement */}
+              {/* Relations commerciales */}
               <div>
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Approvisionnement
+                  Relations
                 </h4>
                 <div className="space-y-2">
-                  {product.supplier_ref?.name ? (
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      {product.supplier_ref.name}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-500 italic">Aucun fournisseur</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Marque */}
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Marque
-                </h4>
-                <div className="space-y-2">
-                  {product.brand_ref?.name ? (
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      {product.brand_ref.name}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-500 italic">Marque distributeur</div>
-                  )}
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Marque:{' '}
+                    {product.brand_ref?.name ? (
+                      <span className="font-medium">{product.brand_ref.name}</span>
+                    ) : (
+                      <span className="text-gray-500 italic">Aucune</span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Fournisseur:{' '}
+                    {product.supplier_ref?.name ? (
+                      <span className="font-medium">{product.supplier_ref.name}</span>
+                    ) : (
+                      <span className="text-gray-500 italic">Aucun</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -90,18 +147,22 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
             {/* Indicateurs de complétude */}
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Complétude des informations
+                Complétude de l'inventaire
               </h4>
               <div className="flex flex-wrap gap-2">
                 {[
-                  { label: 'Catégorisé', condition: product.categories?.length > 0 },
-                  { label: 'Fournisseur', condition: !!product.supplier_ref?.name },
-                  { label: 'Marque', condition: !!product.brand_ref?.name },
-                  { label: 'Stock géré', condition: !!product.manage_stock },
                   {
-                    label: 'Code barres',
+                    label: 'Stock défini',
+                    condition: product.stock !== undefined && product.stock !== null,
+                  },
+                  { label: 'Gestion stock', condition: !!product.manage_stock },
+                  {
+                    label: 'Code-barres',
                     condition: !!product.meta_data?.find((m) => m.key === 'barcode')?.value,
                   },
+                  { label: 'Catégorisé', condition: product.categories?.length > 0 },
+                  { label: 'Marque', condition: !!product.brand_ref?.name },
+                  { label: 'Fournisseur', condition: !!product.supplier_ref?.name },
                 ].map((item) => (
                   <span
                     key={item.label}
