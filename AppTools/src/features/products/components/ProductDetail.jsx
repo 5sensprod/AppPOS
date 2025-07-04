@@ -65,8 +65,6 @@ function ProductDetail() {
               watch={watch}
               errors={errors}
               entityId={currentId}
-              // ✅ UTILISER LES HANDLERS DU FORMULAIRE si disponibles (mode édition)
-              // Sinon utiliser les handlers originaux (mode lecture)
               uploadImage={formProps.onUploadImage || uploadImage}
               deleteImage={formProps.onDeleteImage || deleteImage}
               setMainImage={formProps.onSetMainImage || setMainImage}
@@ -151,7 +149,6 @@ function ProductDetail() {
       onSubmit={handleSubmit}
       onCancel={handleCancel}
       onSync={handleSync}
-      // ✅ AJOUTER les handlers d'images
       onUploadImage={uploadImage}
       onDeleteImage={deleteImage}
       onSetMainImage={setMainImage}
