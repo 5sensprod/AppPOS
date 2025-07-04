@@ -1,5 +1,5 @@
 // src/features/products/components/sections/BrandsSuppliersSection.jsx
-import React, { useMemo, useEffect, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Tag, Truck, Star } from 'lucide-react';
 import BrandSelectField from '../../../../components/common/fields/BrandSelectField';
