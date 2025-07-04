@@ -1,22 +1,14 @@
-<<<<<<< HEAD
-// src/features/products/components/ProductTable.jsx
+// src/features/products/components/ProductTable.jsx - VERSION SIMPLIFIÉE
 import React, { useState, useEffect } from 'react';
-=======
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
->>>>>>> c672840ae92015411b12e94e27d227e87a6d4546
 import { useProduct, useProductDataStore } from '../stores/productStore';
+import { useHierarchicalCategories } from '../../../features/categories/stores/categoryHierarchyStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { usePaginationStore } from '@/stores/usePaginationStore';
 import { useProductFilters } from '../hooks/useProductFilters';
 import { useStockOperations } from '../hooks/useStockOperations';
-<<<<<<< HEAD
 import { useCategoryOptions } from '../hooks/useCategoryOptions';
-import { useEntityTable } from '../../../hooks/useEntityTable';
-=======
-import { useEntityTable } from '../../../hooks/useEntityTable';
-import { useCategoryUtils } from '../../../hooks/useCategoryUtils';
->>>>>>> c672840ae92015411b12e94e27d227e87a6d4546
+import { useEntityTable } from '../../../hooks/useEntityTable'; // ✅ Direct comme suppliers
 import exportService from '../../../services/exportService';
 import { useWebCapture } from '../hooks/useWebCapture';
 import StockModal from '../../../components/common/EntityTable/components/BatchActions/components/StockModal';
@@ -36,30 +28,23 @@ function ProductTable(props) {
 
   const {
     hierarchicalCategories,
-    categoriesLoading,
+    loading: categoriesLoading,
     fetchHierarchicalCategories,
-    enrichProductWithCategories,
-    getCategoryOptions,
-    isReady: categoriesReady,
-  } = useCategoryUtils();
+  } = useHierarchicalCategories();
 
+  // États pour la modal de stock
   const [showStockModal, setShowStockModal] = useState(false);
   const [stockModalItems, setStockModalItems] = useState([]);
 
   const { sync: syncEnabled } = ENTITY_CONFIG.features;
   const { getPaginationParams } = usePaginationStore();
   const { pageSize: persistedPageSize } = getPaginationParams('product');
-
-  const enrichedProducts = useMemo(() => {
-    if (!products.length || !categoriesReady) return products;
-
-    console.log('🔄 Enrichissement des produits avec catégories...');
-    return products.map(enrichProductWithCategories);
-  }, [products, enrichProductWithCategories, categoriesReady]);
+  const [localProducts, setLocalProducts] = useState([]);
 
   const { selectedFilters, setSelectedFilters, filterOptions, filterProducts } =
-    useProductFilters(enrichedProducts);
+    useProductFilters(products);
 
+  // ✅ UTILISATION DIRECTE DE useEntityTable COMME LES SUPPLIERS
   const {
     loading: operationLoading,
     error,
@@ -69,9 +54,9 @@ function ProductTable(props) {
     handleBatchSyncEntities,
   } = useEntityTable({
     entityType: 'product',
-    fetchEntities: fetchProducts,
+    fetchEntities: fetchProducts, // ✅ WebSocket store
     deleteEntity: async (id) => {
-      await deleteProduct(id);
+      await deleteProduct(id); // ✅ Entity store
     },
     syncEntity: syncEnabled
       ? async (id) => {
@@ -80,6 +65,7 @@ function ProductTable(props) {
       : undefined,
   });
 
+  // Hook pour les opérations de stock (conservé)
   const {
     handleBatchStockChange,
     loading: stockLoading,
@@ -90,88 +76,145 @@ function ProductTable(props) {
     fetchProducts,
   });
 
-  const categorySelectOptions = useMemo(() => {
-    return getCategoryOptions({
-      format: 'flat',
-      sortAlphabetically: true,
-      includeEmpty: true,
-    });
-  }, [getCategoryOptions]);
-
-  const { handleCreateSheet } = useWebCapture(enrichedProducts);
+  const categorySelectOptions = useCategoryOptions(hierarchicalCategories, products);
+  const { handleCreateSheet } = useWebCapture(products);
   const { toastActions, removeToast, updateToast } = useActionToasts();
 
   useEffect(() => {
-    let mounted = true;
+    if (syncEnabled) initWebSocket();
 
-    const initializeData = async () => {
-      try {
-        if (syncEnabled) {
-          initWebSocket();
-        }
+    if (products.length === 0) {
+      fetchProducts();
+    }
 
-        const promises = [];
-
-        if (products.length === 0) {
-          promises.push(fetchProducts());
-        }
-
-        if (hierarchicalCategories.length === 0 && !categoriesLoading) {
-          promises.push(fetchHierarchicalCategories());
-        }
-
-        if (promises.length > 0) {
-          await Promise.all(promises);
-        }
-      } catch (error) {
-        console.error('Erreur initialisation ProductTable:', error);
-      }
-    };
-
-    initializeData();
+    if (hierarchicalCategories.length === 0 && !categoriesLoading) {
+      fetchHierarchicalCategories();
+    }
 
     return () => {
-      mounted = false;
+      // Nettoyage websocket si nécessaire
     };
   }, []);
 
-  // ✅ GESTION D'ERREUR OPTIMISÉE
+  // Gérer les erreurs de stock
   useEffect(() => {
     if (stockError) {
+      // Pas besoin de setError, on utilise directement l'error de useEntityTable
     }
   }, [stockError]);
 
-  // ✅ FILTRAGE MEMOIZÉ
-  const filteredProducts = useMemo(() => {
-    console.log('🔄 Filtrage des produits...');
-    return filterProducts(enrichedProducts);
-  }, [enrichedProducts, filterProducts]);
+  // Enrichir les produits avec des informations sur les chemins de catégories
+  useEffect(() => {
+    if (products.length > 0 && hierarchicalCategories.length > 0) {
+      // Créer une carte des chemins de catégories
+      const categoryPathMap = {};
+      const categoryHierarchyMap = {};
 
+      // Fonction récursive pour construire les chemins et la hiérarchie
+      const buildCategoryMaps = (categories, parentPath = '', parent = null) => {
+        categories.forEach((cat) => {
+          const currentPath = parentPath ? `${parentPath}/${cat._id}` : cat._id;
+          categoryPathMap[cat._id] = currentPath;
+
+          // Pour chaque catégorie, stocker son parent
+          categoryHierarchyMap[cat._id] = {
+            path: currentPath,
+            parentId: parent ? parent._id : null,
+          };
+
+          if (cat.children && cat.children.length > 0) {
+            buildCategoryMaps(cat.children, currentPath, cat);
+          }
+        });
+      };
+
+      buildCategoryMaps(hierarchicalCategories);
+
+      // Enrichir les produits avec les informations de chemin
+      const enrichedProducts = products.map((product) => {
+        // Créer un objet pour stocker les chemins des catégories associées
+        const path_info = {};
+
+        // Fonction pour ajouter tous les chemins de catégories parents
+        const addAllCategoryPaths = (catId) => {
+          if (!catId || !categoryPathMap[catId]) return;
+
+          path_info[catId] = categoryPathMap[catId];
+
+          Object.keys(categoryPathMap).forEach((potentialParentId) => {
+            if (
+              categoryPathMap[catId].startsWith(categoryPathMap[potentialParentId]) &&
+              catId !== potentialParentId
+            ) {
+              path_info[potentialParentId] = categoryPathMap[potentialParentId];
+            }
+          });
+        };
+
+        // Ajouter tous les chemins pour la catégorie principale
+        if (product.category_id) {
+          addAllCategoryPaths(product.category_id);
+        }
+
+        // Ajouter tous les chemins pour les catégories additionnelles
+        if (Array.isArray(product.categories)) {
+          product.categories.forEach((catId) => {
+            addAllCategoryPaths(catId);
+          });
+        }
+
+        // Si les refs de catégorie existent, ajouter leurs chemins aussi
+        if (product.category_info?.refs) {
+          product.category_info.refs.forEach((ref) => {
+            addAllCategoryPaths(ref.id);
+          });
+        }
+
+        // Ajouter une propriété category_id_path au produit
+        const category_id_path = product.category_id ? categoryPathMap[product.category_id] : null;
+
+        return {
+          ...product,
+          category_id_path,
+          category_info: {
+            ...(product.category_info || {}),
+            path_info,
+          },
+        };
+      });
+
+      setLocalProducts(enrichedProducts);
+    } else {
+      setLocalProducts(products || []);
+    }
+  }, [products, hierarchicalCategories, productsError]);
+
+  const filteredProducts = filterProducts(localProducts);
   const loading = productsLoading || operationLoading || categoriesLoading || stockLoading;
 
-  const handleProductExport = useCallback(
-    async (exportConfig) => {
-      const toastId = toastActions.export.start(
-        exportConfig.selectedItems.length,
-        exportConfig.format,
-        'produit'
-      );
+  const handleProductExport = async (exportConfig) => {
+    const toastId = toastActions.export.start(
+      exportConfig.selectedItems.length,
+      exportConfig.format,
+      'produit'
+    );
 
-      try {
-        const result = await exportService.exportProducts(exportConfig);
-        removeToast(toastId);
-        toastActions.export.success(exportConfig.format);
-        return result;
-      } catch (error) {
-        removeToast(toastId);
-        toastActions.export.error(error.message);
-        return false;
-      }
-    },
-    [toastActions, removeToast]
-  );
+    try {
+      const result = await exportService.exportProducts(exportConfig);
 
-  const handleStockAction = useCallback(async (selectedItems, stockAction) => {
+      removeToast(toastId);
+      toastActions.export.success(exportConfig.format);
+
+      return result;
+    } catch (error) {
+      removeToast(toastId);
+      toastActions.export.error(error.message);
+      return false;
+    }
+  };
+
+  // Fonction pour gérer l'action de stock depuis le dropdown
+  const handleStockAction = async (selectedItems, stockAction) => {
     try {
       setStockModalItems([...selectedItems]);
       setShowStockModal(true);
@@ -180,68 +223,62 @@ function ProductTable(props) {
       console.error("Erreur lors de l'ouverture de la modal stock:", error);
       return Promise.reject(error);
     }
-  }, []);
+  };
 
-  const handleConfirmStockChange = useCallback(
-    async (selectedItems, action, value) => {
-      try {
-        await handleBatchStockChange(selectedItems, action, value);
-        toastActions.stock.success(selectedItems.length, action, 'produit');
-        setShowStockModal(false);
-        setStockModalItems([]);
+  // Fonction pour confirmer l'action de stock depuis la modal
+  const handleConfirmStockChange = async (selectedItems, action, value) => {
+    try {
+      await handleBatchStockChange(selectedItems, action, value);
+      toastActions.stock.success(selectedItems.length, action, 'produit');
+      setShowStockModal(false);
+      setStockModalItems([]);
 
-        setTimeout(async () => {
-          await fetchProducts();
-        }, 200);
-      } catch (error) {
-        toastActions.stock.error(error.message);
-      }
-    },
-    [handleBatchStockChange, toastActions, fetchProducts]
-  );
+      setTimeout(async () => {
+        await fetchProducts();
+      }, 200);
+    } catch (error) {
+      toastActions.stock.error(error.message);
+    }
+  };
 
-  const handleBatchStatusChange = useCallback(
-    async (itemIds, newStatus) => {
-      if (itemIds.length === 0) return;
+  const handleBatchStatusChange = async (itemIds, newStatus) => {
+    if (itemIds.length === 0) return;
 
-      try {
-        await Promise.all(itemIds.map((id) => updateProduct(id, { status: newStatus })));
-        toastActions.status.success(itemIds.length, newStatus, 'produit');
+    try {
+      await Promise.all(itemIds.map((id) => updateProduct(id, { status: newStatus })));
+      toastActions.status.success(itemIds.length, newStatus, 'produit');
 
-        setTimeout(async () => {
-          await fetchProducts();
-        }, 500);
-      } catch (err) {
-        toastActions.status.error(err.message || String(err));
-      }
-    },
-    [updateProduct, toastActions, fetchProducts]
-  );
+      // Attendre puis recharger
+      setTimeout(async () => {
+        await fetchProducts();
+      }, 500);
+    } catch (err) {
+      toastActions.status.error(err.message || String(err));
+    }
+  };
 
-  const handleBatchCategoryChange = useCallback(
-    async (itemIds, categoryId, categoryName) => {
-      if (itemIds.length === 0) return;
+  const handleBatchCategoryChange = async (itemIds, categoryId, categoryName) => {
+    if (itemIds.length === 0) return;
 
-      try {
-        await Promise.all(
-          itemIds.map((id) =>
-            updateProduct(id, {
-              category_id: categoryId,
-              categories: [categoryId],
-            })
-          )
-        );
+    try {
+      // Utiliser updateProduct mais avec écrasement complet
+      await Promise.all(
+        itemIds.map((id) =>
+          updateProduct(id, {
+            category_id: categoryId,
+            categories: [categoryId], // 🎯 Écraser complètement les catégories
+          })
+        )
+      );
 
-        toastActions.category.success(itemIds.length, 'produit');
-        setTimeout(async () => {
-          await fetchProducts();
-        }, 500);
-      } catch (err) {
-        toastActions.category.error(err.message || String(err));
-      }
-    },
-    [updateProduct, toastActions, fetchProducts]
-  );
+      toastActions.category.success(itemIds.length, 'produit');
+      setTimeout(async () => {
+        await fetchProducts();
+      }, 500);
+    } catch (err) {
+      toastActions.category.error(err.message || String(err));
+    }
+  };
 
   return (
     <>
@@ -300,6 +337,7 @@ function ProductTable(props) {
         {...props}
       />
 
+      {/* Modal de gestion du stock */}
       <StockModal
         isOpen={showStockModal}
         onClose={() => {
