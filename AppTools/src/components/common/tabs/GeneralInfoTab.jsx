@@ -2,7 +2,7 @@
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Controller } from 'react-hook-form';
-import CategorySelector from '../../common/CategorySelector';
+import CategorySelectField from '../fields/CategorySelectField';
 import BrandSelectField from '../fields/BrandSelectField';
 import imageProxyService from '../../../services/imageProxyService';
 import SupplierSelectField from '../fields/SupplierSelectField';
@@ -130,8 +130,7 @@ const GeneralInfoTab = ({
           name={field}
           control={formContext.control}
           render={({ field: controllerField }) => (
-            <CategorySelector
-              mode="single"
+            <CategorySelectField
               hierarchicalData={formContext.getValues('_hierarchicalCategories') || []}
               value={controllerField.value}
               onChange={controllerField.onChange}

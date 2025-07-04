@@ -9,10 +9,12 @@ const InventoryTab = ({
   register,
   control,
   errors,
-  setValue, // ✅ AJOUTÉ
-  watch, // ✅ AJOUTÉ
+  setValue,
+  watch,
   specialFields = {},
-  hierarchicalCategories = [],
+  // ✅ SUPPRIMER hierarchicalCategories - le hook useCategoryUtils gère cela
+  // hierarchicalCategories = [], // ❌ RETIRÉ
+  categoryUtils, // ✅ NOUVEAU : pour usage avancé si nécessaire
 }) => {
   return (
     <div className="space-y-8">
@@ -22,10 +24,10 @@ const InventoryTab = ({
         product={product}
         editable={editable}
         register={register}
-        control={control} // ✅ AJOUTÉ au cas où
+        control={control}
         errors={errors}
-        setValue={setValue} // ✅ AJOUTÉ
-        watch={watch} // ✅ AJOUTÉ
+        setValue={setValue}
+        watch={watch}
       />
 
       <CategoriesSection
@@ -35,7 +37,9 @@ const InventoryTab = ({
         control={control}
         errors={errors}
         specialFields={specialFields}
-        hierarchicalCategories={hierarchicalCategories}
+        // ✅ SUPPRIMER hierarchicalCategories - CategoriesSection utilise maintenant useCategoryUtils
+        // hierarchicalCategories={hierarchicalCategories} // ❌ RETIRÉ
+        categoryUtils={categoryUtils} // ✅ PASSER pour usage avancé si nécessaire
       />
     </div>
   );

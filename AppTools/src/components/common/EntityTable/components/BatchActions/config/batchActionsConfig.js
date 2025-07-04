@@ -1,15 +1,5 @@
 // config/batchActionsConfig.js
-import {
-  Trash2,
-  RefreshCw,
-  FileText,
-  ListFilter,
-  Folder,
-  FileOutput,
-  FileSearch,
-  Check,
-  Package, // Icône pour le stock
-} from 'lucide-react';
+import { Trash2, RefreshCw, FileText, ListFilter, Folder, FileOutput, Package } from 'lucide-react';
 import SyncButton from '../components/SyncButton';
 
 export const STATUS_OPTIONS = [

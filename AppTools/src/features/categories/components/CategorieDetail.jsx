@@ -4,7 +4,7 @@ import EntityDetail from '../../../components/common/EntityDetail';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
-import CategorySelector from '../../../components/common/CategorySelector'; // ✅ NOUVEAU
+import CategorySelectField from '../../../components/common/fields/CategorySelectField';
 import { Controller } from 'react-hook-form';
 import { ENTITY_CONFIG } from '../constants';
 import useCategoryDetail from '../hooks/useCategoryDetail';
@@ -60,8 +60,7 @@ function CategorieDetail() {
                     name="parent_id"
                     control={control}
                     render={({ field }) => (
-                      <CategorySelector
-                        mode="single"
+                      <CategorySelectField
                         hierarchicalData={hierarchicalCategories}
                         value={field.value}
                         onChange={field.onChange}

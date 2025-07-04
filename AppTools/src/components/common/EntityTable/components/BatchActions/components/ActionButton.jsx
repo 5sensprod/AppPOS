@@ -3,7 +3,7 @@ import React, { useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { useResponsiveDropdown } from '../hooks/useResponsiveDropdown';
-import CategorySelector from '../../../../CategorySelector';
+import CategorySelectField from '../../../../fields/CategorySelectField';
 
 const ActionButton = ({
   action,
@@ -86,8 +86,7 @@ const ActionButton = ({
               minWidth: `${Math.max(buttonRect.width, 200)}px`,
             }}
           >
-            <CategorySelector
-              mode="single"
+            <CategorySelectField
               hierarchicalData={hierarchicalData}
               value={''} // Pas de valeur initiale car on ne garde pas l’état ici
               onChange={(val) => {

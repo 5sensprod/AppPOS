@@ -30,6 +30,8 @@ function ProductDetail() {
     deleteImage,
     setMainImage,
     hierarchicalCategories,
+    // ✅ RÉCUPÉRER les utilitaires de catégories
+    categoryUtils,
   } = useProductDetail();
 
   const renderTabContent = useCallback(
@@ -65,8 +67,6 @@ function ProductDetail() {
               watch={watch}
               errors={errors}
               entityId={currentId}
-              // ✅ UTILISER LES HANDLERS DU FORMULAIRE si disponibles (mode édition)
-              // Sinon utiliser les handlers originaux (mode lecture)
               uploadImage={formProps.onUploadImage || uploadImage}
               deleteImage={formProps.onDeleteImage || deleteImage}
               setMainImage={formProps.onSetMainImage || setMainImage}
@@ -102,7 +102,9 @@ function ProductDetail() {
                   options: [{ value: '', label: 'Aucun fournisseur' }, ...supplierOptions],
                 },
               }}
-              hierarchicalCategories={hierarchicalCategories}
+              // ✅ SUPPRIMER hierarchicalCategories - géré par useCategoryUtils
+              // hierarchicalCategories={hierarchicalCategories} // ❌ RETIRÉ
+              categoryUtils={categoryUtils}
             />
           );
         case 'woocommerce':
@@ -128,10 +130,12 @@ function ProductDetail() {
       deleteImage,
       setMainImage,
       handleSync,
-      hierarchicalCategories,
+      // ✅ SUPPRIMER hierarchicalCategories des dépendances
+      // hierarchicalCategories, // ❌ RETIRÉ
       currentId,
       loading,
       error,
+      categoryUtils, // ✅ GARDER categoryUtils
     ]
   );
 
@@ -164,7 +168,6 @@ function ProductDetail() {
       onSubmit={handleSubmit}
       onCancel={handleCancel}
       onSync={handleSync}
-      // ✅ AJOUTER les handlers d'images
       onUploadImage={uploadImage}
       onDeleteImage={deleteImage}
       onSetMainImage={setMainImage}
