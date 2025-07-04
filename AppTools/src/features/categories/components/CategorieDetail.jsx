@@ -62,7 +62,6 @@ function CategorieDetail() {
                     control={control}
                     render={({ field }) => (
                       <CategorySelectField
-                        mode="single"
                         hierarchicalData={hierarchicalCategories}
                         value={field.value}
                         onChange={field.onChange}

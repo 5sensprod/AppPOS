@@ -131,7 +131,6 @@ const GeneralInfoTab = ({
           control={formContext.control}
           render={({ field: controllerField }) => (
             <CategorySelectField
-              mode="single"
               hierarchicalData={formContext.getValues('_hierarchicalCategories') || []}
               value={controllerField.value}
               onChange={controllerField.onChange}

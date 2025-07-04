@@ -87,7 +87,6 @@ const ActionButton = ({
             }}
           >
             <CategorySelectField
-              mode="single"
               hierarchicalData={hierarchicalData}
               value={''} // Pas de valeur initiale car on ne garde pas l’état ici
               onChange={(val) => {

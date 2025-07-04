@@ -216,7 +216,6 @@ const UnifiedFilterBar = ({
         <div ref={valueSelectRef} className="relative">
           <div className="w-80" style={{ position: 'relative', zIndex: 99999 }}>
             <CategorySelectField
-              mode="single"
               hierarchicalData={hierarchicalCategories}
               value={''}
               onChange={(selectedCategoryId) => {
