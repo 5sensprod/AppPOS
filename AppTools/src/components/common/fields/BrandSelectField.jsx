@@ -1,9 +1,8 @@
-//AppTools\src\components\common\fields\BrandSelectField.jsx
+// AppTools\src\components\common\fields\BrandSelectField.jsx
 import React, { useMemo } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import Select from 'react-select';
 
-// ✅ Styles modernes tirés de CategoriesSection
 const modernSelectStyles = {
   control: (provided, state) => ({
     ...provided,
@@ -38,40 +37,21 @@ const modernSelectStyles = {
   }),
 };
 
-const BrandSelectField = ({
-  name = 'brands', // ✅ CHANGÉ: pluriel par défaut pour les multi-sélections
-  options = [],
-  editable = false,
-  value,
-  isMulti = true, // ✅ NOUVEAU: Prop pour gérer le mode multiple
-}) => {
+const BrandSelectField = ({ name = 'brands', options = [], editable = false, value }) => {
   const { control, watch } = useFormContext() || {};
-  const selected = watch?.(name) || value || [];
+  const selected = watch?.(name) ?? value ?? [];
+  const isMulti = Array.isArray(selected);
 
-  console.log('🔍 BrandSelectField Debug:', {
-    name,
-    selected,
-    options: options.slice(0, 3), // Afficher seulement les 3 premières options
-    isMulti,
-    editable,
-  });
-
-  // ✅ Tri alphabétique des options
   const sortedOptions = useMemo(() => {
     return [...options].sort((a, b) => a.label.localeCompare(b.label));
   }, [options]);
 
   if (!editable) {
-    // ✅ CORRECTION: Gérer les deux modes (single et multi)
     let selectedOptions = [];
 
     if (isMulti) {
-      // Mode multiple : selected est un tableau d'IDs
-      selectedOptions = sortedOptions.filter((opt) =>
-        Array.isArray(selected) ? selected.includes(opt.value) : false
-      );
+      selectedOptions = sortedOptions.filter((opt) => selected.includes(opt.value));
     } else {
-      // Mode simple : selected est un ID unique
       const selectedOption = sortedOptions.find((opt) => opt.value === selected);
       selectedOptions = selectedOption ? [selectedOption] : [];
     }
@@ -99,15 +79,12 @@ const BrandSelectField = ({
       name={name}
       control={control}
       render={({ field }) => {
-        // ✅ CORRECTION: Gérer les valeurs pour le mode multiple
         let fieldValue = null;
 
         if (isMulti) {
-          // Mode multiple : convertir le tableau d'IDs en tableau d'options
           const selectedIds = Array.isArray(field.value) ? field.value : [];
           fieldValue = sortedOptions.filter((opt) => selectedIds.includes(opt.value));
         } else {
-          // Mode simple : trouver l'option correspondante
           fieldValue = sortedOptions.find((opt) => opt.value === field.value) || null;
         }
 
@@ -118,20 +95,16 @@ const BrandSelectField = ({
             value={fieldValue}
             onChange={(selected) => {
               if (isMulti) {
-                // Mode multiple : extraire les IDs des options sélectionnées
                 const selectedIds = selected ? selected.map((opt) => opt.value) : [];
                 field.onChange(selectedIds);
-                console.log('🔄 BrandSelectField onChange (multi):', selectedIds);
               } else {
-                // Mode simple : extraire l'ID de l'option sélectionnée
                 const selectedId = selected?.value || '';
                 field.onChange(selectedId);
-                console.log('🔄 BrandSelectField onChange (single):', selectedId);
               }
             }}
             placeholder={isMulti ? 'Sélectionner des marques' : 'Aucune marque'}
             isClearable
-            isMulti={isMulti} // ✅ AJOUT: Activer le mode multiple
+            isMulti={isMulti}
             className="react-select-container"
             classNamePrefix="react-select"
             menuPlacement="top"
