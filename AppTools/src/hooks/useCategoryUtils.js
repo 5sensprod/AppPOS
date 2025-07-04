@@ -1,6 +1,6 @@
 // src/hooks/useCategoryUtils.js
 import { useMemo, useCallback } from 'react';
-import { useHierarchicalCategories } from '../../features/categories/stores/categoryHierarchyStore';
+import { useHierarchicalCategories } from '../features/categories/stores/categoryHierarchyStore';
 
 /**
  * Hook centralisé pour toutes les opérations sur les catégories hiérarchiques

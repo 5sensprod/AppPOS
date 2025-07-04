@@ -4,78 +4,10 @@ import { useFormContext } from 'react-hook-form';
 import { Star } from 'lucide-react';
 import BrandSelectField from '../../../../components/common/fields/BrandSelectField';
 import SupplierSelectField from '../../../../components/common/fields/SupplierSelectField';
-import CategorySelector from '../../../../components/common/CategorySelector';
+import CategorySelectField from '../../../../components/common/fields/CategorySelectField';
+import { useCategoryUtils } from '../../../../hooks/useCategoryUtils';
 
-// ===== UTILITAIRES DE CATÉGORIES (logique ProductTable.jsx) =====
-
-const buildCategoryMaps = (hierarchicalCategories) => {
-  const categoryPathMap = {};
-  const categoryNameMap = {};
-
-  const buildMaps = (categories, parentPath = '') => {
-    categories.forEach((cat) => {
-      const currentPath = parentPath ? `${parentPath}/${cat._id}` : cat._id;
-      categoryPathMap[cat._id] = currentPath;
-      categoryNameMap[cat._id] = cat.name;
-
-      if (cat.children?.length > 0) {
-        buildMaps(cat.children, currentPath);
-      }
-    });
-  };
-
-  buildMaps(hierarchicalCategories);
-  return { categoryPathMap, categoryNameMap };
-};
-
-const buildCategoryNamePath = (categoryId, categoryPathMap, categoryNameMap) => {
-  if (!categoryPathMap[categoryId]) return null;
-
-  const pathIds = categoryPathMap[categoryId].split('/');
-  const pathNames = pathIds.map((id) => categoryNameMap[id]).filter(Boolean);
-
-  return pathNames.join(' > ');
-};
-
-const getCategoriesWithHierarchy = (
-  selectedCategories,
-  hierarchicalCategories,
-  primaryCategoryId
-) => {
-  const result = [];
-  const processedCategories = new Set();
-  const { categoryPathMap, categoryNameMap } = buildCategoryMaps(hierarchicalCategories);
-
-  selectedCategories.forEach((categoryId) => {
-    if (!processedCategories.has(categoryId) && categoryPathMap[categoryId]) {
-      const pathIds = categoryPathMap[categoryId].split('/');
-
-      const hierarchy = pathIds.map((id, index) => ({
-        id: id,
-        name: categoryNameMap[id],
-        level: index,
-      }));
-
-      result.push({
-        categoryId,
-        hierarchy,
-        isPrimary: categoryId === primaryCategoryId,
-      });
-
-      pathIds.forEach((id) => processedCategories.add(id));
-    }
-  });
-
-  return result.sort((a, b) => {
-    if (a.isPrimary && !b.isPrimary) return -1;
-    if (!a.isPrimary && b.isPrimary) return 1;
-    const aName = a.hierarchy[a.hierarchy.length - 1]?.name || '';
-    const bName = b.hierarchy[b.hierarchy.length - 1]?.name || '';
-    return aName.localeCompare(bName);
-  });
-};
-
-// ===== COMPOSANTS UI =====
+// ===== COMPOSANTS UI (inchangés) =====
 
 const CategoryChip = ({ category, isPrimary, fullPath, isChild, pathParts }) => (
   <div
@@ -163,15 +95,13 @@ const HierarchyPreview = ({ categoryGroup, selectedCategoryId, selectedCategorie
   </div>
 );
 
-// ===== SECTIONS =====
+// ===== SECTIONS OPTIMISÉES =====
 
-const ReadOnlyView = ({ product, hierarchicalCategories }) => {
+const ReadOnlyView = ({ product }) => {
+  // ✅ UTILISER useCategoryUtils pour les opérations sur les catégories
+  const { getCategoryPath } = useCategoryUtils();
+
   const displayCategories = product.category_info?.refs || [];
-
-  const buildCategoryPathFromHierarchy = (categoryId) => {
-    const { categoryPathMap, categoryNameMap } = buildCategoryMaps(hierarchicalCategories);
-    return buildCategoryNamePath(categoryId, categoryPathMap, categoryNameMap);
-  };
 
   return (
     <div>
@@ -191,7 +121,8 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
               <div className="flex flex-wrap gap-2">
                 {displayCategories.map((category) => {
                   const isPrimary = category.id === product.category_id;
-                  const fullPath = buildCategoryPathFromHierarchy(category.id);
+                  // ✅ UTILISER getCategoryPath du hook
+                  const fullPath = getCategoryPath(category.id) || category.name;
                   const pathParts = fullPath ? fullPath.split(' > ') : [category.name];
                   const isChild = pathParts.length > 1;
 
@@ -220,7 +151,7 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
           )}
         </div>
 
-        {/* ✅ Services - Affichage simple sans BrandSelectField/SupplierSelectField */}
+        {/* Services */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -249,8 +180,16 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
   );
 };
 
-const EditableView = ({ register, control, errors, specialFields, hierarchicalCategories }) => {
+const EditableView = ({ register, control, errors, specialFields }) => {
   const { watch, setValue } = useFormContext();
+
+  // ✅ UTILISER useCategoryUtils au lieu de recevoir hierarchicalCategories
+  const {
+    hierarchicalCategories,
+    flattenHierarchy,
+    isReady: categoryUtilsReady,
+  } = useCategoryUtils();
+
   const selectedBrandId = watch('brand_id');
   const selectedSupplierId = watch('supplier_id');
   const selectedCategoryId = watch('category_id');
@@ -269,7 +208,55 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
     return allSuppliers.filter((supplier) => supplier.brands?.includes(selectedBrandId));
   }, [selectedBrandId, allSuppliers]);
 
-  // Logique de synchronisation
+  // ✅ UTILISER flattenHierarchy pour construire les catégories avec hiérarchie
+  const getCategoriesWithHierarchy = useMemo(() => {
+    if (!categoryUtilsReady || !selectedCategories.length) return [];
+
+    const result = [];
+    const processedCategories = new Set();
+
+    // Aplatir la hiérarchie pour avoir accès aux métadonnées
+    const flatCategories = flattenHierarchy(
+      {},
+      {
+        includeHidden: true,
+        maxLevel: Infinity,
+      }
+    );
+
+    selectedCategories.forEach((categoryId) => {
+      if (!processedCategories.has(categoryId)) {
+        const categoryData = flatCategories.find((cat) => cat._id === categoryId);
+
+        if (categoryData) {
+          // Construire la hiérarchie à partir des données aplaties
+          const hierarchy = categoryData.pathArray?.map((name, index) => ({
+            id: categoryData._hierarchyIndex?.split('.')[index] || categoryId, // Approximation
+            name: name,
+            level: index,
+          })) || [{ id: categoryId, name: categoryData.name, level: 0 }];
+
+          result.push({
+            categoryId,
+            hierarchy,
+            isPrimary: categoryId === selectedCategoryId,
+          });
+
+          processedCategories.add(categoryId);
+        }
+      }
+    });
+
+    return result.sort((a, b) => {
+      if (a.isPrimary && !b.isPrimary) return -1;
+      if (!a.isPrimary && b.isPrimary) return 1;
+      const aName = a.hierarchy[a.hierarchy.length - 1]?.name || '';
+      const bName = b.hierarchy[b.hierarchy.length - 1]?.name || '';
+      return aName.localeCompare(bName);
+    });
+  }, [selectedCategories, selectedCategoryId, flattenHierarchy, categoryUtilsReady]);
+
+  // Logique de synchronisation (inchangée)
   useEffect(() => {
     const brand = allBrands.find((b) => b.value === selectedBrandId);
     if (selectedSupplierId && brand && !brand.suppliers?.includes(selectedSupplierId)) {
@@ -296,6 +283,20 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
     setValue('category_id', primaryId);
   };
 
+  // Afficher un loader si les catégories ne sont pas prêtes
+  if (!categoryUtilsReady) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Chargement des catégories...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
@@ -309,7 +310,7 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
             Catégories du produit
           </label>
 
-          <CategorySelector
+          <CategorySelectField
             mode="multiple"
             hierarchicalData={hierarchicalCategories}
             selectedCategories={selectedCategories}
@@ -340,11 +341,7 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
               Aperçu des catégories sélectionnées:
             </h4>
             <div className="space-y-3">
-              {getCategoriesWithHierarchy(
-                selectedCategories,
-                hierarchicalCategories,
-                selectedCategoryId
-              ).map((categoryGroup, groupIndex) => (
+              {getCategoriesWithHierarchy.map((categoryGroup, groupIndex) => (
                 <HierarchyPreview
                   key={groupIndex}
                   categoryGroup={categoryGroup}
@@ -363,7 +360,7 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
           </div>
         )}
 
-        {/* ✅ Services avec tes composants (qui ont déjà des Controllers) */}
+        {/* Services */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -403,7 +400,9 @@ const CategoriesSection = ({
   control,
   errors,
   specialFields,
-  hierarchicalCategories,
+  // ✅ SUPPRIMER hierarchicalCategories des props - utiliser le hook
+  // hierarchicalCategories, // ❌ RETIRÉ
+  categoryUtils, // ✅ OPTIONNEL : pour usage avancé
 }) => {
   return editable ? (
     <EditableView
@@ -411,10 +410,9 @@ const CategoriesSection = ({
       control={control}
       errors={errors}
       specialFields={specialFields}
-      hierarchicalCategories={hierarchicalCategories}
     />
   ) : (
-    <ReadOnlyView product={product} hierarchicalCategories={hierarchicalCategories} />
+    <ReadOnlyView product={product} />
   );
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useCategoryUtils } from '../../../../hooks/useCategoryUtils'; // ✅ HOOK CENTRALISÉ
+import { useCategoryUtils } from '../../../../../hooks/useCategoryUtils';
 import { createActionsConfig } from './config/batchActionsConfig';
 import ActionButton from './components/ActionButton';
 

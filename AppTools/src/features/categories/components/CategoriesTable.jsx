@@ -6,7 +6,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
 import { usePaginationStore } from '@/stores/usePaginationStore';
-import { useCategoryUtils } from '../../../components/hooks/useCategoryUtils';
+import { useCategoryUtils } from '../../../hooks/useCategoryUtils';
 
 function CategoriesTable(props) {
   const { deleteCategory, syncCategory } = useCategory();

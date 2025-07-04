@@ -6,7 +6,7 @@ import { usePaginationStore } from '@/stores/usePaginationStore';
 import { useProductFilters } from '../hooks/useProductFilters';
 import { useStockOperations } from '../hooks/useStockOperations';
 import { useEntityTable } from '../../../hooks/useEntityTable';
-import { useCategoryUtils } from '../../../components/hooks/useCategoryUtils';
+import { useCategoryUtils } from '../../../hooks/useCategoryUtils';
 import exportService from '../../../services/exportService';
 import { useWebCapture } from '../hooks/useWebCapture';
 import StockModal from '../../../components/common/EntityTable/components/BatchActions/components/StockModal';
