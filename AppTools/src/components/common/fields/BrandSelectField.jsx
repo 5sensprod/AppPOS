@@ -37,10 +37,25 @@ const modernSelectStyles = {
   }),
 };
 
-const BrandSelectField = ({ name = 'brands', options = [], editable = false, value }) => {
+const BrandSelectField = ({
+  name = 'brand_id',
+  options = [],
+  editable = false,
+  value,
+  isMulti = null, // null = auto-détection basée sur le nom du champ
+}) => {
   const { control, watch } = useFormContext() || {};
-  const selected = watch?.(name) ?? value ?? [];
-  const isMulti = Array.isArray(selected);
+
+  // ✅ Auto-détection du mode multi basée sur le nom du champ
+  const shouldBeMulti = useMemo(() => {
+    if (isMulti !== null) return isMulti; // Si explicitement défini, l'utiliser
+
+    // Auto-détection : si le nom contient "brands" (pluriel), c'est multi
+    // si c'est "brand_id", c'est simple
+    return name === 'brands' || name.includes('brands');
+  }, [name, isMulti]);
+
+  const selected = watch?.(name) ?? value ?? (shouldBeMulti ? [] : '');
 
   const sortedOptions = useMemo(() => {
     return [...options].sort((a, b) => a.label.localeCompare(b.label));
@@ -49,9 +64,12 @@ const BrandSelectField = ({ name = 'brands', options = [], editable = false, val
   if (!editable) {
     let selectedOptions = [];
 
-    if (isMulti) {
-      selectedOptions = sortedOptions.filter((opt) => selected.includes(opt.value));
+    if (shouldBeMulti) {
+      // Mode multi : selected est un tableau d'IDs
+      const selectedIds = Array.isArray(selected) ? selected : [];
+      selectedOptions = sortedOptions.filter((opt) => selectedIds.includes(opt.value));
     } else {
+      // Mode simple : selected est un ID string
       const selectedOption = sortedOptions.find((opt) => opt.value === selected);
       selectedOptions = selectedOption ? [selectedOption] : [];
     }
@@ -59,7 +77,9 @@ const BrandSelectField = ({ name = 'brands', options = [], editable = false, val
     return (
       <div className="space-y-1">
         {selectedOptions.length === 0 ? (
-          <p className="text-gray-500 italic">Aucune marque</p>
+          <p className="text-gray-500 italic">
+            {shouldBeMulti ? 'Aucune marque' : 'Aucune marque'}
+          </p>
         ) : (
           selectedOptions.map((opt) => (
             <div key={opt.value} className="flex items-center gap-2 border px-2 py-1 rounded">
@@ -81,10 +101,12 @@ const BrandSelectField = ({ name = 'brands', options = [], editable = false, val
       render={({ field }) => {
         let fieldValue = null;
 
-        if (isMulti) {
+        if (shouldBeMulti) {
+          // Mode multi : la valeur est un tableau d'IDs
           const selectedIds = Array.isArray(field.value) ? field.value : [];
           fieldValue = sortedOptions.filter((opt) => selectedIds.includes(opt.value));
         } else {
+          // Mode simple : la valeur est un ID string
           fieldValue = sortedOptions.find((opt) => opt.value === field.value) || null;
         }
 
@@ -94,17 +116,19 @@ const BrandSelectField = ({ name = 'brands', options = [], editable = false, val
             options={sortedOptions}
             value={fieldValue}
             onChange={(selected) => {
-              if (isMulti) {
+              if (shouldBeMulti) {
+                // Mode multi : retourner un tableau d'IDs
                 const selectedIds = selected ? selected.map((opt) => opt.value) : [];
                 field.onChange(selectedIds);
               } else {
+                // Mode simple : retourner un ID string ou une chaîne vide
                 const selectedId = selected?.value || '';
                 field.onChange(selectedId);
               }
             }}
-            placeholder={isMulti ? 'Sélectionner des marques' : 'Aucune marque'}
+            placeholder={shouldBeMulti ? 'Sélectionner des marques' : 'Sélectionner une marque'}
             isClearable
-            isMulti={isMulti}
+            isMulti={shouldBeMulti}
             className="react-select-container"
             classNamePrefix="react-select"
             menuPlacement="top"
