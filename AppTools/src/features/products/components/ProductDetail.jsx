@@ -79,20 +79,8 @@ function ProductDetail() {
             <InventoryTab
               product={entity}
               editable={editable}
-              register={register}
-              control={control}
               errors={errors}
-              setValue={setValue}
-              watch={watch}
               specialFields={{
-                category_id: {
-                  type: 'select',
-                  options: [{ value: '', label: 'Aucune catégorie' }, ...categoryOptions],
-                },
-                categories: {
-                  type: 'multiselect',
-                  options: categoryOptions,
-                },
                 brand_id: {
                   type: 'select',
                   options: [{ value: '', label: 'Aucune marque' }, ...brandOptions],
@@ -102,7 +90,6 @@ function ProductDetail() {
                   options: [{ value: '', label: 'Aucun fournisseur' }, ...supplierOptions],
                 },
               }}
-              hierarchicalCategories={hierarchicalCategories}
             />
           );
         case 'woocommerce':
