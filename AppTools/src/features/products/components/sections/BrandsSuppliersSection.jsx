@@ -1,5 +1,5 @@
 // src/features/products/components/sections/BrandsSuppliersSection.jsx
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useCallback } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Tag, Truck, Star } from 'lucide-react';
 import BrandSelectField from '../../../../components/common/fields/BrandSelectField';
@@ -79,6 +79,35 @@ const ReadOnlyView = ({ product }) => {
           )}
         </div>
       </div>
+
+      {/* Informations de relation */}
+      {(product.brand_ref?.name || product.supplier_ref?.name) && (
+        <div className="mt-6 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Informations de relation
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            {product.brand_ref?.name && (
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Marque :</span>
+                <span className="font-medium ml-2">{product.brand_ref.name}</span>
+              </div>
+            )}
+            {product.supplier_ref?.name && (
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Fournisseur :</span>
+                <span className="font-medium ml-2">{product.supplier_ref.name}</span>
+              </div>
+            )}
+            {product.purchase_price && (
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Prix d'achat :</span>
+                <span className="font-medium ml-2">{product.purchase_price}€</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -105,20 +134,47 @@ const EditableView = ({ errors, specialFields }) => {
     return allSuppliers.filter((supplier) => supplier.brands?.includes(selectedBrandId));
   }, [selectedBrandId, allSuppliers]);
 
-  // Synchronisation automatique
-  useEffect(() => {
-    const brand = allBrands.find((b) => b.value === selectedBrandId);
-    if (selectedSupplierId && brand && !brand.suppliers?.includes(selectedSupplierId)) {
-      setValue('brand_id', '');
-    }
-  }, [selectedSupplierId, allBrands, selectedBrandId, setValue]);
+  // ✅ SOLUTION : Utiliser des refs pour éviter les dépendances qui changent
+  const isInitialMount = React.useRef(true);
+  const previousBrandId = React.useRef(selectedBrandId);
+  const previousSupplierId = React.useRef(selectedSupplierId);
 
-  useEffect(() => {
-    const supplier = allSuppliers.find((s) => s.value === selectedSupplierId);
-    if (selectedBrandId && supplier && !supplier.brands?.includes(selectedBrandId)) {
-      setValue('supplier_id', '');
+  // ✅ Synchronisation SEULEMENT quand les valeurs changent vraiment
+  React.useEffect(() => {
+    // Skip sur le premier render
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      previousBrandId.current = selectedBrandId;
+      previousSupplierId.current = selectedSupplierId;
+      return;
     }
-  }, [selectedBrandId, allSuppliers, selectedSupplierId, setValue]);
+
+    let needsUpdate = false;
+
+    // Vérifier si on doit nettoyer la marque
+    if (selectedSupplierId !== previousSupplierId.current && selectedBrandId) {
+      const brand = allBrands.find((b) => b.value === selectedBrandId);
+      if (selectedSupplierId && brand && !brand.suppliers?.includes(selectedSupplierId)) {
+        console.log('🔄 Nettoyage marque incompatible');
+        setValue('brand_id', '');
+        needsUpdate = true;
+      }
+    }
+
+    // Vérifier si on doit nettoyer le fournisseur
+    if (selectedBrandId !== previousBrandId.current && selectedSupplierId) {
+      const supplier = allSuppliers.find((s) => s.value === selectedSupplierId);
+      if (selectedBrandId && supplier && !supplier.brands?.includes(selectedBrandId)) {
+        console.log('🔄 Nettoyage fournisseur incompatible');
+        setValue('supplier_id', '');
+        needsUpdate = true;
+      }
+    }
+
+    // Mettre à jour les références
+    previousBrandId.current = selectedBrandId;
+    previousSupplierId.current = selectedSupplierId;
+  }, [selectedBrandId, selectedSupplierId]); // ✅ SEULEMENT ces deux dépendances
 
   return (
     <div>
