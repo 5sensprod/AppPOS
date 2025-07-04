@@ -18,13 +18,8 @@ const UnifiedFilterBar = ({
   const valueSelectRef = useRef(null);
   const filterButtonRef = useRef(null);
 
-  const {
-    hierarchicalCategories,
-    categoriesLoading,
-    fetchHierarchicalCategories,
-    getCategoryName,
-    isReady: categoriesReady,
-  } = useCategoryUtils();
+  // ✅ Hook simplifié - plus besoin de fetchHierarchicalCategories
+  const { getCategoryName, isReady: categoriesReady, categoriesLoading } = useCategoryUtils();
 
   const closeFilterDropdown = () => {
     setIsAddingFilter(false);
@@ -33,34 +28,6 @@ const UnifiedFilterBar = ({
   };
 
   useClickOutside(valueSelectRef, isAddingFilter, closeFilterDropdown);
-
-  useEffect(() => {
-    if (enableCategories && !categoriesLoading && hierarchicalCategories.length === 0) {
-      fetchHierarchicalCategories();
-    }
-  }, [
-    enableCategories,
-    categoriesLoading,
-    hierarchicalCategories.length,
-    fetchHierarchicalCategories,
-  ]);
-
-  useEffect(() => {
-    if (
-      newFilterType === 'category' &&
-      enableCategories &&
-      !categoriesLoading &&
-      hierarchicalCategories.length === 0
-    ) {
-      fetchHierarchicalCategories();
-    }
-  }, [
-    newFilterType,
-    enableCategories,
-    categoriesLoading,
-    hierarchicalCategories.length,
-    fetchHierarchicalCategories,
-  ]);
 
   const allFilterOptions = useMemo(() => {
     return filterOptions;
@@ -215,9 +182,9 @@ const UnifiedFilterBar = ({
       {isAddingFilter && newFilterType === 'category' && !categoriesLoading && (
         <div ref={valueSelectRef} className="relative">
           <div className="w-80" style={{ position: 'relative', zIndex: 99999 }}>
+            {/* ✅ CategorySelector simplifié */}
             <CategorySelector
               mode="single"
-              hierarchicalData={hierarchicalCategories}
               value={''}
               onChange={(selectedCategoryId) => {
                 if (selectedCategoryId) {

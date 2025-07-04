@@ -10,7 +10,7 @@ const ActionButton = ({
   cfg,
   openDropdown,
   setOpenDropdown,
-  hierarchicalData,
+  // ✅ Supprimé hierarchicalData - plus nécessaire
   syncStats,
 }) => {
   const isOpen = openDropdown === action;
@@ -58,7 +58,7 @@ const ActionButton = ({
     );
   }
 
-  // Action avec dropdown (reste inchangé)
+  // Action avec dropdown
   return (
     <>
       <button
@@ -86,10 +86,10 @@ const ActionButton = ({
               minWidth: `${Math.max(buttonRect.width, 200)}px`,
             }}
           >
+            {/* ✅ CategorySelector simplifié */}
             <CategorySelector
               mode="single"
-              hierarchicalData={hierarchicalData}
-              value={''} // Pas de valeur initiale car on ne garde pas l’état ici
+              value={''} // Pas de valeur initiale car on ne garde pas l'état ici
               onChange={(val) => {
                 cfg.onSelect(val);
                 toggleOpen(); // Fermer après sélection

@@ -132,7 +132,6 @@ const GeneralInfoTab = ({
           render={({ field: controllerField }) => (
             <CategorySelector
               mode="single"
-              hierarchicalData={formContext.getValues('_hierarchicalCategories') || []}
               value={controllerField.value}
               onChange={controllerField.onChange}
               currentCategoryId={formContext.getValues('_id')}

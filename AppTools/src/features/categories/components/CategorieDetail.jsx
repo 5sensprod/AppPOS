@@ -4,7 +4,7 @@ import EntityDetail from '../../../components/common/EntityDetail';
 import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import ImagesTab from '../../../components/common/tabs/ImagesTab';
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
-import CategorySelector from '../../../components/common/CategorySelector'; // ✅ NOUVEAU
+import CategorySelector from '../../../components/common/CategorySelector';
 import { Controller } from 'react-hook-form';
 import { ENTITY_CONFIG } from '../constants';
 import useCategoryDetail from '../hooks/useCategoryDetail';
@@ -15,8 +15,7 @@ function CategorieDetail() {
     currentId,
     isNew,
     editable,
-    parentCategories, // Plus nécessaire - sera supprimé
-    hierarchicalCategories,
+    // ✅ Supprimé : parentCategories, hierarchicalCategories (plus nécessaires)
     handleSubmit,
     handleDelete,
     handleCancel,
@@ -45,16 +44,22 @@ function CategorieDetail() {
                   <div>
                     <label className="text-sm font-medium">Nom</label>
                     <input {...register('name')} className="w-full input" />
+                    {errors?.name && (
+                      <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Description</label>
                     <textarea {...register('description')} className="w-full input" />
+                    {errors?.description && (
+                      <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
+                    )}
                   </div>
                 </div>
               </div>
 
               <div>
-                {/* ✅ NOUVEAU : Sélecteur unifié en mode single */}
+                {/* ✅ CategorySelector simplifié - plus besoin de hierarchicalData */}
                 <label className="text-sm font-medium">Catégorie parente</label>
                 {control && (
                   <Controller
@@ -63,7 +68,6 @@ function CategorieDetail() {
                     render={({ field }) => (
                       <CategorySelector
                         mode="single"
-                        hierarchicalData={hierarchicalCategories}
                         value={field.value}
                         onChange={field.onChange}
                         currentCategoryId={isNew ? null : id}
@@ -75,9 +79,15 @@ function CategorieDetail() {
                     )}
                   />
                 )}
+                {errors?.parent_id && (
+                  <p className="mt-1 text-sm text-red-600">{errors.parent_id.message}</p>
+                )}
+
                 <div className="mt-4">
-                  <input type="checkbox" {...register('is_featured')} />
-                  <label className="ml-2">Catégorie mise en avant</label>
+                  <label className="flex items-center">
+                    <input type="checkbox" {...register('is_featured')} className="mr-2" />
+                    <span>Catégorie mise en avant</span>
+                  </label>
                 </div>
               </div>
             </div>
@@ -121,16 +131,7 @@ function CategorieDetail() {
           return null;
       }
     },
-    [
-      currentId,
-      hierarchicalCategories,
-      isNew,
-      handleUploadImage,
-      handleDeleteImage,
-      handleSync,
-      loading,
-      error,
-    ]
+    [currentId, isNew, handleUploadImage, handleDeleteImage, handleSync, loading, error]
   );
 
   const visibleTabs = isNew ? [{ id: 'general', label: 'Général' }] : ENTITY_CONFIG.tabs;

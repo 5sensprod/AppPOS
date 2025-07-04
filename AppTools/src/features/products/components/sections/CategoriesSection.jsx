@@ -6,101 +6,7 @@ import BrandSelectField from '../../../../components/common/fields/BrandSelectFi
 import SupplierSelectField from '../../../../components/common/fields/SupplierSelectField';
 import CategorySelector from '../../../../components/common/CategorySelector';
 
-// ===== UTILITAIRES DE CATÉGORIES (logique ProductTable.jsx) =====
-
-const buildCategoryMaps = (hierarchicalCategories) => {
-  const categoryPathMap = {};
-  const categoryNameMap = {};
-
-  const buildMaps = (categories, parentPath = '') => {
-    categories.forEach((cat) => {
-      const currentPath = parentPath ? `${parentPath}/${cat._id}` : cat._id;
-      categoryPathMap[cat._id] = currentPath;
-      categoryNameMap[cat._id] = cat.name;
-
-      if (cat.children?.length > 0) {
-        buildMaps(cat.children, currentPath);
-      }
-    });
-  };
-
-  buildMaps(hierarchicalCategories);
-  return { categoryPathMap, categoryNameMap };
-};
-
-const buildCategoryNamePath = (categoryId, categoryPathMap, categoryNameMap) => {
-  if (!categoryPathMap[categoryId]) return null;
-
-  const pathIds = categoryPathMap[categoryId].split('/');
-  const pathNames = pathIds.map((id) => categoryNameMap[id]).filter(Boolean);
-
-  return pathNames.join(' > ');
-};
-
-const getCategoriesWithHierarchy = (
-  selectedCategories,
-  hierarchicalCategories,
-  primaryCategoryId
-) => {
-  const result = [];
-  const processedCategories = new Set();
-  const { categoryPathMap, categoryNameMap } = buildCategoryMaps(hierarchicalCategories);
-
-  selectedCategories.forEach((categoryId) => {
-    if (!processedCategories.has(categoryId) && categoryPathMap[categoryId]) {
-      const pathIds = categoryPathMap[categoryId].split('/');
-
-      const hierarchy = pathIds.map((id, index) => ({
-        id: id,
-        name: categoryNameMap[id],
-        level: index,
-      }));
-
-      result.push({
-        categoryId,
-        hierarchy,
-        isPrimary: categoryId === primaryCategoryId,
-      });
-
-      pathIds.forEach((id) => processedCategories.add(id));
-    }
-  });
-
-  return result.sort((a, b) => {
-    if (a.isPrimary && !b.isPrimary) return -1;
-    if (!a.isPrimary && b.isPrimary) return 1;
-    const aName = a.hierarchy[a.hierarchy.length - 1]?.name || '';
-    const bName = b.hierarchy[b.hierarchy.length - 1]?.name || '';
-    return aName.localeCompare(bName);
-  });
-};
-
-// ===== COMPOSANTS UI =====
-
-const CategoryChip = ({ category, isPrimary, fullPath, isChild, pathParts }) => (
-  <div
-    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-      isPrimary
-        ? 'bg-blue-100 text-blue-800 border-2 border-blue-300 dark:bg-blue-800 dark:text-blue-100'
-        : 'bg-gray-100 text-gray-700 border border-gray-300 dark:bg-gray-700 dark:text-gray-300'
-    }`}
-    title={fullPath}
-  >
-    {isPrimary && <Star className="h-3 w-3 mr-1 text-yellow-500 fill-current" />}
-    <span>
-      {isChild ? (
-        <>
-          <span className="opacity-60 text-xs">
-            {pathParts.slice(0, -1).join(' > ')} {'>'}
-          </span>
-          <span className="font-medium ml-1">{category.name}</span>
-        </>
-      ) : (
-        category.name
-      )}
-    </span>
-  </div>
-);
+// ===== COMPOSANTS UI SIMPLES =====
 
 const InfoBox = ({ children, isEmpty = false }) => (
   <div
@@ -129,50 +35,9 @@ const ServiceChip = ({ service, color = 'purple' }) => {
   );
 };
 
-const HierarchyPreview = ({ categoryGroup, selectedCategoryId, selectedCategories }) => (
-  <div className="flex flex-wrap gap-1 items-center">
-    {categoryGroup.hierarchy.map((cat, index) => {
-      const isPrimary = cat.id === selectedCategoryId;
-      const isDirectlySelected = selectedCategories.includes(cat.id);
+// ===== MODE LECTURE =====
 
-      return (
-        <React.Fragment key={cat.id}>
-          {index > 0 && <span className="text-gray-400 text-xs mx-1">→</span>}
-          <span
-            className={`px-2 py-1 rounded-full text-xs ${
-              isPrimary
-                ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 font-medium border-2 border-blue-300'
-                : isDirectlySelected
-                  ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium'
-                  : 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
-            }`}
-            title={
-              isPrimary
-                ? 'Catégorie principale'
-                : isDirectlySelected
-                  ? 'Catégorie sélectionnée'
-                  : 'Catégorie parente (automatique)'
-            }
-          >
-            {cat.name}
-            {isPrimary && ' ★'}
-          </span>
-        </React.Fragment>
-      );
-    })}
-  </div>
-);
-
-// ===== SECTIONS =====
-
-const ReadOnlyView = ({ product, hierarchicalCategories }) => {
-  const displayCategories = product.category_info?.refs || [];
-
-  const buildCategoryPathFromHierarchy = (categoryId) => {
-    const { categoryPathMap, categoryNameMap } = buildCategoryMaps(hierarchicalCategories);
-    return buildCategoryNamePath(categoryId, categoryPathMap, categoryNameMap);
-  };
-
+const ReadOnlyView = ({ product }) => {
   return (
     <div>
       <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
@@ -180,47 +45,28 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
       </h2>
 
       <div className="space-y-6">
-        {/* Catégories */}
+        {/* Catégories - Affichage simple */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             Catégories du produit
           </label>
 
-          {displayCategories.length > 0 ? (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {displayCategories.map((category) => {
-                  const isPrimary = category.id === product.category_id;
-                  const fullPath = buildCategoryPathFromHierarchy(category.id);
-                  const pathParts = fullPath ? fullPath.split(' > ') : [category.name];
-                  const isChild = pathParts.length > 1;
+          {/* ✅ CategorySelector en mode lecture avec les catégories existantes */}
+          <CategorySelector
+            mode="multiple"
+            selectedCategories={product.categories || []}
+            primaryCategoryId={product.category_id || ''}
+            disabled={true}
+            showSearch={false}
+            showCounts={false}
+          />
 
-                  return (
-                    <CategoryChip
-                      key={category.id}
-                      category={category}
-                      isPrimary={isPrimary}
-                      fullPath={fullPath}
-                      isChild={isChild}
-                      pathParts={pathParts}
-                    />
-                  );
-                })}
-              </div>
-
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                <div className="flex items-center">
-                  <Star className="h-3 w-3 mr-1 text-yellow-500 fill-current" />
-                  <span>Catégorie principale</span>
-                </div>
-              </div>
-            </div>
-          ) : (
+          {(!product.categories || product.categories.length === 0) && (
             <InfoBox isEmpty>Aucune catégorie associée</InfoBox>
           )}
         </div>
 
-        {/* ✅ Services - Affichage simple sans BrandSelectField/SupplierSelectField */}
+        {/* Services */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -249,13 +95,18 @@ const ReadOnlyView = ({ product, hierarchicalCategories }) => {
   );
 };
 
-const EditableView = ({ register, control, errors, specialFields, hierarchicalCategories }) => {
+// ===== MODE ÉDITION =====
+
+const EditableView = ({ errors, specialFields }) => {
   const { watch, setValue } = useFormContext();
+
+  // État du formulaire
   const selectedBrandId = watch('brand_id');
   const selectedSupplierId = watch('supplier_id');
   const selectedCategoryId = watch('category_id');
   const selectedCategories = watch('categories') || [];
 
+  // Options avec filtrage croisé marques/fournisseurs
   const allBrands = specialFields.brand_id?.options || [];
   const allSuppliers = specialFields.supplier_id?.options || [];
 
@@ -269,7 +120,7 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
     return allSuppliers.filter((supplier) => supplier.brands?.includes(selectedBrandId));
   }, [selectedBrandId, allSuppliers]);
 
-  // Logique de synchronisation
+  // Synchronisation automatique marques ↔ fournisseurs
   useEffect(() => {
     const brand = allBrands.find((b) => b.value === selectedBrandId);
     if (selectedSupplierId && brand && !brand.suppliers?.includes(selectedSupplierId)) {
@@ -284,13 +135,14 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
     }
   }, [selectedBrandId, allSuppliers, selectedSupplierId, setValue]);
 
+  // Synchronisation catégorie principale → catégories
   useEffect(() => {
     if (selectedCategoryId && !selectedCategories.includes(selectedCategoryId)) {
-      const newCategories = [...selectedCategories, selectedCategoryId];
-      setValue('categories', newCategories);
+      setValue('categories', [...selectedCategories, selectedCategoryId]);
     }
   }, [selectedCategoryId, selectedCategories, setValue]);
 
+  // Handler pour CategorySelector
   const handleCategoryChange = ({ categories, primaryId }) => {
     setValue('categories', categories);
     setValue('category_id', primaryId);
@@ -303,7 +155,7 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
       </h2>
 
       <div className="space-y-6">
-        {/* Sélecteur moderne */}
+        {/* ✅ CategorySelector gère TOUT automatiquement */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             Catégories du produit
@@ -311,7 +163,6 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
 
           <CategorySelector
             mode="multiple"
-            hierarchicalData={hierarchicalCategories}
             selectedCategories={selectedCategories}
             primaryCategoryId={selectedCategoryId}
             onMultipleChange={handleCategoryChange}
@@ -333,37 +184,7 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
           )}
         </div>
 
-        {/* Aperçu */}
-        {(selectedCategoryId || selectedCategories.length > 0) && (
-          <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Aperçu des catégories sélectionnées:
-            </h4>
-            <div className="space-y-3">
-              {getCategoriesWithHierarchy(
-                selectedCategories,
-                hierarchicalCategories,
-                selectedCategoryId
-              ).map((categoryGroup, groupIndex) => (
-                <HierarchyPreview
-                  key={groupIndex}
-                  categoryGroup={categoryGroup}
-                  selectedCategoryId={selectedCategoryId}
-                  selectedCategories={selectedCategories}
-                />
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              ★ = Catégorie principale •
-              <span className="inline-block w-3 h-3 bg-green-100 dark:bg-green-800 rounded-full mx-1"></span>
-              Sélectionnées directement •
-              <span className="inline-block w-3 h-3 bg-gray-100 dark:bg-gray-600 rounded-full mx-1"></span>
-              Catégories parentes (automatiques)
-            </p>
-          </div>
-        )}
-
-        {/* ✅ Services avec tes composants (qui ont déjà des Controllers) */}
+        {/* Services avec filtrage croisé */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -399,22 +220,15 @@ const EditableView = ({ register, control, errors, specialFields, hierarchicalCa
 const CategoriesSection = ({
   product,
   editable,
-  register,
-  control,
+  register, // Non utilisé mais gardé pour compatibilité
+  control, // Non utilisé mais gardé pour compatibilité
   errors,
   specialFields,
-  hierarchicalCategories,
 }) => {
   return editable ? (
-    <EditableView
-      register={register}
-      control={control}
-      errors={errors}
-      specialFields={specialFields}
-      hierarchicalCategories={hierarchicalCategories}
-    />
+    <EditableView errors={errors} specialFields={specialFields} />
   ) : (
-    <ReadOnlyView product={product} hierarchicalCategories={hierarchicalCategories} />
+    <ReadOnlyView product={product} />
   );
 };
 
