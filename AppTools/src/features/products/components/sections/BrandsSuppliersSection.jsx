@@ -79,35 +79,6 @@ const ReadOnlyView = ({ product }) => {
           )}
         </div>
       </div>
-
-      {/* Informations de relation */}
-      {(product.brand_ref?.name || product.supplier_ref?.name) && (
-        <div className="mt-6 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            Informations de relation
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            {product.brand_ref?.name && (
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Marque :</span>
-                <span className="font-medium ml-2">{product.brand_ref.name}</span>
-              </div>
-            )}
-            {product.supplier_ref?.name && (
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Fournisseur :</span>
-                <span className="font-medium ml-2">{product.supplier_ref.name}</span>
-              </div>
-            )}
-            {product.purchase_price && (
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Prix d'achat :</span>
-                <span className="font-medium ml-2">{product.purchase_price}€</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
