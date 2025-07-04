@@ -38,9 +38,23 @@ const modernSelectStyles = {
   }),
 };
 
-const SupplierSelectField = ({ name = 'supplier_id', options = [], editable = false, value }) => {
+const SupplierSelectField = ({
+  name = 'suppliers', // ✅ CHANGÉ: pluriel par défaut pour les multi-sélections
+  options = [],
+  editable = false,
+  value,
+  isMulti = true, // ✅ NOUVEAU: Prop pour gérer le mode multiple
+}) => {
   const { control, watch } = useFormContext() || {};
   const selected = watch?.(name) || value || [];
+
+  console.log('🔍 SupplierSelectField Debug:', {
+    name,
+    selected,
+    options: options.slice(0, 3), // Afficher seulement les 3 premières options
+    isMulti,
+    editable,
+  });
 
   // ✅ Tri alphabétique des options
   const sortedOptions = useMemo(() => {
@@ -48,14 +62,30 @@ const SupplierSelectField = ({ name = 'supplier_id', options = [], editable = fa
   }, [options]);
 
   if (!editable) {
-    const selectedOptions = sortedOptions.filter((opt) => selected.includes(opt.value));
+    // ✅ CORRECTION: Gérer les deux modes (single et multi)
+    let selectedOptions = [];
+
+    if (isMulti) {
+      // Mode multiple : selected est un tableau d'IDs
+      selectedOptions = sortedOptions.filter((opt) =>
+        Array.isArray(selected) ? selected.includes(opt.value) : false
+      );
+    } else {
+      // Mode simple : selected est un ID unique
+      const selectedOption = sortedOptions.find((opt) => opt.value === selected);
+      selectedOptions = selectedOption ? [selectedOption] : [];
+    }
+
     return (
       <div className="space-y-1">
         {selectedOptions.length === 0 ? (
           <p className="text-gray-500 italic">Aucun fournisseur</p>
         ) : (
           selectedOptions.map((opt) => (
-            <div key={opt.value} className="flex items-center gap-2">
+            <div key={opt.value} className="flex items-center gap-2 border px-2 py-1 rounded">
+              {opt.image?.src && (
+                <img src={opt.image.src} alt={opt.label} className="w-6 h-6 object-cover rounded" />
+              )}
               <span>{opt.label}</span>
             </div>
           ))
@@ -68,21 +98,48 @@ const SupplierSelectField = ({ name = 'supplier_id', options = [], editable = fa
     <Controller
       name={name}
       control={control}
-      render={({ field }) => (
-        <Select
-          {...field}
-          options={sortedOptions}
-          value={sortedOptions.find((opt) => opt.value === field.value) || null}
-          onChange={(selected) => field.onChange(selected?.value || '')}
-          placeholder="Aucun fournisseur"
-          isClearable
-          className="react-select-container"
-          classNamePrefix="react-select"
-          menuPlacement="top"
-          menuPortalTarget={document.body}
-          styles={modernSelectStyles}
-        />
-      )}
+      render={({ field }) => {
+        // ✅ CORRECTION: Gérer les valeurs pour le mode multiple
+        let fieldValue = null;
+
+        if (isMulti) {
+          // Mode multiple : convertir le tableau d'IDs en tableau d'options
+          const selectedIds = Array.isArray(field.value) ? field.value : [];
+          fieldValue = sortedOptions.filter((opt) => selectedIds.includes(opt.value));
+        } else {
+          // Mode simple : trouver l'option correspondante
+          fieldValue = sortedOptions.find((opt) => opt.value === field.value) || null;
+        }
+
+        return (
+          <Select
+            {...field}
+            options={sortedOptions}
+            value={fieldValue}
+            onChange={(selected) => {
+              if (isMulti) {
+                // Mode multiple : extraire les IDs des options sélectionnées
+                const selectedIds = selected ? selected.map((opt) => opt.value) : [];
+                field.onChange(selectedIds);
+                console.log('🔄 SupplierSelectField onChange (multi):', selectedIds);
+              } else {
+                // Mode simple : extraire l'ID de l'option sélectionnée
+                const selectedId = selected?.value || '';
+                field.onChange(selectedId);
+                console.log('🔄 SupplierSelectField onChange (single):', selectedId);
+              }
+            }}
+            placeholder={isMulti ? 'Sélectionner des fournisseurs' : 'Aucun fournisseur'}
+            isClearable
+            isMulti={isMulti} // ✅ AJOUT: Activer le mode multiple
+            className="react-select-container"
+            classNamePrefix="react-select"
+            menuPlacement="top"
+            menuPortalTarget={document.body}
+            styles={modernSelectStyles}
+          />
+        );
+      }}
     />
   );
 };

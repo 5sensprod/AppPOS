@@ -15,7 +15,6 @@ function CategorieDetail() {
     currentId,
     isNew,
     editable,
-    parentCategories, // Plus nécessaire - sera supprimé
     hierarchicalCategories,
     handleSubmit,
     handleDelete,

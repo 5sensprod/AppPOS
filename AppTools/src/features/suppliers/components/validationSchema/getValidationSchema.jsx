@@ -1,5 +1,6 @@
 // src/features/suppliers/components/validationSchema/getValidationSchema.jsx
 import * as yup from 'yup';
+
 /**
  * Génère un schéma de validation Yup pour les formulaires de fournisseurs
  * @param {boolean} isNew - Indique si c'est un nouveau fournisseur ou une mise à jour
@@ -18,8 +19,28 @@ export const getSupplierValidationSchema = (isNew = false) => {
       .string()
       .nullable()
       .transform((value) => (value === '' ? null : value)),
-    // Marques associées
-    brands: yup.array().of(yup.string()).nullable().default([]),
+
+    // ✅ CORRECTION: Transformer les valeurs string en tableau
+    brands: yup
+      .mixed()
+      .transform((value, originalValue) => {
+        console.log('🔍 Transform brands - originalValue:', originalValue, 'value:', value);
+
+        // Si c'est déjà un tableau, le retourner tel quel
+        if (Array.isArray(value)) {
+          return value.filter(Boolean); // Nettoyer les valeurs vides
+        }
+
+        // Si c'est une chaîne de caractères (ID unique), la transformer en tableau
+        if (typeof value === 'string' && value.trim() !== '') {
+          return [value];
+        }
+
+        // Valeur par défaut : tableau vide
+        return [];
+      })
+      .default([]),
+
     // Contact
     contact: yup
       .object()
@@ -44,6 +65,7 @@ export const getSupplierValidationSchema = (isNew = false) => {
       })
       .nullable()
       .default({}),
+
     // Informations bancaires
     banking: yup
       .object()
@@ -59,6 +81,7 @@ export const getSupplierValidationSchema = (isNew = false) => {
       })
       .nullable()
       .default({}),
+
     // Conditions de paiement
     payment_terms: yup
       .object()
@@ -77,11 +100,14 @@ export const getSupplierValidationSchema = (isNew = false) => {
       .nullable()
       .default({}),
   });
+
   // En mode création, rendre le nom obligatoire
   if (isNew) {
     return schema;
   }
+
   // En mode mise à jour, tous les champs sont optionnels
   return schema;
 };
+
 export default getSupplierValidationSchema;

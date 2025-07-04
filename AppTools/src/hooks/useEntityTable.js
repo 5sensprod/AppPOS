@@ -13,7 +13,6 @@ export const useEntityTable = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const operationInProgress = useRef(false);
   const { toastActions } = useActionToasts(); // ✅ AJOUT
 
   // Stocker les fonctions dans une ref pour éviter de recréer les callbacks
@@ -37,8 +36,6 @@ export const useEntityTable = ({
   }, [fetchEntities, deleteEntity, syncEntity, batchDeleteEntities, batchSyncEntities]);
 
   const executeOperation = useCallback(async (operation) => {
-    if (operationInProgress.current) return;
-    operationInProgress.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -49,7 +46,6 @@ export const useEntityTable = ({
       throw err;
     } finally {
       setLoading(false);
-      operationInProgress.current = false;
     }
   }, []);
 
@@ -215,7 +211,6 @@ export const useEntityTable = ({
     handleBatchDeleteEntities,
     ...(syncEntity && { handleBatchSyncEntities }),
     executeOperation,
-    operationInProgress: operationInProgress.current,
   };
 };
 

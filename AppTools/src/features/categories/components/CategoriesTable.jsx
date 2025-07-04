@@ -289,7 +289,6 @@ function CategoriesTable(props) {
         entityName="catégorie"
         entityNamePlural="catégories"
         baseRoute="/products/categories"
-        filters={[]}
         searchFields={['_originalName', 'description']}
         searchProcessor={searchProcessor}
         onSearch={handleSearch}

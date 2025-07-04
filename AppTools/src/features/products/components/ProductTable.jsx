@@ -1,4 +1,4 @@
-// src/features/products/components/ProductTable.jsx - VERSION SIMPLIFIÉE
+// src/features/products/components/ProductTable.jsx
 import React, { useState, useEffect } from 'react';
 import { useProduct, useProductDataStore } from '../stores/productStore';
 import { useHierarchicalCategories } from '../../../features/categories/stores/categoryHierarchyStore';
@@ -8,7 +8,7 @@ import { usePaginationStore } from '@/stores/usePaginationStore';
 import { useProductFilters } from '../hooks/useProductFilters';
 import { useStockOperations } from '../hooks/useStockOperations';
 import { useCategoryOptions } from '../hooks/useCategoryOptions';
-import { useEntityTable } from '../../../hooks/useEntityTable'; // ✅ Direct comme suppliers
+import { useEntityTable } from '../../../hooks/useEntityTable';
 import exportService from '../../../services/exportService';
 import { useWebCapture } from '../hooks/useWebCapture';
 import StockModal from '../../../components/common/EntityTable/components/BatchActions/components/StockModal';
@@ -44,7 +44,6 @@ function ProductTable(props) {
   const { selectedFilters, setSelectedFilters, filterOptions, filterProducts } =
     useProductFilters(products);
 
-  // ✅ UTILISATION DIRECTE DE useEntityTable COMME LES SUPPLIERS
   const {
     loading: operationLoading,
     error,
@@ -54,9 +53,9 @@ function ProductTable(props) {
     handleBatchSyncEntities,
   } = useEntityTable({
     entityType: 'product',
-    fetchEntities: fetchProducts, // ✅ WebSocket store
+    fetchEntities: fetchProducts,
     deleteEntity: async (id) => {
-      await deleteProduct(id); // ✅ Entity store
+      await deleteProduct(id);
     },
     syncEntity: syncEnabled
       ? async (id) => {

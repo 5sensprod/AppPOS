@@ -1,3 +1,4 @@
+//AppTools\src\features\products\components\validationSchema\getValidationSchema.jsx
 import * as yup from 'yup';
 
 // Fonction pour obtenir le schéma de validation en fonction du mode
