@@ -22,9 +22,9 @@ export const TableHeader = ({
   }, [someSelected, allSelected]);
 
   return (
-    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0  shadow-md">
+    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-md">
       <tr>
-        <th className="px-4 py-3 w-8 sticky top-0">
+        <th className="px-4 py-3 w-8 sticky top-0 z-10">
           <input
             ref={checkboxRef}
             type="checkbox"

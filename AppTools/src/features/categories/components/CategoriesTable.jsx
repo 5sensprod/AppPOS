@@ -6,7 +6,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useEntityTable } from '@/hooks/useEntityTable';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
 import { usePaginationStore } from '@/stores/usePaginationStore';
-import { useCategoryUtils } from '../../../hooks/useCategoryUtils';
+import { useCategoryUtils } from '../../../components/hooks/useCategoryUtils';
 
 function CategoriesTable(props) {
   const { deleteCategory, syncCategory } = useCategory();
@@ -207,6 +207,7 @@ function CategoriesTable(props) {
         entityName="catégorie"
         entityNamePlural="catégories"
         baseRoute="/products/categories"
+        filters={[]}
         searchFields={['_originalName', 'description']}
         searchProcessor={searchProcessor}
         onSearch={handleSearch}

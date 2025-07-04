@@ -1,9 +1,11 @@
 // src/features/suppliers/hooks/useSupplierDetail.js
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { useSupplier, useSupplierExtras } from '../stores/supplierStore';
-import { ENTITY_CONFIG } from '../constants';
-import getValidationSchema from '../components/validationSchema/getValidationSchema';
+import { useSupplierDataStore, useSupplier, useSupplierExtras } from '../stores/supplierStore';
+import { useBrand } from '../../brands/stores/brandStore';
+import { getSupplierValidationSchema } from '../components/validationSchema/getValidationSchema';
+import imageProxyService from '../../../services/imageProxyService';
+import { useActionToasts } from '../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
 import apiService from '../../../services/api';
 
 export default function useSupplierDetail() {
@@ -23,34 +25,97 @@ export default function useSupplierDetail() {
   const [success, setSuccess] = useState(null);
   const [dataFetched, setDataFetched] = useState(false);
 
-  // ✅ NOUVEAU : État pour les données relationnelles
   const [relatedData, setRelatedData] = useState({ brands: [] });
 
-  // ✅ NOUVEAU : Fetch des données relationnelles (brands pour le champ brands)
+  const supplierWsStore = useSupplierDataStore();
+  const { fetchBrands } = useBrand();
+
+  const { toastActions } = useActionToasts();
+
+  // WebSocket init pour les mises à jour de fournisseurs
+  useEffect(() => {
+    let cleanup = () => {};
+
+    if (supplierWsStore?.initWebSocket) {
+      cleanup = supplierWsStore.initWebSocket();
+    }
+
+    import('../../../services/websocketService')
+      .then((module) => {
+        const websocketService = module.default;
+
+        if (!websocketService) {
+          console.error('[SUPPLIER_DETAIL] Service WebSocket non trouvé');
+          return;
+        }
+
+        const effectiveId = currentId || paramId;
+
+        if (!effectiveId) {
+          console.log("[SUPPLIER_DETAIL] Pas d'ID de fournisseur, pas d'écouteur WebSocket");
+          return;
+        }
+
+        console.log(
+          `[SUPPLIER_DETAIL] Configuration de l'écouteur WebSocket pour le fournisseur ${effectiveId}`
+        );
+
+        // Fonction de gestion des événements de mise à jour
+        const handleSupplierUpdate = (payload) => {
+          if (payload?.entityId === effectiveId) {
+            console.log(
+              `[SUPPLIER_DETAIL] Mise à jour WebSocket pour le fournisseur ${effectiveId}, rechargement`
+            );
+            getSupplierById(effectiveId)
+              .then((updatedSupplier) => {
+                setSupplier(updatedSupplier);
+              })
+              .catch((err) => console.error('[SUPPLIER_DETAIL] Erreur lors du rechargement:', err));
+          }
+        };
+
+        // S'abonner aux événements
+        websocketService.on('suppliers.updated', handleSupplierUpdate);
+
+        // S'assurer que nous sommes abonnés au canal suppliers
+        websocketService.subscribe('suppliers');
+      })
+      .catch((err) => {
+        console.error("[SUPPLIER_DETAIL] Erreur lors de l'import du service WebSocket:", err);
+      });
+
+    // Nettoyage lors du démontage
+    return () => {
+      if (typeof cleanup === 'function') {
+        cleanup();
+      }
+    };
+  }, [currentId, paramId, getSupplierById, supplierWsStore]);
+
+  // Fetch all data (brands)
   useEffect(() => {
     if (dataFetched) return;
 
-    const fetchRelatedData = async () => {
+    const fetchAll = async () => {
       setLoading(true);
       try {
-        // Charger les marques pour le champ brands
-        const brandsResponse = await apiService.get('/api/brands');
+        const [brands] = await Promise.all([fetchBrands()]);
 
         setRelatedData({
-          brands: brandsResponse?.data?.data || [],
+          brands: brands?.data || brands || [],
         });
 
         setDataFetched(true);
       } catch (err) {
         setError('Erreur chargement des données liées');
-        console.error('Erreur chargement brands pour supplier:', err);
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchRelatedData();
-  }, [dataFetched]);
+    fetchAll();
+  }, [dataFetched, fetchBrands]);
 
   // Load supplier if not new
   useEffect(() => {
@@ -71,54 +136,76 @@ export default function useSupplierDetail() {
       .finally(() => setLoading(false));
   }, [paramId, isNew, getSupplierById]);
 
-  // ✅ NOUVEAU : Options pour les champs spéciaux avec tri alphabétique
-  const toOptions = (items) =>
-    items
-      .map((item) => ({
-        value: item._id,
-        label: item.name,
-        image: item.image ? { src: item.image } : null,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+  // Utils: option builders
+  const toOptions = (items, includeRelations = false) =>
+    items.map((i) => ({
+      value: i._id,
+      label: i.name,
+      ...(includeRelations && {
+        image: i.image?.src ? imageProxyService.getImageUrl(i.image.src) : null,
+      }),
+    }));
 
-  const brandOptions = useMemo(() => toOptions(relatedData.brands), [relatedData.brands]);
+  const brandOptions = useMemo(() => toOptions(relatedData.brands, true), [relatedData.brands]);
 
-  // ✅ NOUVEAU : Configuration des champs spéciaux
   const specialFields = useMemo(
     () => ({
-      brands: {
-        type: 'multiselect',
-        options: brandOptions,
-      },
+      brands: { options: brandOptions },
     }),
     [brandOptions]
   );
 
   // Submission
+  const preprocessData = useCallback((data) => {
+    const d = { ...data };
+
+    // Nettoyage des champs de base
+    d.name = d.name || 'Nouveau fournisseur';
+    d.supplier_code = d.supplier_code || '';
+    d.customer_code = d.customer_code || '';
+
+    // Gestion des brands
+    if (Array.isArray(d.brands)) {
+      d.brands = d.brands.filter((brandId) => brandId && brandId.trim() !== '');
+    } else {
+      d.brands = [];
+    }
+
+    // Nettoyage des objets imbriqués
+    ['contact', 'banking', 'payment_terms'].forEach((objKey) => {
+      if (d[objKey] && typeof d[objKey] === 'object') {
+        const objData = {};
+        let hasValues = false;
+
+        Object.entries(d[objKey]).forEach(([key, value]) => {
+          if (value !== '' && value !== null && value !== undefined) {
+            objData[key] =
+              key === 'discount' && !isNaN(parseFloat(value)) ? parseFloat(value) : value;
+            hasValues = true;
+          }
+        });
+
+        if (hasValues) {
+          d[objKey] = objData;
+        } else {
+          delete d[objKey];
+        }
+      }
+    });
+
+    console.log('📦 PreprocessData Supplier - Résultat final:', d);
+    return d;
+  }, []);
+
   const handleSubmit = async (data) => {
     setLoading(true);
     setError(null);
 
     try {
-      // Assurer que le nom est défini
-      if (!data.name || data.name.trim() === '') {
-        throw new Error('Le nom du fournisseur est requis');
-      }
-
-      // ✅ TRAITEMENT DES BRANDS : S'assurer que c'est un tableau
-      const processedData = {
-        ...data,
-        brands: Array.isArray(data.brands)
-          ? data.brands.filter(Boolean)
-          : data.brands
-            ? [data.brands]
-            : [],
-      };
-
-      console.log('📦 Données à envoyer (supplier):', processedData);
+      const processed = preprocessData(data);
 
       if (isNew) {
-        const created = await createSupplier(processedData);
+        const created = await createSupplier(processed);
         const newId = created?.id || created?._id || created?.data?.id || created?.data?._id;
 
         if (!newId) {
@@ -132,7 +219,7 @@ export default function useSupplierDetail() {
         setSupplier(newData);
         navigate(`/products/suppliers/${newId}`, { replace: true });
       } else {
-        await updateSupplier(paramId, processedData);
+        await updateSupplier(paramId, processed);
         const updated = await getSupplierById(paramId);
         setSupplier(updated);
         setSuccess('Fournisseur mis à jour');
@@ -144,27 +231,94 @@ export default function useSupplierDetail() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (supplierId) => {
     try {
       setLoading(true);
-      await deleteSupplier(paramId);
+
+      // Appel direct à l'API au lieu du store pour gérer les erreurs 400
+      const response = await apiService.delete(`/api/suppliers/${supplierId}`);
+
+      // Si on arrive ici, la suppression a réussi
+      toastActions.deletion.success(1, `Fournisseur "${supplier.name}"`);
       navigate('/products/suppliers');
+
+      // Retourner le succès pour EntityDetail
+      return { success: true, dependency: false };
     } catch (err) {
-      setError(err.message);
+      console.error('Erreur suppression:', err);
+
+      // ✅ Vérifier si c'est une erreur de dépendance (400 avec linkedProducts)
+      if (err.response?.status === 400 && err.response?.data?.details?.linkedProducts) {
+        const errorData = err.response.data;
+        const linkedProducts = errorData.details.linkedProducts;
+        const productCount = linkedProducts.length;
+
+        // ✅ TOAST ENRICHI AVEC LISTE DES PRODUITS
+        const productList = linkedProducts
+          .slice(0, 5) // Limiter à 5 produits pour pas surcharger
+          .map((p) => `• ${p.name}${p.sku ? ` (${p.sku})` : ''}`)
+          .join('\n');
+
+        const moreText = productCount > 5 ? `\n... et ${productCount - 5} autre(s)` : '';
+
+        toastActions.deletion.error(
+          `${errorData.error}\n\nProduits concernés :\n${productList}${moreText}`,
+          'fournisseur'
+        );
+
+        // NE PAS naviguer, rester sur la page
+        return { success: false, dependency: true, data: errorData };
+      }
+
+      // ✅ Vérifier les erreurs de dépendance avec marques (spécifique aux suppliers)
+      if (err.response?.status === 400 && err.response?.data?.details?.brandsWithProducts) {
+        const errorData = err.response.data;
+        const brandsWithProducts = errorData.details.brandsWithProducts;
+
+        // Compter le total de produits
+        const totalProducts = brandsWithProducts.reduce(
+          (sum, brand) => sum + brand.productCount,
+          0
+        );
+
+        // Construire la liste des marques avec produits
+        const brandList = brandsWithProducts
+          .slice(0, 3) // Limiter à 3 marques
+          .map(
+            (brand) =>
+              `• ${brand.name} (${brand.productCount} produit${brand.productCount > 1 ? 's' : ''})`
+          )
+          .join('\n');
+
+        const moreBrands =
+          brandsWithProducts.length > 3
+            ? `\n... et ${brandsWithProducts.length - 3} autre(s) marque(s)`
+            : '';
+
+        toastActions.deletion.error(
+          `${errorData.error}\n\nMarques concernées :\n${brandList}${moreBrands}\n\nTotal : ${totalProducts} produit(s)`,
+          'fournisseur'
+        );
+
+        return { success: false, dependency: true, data: errorData };
+      }
+
+      // Autres erreurs (réseau, 500, etc.)
+      const errorMessage = err.response?.data?.error || err.message || 'Erreur inconnue';
+      setError(`Erreur suppression: ${errorMessage}`);
+      toastActions.deletion.error(errorMessage, 'fournisseur');
+
+      return { success: false, dependency: false };
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    if (isNew) {
-      navigate('/products/suppliers');
-    } else {
-      navigate(`/products/suppliers/${paramId}`);
-    }
+    navigate(isNew ? '/products/suppliers' : `/products/suppliers/${paramId}`);
   };
 
-  // ✅ FONCTIONS IMAGE CORRIGÉES
+  // Fonctions d'images
   const handleUploadImage = async (entityId, file) => {
     try {
       setLoading(true);
@@ -210,33 +364,21 @@ export default function useSupplierDetail() {
     handleSubmit,
     handleDelete,
     handleCancel,
-    validationSchema: getValidationSchema(isNew),
+    validationSchema: getSupplierValidationSchema(isNew),
     defaultValues,
-    // ✅ NOUVEAU : Exposer les champs spéciaux avec options
-    specialFields,
-    // Fonctions image
     uploadImage: handleUploadImage,
     deleteImage: handleDeleteImage,
+    specialFields,
   };
 }
 
+// Valeurs par défaut
 const defaultValues = {
   name: '',
   supplier_code: '',
   customer_code: '',
-  brands: [], // ✅ Tableau par défaut
-  contact: {
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-  },
-  banking: {
-    iban: '',
-    bic: '',
-  },
-  payment_terms: {
-    type: '',
-    discount: null,
-  },
+  brands: [],
+  contact: { name: '', email: '', phone: '', address: '' },
+  banking: { iban: '', bic: '' },
+  payment_terms: { type: 'immediate', discount: 0 },
 };

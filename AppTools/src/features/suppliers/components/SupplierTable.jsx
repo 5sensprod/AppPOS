@@ -51,6 +51,8 @@ function SupplierTable(props) {
 
   const isLoading = suppliersLoading || operationLoading;
 
+  const filters = [];
+
   return (
     <EntityTable
       data={suppliers || []}
@@ -60,6 +62,7 @@ function SupplierTable(props) {
       entityName="fournisseur"
       entityNamePlural="fournisseurs"
       baseRoute="/products/suppliers"
+      filters={filters}
       searchFields={['name']}
       onDelete={handleDeleteEntity}
       syncEnabled={syncEnabled}

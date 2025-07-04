@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
 import { X, Filter, ChevronDown, Trash2 } from 'lucide-react';
-import CategorySelectField from '../../fields/CategorySelectField';
+import CategorySelector from '../../../common/CategorySelector';
 import { useClickOutside } from './BatchActions/hooks/useClickOutside';
-import { useCategoryUtils } from '../../../../hooks/useCategoryUtils';
+import { useCategoryUtils } from '../../../hooks/useCategoryUtils';
 
 const UnifiedFilterBar = ({
   filterOptions = [],
@@ -215,7 +215,8 @@ const UnifiedFilterBar = ({
       {isAddingFilter && newFilterType === 'category' && !categoriesLoading && (
         <div ref={valueSelectRef} className="relative">
           <div className="w-80" style={{ position: 'relative', zIndex: 99999 }}>
-            <CategorySelectField
+            <CategorySelector
+              mode="single"
               hierarchicalData={hierarchicalCategories}
               value={''}
               onChange={(selectedCategoryId) => {

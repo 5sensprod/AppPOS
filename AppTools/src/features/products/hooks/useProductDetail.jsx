@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useProduct, useProductExtras } from '../stores/productStore';
-import { useCategoryUtils } from '../../../hooks/useCategoryUtils'; // ✅ IMPORT DU HOOK OPTIMISÉ
+import { useHierarchicalCategories } from '../../categories/stores/categoryHierarchyStore';
 import { ENTITY_CONFIG } from '../constants';
 import getValidationSchema from '../components/validationSchema/getValidationSchema';
 import apiService from '../../../services/api';
@@ -15,19 +15,8 @@ export default function useProductDetail() {
   const isEditMode = isNew || location.pathname.endsWith('/edit');
 
   const { getProductById, createProduct, updateProduct, deleteProduct, syncProduct } = useProduct();
+  // Obtenir les fonctions correctes du hook useProductExtras
   const productExtras = useProductExtras();
-
-  // ✅ REMPLACER useHierarchicalCategories par useCategoryUtils
-  const {
-    hierarchicalCategories,
-    categoriesLoading,
-    getCategoryOptions,
-    buildCategoryInfo,
-    enrichProductWithCategories,
-    fetchHierarchicalCategories,
-    initWebSocketListeners,
-    isReady: categoryUtilsReady,
-  } = useCategoryUtils();
 
   const [product, setProduct] = useState(null);
   const [currentId, setCurrentId] = useState(paramId);
@@ -38,12 +27,20 @@ export default function useProductDetail() {
 
   const [relatedData, setRelatedData] = useState({ brands: [], suppliers: [] });
 
+  const {
+    hierarchicalCategories,
+    fetchHierarchicalCategories,
+    initWebSocketListeners,
+    loading: hierarchyLoading,
+  } = useHierarchicalCategories();
+
   // WebSocket init pour les mises à jour de produits
   useEffect(() => {
-    // Initialisation du WebSocket principal via le hook useCategoryUtils
+    // Initialisation du WebSocket principal via le hook existant
     const cleanup = initWebSocketListeners();
 
-    // Importation directe du service WebSocket pour les produits
+    // Importation directe du service WebSocket
+    // Cette approche est similaire à celle utilisée dans useBrandDetail
     import('../../../services/websocketService')
       .then((module) => {
         const websocketService = module.default;
@@ -80,16 +77,23 @@ export default function useProductDetail() {
 
         // S'abonner aux événements
         websocketService.on('products.updated', handleProductUpdate);
+
+        // S'assurer que nous sommes abonnés au canal products
         websocketService.subscribe('products');
       })
       .catch((err) => {
         console.error("[PRODUCT_DETAIL] Erreur lors de l'import du service WebSocket:", err);
       });
 
+    // Nettoyage lors du démontage
     return () => {
       if (typeof cleanup === 'function') {
         cleanup();
       }
+
+      // Le désabonnement se fait automatiquement lors du démontage
+      // car nous avons utilisé import dynamique, le websocketService
+      // n'est pas disponible dans cette portée
     };
   }, [initWebSocketListeners, currentId, paramId, getProductById]);
 
@@ -100,7 +104,6 @@ export default function useProductDetail() {
     const fetchAll = async () => {
       setLoading(true);
       try {
-        // ✅ Le hook useCategoryUtils gère déjà le fetch des catégories
         await fetchHierarchicalCategories();
 
         const [brands, suppliers] = await Promise.all([
@@ -150,24 +153,27 @@ export default function useProductDetail() {
       .map((i) => ({
         value: i._id,
         label: i.name,
+        // ✅ Ajouter les images pour BrandSelectField et SupplierSelectField
         image: i.image ? { src: i.image } : null,
         ...(includeRelations && {
           suppliers: i.suppliers || [],
           brands: i.brands || [],
         }),
       }))
+      // ✅ TRI ALPHABÉTIQUE ajouté
       .sort((a, b) => a.label.localeCompare(b.label));
 
-  // ✅ UTILISER getCategoryOptions du hook useCategoryUtils au lieu de logique custom
   const categoryOptions = useMemo(() => {
-    return getCategoryOptions({
-      includeEmpty: false,
-      sortAlphabetically: false,
-      prefix: '— ',
-      format: 'hierarchical',
-    });
-  }, [getCategoryOptions]);
+    const transform = (cats, prefix = '') => {
+      return cats.flatMap((cat) => [
+        { value: cat._id, label: prefix + cat.name },
+        ...(cat.children ? transform(cat.children, prefix + '— ') : []),
+      ]);
+    };
+    return transform(hierarchicalCategories);
+  }, [hierarchicalCategories]);
 
+  // ✅ Options triées alphabétiquement
   const brandOptions = useMemo(() => toOptions(relatedData.brands, true), [relatedData.brands]);
 
   const supplierOptions = useMemo(
@@ -175,7 +181,7 @@ export default function useProductDetail() {
     [relatedData.suppliers]
   );
 
-  // ✅ UTILISER buildCategoryInfo du hook au lieu de logique custom
+  // Submission
   const preprocessData = useCallback(
     (data) => {
       const d = { ...data };
@@ -199,7 +205,7 @@ export default function useProductDetail() {
         d.categories = [];
       }
 
-      // Nettoyer le tableau des catégories
+      // Nettoyer le tableau des catégories (supprimer les valeurs vides/null/undefined)
       d.categories = d.categories.filter((catId) => catId && catId.trim() !== '');
 
       // Si category_id est défini mais pas dans categories, l'ajouter
@@ -217,8 +223,116 @@ export default function useProductDetail() {
         categories: d.categories,
       });
 
-      // ✅ UTILISER buildCategoryInfo du hook useCategoryUtils
-      d.category_info = buildCategoryInfo(d.categories);
+      // Construction de category_info améliorée
+      // Compatible avec votre architecture hierarchicalCategories existante
+      const buildCategoryInfo = () => {
+        if (!d.categories || d.categories.length === 0) {
+          return { refs: [], primary: null };
+        }
+
+        // Fonction pour construire les références de catégories avec leurs chemins
+        const buildCategoryRefs = (categoryIds) => {
+          const refs = [];
+          const processedPaths = new Set();
+
+          categoryIds.forEach((catId) => {
+            const category = categoryOptions.find((c) => c.value === catId);
+            if (category) {
+              // Analyser le label pour déduire la hiérarchie (avec les tirets —)
+              const level = (category.label.match(/—/g) || []).length;
+              const cleanName = category.label.replace(/^—+\s*/, '');
+
+              // Construire le chemin hiérarchique en analysant la position dans categoryOptions
+              let path = [cleanName];
+              let pathIds = [catId];
+
+              if (level > 0) {
+                // Trouver les catégories parentes en remontant dans categoryOptions
+                const currentIndex = categoryOptions.findIndex((c) => c.value === catId);
+                let parentPath = [];
+                let parentIds = [];
+
+                // Remonter pour trouver les parents (catégories avec moins de tirets)
+                for (let i = currentIndex - 1; i >= 0; i--) {
+                  const potentialParent = categoryOptions[i];
+                  const parentLevel = (potentialParent.label.match(/—/g) || []).length;
+
+                  if (parentLevel < level) {
+                    const cleanParentName = potentialParent.label.replace(/^—+\s*/, '');
+                    parentPath.unshift(cleanParentName);
+                    parentIds.unshift(potentialParent.value);
+
+                    // Continuer jusqu'à trouver tous les parents
+                    if (parentLevel === 0) break; // Racine atteinte
+                  }
+                }
+
+                path = [...parentPath, cleanName];
+                pathIds = [...parentIds, catId];
+              }
+
+              // Ajouter toutes les catégories de ce chemin aux refs (parents + enfant)
+              for (let i = 0; i < path.length; i++) {
+                const pathKey = pathIds.slice(0, i + 1).join('->');
+
+                if (!processedPaths.has(pathKey)) {
+                  processedPaths.add(pathKey);
+
+                  refs.push({
+                    id: pathIds[i],
+                    name: path[i],
+                    path: path.slice(0, i + 1),
+                    path_ids: pathIds.slice(0, i + 1),
+                    path_string: path.slice(0, i + 1).join(' > '),
+                    level: i,
+                    woo_id: null,
+                  });
+                }
+              }
+            }
+          });
+
+          return refs.sort((a, b) => {
+            // Trier par niveau puis par nom
+            if (a.level !== b.level) return a.level - b.level;
+            return a.name.localeCompare(b.name);
+          });
+        };
+
+        const refs = buildCategoryRefs(d.categories);
+
+        // Déterminer la catégorie principale
+        let primary = null;
+        if (d.category_id) {
+          // Chercher la catégorie principale dans les refs
+          primary = refs.find((ref) => ref.id === d.category_id);
+
+          if (!primary) {
+            // Si pas trouvée, la créer à partir de categoryOptions
+            const category = categoryOptions.find((c) => c.value === d.category_id);
+            if (category) {
+              const cleanName = category.label.replace(/^—+\s*/, '');
+              primary = {
+                id: d.category_id,
+                name: cleanName,
+                path: [cleanName],
+                path_ids: [d.category_id],
+                path_string: cleanName,
+                level: 0,
+                woo_id: null,
+              };
+            }
+          }
+        } else if (refs.length > 0) {
+          // Si pas de catégorie principale définie, prendre la première
+          primary = refs[0];
+          d.category_id = refs[0].id;
+        }
+
+        return { refs, primary };
+      };
+
+      d.category_info = buildCategoryInfo();
 
       // Construction des références de marque et fournisseur
       if (d.brand_id) {
@@ -226,6 +340,7 @@ export default function useProductDetail() {
         if (brand) {
           d.brand_ref = { id: brand._id, name: brand.name };
         } else {
+          // Si la marque n'existe plus, nettoyer
           d.brand_id = null;
           d.brand_ref = null;
         }
@@ -238,6 +353,7 @@ export default function useProductDetail() {
         if (supplier) {
           d.supplier_ref = { id: supplier._id, name: supplier.name };
         } else {
+          // Si le fournisseur n'existe plus, nettoyer
           d.supplier_id = null;
           d.supplier_ref = null;
         }
@@ -255,7 +371,7 @@ export default function useProductDetail() {
 
       return d;
     },
-    [buildCategoryInfo, relatedData]
+    [categoryOptions, relatedData]
   );
 
   const handleSubmit = async (data) => {
@@ -265,11 +381,16 @@ export default function useProductDetail() {
     try {
       // Vérifier si le champ name est vide ou non défini
       if (!data.name || data.name.trim() === '') {
+        // Utiliser designation si disponible
         if (data.designation && data.designation.trim() !== '') {
           data.name = data.designation;
-        } else if (data.sku && data.sku.trim() !== '') {
+        }
+        // Sinon utiliser SKU si disponible
+        else if (data.sku && data.sku.trim() !== '') {
           data.name = data.sku;
-        } else {
+        }
+        // Sinon, nom par défaut
+        else {
           data.name = `Produit ${new Date().toISOString()}`;
         }
       }
@@ -277,6 +398,7 @@ export default function useProductDetail() {
       const processed = preprocessData(data);
 
       if (isNew) {
+        // Validation avant envoi
         const requiredFields = ['name'];
         const missingFields = requiredFields.filter(
           (field) => !processed[field] || processed[field].trim() === ''
@@ -326,8 +448,10 @@ export default function useProductDetail() {
 
   const handleCancel = () => {
     if (isNew) {
+      // Si c'est une création, retourner à la liste
       navigate('/products');
     } else {
+      // Si c'est une modification, retourner au mode lecture
       navigate(`/products/${paramId}`);
     }
   };
@@ -346,12 +470,14 @@ export default function useProductDetail() {
     }
   };
 
-  // Fonctions pour la gestion des images (inchangées)
+  // Fonctions corrigées pour la gestion des images
   const handleUploadImage = async (entityId, file) => {
     try {
       setLoading(true);
+      // Utiliser la fonction correcte du hook useProductExtras
       await productExtras.uploadGalleryImage(entityId, file);
       const effectiveId = currentId || paramId;
+      // Rafraîchir les données du produit
       const updated = await getProductById(effectiveId);
       setProduct(updated);
       return true;
@@ -369,15 +495,20 @@ export default function useProductDetail() {
       setLoading(true);
       console.log("Tentative de suppression d'image:", { entityId, imageIdOrIndex });
 
+      // Récupérer le produit actuel pour avoir les données à jour
       const currentProduct = await getProductById(entityId);
       console.log('Images dans la galerie:', currentProduct?.gallery_images);
 
+      // Déterminer si imageIdOrIndex est un index numérique ou un ID string
       let imageIndex = -1;
 
       if (typeof imageIdOrIndex === 'number') {
+        // Si c'est déjà un index numérique, l'utiliser directement
         imageIndex = imageIdOrIndex;
         console.log('Index numérique détecté:', imageIndex);
       } else if (currentProduct?.gallery_images) {
+        // Sinon, essayer de trouver l'index par ID
+        // Tester plusieurs propriétés possibles où l'ID pourrait se trouver
         imageIndex = currentProduct.gallery_images.findIndex(
           (img) =>
             img._id === imageIdOrIndex ||
@@ -387,11 +518,13 @@ export default function useProductDetail() {
         console.log("Index trouvé à partir de l'ID:", imageIndex);
       }
 
+      // Si on n'a toujours pas trouvé l'index, essayer de traiter l'image comme étant la première
       if (imageIndex === -1 && currentProduct?.gallery_images?.length > 0) {
         console.log('Image non trouvée par ID, tentative avec la première image');
         imageIndex = 0;
       }
 
+      // Vérifier si nous avons un index valide
       if (
         imageIndex === -1 ||
         !currentProduct?.gallery_images ||
@@ -401,14 +534,17 @@ export default function useProductDetail() {
         throw new Error("Index d'image invalide ou galerie vide");
       }
 
+      // Log l'image qu'on va supprimer
       console.log(
         "Suppression de l'image à l'index:",
         imageIndex,
         currentProduct.gallery_images[imageIndex]
       );
 
+      // Appeler la fonction avec l'index trouvé
       await productExtras.deleteGalleryImage(entityId, imageIndex);
 
+      // Rafraîchir les données du produit
       const effectiveId = currentId || paramId;
       const updated = await getProductById(effectiveId);
       setProduct(updated);
@@ -427,6 +563,7 @@ export default function useProductDetail() {
       setLoading(true);
       await productExtras.setMainImage(entityId, imageIndex);
       const effectiveId = currentId || paramId;
+      // Rafraîchir les données du produit
       const updated = await getProductById(effectiveId);
       setProduct(updated);
       return true;
@@ -441,8 +578,7 @@ export default function useProductDetail() {
 
   return {
     product,
-    // ✅ UTILISER categoriesLoading du hook useCategoryUtils
-    loading: loading || categoriesLoading,
+    loading: loading || hierarchyLoading,
     error,
     success,
     isNew,
@@ -457,17 +593,11 @@ export default function useProductDetail() {
     categoryOptions,
     brandOptions,
     supplierOptions,
+    // Exposer les fonctions corrigées
     uploadImage: handleUploadImage,
     deleteImage: handleDeleteImage,
     setMainImage: handleSetMainImage,
     hierarchicalCategories,
-    // ✅ EXPOSER les utilitaires de catégories pour usage avancé si nécessaire
-    categoryUtils: {
-      enrichProductWithCategories,
-      buildCategoryInfo,
-      getCategoryOptions,
-      isReady: categoryUtilsReady,
-    },
   };
 }
 
@@ -492,6 +622,6 @@ const defaultValues = {
   margin_rate: null,
   margin_amount: null,
   tax_rate: 20,
-  promo_rate: null,
+  promo_rate: null, // 🆕 NOUVEAU CHAMP
   promo_amount: null,
 };

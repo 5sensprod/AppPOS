@@ -93,6 +93,11 @@ export default function useCategoryDetail() {
     loadData();
   }, [paramId, currentId, isNew, fetchHierarchicalCategories, getCategoryById]);
 
+  const parentCategories = useMemo(() => {
+    const id = currentId || paramId;
+    return transformToOptions(hierarchicalCategories, id, isNew);
+  }, [hierarchicalCategories, currentId, paramId, isNew]);
+
   const handleSubmit = async (data) => {
     setLoading(true);
     setError(null);
