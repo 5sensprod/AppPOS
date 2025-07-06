@@ -100,6 +100,7 @@ const ActionButton = ({
               showCounts={true}
               autoFocusOpen={true}
               variant="portal"
+              theme="elegant"
             />
           </div>,
           document.body

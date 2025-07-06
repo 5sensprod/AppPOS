@@ -67,6 +67,7 @@ function CategorieDetail() {
                     control={control}
                     render={({ field }) => (
                       <CategorySelector
+                        theme="elegant"
                         mode="single"
                         value={field.value}
                         onChange={field.onChange}

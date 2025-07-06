@@ -1,7 +1,7 @@
-// AppTools/src/components/atoms/Select/SelectChip.jsx
+// AppTools/src/components/atoms/Select/SelectChip.jsx - AVEC THÈMES
 import React from 'react';
 import { X, Star } from 'lucide-react';
-import { getChipClassName } from './selectStyles';
+import { getChipClassName, getThemedClasses } from './selectStyles';
 
 const SelectChip = ({
   children,
@@ -13,15 +13,27 @@ const SelectChip = ({
   primaryToggle = false,
   className = '',
   size = 'md', // 'sm' | 'md' | 'lg'
+  theme = 'default', // ⚡ Support des thèmes
 }) => {
-  // Utilise votre utility existante + tailles
+  // Tailles
   const sizeClasses = {
     sm: 'px-2 py-0.5 text-xs',
-    md: 'px-3 py-1 text-sm', // Déjà dans vos styles
+    md: 'px-3 py-1 text-sm',
     lg: 'px-4 py-2 text-base',
   };
 
-  const chipClassName = getChipClassName(isPrimary, `${sizeClasses[size]} ${className}`);
+  // ⚡ CHOIX: Utilise les thèmes SI différent de 'default', sinon garde l'ancienne logique
+  let chipClassName;
+
+  if (theme === 'default') {
+    // ✅ Garde votre logique existante pour le thème par défaut
+    chipClassName = getChipClassName(isPrimary, `${sizeClasses[size]} ${className}`);
+  } else {
+    // ⚡ Utilise les nouveaux thèmes
+    const themedClasses = getThemedClasses(theme);
+    const baseChipClass = isPrimary ? themedClasses.chipPrimary : themedClasses.chipSecondary;
+    chipClassName = `${baseChipClass} ${sizeClasses[size]} ${className}`;
+  }
 
   return (
     <div className={chipClassName} title={title}>

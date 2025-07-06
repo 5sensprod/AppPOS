@@ -17,6 +17,7 @@ const CategoryItem = ({
   onToggleExpand,
   onSetPrimary,
   displayName = null,
+  theme = 'default',
 }) => {
   const handleClick = () => onSelect(item._id);
 
@@ -72,6 +73,7 @@ const CategoryItem = ({
       rightIcon={rightActions}
       showCounter={showCounts && hasChildren}
       counterValue={childCount}
+      theme={theme}
     >
       {displayName || item.name}
     </SelectOption>

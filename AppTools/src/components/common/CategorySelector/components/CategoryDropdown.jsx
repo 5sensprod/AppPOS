@@ -9,6 +9,7 @@ const CategoryDropdown = ({
   showSearch,
   children,
   className = '',
+  theme = 'default',
 }) => {
   return (
     <SelectDropdown
@@ -19,6 +20,7 @@ const CategoryDropdown = ({
       searchPlaceholder="Rechercher une catégorie..."
       className={className}
       maxHeight="max-h-72"
+      theme={theme}
     >
       {children}
     </SelectDropdown>

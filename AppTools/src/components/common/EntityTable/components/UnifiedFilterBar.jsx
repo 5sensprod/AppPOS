@@ -186,6 +186,7 @@ const UnifiedFilterBar = ({
             <CategorySelector
               mode="single"
               value={''}
+              theme="elegant"
               onChange={(selectedCategoryId) => {
                 if (selectedCategoryId) {
                   let categoryName = getCategoryName(selectedCategoryId);

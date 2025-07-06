@@ -1,7 +1,7 @@
 // AppTools/src/components/atoms/Select/SelectOption.jsx
 import React from 'react';
 import { Check, ChevronRight, ChevronDown } from 'lucide-react';
-import { getListItemClassName } from './selectStyles';
+import { getListItemClassName, getThemedClasses } from './selectStyles';
 
 const SelectOption = ({
   children,
@@ -18,6 +18,7 @@ const SelectOption = ({
   indentSize = 20, // pixels par niveau
   showCounter = false,
   counterValue = 0,
+  theme = 'default',
 }) => {
   const handleClick = (e) => {
     if (disabled) return;
@@ -31,10 +32,17 @@ const SelectOption = ({
   };
 
   // Utilise votre utility existante
-  const optionClassName = getListItemClassName(
-    isSelected,
-    `${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`
-  );
+  let optionClassName;
+  if (theme === 'default') {
+    optionClassName = getListItemClassName(
+      isSelected,
+      `${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`
+    );
+  } else {
+    const themedClasses = getThemedClasses(theme);
+    const baseClass = isSelected ? themedClasses.listItemSelected : themedClasses.listItem;
+    optionClassName = `${baseClass} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`;
+  }
 
   return (
     <div

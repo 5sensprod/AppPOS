@@ -131,3 +131,97 @@ export const getDropdownClassName = (
 ) => {
   return `${position} ${zIndex} mt-1 w-full ${sharedClasses.dropdownContainer} ${maxHeight} ${extraClasses}`.trim();
 };
+
+export const themes = {
+  default: {
+    // Votre thème actuel
+    container: 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600',
+    item: 'hover:bg-gray-50 dark:hover:bg-gray-700',
+    selected: 'bg-blue-50 dark:bg-blue-900/20',
+    chip: {
+      primary: 'bg-blue-100 text-blue-800 border-blue-300',
+      secondary: 'bg-gray-100 text-gray-700 border-gray-300',
+    },
+  },
+
+  elegant: {
+    // ⚡ Nouveau thème élégant
+    container: 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700',
+    item: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    selected: 'bg-indigo-50 dark:bg-indigo-900/30 border-l-4 border-indigo-500',
+    chip: {
+      primary: 'bg-indigo-100 text-indigo-900 border-indigo-200 shadow-sm',
+      secondary: 'bg-slate-100 text-slate-700 border-slate-200 shadow-sm',
+    },
+  },
+
+  colorful: {
+    // ⚡ Thème coloré fun
+    container:
+      'bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200 dark:border-purple-700',
+    item: 'hover:bg-gradient-to-r hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/30 dark:hover:to-pink-800/30',
+    selected:
+      'bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-800/40 dark:to-pink-800/40 border-l-4 border-gradient-to-b border-purple-500',
+    chip: {
+      primary:
+        'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-900 border-purple-300 shadow-lg',
+      secondary:
+        'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border-gray-300 shadow-md',
+    },
+  },
+
+  minimal: {
+    // ⚡ Thème ultra minimal
+    container: 'bg-white dark:bg-gray-900 border-0 shadow-2xl',
+    item: 'hover:bg-gray-25 dark:hover:bg-gray-850 border-b border-gray-100 dark:border-gray-800',
+    selected: 'bg-blue-25 dark:bg-blue-950 border-l-2 border-blue-400',
+    chip: {
+      primary: 'bg-blue-25 text-blue-900 border-0 shadow-none ring-1 ring-blue-200',
+      secondary: 'bg-gray-25 text-gray-800 border-0 shadow-none ring-1 ring-gray-200',
+    },
+  },
+};
+
+// ===== FONCTION: Obtenir les classes selon le thème =====
+export const getThemedClasses = (themeName = 'default') => {
+  const theme = themes[themeName] || themes.default;
+
+  return {
+    // Conteneurs
+    dropdownContainer: `${theme.container} rounded-md shadow-lg overflow-hidden`,
+
+    // Items de liste
+    listItem: `flex items-center px-3 py-2 cursor-pointer group ${theme.item}`,
+    listItemSelected: `${theme.item} ${theme.selected}`,
+
+    // Chips
+    chipPrimary: `inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${theme.chip.primary}`,
+    chipSecondary: `inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${theme.chip.secondary}`,
+  };
+};
+
+// ===== MISE À JOUR: sharedClasses avec support des thèmes =====
+export const getSharedClasses = (themeName = 'default') => {
+  const themed = getThemedClasses(themeName);
+
+  return {
+    // Classes existantes + thème
+    input:
+      'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white',
+
+    // Classes thématisées
+    dropdownContainer: themed.dropdownContainer,
+    listItem: themed.listItem,
+    listItemSelected: themed.listItemSelected,
+    chipPrimary: themed.chipPrimary,
+    chipSecondary: themed.chipSecondary,
+
+    // Boutons (inchangés)
+    button: {
+      primary:
+        'px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500',
+      secondary:
+        'px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500',
+    },
+  };
+};

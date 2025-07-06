@@ -1,7 +1,7 @@
 // AppTools/src/components/atoms/Select/SelectDropdown.jsx
 import React from 'react';
 import { Search } from 'lucide-react';
-import { sharedClasses } from './selectStyles';
+import { sharedClasses, getThemedClasses } from './selectStyles';
 
 const SelectDropdown = ({
   isOpen,
@@ -14,11 +14,20 @@ const SelectDropdown = ({
   maxHeight = 'max-h-72',
   position = 'absolute', // 'absolute' | 'relative'
   zIndex = 'z-10',
+  theme = 'default',
 }) => {
   if (!isOpen) return null;
 
   // Utilise votre classe existante + personnalisation
-  const dropdownClassName = `${position} ${zIndex} mt-1 w-full ${sharedClasses.dropdownContainer} ${maxHeight} ${className}`;
+  let dropdownContainerClass;
+  if (theme === 'default') {
+    dropdownContainerClass = sharedClasses.dropdownContainer;
+  } else {
+    const themedClasses = getThemedClasses(theme);
+    dropdownContainerClass = themedClasses.dropdownContainer;
+  }
+
+  const dropdownClassName = `${position} ${zIndex} mt-1 w-full ${dropdownContainerClass} ${maxHeight} ${className}`;
 
   return (
     <div className={dropdownClassName}>

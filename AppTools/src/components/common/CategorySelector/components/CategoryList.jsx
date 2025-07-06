@@ -14,6 +14,7 @@ const CategoryList = ({
   onSelect,
   onToggleExpand,
   onSetPrimary,
+  theme = 'default',
 }) => {
   const renderItems = (items, level = 0) => {
     return items.map((item) => {
@@ -42,6 +43,7 @@ const CategoryList = ({
             onToggleExpand={(e) => onToggleExpand(item._id, e)}
             onSetPrimary={onSetPrimary}
             displayName={searchTerm ? item._fullPath : null}
+            theme={theme}
           />
 
           {/* Enfants */}
@@ -76,6 +78,7 @@ const CategoryList = ({
           onToggleExpand={() => {}}
           onSetPrimary={onSetPrimary}
           displayName={item._fullPath || item.name}
+          theme={theme}
         />
       );
     });

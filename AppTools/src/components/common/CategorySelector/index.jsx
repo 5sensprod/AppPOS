@@ -28,6 +28,7 @@ const CategorySelector = ({
   allowRootSelection = true, // Permet de sélectionner "Aucune" en mode single
   autoFocusOpen = false,
   variant = 'default', // ⚡ NOUVEAU: 'default' | 'compact' | 'portal'
+  theme = 'default',
 }) => {
   const { isReady, categoriesLoading } = useCategoryUtils();
 
@@ -52,7 +53,8 @@ const CategorySelector = ({
     showCounts,
     allowRootSelection,
     autoFocusOpen,
-    variant, // ⚡ Passe le variant aux composants enfants
+    variant,
+    theme,
   };
 
   // Rendu conditionnel selon le mode

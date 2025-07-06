@@ -15,6 +15,7 @@ const MultipleCategorySelector = ({
   showSearch = true,
   showCounts = true,
   autoFocusOpen = false,
+  theme = 'default', // ⚡ AJOUT: Prop theme manquante
 }) => {
   const {
     isOpen,
@@ -34,7 +35,7 @@ const MultipleCategorySelector = ({
     disabled,
   });
 
-  // ⚡ CORRECTION: Labels des catégories sélectionnées (manquait dans la version précédente)
+  // Labels des catégories sélectionnées
   const selectedLabels = useMemo(() => {
     return selectedCategories
       .map((id) => ({
@@ -45,7 +46,7 @@ const MultipleCategorySelector = ({
       .filter((item) => item.name !== 'Catégorie inconnue');
   }, [selectedCategories, getCategoryName, getCategoryPath]);
 
-  // ⚡ CORRECTION: Placeholder par défaut (manquait aussi)
+  // Placeholder par défaut
   const defaultPlaceholder = useMemo(() => {
     if (placeholder) return placeholder;
     return selectedCategories.length > 0
@@ -53,7 +54,7 @@ const MultipleCategorySelector = ({
       : 'Ajouter des catégories...';
   }, [placeholder, selectedCategories.length]);
 
-  // ⚡ CORRECTION: Gestionnaires (manquaient aussi)
+  // Gestionnaires
   const toggleCategory = (categoryId) => {
     let newCategories;
     let newPrimaryId = primaryCategoryId;
@@ -122,6 +123,7 @@ const MultipleCategorySelector = ({
                   primaryToggle={!isPrimary}
                   title={category.path}
                   size="md"
+                  theme={theme} // ✅ Maintenant theme existe
                 >
                   {category.name}
                 </SelectChip>
@@ -154,6 +156,7 @@ const MultipleCategorySelector = ({
         showSearch={showSearch}
         containerRef={containerRef}
         className="mt-2 max-h-80"
+        theme={theme}
       >
         <CategoryList
           items={displayData}
@@ -166,6 +169,7 @@ const MultipleCategorySelector = ({
           onSelect={toggleCategory}
           onToggleExpand={toggleExpand}
           onSetPrimary={setPrimary}
+          theme={theme}
         />
       </CategoryDropdown>
 
