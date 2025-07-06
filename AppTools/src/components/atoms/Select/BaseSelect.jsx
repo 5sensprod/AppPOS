@@ -1,40 +1,7 @@
 // src/components/atoms/Select/BaseSelect.jsx
 import React from 'react';
 import Select from 'react-select';
-
-const baseStyles = {
-  control: (provided, state) => ({
-    ...provided,
-    minHeight: '38px',
-    borderColor: state.isFocused ? '#3B82F6' : '#D1D5DB',
-    boxShadow: state.isFocused ? '0 0 0 1px #3B82F6' : 'none',
-    '&:hover': {
-      borderColor: '#9CA3AF',
-    },
-  }),
-  valueContainer: (provided) => ({
-    ...provided,
-    padding: '2px 8px',
-  }),
-  option: (provided, state) => ({
-    ...provided,
-    backgroundColor: state.isSelected ? '#3B82F6' : state.isFocused ? '#F3F4F6' : 'white',
-    color: state.isSelected ? 'white' : '#374151',
-    padding: '8px 12px',
-    fontSize: '14px',
-    ':active': {
-      backgroundColor: '#3B82F6',
-    },
-  }),
-  menuPortal: (base) => ({
-    ...base,
-    zIndex: 9999,
-  }),
-  menu: (provided) => ({
-    ...provided,
-    zIndex: 9999,
-  }),
-};
+import { createSelectStyles } from './selectStyles';
 
 const BaseSelect = ({
   options = [],
@@ -49,10 +16,8 @@ const BaseSelect = ({
   styles = {},
   ...props
 }) => {
-  const mergedStyles = {
-    ...baseStyles,
-    ...styles,
-  };
+  // ✅ Utiliser les styles partagés comme base
+  const mergedStyles = createSelectStyles(styles);
 
   return (
     <Select
