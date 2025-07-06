@@ -94,3 +94,40 @@ export const getListItemClassName = (isSelected = false, extraClasses = '') => {
   const selectedClass = isSelected ? sharedClasses.listItemSelected : '';
   return `${baseClass} ${selectedClass} ${extraClasses}`.trim();
 };
+
+export const getFieldClassName = (isOpen = false, error = false, disabled = false, size = 'md') => {
+  const sizeStyles = {
+    sm: 'px-2 py-1 text-sm min-h-[32px]',
+    md: 'px-3 py-2 text-base min-h-[38px]',
+    lg: 'px-4 py-3 text-lg min-h-[44px]',
+  };
+
+  let className = sharedClasses.input.replace('w-full px-3 py-2', `w-full ${sizeStyles[size]}`);
+
+  if (error) {
+    className = className.replace(
+      'focus:ring-blue-500 focus:border-blue-500',
+      'focus:ring-red-500 focus:border-red-500 border-red-500'
+    );
+  } else if (isOpen) {
+    className = className.replace(
+      'border-gray-300 dark:border-gray-600',
+      'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200'
+    );
+  }
+
+  if (disabled) {
+    className += ` ${sharedClasses.disabled}`;
+  }
+
+  return className;
+};
+
+export const getDropdownClassName = (
+  position = 'absolute',
+  zIndex = 'z-10',
+  maxHeight = 'max-h-72',
+  extraClasses = ''
+) => {
+  return `${position} ${zIndex} mt-1 w-full ${sharedClasses.dropdownContainer} ${maxHeight} ${extraClasses}`.trim();
+};

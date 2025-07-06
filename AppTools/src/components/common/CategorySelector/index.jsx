@@ -4,10 +4,6 @@ import { useCategoryUtils } from '../../hooks/useCategoryUtils';
 import SingleCategorySelector from './SingleCategorySelector';
 import MultipleCategorySelector from './MultipleCategorySelector';
 
-/**
- * Composant unifié pour la sélection de catégories
- * Supporte deux modes avec des composants séparés
- */
 const CategorySelector = ({
   // Mode de fonctionnement
   mode = 'single', // 'single' | 'multiple'
@@ -31,7 +27,7 @@ const CategorySelector = ({
   showCounts = true,
   allowRootSelection = true, // Permet de sélectionner "Aucune" en mode single
   autoFocusOpen = false,
-  variant = 'default', // 'default' | 'compact' | 'modern'
+  variant = 'default', // ⚡ NOUVEAU: 'default' | 'compact' | 'portal'
 }) => {
   const { isReady, categoriesLoading } = useCategoryUtils();
 
@@ -56,7 +52,7 @@ const CategorySelector = ({
     showCounts,
     allowRootSelection,
     autoFocusOpen,
-    variant,
+    variant, // ⚡ Passe le variant aux composants enfants
   };
 
   // Rendu conditionnel selon le mode

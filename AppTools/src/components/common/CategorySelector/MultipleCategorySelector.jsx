@@ -1,6 +1,7 @@
-// src/components/common/CategorySelector/MultipleCategorySelector.jsx
+// AppTools/src/components/common/CategorySelector/MultipleCategorySelector.jsx
 import React, { useMemo } from 'react';
-import { Plus, X, Star } from 'lucide-react';
+import { Plus, Star } from 'lucide-react';
+import { SelectChip } from '../../atoms/Select';
 import { useCategorySelector } from './hooks/useCategorySelector';
 import { CategoryDropdown, CategoryList } from './components';
 
@@ -33,7 +34,7 @@ const MultipleCategorySelector = ({
     disabled,
   });
 
-  // Labels des catégories sélectionnées
+  // ⚡ CORRECTION: Labels des catégories sélectionnées (manquait dans la version précédente)
   const selectedLabels = useMemo(() => {
     return selectedCategories
       .map((id) => ({
@@ -44,7 +45,7 @@ const MultipleCategorySelector = ({
       .filter((item) => item.name !== 'Catégorie inconnue');
   }, [selectedCategories, getCategoryName, getCategoryPath]);
 
-  // Placeholder par défaut
+  // ⚡ CORRECTION: Placeholder par défaut (manquait aussi)
   const defaultPlaceholder = useMemo(() => {
     if (placeholder) return placeholder;
     return selectedCategories.length > 0
@@ -52,7 +53,7 @@ const MultipleCategorySelector = ({
       : 'Ajouter des catégories...';
   }, [placeholder, selectedCategories.length]);
 
-  // Gestionnaires
+  // ⚡ CORRECTION: Gestionnaires (manquaient aussi)
   const toggleCategory = (categoryId) => {
     let newCategories;
     let newPrimaryId = primaryCategoryId;
@@ -104,7 +105,7 @@ const MultipleCategorySelector = ({
   const displayData = searchTerm ? searchResults : filteredData;
 
   return (
-    <div ref={containerRef} className="category-selector">
+    <div ref={containerRef} className="category-selector relative">
       {/* Zone d'affichage des catégories sélectionnées */}
       <div className="space-y-3">
         {/* Chips des catégories sélectionnées */}
@@ -113,36 +114,17 @@ const MultipleCategorySelector = ({
             {selectedLabels.map((category) => {
               const isPrimary = category.id === primaryCategoryId;
               return (
-                <div
+                <SelectChip
                   key={category.id}
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                    isPrimary
-                      ? 'bg-blue-100 text-blue-800 border-2 border-blue-300 dark:bg-blue-800 dark:text-blue-100'
-                      : 'bg-gray-100 text-gray-700 border border-gray-300 dark:bg-gray-700 dark:text-gray-300'
-                  }`}
+                  isPrimary={isPrimary}
+                  onRemove={() => removeCategory(category.id)}
+                  onPrimary={() => setPrimary(category.id)}
+                  primaryToggle={!isPrimary}
                   title={category.path}
+                  size="md"
                 >
-                  {isPrimary && <Star className="h-3 w-3 mr-1 text-yellow-500 fill-current" />}
-                  <span className="mr-2">{category.name}</span>
-
-                  {!isPrimary && (
-                    <button
-                      onClick={() => setPrimary(category.id)}
-                      className="mr-1 text-gray-400 hover:text-yellow-500 transition-colors"
-                      title="Définir comme principale"
-                    >
-                      <Star className="h-3 w-3" />
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => removeCategory(category.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                    title="Retirer cette catégorie"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
+                  {category.name}
+                </SelectChip>
               );
             })}
           </div>
@@ -170,7 +152,8 @@ const MultipleCategorySelector = ({
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         showSearch={showSearch}
-        className="mt-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-80 overflow-hidden"
+        containerRef={containerRef}
+        className="mt-2 max-h-80"
       >
         <CategoryList
           items={displayData}

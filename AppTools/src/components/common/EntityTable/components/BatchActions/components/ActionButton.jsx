@@ -83,22 +83,23 @@ const ActionButton = ({
             style={{
               top: `${buttonRect.bottom + 4}px`,
               left: `${buttonRect.left}px`,
-              minWidth: `${Math.max(buttonRect.width, 200)}px`,
+              minWidth: `${Math.max(buttonRect.width, 350)}px`,
             }}
           >
             {/* ✅ CategorySelector simplifié */}
             <CategorySelector
               mode="single"
-              value={''} // Pas de valeur initiale car on ne garde pas l'état ici
+              value={''}
               onChange={(val) => {
                 cfg.onSelect(val);
-                toggleOpen(); // Fermer après sélection
+                toggleOpen();
               }}
               placeholder="Sélectionner une catégorie"
               allowRootSelection={true}
               showSearch={true}
               showCounts={true}
               autoFocusOpen={true}
+              variant="portal"
             />
           </div>,
           document.body
