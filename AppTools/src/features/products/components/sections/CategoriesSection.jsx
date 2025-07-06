@@ -141,7 +141,7 @@ const EditableView = ({ errors }) => {
             placeholder="Ajouter des catégories au produit"
             showSearch={true}
             showCounts={true}
-            theme="minimal"
+            theme="elegant"
           />
 
           {/* ✅ Aide simplifiée et concise */}

@@ -1,7 +1,6 @@
 // src/components/common/tabs/GeneralInfoTab.jsx
 import React from 'react';
-import { useFormContext } from 'react-hook-form';
-import { Controller } from 'react-hook-form';
+import { useFormContext, Controller } from 'react-hook-form';
 import CategorySelector from '../../common/CategorySelector';
 import BrandSelectField from '../fields/BrandSelectField';
 import imageProxyService from '../../../services/imageProxyService';
@@ -131,6 +130,7 @@ const GeneralInfoTab = ({
           control={formContext.control}
           render={({ field: controllerField }) => (
             <CategorySelector
+              theme="colorful"
               mode="single"
               value={controllerField.value}
               onChange={controllerField.onChange}
