@@ -1,7 +1,8 @@
 // src/components/common/CategorySelector/MultipleCategorySelector.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ChevronRight, ChevronDown, Plus, X, Star, Search } from 'lucide-react';
 import { useCategoryUtils } from '../../hooks/useCategoryUtils';
+import { useClickOutside } from '../EntityTable/components/BatchActions/hooks/useClickOutside';
 
 const MultipleCategorySelector = ({
   selectedCategories = [],
@@ -18,6 +19,12 @@ const MultipleCategorySelector = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedItems, setExpandedItems] = useState({});
+
+  const containerRef = useRef(null);
+
+  // ✅ REMPLACEMENT : Utiliser votre hook
+  const closeDropdown = () => setIsOpen(false);
+  useClickOutside(containerRef, isOpen, closeDropdown);
 
   const {
     hierarchicalCategories,
@@ -116,18 +123,6 @@ const MultipleCategorySelector = ({
     }
     setExpandedItems((prev) => ({ ...prev, ...expanded }));
   }, [searchResults, searchTerm]);
-
-  // Gestion du clic en dehors
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isOpen && !event.target.closest('.category-selector')) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
 
   // ========================================
   // GESTIONNAIRES D'ÉVÉNEMENTS
@@ -347,7 +342,7 @@ const MultipleCategorySelector = ({
   };
 
   return (
-    <div className="category-selector">
+    <div ref={containerRef} className="category-selector">
       {/* Zone d'affichage des catégories sélectionnées */}
       <div className="space-y-3">
         {/* Chips des catégories sélectionnées */}

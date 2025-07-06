@@ -1,7 +1,8 @@
 // src/components/common/CategorySelector/SingleCategorySelector.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ChevronRight, ChevronDown, Search, Check } from 'lucide-react';
 import { useCategoryUtils } from '../../hooks/useCategoryUtils';
+import { useClickOutside } from '../EntityTable/components/BatchActions/hooks/useClickOutside';
 
 const SingleCategorySelector = ({
   value = '',
@@ -18,6 +19,12 @@ const SingleCategorySelector = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedItems, setExpandedItems] = useState({});
+
+  // ✅ Ref pour le conteneur principal
+  const containerRef = useRef(null);
+
+  const closeDropdown = () => setIsOpen(false);
+  useClickOutside(containerRef, isOpen, closeDropdown);
 
   const { hierarchicalCategories, getCategoryPath, getAllChildrenIds, searchInHierarchy } =
     useCategoryUtils();
@@ -123,18 +130,6 @@ const SingleCategorySelector = ({
     setExpandedItems((prev) => ({ ...prev, ...expanded }));
   }, [searchResults, searchTerm]);
 
-  // Gestion du clic en dehors
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isOpen && !event.target.closest('.category-selector')) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
-
   // ========================================
   // GESTIONNAIRES D'ÉVÉNEMENTS
   // ========================================
@@ -229,7 +224,7 @@ const SingleCategorySelector = ({
   };
 
   return (
-    <div className="category-selector relative">
+    <div ref={containerRef} className="category-selector relative">
       {/* Champ de sélection */}
       <div
         className={`border rounded-md px-3 py-2 flex justify-between items-center cursor-pointer ${
