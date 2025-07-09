@@ -13,8 +13,12 @@ const CategoryTreeNode = ({
   onToggleExpansion,
   onToggleSelection,
   collectAllCategoryIds,
+  selectedCategories = [], // 🔥 NOUVEAU : Ajout de la liste complète des catégories sélectionnées
 }) => {
   const hasChildren = category.children && category.children.length > 0;
+
+  // 🔥 CORRECTION : Calculer correctement l'état de sélection
+  const isCurrentlySelected = selectedCategories.includes(category._id);
 
   /**
    * Gère la sélection/désélection de la catégorie
@@ -71,10 +75,10 @@ const CategoryTreeNode = ({
           <div className="w-4" />
         )}
 
-        {/* Checkbox */}
+        {/* Checkbox - 🔥 CORRECTION : Utilise isCurrentlySelected */}
         <input
           type="checkbox"
-          checked={isSelected}
+          checked={isCurrentlySelected}
           onChange={handleToggleSelection}
           className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           aria-label={`Sélectionner ${category.name}`}
@@ -121,6 +125,7 @@ const CategoryTreeNode = ({
               onToggleExpansion={onToggleExpansion}
               onToggleSelection={onToggleSelection}
               collectAllCategoryIds={collectAllCategoryIds}
+              selectedCategories={selectedCategories} // 🔥 NOUVEAU : Passer la liste complète
             />
           ))}
         </div>

@@ -204,6 +204,7 @@ const CategoryTreeSelector = ({
                 onToggleExpansion={toggleCategoryExpansion}
                 onToggleSelection={handleCategoryToggle}
                 collectAllCategoryIds={collectAllCategoryIds}
+                selectedCategories={exportOptions.selectedCategories} // 🔥 CORRECTION : Passer la liste complète
               />
             ))
           ) : (
@@ -248,7 +249,7 @@ const CategoryTreeSelector = ({
             </span>
           </label>
 
-          {/* 🔥 NOUVELLE OPTION : Rapport simplifié */}
+          {/* Option : Rapport simplifié */}
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
