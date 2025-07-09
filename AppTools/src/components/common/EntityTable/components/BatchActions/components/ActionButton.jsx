@@ -5,14 +5,7 @@ import { useClickOutside } from '../hooks/useClickOutside';
 import { useResponsiveDropdown } from '../hooks/useResponsiveDropdown';
 import CategorySelector from '../../../../CategorySelector';
 
-const ActionButton = ({
-  action,
-  cfg,
-  openDropdown,
-  setOpenDropdown,
-  // ✅ Supprimé hierarchicalData - plus nécessaire
-  syncStats,
-}) => {
+const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, syncStats }) => {
   const isOpen = openDropdown === action;
   const dropdownRef = useRef(null);
 
@@ -86,22 +79,41 @@ const ActionButton = ({
               minWidth: `${Math.max(buttonRect.width, 350)}px`,
             }}
           >
-            {/* ✅ CategorySelector simplifié */}
-            <CategorySelector
-              mode="single"
-              value={''}
-              onChange={(val) => {
-                cfg.onSelect(val);
-                toggleOpen();
-              }}
-              placeholder="Sélectionner une catégorie"
-              allowRootSelection={true}
-              showSearch={true}
-              showCounts={true}
-              autoFocusOpen={true}
-              variant="portal"
-              theme="elegant"
-            />
+            {/* ✅ Condition pour afficher le bon composant selon l'action */}
+            {cfg.isHierarchical ? (
+              // Pour les catégories hiérarchiques
+              <CategorySelector
+                mode="single"
+                value={''}
+                onChange={(val) => {
+                  cfg.onSelect(val);
+                  toggleOpen();
+                }}
+                placeholder="Sélectionner une catégorie"
+                allowRootSelection={true}
+                showSearch={true}
+                showCounts={true}
+                autoFocusOpen={true}
+                variant="portal"
+                theme="elegant"
+              />
+            ) : (
+              // Pour les options simples (statut, etc.)
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg py-1 max-h-60 overflow-y-auto">
+                {cfg.options?.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      cfg.onSelect(option.value);
+                      toggleOpen();
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${option.color}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>,
           document.body
         )}
