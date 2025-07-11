@@ -121,9 +121,23 @@ class ExportService {
       const disabledCells = exportConfig.labelLayout?.disabledCells || [];
       console.log('🚫 Cases désactivées:', disabledCells);
 
+      // ✅ NOUVEAU : Dupliquer les étiquettes selon duplicateCount
+      const duplicateCount = style.duplicateCount || 1;
+      const duplicatedLabelData = [];
+
+      for (const label of labelData) {
+        for (let i = 0; i < duplicateCount; i++) {
+          duplicatedLabelData.push(label);
+        }
+      }
+
+      console.log(
+        `🔄 Duplication: ${labelData.length} produits × ${duplicateCount} = ${duplicatedLabelData.length} étiquettes`
+      );
+
       console.log('🎨 Layout:', layout);
       console.log('🎨 Style:', style);
-      console.log('📋 Données:', labelData.length, 'étiquettes');
+      console.log('📋 Données:', duplicatedLabelData.length, 'étiquettes');
 
       // ✅ CALCUL FIXE DES DIMENSIONS ET POSITIONS
       const pageWidth = 210; // A4 en mm
@@ -159,11 +173,11 @@ class ExportService {
       });
 
       // ✅ FIX : Gérer les cases désactivées lors du placement
-      let labelIndex = 0; // Index dans labelData
+      let labelIndex = 0; // Index dans duplicatedLabelData
       let currentPage = 0;
       let totalCellsProcessed = 0;
 
-      while (labelIndex < labelData.length) {
+      while (labelIndex < duplicatedLabelData.length) {
         // Nouvelle page si nécessaire
         if (currentPage > 0) {
           doc.addPage();
@@ -173,7 +187,7 @@ class ExportService {
         // Traiter chaque cellule de la page
         for (
           let cellInPage = 0;
-          cellInPage < labelsPerPage && labelIndex < labelData.length;
+          cellInPage < labelsPerPage && labelIndex < duplicatedLabelData.length;
           cellInPage++
         ) {
           const absoluteCellIndex = currentPage * labelsPerPage + cellInPage;
@@ -186,7 +200,7 @@ class ExportService {
           }
 
           // Placer l'étiquette dans cette cellule
-          const label = labelData[labelIndex];
+          const label = duplicatedLabelData[labelIndex];
           const col = cellInPage % columns;
           const row = Math.floor(cellInPage / columns);
 

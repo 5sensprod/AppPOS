@@ -249,10 +249,10 @@ const ExportModal = ({
         {/* ✅ APERÇU DES ÉTIQUETTES (affiché seulement pour les étiquettes) */}
         {exportType === 'labels' && selectedItems.length > 0 && (
           <>
-            <LabelsPreviewPanel
+            {/* <LabelsPreviewPanel
               labelData={extractLabelData()}
               selectedCount={selectedItems.length}
-            />
+            /> */}
 
             {/* ✅ NOUVEAU : CONFIGURATEUR DE MISE EN PAGE */}
             <LabelsLayoutConfigurator
