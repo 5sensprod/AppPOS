@@ -1,3 +1,5 @@
+// ProductTable.jsx - MODIFICATION FINALE pour supporter les étiquettes
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useProduct, useProductDataStore } from '../stores/productStore';
 import { EntityTable } from '../../../components/common/';
@@ -7,7 +9,7 @@ import { useProductFilters } from '../hooks/useProductFilters';
 import { useStockOperations } from '../hooks/useStockOperations';
 import { useEntityTable } from '../../../hooks/useEntityTable';
 import { useCategoryUtils } from '../../../components/hooks/useCategoryUtils';
-import exportService from '../../../services/exportService';
+import exportService from '../../../services/exportService'; // ✅ Service mis à jour
 import { useWebCapture } from '../hooks/useWebCapture';
 import StockModal from '../../../components/common/EntityTable/components/BatchActions/components/StockModal';
 import ToastContainer from '../../../components/common/EntityTable/components/BatchActions/components/ToastContainer';
@@ -125,13 +127,11 @@ function ProductTable(props) {
     };
   }, []);
 
-  // ✅ GESTION D'ERREUR OPTIMISÉE
   useEffect(() => {
     if (stockError) {
     }
   }, [stockError]);
 
-  // ✅ FILTRAGE MEMOIZÉ
   const filteredProducts = useMemo(() => {
     console.log('🔄 Filtrage des produits...');
     return filterProducts(enrichedProducts);
@@ -139,8 +139,11 @@ function ProductTable(props) {
 
   const loading = productsLoading || operationLoading || categoriesLoading || stockLoading;
 
+  // ✅ FONCTION D'EXPORT MISE À JOUR POUR SUPPORTER LES ÉTIQUETTES
   const handleProductExport = useCallback(
     async (exportConfig) => {
+      console.log('📤 Configuration export reçue:', exportConfig);
+
       const toastId = toastActions.export.start(
         exportConfig.selectedItems.length,
         exportConfig.format,
@@ -148,13 +151,52 @@ function ProductTable(props) {
       );
 
       try {
-        const result = await exportService.exportProducts(exportConfig);
+        let result;
+
+        // ✅ GESTION DIFFÉRENCIÉE SELON LE TYPE D'EXPORT
+        if (exportConfig.exportType === 'labels') {
+          console.log("🏷️ Export d'étiquettes demandé");
+          console.log('📋 Données étiquettes:', exportConfig.labelData);
+          console.log('🎨 Configuration layout:', exportConfig.labelLayout);
+
+          // ✅ VALIDATION DES DONNÉES D'ÉTIQUETTES
+          if (!exportConfig.labelData || exportConfig.labelData.length === 0) {
+            throw new Error("Aucune donnée d'étiquette à exporter");
+          }
+
+          // ✅ APPEL DU SERVICE D'EXPORT D'ÉTIQUETTES
+          result = await exportService.exportProducts(exportConfig);
+
+          console.log('✅ Export étiquettes terminé:', result);
+        } else {
+          // ✅ Export tableau classique (existant)
+          console.log('📊 Export tableau classique');
+          result = await exportService.exportProducts(exportConfig);
+        }
+
+        // ✅ SUPPRESSION DU TOAST DE PROGRESSION
         removeToast(toastId);
-        toastActions.export.success(exportConfig.format);
+
+        // ✅ TOAST DE SUCCÈS DIFFÉRENCIÉ
+        if (exportConfig.exportType === 'labels') {
+          toastActions.export.success(`Étiquettes ${exportConfig.format.toUpperCase()}`);
+        } else {
+          toastActions.export.success(exportConfig.format);
+        }
+
         return result;
       } catch (error) {
+        console.error('❌ Erreur export:', error);
+
         removeToast(toastId);
-        toastActions.export.error(error.message);
+
+        // ✅ MESSAGE D'ERREUR SPÉCIFIQUE AUX ÉTIQUETTES
+        if (exportConfig.exportType === 'labels') {
+          toastActions.export.error(`Erreur export étiquettes: ${error.message}`);
+        } else {
+          toastActions.export.error(error.message);
+        }
+
         return false;
       }
     },
@@ -272,7 +314,7 @@ function ProductTable(props) {
         showActions={false}
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities}
-        onExport={handleProductExport}
+        onExport={handleProductExport} // ✅ Fonction mise à jour
         onBatchStatusChange={handleBatchStatusChange}
         onBatchCategoryChange={handleBatchCategoryChange}
         onBatchStockChange={handleStockAction}
@@ -287,6 +329,7 @@ function ProductTable(props) {
         defaultSort={ENTITY_CONFIG.defaultSort}
         paginationEntityId="product"
         externalActiveFilters={selectedFilters}
+        productsData={enrichedProducts} // ✅ Données pour étiquettes
         {...props}
       />
 

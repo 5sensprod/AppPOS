@@ -29,12 +29,12 @@ const EntityTable = ({
   showActions = true,
 
   // NOUVELLES PROPS pour UnifiedFilterBar
-  enableUnifiedFilters = true, // Activer/désactiver UnifiedFilterBar
-  unifiedFilterOptions = [], // Options de filtres pour UnifiedFilterBar
-  selectedFilters = [], // Filtres sélectionnés (externe)
-  onFiltersChange, // Callback pour changement de filtres
-  enableCategories = true, // Activer filtres de catégories
-  enableStatusFilter = true, // Activer filtre de statut
+  enableUnifiedFilters = true,
+  unifiedFilterOptions = [],
+  selectedFilters = [],
+  onFiltersChange,
+  enableCategories = true,
+  enableStatusFilter = true,
 
   pagination = {
     enabled: true,
@@ -61,6 +61,7 @@ const EntityTable = ({
   searchProcessor,
   paginationEntityId = 'default',
   externalActiveFilters = [],
+  productsData = [],
 }) => {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const { confirm, ConfirmModal } = useConfirmModal();
@@ -551,6 +552,7 @@ const EntityTable = ({
         entityName={entityName}
         entityNamePlural={entityNamePlural}
         activeFilters={filtersToUse}
+        productsData={productsData}
       />
 
       {/* Modal de confirmation pour les suppressions par lot */}
