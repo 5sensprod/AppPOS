@@ -1,3 +1,4 @@
+//AppTools\src\components\common\EntityTable\components\UnifiedFilterBar.jsx
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Select from 'react-select';
 import { X, Filter, ChevronDown, Trash2 } from 'lucide-react';
@@ -49,6 +50,7 @@ const UnifiedFilterBar = ({
     description: 'Description',
     brand: 'Marque',
     category: 'Catégorie',
+    barcode: 'Code barre',
   };
 
   const selectedTypes = new Set(selectedFilters.map((f) => f.type));

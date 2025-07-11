@@ -2,6 +2,83 @@
 import { useMemo } from 'react';
 import { useEntityFilter } from '@/hooks/useEntityFilter';
 
+// ✅ NOUVEAU - Fonctions utilitaires pour les codes-barres
+/**
+ * Valide un code-barres UPC-A (12 chiffres)
+ * @param {string} barcode - Le code-barres à valider
+ * @returns {boolean} - True si le code-barres UPC-A est valide
+ */
+const isValidUPC = (barcode) => {
+  if (!barcode || typeof barcode !== 'string') return false;
+
+  const cleaned = barcode.replace(/[\s-]/g, '');
+  if (!/^\d{12}$/.test(cleaned)) return false;
+
+  // Calcul de la clé de contrôle UPC-A
+  let sum = 0;
+  for (let i = 0; i < 11; i++) {
+    const digit = parseInt(cleaned[i]);
+    sum += i % 2 === 0 ? digit * 3 : digit;
+  }
+
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === parseInt(cleaned[11]);
+};
+
+/**
+ * Valide un code-barres EAN-13 (13 chiffres)
+ * @param {string} barcode - Le code-barres à valider
+ * @returns {boolean} - True si le code-barres EAN-13 est valide
+ */
+const isValidEAN13 = (barcode) => {
+  if (!barcode || typeof barcode !== 'string') return false;
+
+  const cleaned = barcode.replace(/[\s-]/g, '');
+  if (!/^\d{13}$/.test(cleaned)) return false;
+
+  // Calcul de la clé de contrôle EAN-13
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const digit = parseInt(cleaned[i]);
+    sum += i % 2 === 0 ? digit : digit * 3;
+  }
+
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === parseInt(cleaned[12]);
+};
+
+/**
+ * Valide un code-barres (UPC-A ou EAN-13)
+ * @param {string} barcode - Le code-barres à valider
+ * @returns {boolean} - True si le code-barres est valide
+ */
+const isValidBarcode = (barcode) => {
+  if (!barcode || typeof barcode !== 'string') return false;
+
+  const cleaned = barcode.replace(/[\s-]/g, '');
+
+  // Vérifier UPC-A (12 chiffres) ou EAN-13 (13 chiffres)
+  if (cleaned.length === 12) {
+    return isValidUPC(cleaned);
+  } else if (cleaned.length === 13) {
+    return isValidEAN13(cleaned);
+  }
+
+  return false;
+};
+
+/**
+ * Extrait le code-barres des meta_data d'un produit
+ * @param {Object} product - L'objet produit
+ * @returns {string} - Le code-barres ou chaîne vide
+ */
+const extractBarcode = (product) => {
+  if (!product?.meta_data || !Array.isArray(product.meta_data)) return '';
+
+  const barcodeItem = product.meta_data.find((item) => item.key === 'barcode');
+  return barcodeItem ? (barcodeItem.value || '').toString().trim() : '';
+};
+
 export const useProductFilters = (products = []) => {
   const { selectedFilters, setSelectedFilters } = useEntityFilter('product');
 
@@ -29,6 +106,13 @@ export const useProductFilters = (products = []) => {
       { label: 'Sans description', value: 'no_description', type: 'description' },
     ];
 
+    // ✅ NOUVEAU - Options de filtre Code barre
+    const barcodeOptions = [
+      { label: 'Avec code barre', value: 'has_barcode', type: 'barcode' },
+      { label: 'Sans code barre', value: 'no_barcode', type: 'barcode' },
+      { label: 'Code barre invalide', value: 'invalid_barcode', type: 'barcode' },
+    ];
+
     // Extraction des options de marque depuis les produits
     const brandOptions = Array.from(
       new Map(
@@ -54,6 +138,7 @@ export const useProductFilters = (products = []) => {
       ...statusOptions,
       ...imageOptions,
       ...descriptionOptions,
+      ...barcodeOptions, // ✅ NOUVEAU - Ajout des options code barre
       ...brandOptions,
       ...supplierOptions,
     ];
@@ -70,6 +155,7 @@ export const useProductFilters = (products = []) => {
     const categoryFilters = selectedFilters.filter((f) => f.type === 'category');
     const descriptionFilter = selectedFilters.find((f) => f.type === 'description')?.value;
     const statusFilter = selectedFilters.find((f) => f.type === 'status')?.value;
+    const barcodeFilter = selectedFilters.find((f) => f.type === 'barcode')?.value; // ✅ NOUVEAU
 
     // Filtre par statut de synchronisation WooCommerce
     if (wooFilter === 'woo_synced') {
@@ -103,6 +189,24 @@ export const useProductFilters = (products = []) => {
           const height = img?.metadata?.dimensions?.height || 0;
           return width < 700 || height < 700;
         });
+      });
+    }
+
+    // ✅ NOUVEAU - Filtre par code barre
+    if (barcodeFilter) {
+      data = data.filter((p) => {
+        const barcode = extractBarcode(p);
+
+        switch (barcodeFilter) {
+          case 'has_barcode':
+            return barcode !== '';
+          case 'no_barcode':
+            return barcode === '';
+          case 'invalid_barcode':
+            return barcode !== '' && !isValidBarcode(barcode);
+          default:
+            return true;
+        }
       });
     }
 
@@ -158,4 +262,5 @@ export const useProductFilters = (products = []) => {
     filterProducts,
   };
 };
+
 export default useProductFilters;
