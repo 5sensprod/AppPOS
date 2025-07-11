@@ -30,6 +30,26 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
     nameSize: 10,
   });
 
+  // ✅ NOUVEAU : États pour la gestion des cases vides
+  const [enableCellSelection, setEnableCellSelection] = useState(false);
+  const [disabledCells, setDisabledCells] = useState(new Set());
+
+  // ✅ CALCUL DU NOMBRE DE CASES PAR PAGE
+  const calculateGridDimensions = () => {
+    const pageWidth = 210; // A4 en mm
+    const pageHeight = 297; // A4 en mm
+
+    const usableWidth = pageWidth - customLayout.offsetLeft * 2;
+    const usableHeight = pageHeight - customLayout.offsetTop * 2;
+
+    const columns = Math.floor(usableWidth / (customLayout.width + customLayout.spacingH));
+    const rows = Math.floor(usableHeight / (customLayout.height + customLayout.spacingV));
+
+    return { columns, rows, total: columns * rows };
+  };
+
+  const gridDimensions = calculateGridDimensions();
+
   const handleCustomLayoutChange = (field, value) => {
     const newLayout = { ...customLayout, [field]: parseFloat(value) || 0 };
     setCustomLayout(newLayout);
@@ -50,11 +70,115 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
         preset: 'custom',
         layout: customLayout,
         style: { ...labelStyle, ...newStyle },
+        disabledCells: Array.from(disabledCells), // ✅ Inclure les cases désactivées
       });
     }
   };
 
-  // ✅ APERÇU TAILLE RÉELLE
+  // ✅ GESTION DES CASES VIDES (avec preventDefault pour éviter le submit)
+  const toggleCellSelection = (cellIndex, event) => {
+    // ✅ FIX : Empêcher la propagation et le submit du formulaire
+    event.preventDefault();
+    event.stopPropagation();
+
+    const newDisabledCells = new Set(disabledCells);
+    if (newDisabledCells.has(cellIndex)) {
+      newDisabledCells.delete(cellIndex);
+    } else {
+      newDisabledCells.add(cellIndex);
+    }
+    setDisabledCells(newDisabledCells);
+
+    // Mettre à jour la configuration
+    if (onLayoutChange) {
+      onLayoutChange({
+        preset: 'custom',
+        layout: customLayout,
+        style: labelStyle,
+        disabledCells: Array.from(newDisabledCells),
+      });
+    }
+  };
+
+  // ✅ GRILLE INTERACTIVE POUR SÉLECTION DES CASES
+  const renderCellSelectionGrid = () => {
+    if (!enableCellSelection) return null;
+
+    const cells = [];
+    for (let i = 0; i < gridDimensions.total; i++) {
+      const row = Math.floor(i / gridDimensions.columns);
+      const col = i % gridDimensions.columns;
+      const isDisabled = disabledCells.has(i);
+
+      cells.push(
+        <button
+          key={i}
+          type="button" // ✅ FIX : Spécifier explicitement le type pour éviter le submit
+          onClick={(e) => toggleCellSelection(i, e)} // ✅ FIX : Passer l'event
+          className={`
+            relative border border-gray-300 text-xs font-mono flex items-center justify-center
+            transition-colors hover:border-gray-400
+            ${
+              isDisabled
+                ? 'bg-red-100 text-red-700 border-red-300'
+                : 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
+            }
+          `}
+          style={{
+            width: '24px',
+            height: '16px',
+          }}
+          title={`Case ${i + 1} (Ligne ${row + 1}, Col ${col + 1}) - ${isDisabled ? 'Ignorée' : 'Active'}`}
+        >
+          {isDisabled ? '✗' : '✓'}
+        </button>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700">
+            Grille d'étiquettes ({gridDimensions.columns}×{gridDimensions.rows})
+          </span>
+          <div className="flex items-center space-x-4 text-xs">
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-green-50 border border-green-300 mr-1"></div>
+              <span className="text-green-700">Active (✓)</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-red-100 border border-red-300 mr-1"></div>
+              <span className="text-red-700">Ignorée (✗)</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="grid gap-1 justify-center bg-gray-50 p-3 rounded border"
+          style={{
+            gridTemplateColumns: `repeat(${gridDimensions.columns}, 24px)`,
+          }}
+        >
+          {cells}
+        </div>
+
+        <div className="text-xs text-gray-600 space-y-1">
+          <p>
+            • <strong>Cliquez</strong> sur une case pour l'activer/désactiver
+          </p>
+          <p>
+            • <strong>{gridDimensions.total - disabledCells.size}</strong> cases actives sur{' '}
+            {gridDimensions.total}
+          </p>
+          <p>
+            • <strong>{disabledCells.size}</strong> cases ignorées
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  // ✅ APERÇU TAILLE RÉELLE (avec bordure code-barres corrigée)
   const renderLabelPreview = () => {
     if (labelData.length === 0) return null;
 
@@ -70,31 +194,43 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
           Aperçu taille réelle ({customLayout.width}×{customLayout.height}mm)
         </h4>
         <div
-          className="relative bg-white border border-gray-400 flex flex-col items-center justify-center text-center p-1"
+          className="relative bg-white flex flex-col items-center justify-start text-center"
           style={{
             width: `${previewWidth}px`,
             height: `${previewHeight}px`,
-            fontSize: `${labelStyle.nameSize}px`,
             border: labelStyle.showBorder
               ? `${labelStyle.borderWidth}px solid ${labelStyle.borderColor}`
-              : 'none',
+              : '1px solid #ccc', // ✅ Bordure légère par défaut pour la délimitation visuelle
+            fontSize: `${labelStyle.nameSize}px`,
+            padding: '2px',
           }}
         >
-          {/* Nom du produit */}
+          {/* ✅ ORDRE IDENTIQUE AU PDF : NOM → PRIX → CODE-BARRES */}
+
+          {/* Nom du produit (en haut) */}
           {labelStyle.showName && (
             <div
-              className="font-bold text-gray-900 leading-tight"
-              style={{ fontSize: `${labelStyle.nameSize}px` }}
+              className="font-bold text-gray-900 leading-tight mt-1"
+              style={{
+                fontSize: `${Math.max(8, labelStyle.nameSize * 0.8)}px`,
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
             >
               {sampleLabel.name}
             </div>
           )}
 
-          {/* Prix */}
+          {/* Prix (au centre/milieu) */}
           {labelStyle.showPrice && (
             <div
-              className="font-bold text-gray-900 mt-1"
-              style={{ fontSize: `${labelStyle.priceSize}px` }}
+              className="font-bold text-gray-900 flex-shrink-0"
+              style={{
+                fontSize: `${Math.max(10, labelStyle.priceSize * 0.8)}px`,
+                marginTop: labelStyle.showName ? '3px' : '8px',
+              }}
             >
               {sampleLabel.price.toFixed(2)} €
             </div>
@@ -105,7 +241,11 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
             <div className="mt-1">
               <div
                 className="bg-gray-900 flex"
-                style={{ height: `${labelStyle.barcodeHeight}px`, width: '80%' }}
+                style={{
+                  height: `${labelStyle.barcodeHeight}px`,
+                  width: '80%',
+                  // paddingTop: '10px',
+                }}
               >
                 {/* Simulation de barres */}
                 {Array.from({ length: 30 }).map((_, i) => (
@@ -340,6 +480,53 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
           </div>
         </div>
       )}
+
+      {/* ✅ GESTION DES CASES VIDES AMÉLIORÉE */}
+      <div className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-600">
+        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center">
+          <Grid className="h-4 w-4 mr-2" />
+          Gestion des cases vides
+        </h4>
+
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            Si votre feuille d'étiquettes n'est pas vierge, vous pouvez désactiver certaines cases
+            pour éviter d'imprimer dessus.
+          </p>
+
+          <div className="flex items-center space-x-4">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={enableCellSelection}
+                onChange={(e) => {
+                  console.log('Mode sélection cases:', e.target.checked);
+                  setEnableCellSelection(e.target.checked);
+
+                  // Réinitialiser les cases désactivées si on désactive le mode
+                  if (!e.target.checked) {
+                    setDisabledCells(new Set());
+                  }
+                }}
+                className="mr-2 text-blue-600"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Activer la sélection de cases
+              </span>
+            </label>
+          </div>
+
+          {/* ✅ GRILLE INTERACTIVE */}
+          {renderCellSelectionGrid()}
+
+          {!enableCellSelection && (
+            <div className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded p-2">
+              💡 <strong>Info :</strong> Cochez la case ci-dessus pour afficher la grille et
+              sélectionner les cases à ignorer
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

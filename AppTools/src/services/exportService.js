@@ -117,6 +117,10 @@ class ExportService {
       const style = exportConfig.labelLayout?.style || this.getDefaultLabelStyle();
       const labelData = exportConfig.labelData;
 
+      // ✅ FIX : Récupérer les cases désactivées
+      const disabledCells = exportConfig.labelLayout?.disabledCells || [];
+      console.log('🚫 Cases désactivées:', disabledCells);
+
       console.log('🎨 Layout:', layout);
       console.log('🎨 Style:', style);
       console.log('📋 Données:', labelData.length, 'étiquettes');
@@ -154,38 +158,65 @@ class ExportService {
         format: 'a4',
       });
 
-      // Générer les étiquettes
-      for (let i = 0; i < labelData.length; i++) {
-        const label = labelData[i];
+      // ✅ FIX : Gérer les cases désactivées lors du placement
+      let labelIndex = 0; // Index dans labelData
+      let currentPage = 0;
+      let totalCellsProcessed = 0;
 
-        // Calculer position sur la page
-        const positionOnPage = i % labelsPerPage;
-        const col = positionOnPage % columns;
-        const row = Math.floor(positionOnPage / columns);
-
+      while (labelIndex < labelData.length) {
         // Nouvelle page si nécessaire
-        if (i > 0 && positionOnPage === 0) {
+        if (currentPage > 0) {
           doc.addPage();
-          console.log(`📄 Nouvelle page ${Math.floor(i / labelsPerPage) + 1}`);
+          console.log(`📄 Nouvelle page ${currentPage + 1}`);
         }
 
-        // ✅ CALCUL POSITION PRÉCIS
-        const x = offsetLeft + col * (layout.width + spacingH);
-        const y = offsetTop + row * (layout.height + spacingV);
+        // Traiter chaque cellule de la page
+        for (
+          let cellInPage = 0;
+          cellInPage < labelsPerPage && labelIndex < labelData.length;
+          cellInPage++
+        ) {
+          const absoluteCellIndex = currentPage * labelsPerPage + cellInPage;
 
-        console.log(
-          `🏷️ Étiquette ${i + 1}: ${label.name} à (${x.toFixed(1)}, ${y.toFixed(1)}) - Col ${col}, Row ${row}`
-        );
+          // ✅ FIX : Vérifier si cette cellule est désactivée
+          if (disabledCells.includes(absoluteCellIndex)) {
+            console.log(`🚫 Case ${absoluteCellIndex} ignorée (désactivée)`);
+            totalCellsProcessed++;
+            continue; // Passer à la cellule suivante sans placer d'étiquette
+          }
 
-        // Dessiner l'étiquette
-        await this.drawLabelOnPDF(
-          doc,
-          label,
-          { x, y, width: layout.width, height: layout.height },
-          style,
-          JsBarcode
-        );
+          // Placer l'étiquette dans cette cellule
+          const label = labelData[labelIndex];
+          const col = cellInPage % columns;
+          const row = Math.floor(cellInPage / columns);
+
+          // ✅ CALCUL POSITION PRÉCIS
+          const x = offsetLeft + col * (layout.width + spacingH);
+          const y = offsetTop + row * (layout.height + spacingV);
+
+          console.log(
+            `🏷️ Étiquette ${labelIndex + 1} ("${label.name}") → Case ${absoluteCellIndex} à (${x.toFixed(1)}, ${y.toFixed(1)}) - Col ${col}, Row ${row}`
+          );
+
+          // Dessiner l'étiquette
+          await this.drawLabelOnPDF(
+            doc,
+            label,
+            { x, y, width: layout.width, height: layout.height },
+            style,
+            JsBarcode
+          );
+
+          labelIndex++; // Passer à l'étiquette suivante
+          totalCellsProcessed++;
+        }
+
+        currentPage++;
       }
+
+      console.log(
+        `✅ Export terminé: ${labelIndex} étiquettes placées, ${totalCellsProcessed} cases traitées`
+      );
 
       // Sauvegarder le PDF
       const filename = `${exportConfig.title || 'Etiquettes'}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -247,12 +278,29 @@ class ExportService {
         doc.setFontSize(fontSize);
         doc.setFont('helvetica', 'bold');
 
-        // Tronquer le nom si trop long
-        let displayName = labelData.name;
+        // ✅ CROPPING INTELLIGENT DU NOM
+        let displayName = labelData.name.trim();
         let textWidth = doc.getTextWidth(displayName);
 
-        while (textWidth > contentWidth && displayName.length > 10) {
-          displayName = displayName.substring(0, displayName.length - 4) + '...';
+        // Première tentative : raccourcir progressivement
+        while (textWidth > contentWidth && displayName.length > 8) {
+          displayName = displayName.substring(0, displayName.length - 1);
+          textWidth = doc.getTextWidth(displayName + '...');
+        }
+
+        // Si encore trop long, ajouter les points de suspension
+        if (textWidth > contentWidth) {
+          displayName = displayName + '...';
+          textWidth = doc.getTextWidth(displayName);
+
+          // Dernier recours : couper encore plus court
+          while (textWidth > contentWidth && displayName.length > 6) {
+            displayName = displayName.substring(0, displayName.length - 4) + '...';
+            textWidth = doc.getTextWidth(displayName);
+          }
+        } else if (displayName !== labelData.name.trim()) {
+          // Ajouter les points seulement si on a coupé
+          displayName = displayName + '...';
           textWidth = doc.getTextWidth(displayName);
         }
 
@@ -261,7 +309,7 @@ class ExportService {
         currentY += nameHeight * scale + elementSpacing;
 
         console.log(
-          `📝 Nom affiché: "${displayName}" à (${textX.toFixed(1)}, ${(currentY - nameHeight * scale - elementSpacing + fontSize * 0.35).toFixed(1)})`
+          `📝 Nom affiché: "${displayName}" (original: "${labelData.name}") à (${textX.toFixed(1)}, ${(currentY - nameHeight * scale - elementSpacing + fontSize * 0.35).toFixed(1)})`
         );
       }
 
@@ -284,44 +332,47 @@ class ExportService {
         );
       }
 
-      // ✅ CODE-BARRES AMÉLIORÉ AVEC CHIFFRES LISIBLES
+      // ✅ CODE-BARRES AMÉLIORÉ AVEC CHIFFRES LISIBLES - FIX POSITION
       if (style.showBarcode && labelData.barcode && labelData.barcode.trim() !== '') {
         try {
           // Créer un canvas temporaire pour le code-barres
           const canvas = document.createElement('canvas');
 
           // ✅ DIMENSIONS ADAPTÉES À LA CELLULE
-          const targetBarcodeWidth = Math.min(contentWidth - 1, 45);
-          const targetBarcodeHeight = Math.min(barcodeHeight * scale, contentHeight * 0.5);
+          const targetBarcodeWidth = Math.min(contentWidth - 1, 35); // ✅ FIX : Plus petit pour mieux rentrer
+          const targetBarcodeHeight = Math.min(barcodeHeight * scale, contentHeight * 0.4); // ✅ FIX : Plus petit
 
           // ✅ RÉSOLUTION ÉLEVÉE POUR QUALITÉ
-          canvas.width = targetBarcodeWidth * 15; // Haute résolution
-          canvas.height = (targetBarcodeHeight + 6) * 8; // Espace pour les chiffres
+          canvas.width = targetBarcodeWidth * 12; // ✅ FIX : Résolution adaptée
+          canvas.height = (targetBarcodeHeight + 4) * 6; // ✅ FIX : Espace pour les chiffres
 
           // ✅ GÉNÉRATION CODE-BARRES AVEC CHIFFRES LISIBLES
           JsBarcode(canvas, labelData.barcode, {
             format: 'EAN13',
-            width: 3, // ✅ Barres plus épaisses
-            height: targetBarcodeHeight * 4, // ✅ Hauteur des barres adaptée
+            width: 2, // ✅ FIX : Barres plus fines
+            height: targetBarcodeHeight * 3, // ✅ FIX : Hauteur des barres adaptée
             displayValue: true, // ✅ AFFICHER les chiffres
-            fontSize: Math.max(14, 16 * scale), // ✅ CHIFFRES PLUS GROS
-            textMargin: 3, // ✅ Marge entre barres et chiffres
+            fontSize: Math.max(10, 12 * scale), // ✅ FIX : Chiffres plus petits mais lisibles
+            textMargin: 2, // ✅ FIX : Marge entre barres et chiffres réduite
             fontOptions: 'bold', // ✅ Chiffres en gras
             background: '#ffffff',
             lineColor: '#000000',
-            margin: 4,
+            margin: 2, // ✅ FIX : Marge réduite
           });
 
           // Convertir en image et ajouter au PDF
           const imgData = canvas.toDataURL('image/png');
           const barcodeX = contentX + (contentWidth - targetBarcodeWidth) / 2;
-          const totalBarcodeHeight = targetBarcodeHeight + 4; // Inclut l'espace pour les chiffres
 
-          doc.addImage(imgData, 'PNG', barcodeX, currentY, targetBarcodeWidth, totalBarcodeHeight);
-          currentY += totalBarcodeHeight + elementSpacing;
+          // ✅ FIX : Ajuster la position Y pour être en bas de l'étiquette
+          const remainingHeight = contentY + contentHeight - currentY;
+          const totalBarcodeHeight = targetBarcodeHeight + 3; // Inclut l'espace pour les chiffres
+          const barcodeY = Math.max(currentY, contentY + contentHeight - totalBarcodeHeight);
+
+          doc.addImage(imgData, 'PNG', barcodeX, barcodeY, targetBarcodeWidth, totalBarcodeHeight);
 
           console.log(
-            `🏷️ Code-barres affiché: "${labelData.barcode}" à (${barcodeX.toFixed(1)}, ${(currentY - totalBarcodeHeight - elementSpacing).toFixed(1)})`
+            `🏷️ Code-barres affiché: "${labelData.barcode}" à (${barcodeX.toFixed(1)}, ${barcodeY.toFixed(1)}) taille: ${targetBarcodeWidth}×${totalBarcodeHeight}mm`
           );
         } catch (barcodeError) {
           console.warn('Erreur génération code-barres pour', labelData.barcode, barcodeError);
