@@ -121,24 +121,31 @@ class ExportService {
       console.log('🎨 Style:', style);
       console.log('📋 Données:', labelData.length, 'étiquettes');
 
-      // ✅ CALCUL DES DIMENSIONS ET POSITIONS
-      // Calculer combien d'étiquettes par page en fonction de la taille A4
+      // ✅ CALCUL FIXE DES DIMENSIONS ET POSITIONS
       const pageWidth = 210; // A4 en mm
       const pageHeight = 297; // A4 en mm
 
-      // Calculer combien d'étiquettes peuvent tenir
-      const maxColumns = Math.floor(
-        (pageWidth - (layout.offsetLeft || 0) * 2) / (layout.width + (layout.spacingH || 0))
-      );
-      const maxRows = Math.floor(
-        (pageHeight - (layout.offsetTop || 0) * 2) / (layout.height + (layout.spacingV || 0))
-      );
+      // ✅ CALCUL SIMPLE DU NOMBRE D'ÉTIQUETTES QUI TIENNENT
+      const offsetLeft = layout.offsetLeft || 8;
+      const offsetTop = layout.offsetTop || 22;
+      const spacingH = layout.spacingH || 0;
+      const spacingV = layout.spacingV || 0;
 
-      const columns = Math.max(1, maxColumns);
-      const rows = Math.max(1, maxRows);
+      // Largeur et hauteur utilisables
+      const usableWidth = pageWidth - offsetLeft * 2;
+      const usableHeight = pageHeight - offsetTop * 2;
+
+      // Nombre de colonnes/lignes possibles
+      const columns = Math.floor(usableWidth / (layout.width + spacingH));
+      const rows = Math.floor(usableHeight / (layout.height + spacingV));
       const labelsPerPage = columns * rows;
 
-      console.log(`📐 Calculé: ${columns}×${rows} = ${labelsPerPage} étiquettes par page`);
+      console.log(
+        `📐 Calculé: ${columns} colonnes × ${rows} lignes = ${labelsPerPage} étiquettes par page`
+      );
+      console.log(
+        `📐 Dimensions: ${layout.width}×${layout.height}mm, Espacement: ${spacingH}×${spacingV}mm`
+      );
 
       // Créer le PDF
       const doc = new jsPDF({
@@ -146,8 +153,6 @@ class ExportService {
         unit: 'mm',
         format: 'a4',
       });
-
-      let currentPage = 0;
 
       // Générer les étiquettes
       for (let i = 0; i < labelData.length; i++) {
@@ -161,18 +166,16 @@ class ExportService {
         // Nouvelle page si nécessaire
         if (i > 0 && positionOnPage === 0) {
           doc.addPage();
-          currentPage++;
+          console.log(`📄 Nouvelle page ${Math.floor(i / labelsPerPage) + 1}`);
         }
 
-        // ✅ CALCUL POSITION AVEC OFFSETS (nouveau format)
-        const x =
-          (layout.offsetLeft || layout.marginLeft || 0) +
-          col * (layout.width + (layout.spacingH || 0));
-        const y =
-          (layout.offsetTop || layout.marginTop || 0) +
-          row * (layout.height + (layout.spacingV || 0));
+        // ✅ CALCUL POSITION PRÉCIS
+        const x = offsetLeft + col * (layout.width + spacingH);
+        const y = offsetTop + row * (layout.height + spacingV);
 
-        console.log(`🏷️ Étiquette ${i + 1}: ${label.name} à (${x}, ${y})`);
+        console.log(
+          `🏷️ Étiquette ${i + 1}: ${label.name} à (${x.toFixed(1)}, ${y.toFixed(1)}) - Col ${col}, Row ${row}`
+        );
 
         // Dessiner l'étiquette
         await this.drawLabelOnPDF(
@@ -203,98 +206,147 @@ class ExportService {
     const { x, y, width, height } = position;
 
     try {
-      // ✅ BORDURE
+      // ✅ BORDURE (si activée)
       if (style.showBorder) {
         doc.setDrawColor('#000000');
         doc.setLineWidth(0.1);
         doc.rect(x, y, width, height);
       }
 
-      // ✅ ZONES DE CONTENU
-      const padding = style.padding || 2;
+      // ✅ ZONES DE CONTENU AVEC PADDING
+      const padding = style.padding || 1;
       const contentX = x + padding;
       const contentY = y + padding;
       const contentWidth = width - padding * 2;
       const contentHeight = height - padding * 2;
 
+      // ✅ CALCUL INTELLIGENT DE L'ESPACE DISPONIBLE
       let currentY = contentY;
+      const elementSpacing = 1; // Espacement entre éléments
 
-      // ✅ NOM DU PRODUIT (en haut)
+      // Calculer l'espace nécessaire pour chaque élément (en mm)
+      const priceHeight = style.showPrice ? Math.max(3, (style.priceSize || 14) * 0.35) : 0;
+      const nameHeight = style.showName ? Math.max(2.5, (style.nameSize || 10) * 0.35) : 0;
+      const barcodeHeight = style.showBarcode ? Math.max(8, style.barcodeHeight || 15) : 0;
+      const barcodeTextHeight = style.showBarcode ? 4 : 0; // Hauteur pour les chiffres sous code-barres
+
+      // Espace total nécessaire
+      const totalNeededHeight =
+        priceHeight + nameHeight + barcodeHeight + barcodeTextHeight + elementSpacing * 4;
+
+      // ✅ AJUSTEMENT AUTOMATIQUE SI ÇA NE RENTRE PAS
+      let scale = 1;
+      if (totalNeededHeight > contentHeight) {
+        scale = Math.max(0.6, contentHeight / totalNeededHeight);
+        console.log(`⚠️ Ajustement échelle: ${scale.toFixed(2)} pour étiquette ${labelData.name}`);
+      }
+
+      // ✅ NOM DU PRODUIT (en haut si activé)
       if (style.showName && labelData.name) {
-        doc.setFontSize(style.nameSize || 10);
+        const fontSize = Math.max(6, (style.nameSize || 10) * scale);
+        doc.setFontSize(fontSize);
         doc.setFont('helvetica', 'bold');
 
-        // Centrer le texte
-        const textWidth = doc.getTextWidth(labelData.name);
-        const textX = contentX + (contentWidth - textWidth) / 2;
+        // Tronquer le nom si trop long
+        let displayName = labelData.name;
+        let textWidth = doc.getTextWidth(displayName);
 
-        doc.text(labelData.name, textX, currentY + 4);
-        currentY += 8;
+        while (textWidth > contentWidth && displayName.length > 10) {
+          displayName = displayName.substring(0, displayName.length - 4) + '...';
+          textWidth = doc.getTextWidth(displayName);
+        }
+
+        const textX = contentX + (contentWidth - textWidth) / 2;
+        doc.text(displayName, textX, currentY + fontSize * 0.35);
+        currentY += nameHeight * scale + elementSpacing;
+
+        console.log(
+          `📝 Nom affiché: "${displayName}" à (${textX.toFixed(1)}, ${(currentY - nameHeight * scale - elementSpacing + fontSize * 0.35).toFixed(1)})`
+        );
       }
 
       // ✅ PRIX (style proéminent)
       if (style.showPrice && labelData.price) {
         const priceText = `${labelData.price.toFixed(2)} €`;
-        doc.setFontSize(style.priceSize || 14);
+        const fontSize = Math.max(8, (style.priceSize || 14) * scale);
+
+        doc.setFontSize(fontSize);
         doc.setFont('helvetica', 'bold');
 
-        const priceWidth = doc.getTextWidth(priceText);
-        const priceX = contentX + (contentWidth - priceWidth) / 2;
+        const textWidth = doc.getTextWidth(priceText);
+        const textX = contentX + (contentWidth - textWidth) / 2;
 
-        doc.text(priceText, priceX, currentY + 5);
-        currentY += 10;
+        doc.text(priceText, textX, currentY + fontSize * 0.35);
+        currentY += priceHeight * scale + elementSpacing;
+
+        console.log(
+          `💰 Prix affiché: "${priceText}" à (${textX.toFixed(1)}, ${(currentY - priceHeight * scale - elementSpacing + fontSize * 0.35).toFixed(1)})`
+        );
       }
 
-      // ✅ CODE-BARRES AMÉLIORÉ (si disponible)
+      // ✅ CODE-BARRES AMÉLIORÉ AVEC CHIFFRES LISIBLES
       if (style.showBarcode && labelData.barcode && labelData.barcode.trim() !== '') {
         try {
           // Créer un canvas temporaire pour le code-barres
           const canvas = document.createElement('canvas');
-          canvas.width = 300; // ✅ Plus large pour meilleure qualité
-          canvas.height = 80; // ✅ Plus haut pour les chiffres
 
-          // ✅ GÉNÉRATION CODE-BARRES AMÉLIORÉE
+          // ✅ DIMENSIONS ADAPTÉES À LA CELLULE
+          const targetBarcodeWidth = Math.min(contentWidth - 1, 45);
+          const targetBarcodeHeight = Math.min(barcodeHeight * scale, contentHeight * 0.5);
+
+          // ✅ RÉSOLUTION ÉLEVÉE POUR QUALITÉ
+          canvas.width = targetBarcodeWidth * 15; // Haute résolution
+          canvas.height = (targetBarcodeHeight + 6) * 8; // Espace pour les chiffres
+
+          // ✅ GÉNÉRATION CODE-BARRES AVEC CHIFFRES LISIBLES
           JsBarcode(canvas, labelData.barcode, {
             format: 'EAN13',
-            width: 2, // ✅ Largeur des barres
-            height: 40, // ✅ Hauteur des barres
+            width: 3, // ✅ Barres plus épaisses
+            height: targetBarcodeHeight * 4, // ✅ Hauteur des barres adaptée
             displayValue: true, // ✅ AFFICHER les chiffres
-            fontSize: 12, // ✅ Taille des chiffres PLUS GRANDE
-            textMargin: 4, // ✅ Marge entre barres et texte
+            fontSize: Math.max(14, 16 * scale), // ✅ CHIFFRES PLUS GROS
+            textMargin: 3, // ✅ Marge entre barres et chiffres
             fontOptions: 'bold', // ✅ Chiffres en gras
             background: '#ffffff',
             lineColor: '#000000',
-            margin: 5,
+            margin: 4,
           });
 
           // Convertir en image et ajouter au PDF
           const imgData = canvas.toDataURL('image/png');
-          const barcodeWidth = Math.min(contentWidth - 2, 40);
-          const barcodeHeight = 18; // ✅ Plus haut pour inclure les chiffres
-          const barcodeX = contentX + (contentWidth - barcodeWidth) / 2;
+          const barcodeX = contentX + (contentWidth - targetBarcodeWidth) / 2;
+          const totalBarcodeHeight = targetBarcodeHeight + 4; // Inclut l'espace pour les chiffres
 
-          doc.addImage(imgData, 'PNG', barcodeX, currentY, barcodeWidth, barcodeHeight);
-          currentY += barcodeHeight + 2;
+          doc.addImage(imgData, 'PNG', barcodeX, currentY, targetBarcodeWidth, totalBarcodeHeight);
+          currentY += totalBarcodeHeight + elementSpacing;
+
+          console.log(
+            `🏷️ Code-barres affiché: "${labelData.barcode}" à (${barcodeX.toFixed(1)}, ${(currentY - totalBarcodeHeight - elementSpacing).toFixed(1)})`
+          );
         } catch (barcodeError) {
           console.warn('Erreur génération code-barres pour', labelData.barcode, barcodeError);
 
           // Fallback : afficher le code en texte
-          doc.setFontSize(8);
+          const fontSize = Math.max(6, 8 * scale);
+          doc.setFontSize(fontSize);
           doc.setFont('helvetica', 'normal');
           const codeWidth = doc.getTextWidth(labelData.barcode);
           const codeX = contentX + (contentWidth - codeWidth) / 2;
-          doc.text(labelData.barcode, codeX, currentY + 3);
+          doc.text(labelData.barcode, codeX, currentY + fontSize * 0.35);
+          currentY += fontSize + elementSpacing;
         }
       }
     } catch (error) {
       console.error('Erreur dessin étiquette:', error);
 
-      // Fallback : étiquette simple avec texte uniquement
+      // Fallback : étiquette simple avec prix uniquement
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(labelData.name || 'Produit', x + 2, y + 8);
+      doc.setFont('helvetica', 'bold');
       if (labelData.price) {
-        doc.text(`${labelData.price.toFixed(2)} €`, x + 2, y + 16);
+        const priceText = `${labelData.price.toFixed(2)} €`;
+        const textWidth = doc.getTextWidth(priceText);
+        const textX = x + (width - textWidth) / 2;
+        doc.text(priceText, textX, y + height / 2);
       }
     }
   }
@@ -317,16 +369,16 @@ class ExportService {
     return {
       fontSize: 12,
       fontFamily: 'Arial',
-      showBorder: true,
+      showBorder: false, // ✅ Désactivé par défaut
       borderWidth: 0.5,
       borderColor: '#000000',
       padding: 2,
       alignment: 'center',
-      showBarcode: true,
+      showBarcode: true, // ✅ Activé par défaut
       barcodeHeight: 15,
-      showPrice: true,
+      showPrice: true, // ✅ Activé par défaut
       priceSize: 14,
-      showName: true,
+      showName: false, // ✅ Désactivé par défaut
       nameSize: 10,
     };
   }

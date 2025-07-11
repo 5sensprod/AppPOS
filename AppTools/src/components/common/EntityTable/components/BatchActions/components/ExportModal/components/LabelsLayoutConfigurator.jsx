@@ -13,20 +13,20 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
     spacingH: 0,
   });
 
-  // ✅ STYLES D'ÉTIQUETTES
+  // ✅ STYLES D'ÉTIQUETTES (par défaut : seulement prix et code-barres)
   const [labelStyle, setLabelStyle] = useState({
     fontSize: 12,
     fontFamily: 'Arial',
-    showBorder: true,
+    showBorder: false, // ✅ Désactivé par défaut
     borderWidth: 1,
     borderColor: '#000000',
     padding: 2,
     alignment: 'center',
-    showBarcode: true,
+    showBarcode: true, // ✅ Activé par défaut
     barcodeHeight: 15,
-    showPrice: true,
+    showPrice: true, // ✅ Activé par défaut
     priceSize: 14,
-    showName: true,
+    showName: false, // ✅ Désactivé par défaut
     nameSize: 10,
   });
 

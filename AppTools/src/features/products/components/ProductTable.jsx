@@ -156,16 +156,48 @@ function ProductTable(props) {
         // ✅ GESTION DIFFÉRENCIÉE SELON LE TYPE D'EXPORT
         if (exportConfig.exportType === 'labels') {
           console.log("🏷️ Export d'étiquettes demandé");
-          console.log('📋 Données étiquettes:', exportConfig.labelData);
-          console.log('🎨 Configuration layout:', exportConfig.labelLayout);
+          console.log('📋 Données étiquettes avant filtrage:', exportConfig.labelData);
 
-          // ✅ VALIDATION DES DONNÉES D'ÉTIQUETTES
-          if (!exportConfig.labelData || exportConfig.labelData.length === 0) {
-            throw new Error("Aucune donnée d'étiquette à exporter");
+          // ✅ FILTRAGE PRÉALABLE DES PRODUITS VALIDES
+          const validLabels = exportConfig.labelData.filter((label) => {
+            const hasPrice = label.price && label.price > 0;
+            const hasBarcode = label.barcode && label.barcode.trim() !== '';
+
+            if (!hasPrice) {
+              console.warn(
+                `⚠️ Produit rejeté (pas de prix valide): ${label.name} - Prix: ${label.price}`
+              );
+            }
+            if (!hasBarcode) {
+              console.warn(
+                `⚠️ Produit rejeté (pas de code-barres): ${label.name} - Code: "${label.barcode}"`
+              );
+            }
+
+            return hasPrice && hasBarcode;
+          });
+
+          console.log(
+            `✅ Produits valides: ${validLabels.length}/${exportConfig.labelData.length}`
+          );
+
+          // ✅ VÉRIFICATION QU'IL RESTE DES PRODUITS VALIDES
+          if (validLabels.length === 0) {
+            throw new Error(
+              'Aucun produit valide à exporter.\n\nLes produits doivent avoir :\n• Un prix supérieur à 0\n• Un code-barres non vide'
+            );
           }
 
+          // ✅ MISE À JOUR DE LA CONFIGURATION AVEC PRODUITS VALIDES
+          const filteredConfig = {
+            ...exportConfig,
+            labelData: validLabels,
+          };
+
+          console.log('🎨 Configuration layout:', filteredConfig.labelLayout);
+
           // ✅ APPEL DU SERVICE D'EXPORT D'ÉTIQUETTES
-          result = await exportService.exportProducts(exportConfig);
+          result = await exportService.exportProducts(filteredConfig);
 
           console.log('✅ Export étiquettes terminé:', result);
         } else {
