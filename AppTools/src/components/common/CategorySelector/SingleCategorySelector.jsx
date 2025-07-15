@@ -40,6 +40,8 @@ const SingleCategorySelector = ({
   // Label sélectionné
   const selectedLabel = useMemo(() => {
     if (!value) return '';
+    // ✅ NOUVEAU - Gestion spéciale pour "Sans catégorie"
+    if (value === 'no_category') return 'Sans catégorie';
     return getCategoryPath(value) || 'Catégorie inconnue';
   }, [value, getCategoryPath]);
 
@@ -57,7 +59,7 @@ const SingleCategorySelector = ({
 
   // Expansion automatique vers la valeur sélectionnée
   React.useEffect(() => {
-    if (!value) return;
+    if (!value || value === 'no_category') return;
 
     const expandPathToValue = (items) => {
       for (const item of items) {
@@ -93,6 +95,62 @@ const SingleCategorySelector = ({
   const isPortalVariant = variant === 'portal';
   const containerClassName = isPortalVariant ? 'category-selector' : 'category-selector relative';
 
+  // ✅ NOUVEAU - Fonction pour rendre les options spéciales
+  const renderSpecialOptions = () => {
+    const options = [];
+
+    // Option "Aucune" (catégorie racine)
+    if (allowRootSelection && !searchTerm) {
+      options.push(
+        <div
+          key="none"
+          className={`flex items-center px-3 py-2 cursor-pointer ${
+            theme === 'elegant'
+              ? 'hover:bg-slate-100 dark:hover:bg-slate-800'
+              : theme === 'colorful'
+                ? 'hover:bg-gradient-to-r hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/30 dark:hover:to-pink-800/30'
+                : theme === 'minimal'
+                  ? 'hover:bg-gray-25 dark:hover:bg-gray-850 border-b border-gray-100 dark:border-gray-800'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+          onClick={() => handleSelect('')}
+        >
+          <span className="text-gray-500 dark:text-gray-400">Aucune (catégorie racine)</span>
+          {value === '' && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 ml-2" />}
+        </div>
+      );
+    }
+
+    // ✅ NOUVEAU - Option "Sans catégorie"
+    if (!searchTerm) {
+      options.push(
+        <div
+          key="no_category"
+          className={`flex items-center px-3 py-2 cursor-pointer ${
+            theme === 'elegant'
+              ? 'hover:bg-slate-100 dark:hover:bg-slate-800'
+              : theme === 'colorful'
+                ? 'hover:bg-gradient-to-r hover:from-red-100 hover:to-orange-100 dark:hover:from-red-800/30 dark:hover:to-orange-800/30'
+                : theme === 'minimal'
+                  ? 'hover:bg-gray-25 dark:hover:bg-gray-850 border-b border-gray-100 dark:border-gray-800'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+          onClick={() => handleSelect('no_category')}
+        >
+          <span className="flex items-center">
+            <span className="mr-2">🚫</span>
+            <span className="text-red-600 dark:text-red-400">Sans catégorie</span>
+          </span>
+          {value === 'no_category' && (
+            <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 ml-2" />
+          )}
+        </div>
+      );
+    }
+
+    return options;
+  };
+
   // ⚡ PORTAL: Rendu spécial avec thème APPLIQUÉ
   if (isPortalVariant) {
     return (
@@ -106,24 +164,8 @@ const SingleCategorySelector = ({
           theme={theme} // ⚡ Passe le thème
           className={portalDropdownClassName} // ⚡ Utilise la classe thématisée
         >
-          {/* Option "Aucune" - ⚡ AUSSI thématisée */}
-          {allowRootSelection && !searchTerm && (
-            <div
-              className={`flex items-center px-3 py-2 cursor-pointer ${
-                theme === 'elegant'
-                  ? 'hover:bg-slate-100 dark:hover:bg-slate-800'
-                  : theme === 'colorful'
-                    ? 'hover:bg-gradient-to-r hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/30 dark:hover:to-pink-800/30'
-                    : theme === 'minimal'
-                      ? 'hover:bg-gray-25 dark:hover:bg-gray-850 border-b border-gray-100 dark:border-gray-800'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-              onClick={() => handleSelect('')}
-            >
-              <span className="text-gray-500 dark:text-gray-400">Aucune (catégorie racine)</span>
-              {value === '' && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 ml-2" />}
-            </div>
-          )}
+          {/* ✅ Options spéciales (Aucune + Sans catégorie) */}
+          {renderSpecialOptions()}
 
           {/* Liste des catégories */}
           <CategoryList
@@ -162,16 +204,8 @@ const SingleCategorySelector = ({
         containerRef={containerRef}
         theme={theme}
       >
-        {/* Option "Aucune" */}
-        {allowRootSelection && !searchTerm && (
-          <div
-            className="flex items-center px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-            onClick={() => handleSelect('')}
-          >
-            <span className="text-gray-500 dark:text-gray-400">Aucune (catégorie racine)</span>
-            {value === '' && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 ml-2" />}
-          </div>
-        )}
+        {/* ✅ Options spéciales (Aucune + Sans catégorie) */}
+        {renderSpecialOptions()}
 
         <CategoryList
           items={displayData}

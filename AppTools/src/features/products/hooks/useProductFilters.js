@@ -224,19 +224,31 @@ export const useProductFilters = (products = []) => {
 
     // Filtrage amélioré pour les catégories hiérarchiques
     if (categoryFilters.length > 0) {
-      const categoryIds = categoryFilters.map((f) => f.value.replace('category_', ''));
+      const categoryIds = categoryFilters.map((f) => f.value);
 
-      // Méthode simplifiée et optimisée pour vérifier l'appartenance à une catégorie
-      const productBelongsToCategory = (product, categoryId) => {
-        // Vérifier si le produit a un chemin enregistré pour cette catégorie
-        // Ce qui signifie qu'il appartient à cette catégorie ou à l'une de ses sous-catégories
-        return !!product.category_info?.path_info?.[categoryId];
-      };
+      data = data.filter((product) => {
+        // Vérifier chaque filtre de catégorie
+        return categoryIds.some((categoryId) => {
+          // ✅ NOUVEAU - Cas spécial "Sans catégorie"
+          if (categoryId === 'no_category') {
+            const hasNoMainCategory = !product.category_id || product.category_id === '';
+            const hasNoCategories =
+              !product.categories ||
+              !Array.isArray(product.categories) ||
+              product.categories.length === 0 ||
+              product.categories.every((cat) => !cat || cat === '');
+            const hasNoCategoryInfo =
+              !product.category_info ||
+              !product.category_info.refs ||
+              product.category_info.refs.length === 0;
 
-      // Filtrer les produits appartenant à l'une des catégories sélectionnées ou à leurs sous-catégories
-      data = data.filter((product) =>
-        categoryIds.some((categoryId) => productBelongsToCategory(product, categoryId))
-      );
+            return hasNoMainCategory && hasNoCategories && hasNoCategoryInfo;
+          }
+
+          // Cas normal - catégorie existante
+          return !!product.category_info?.path_info?.[categoryId];
+        });
+      });
     }
 
     // Filtre par présence de description

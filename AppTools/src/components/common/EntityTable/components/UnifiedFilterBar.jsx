@@ -191,18 +191,25 @@ const UnifiedFilterBar = ({
               theme="elegant"
               onChange={(selectedCategoryId) => {
                 if (selectedCategoryId) {
-                  let categoryName = getCategoryName(selectedCategoryId);
+                  let categoryName;
 
-                  if (!categoryName) {
-                    const existingFilter = selectedFilters.find(
-                      (f) => f.type === 'category' && f.value === selectedCategoryId
-                    );
-                    categoryName = existingFilter?.label;
-                  }
+                  // ✅ NOUVEAU - Gestion spéciale pour "Sans catégorie"
+                  if (selectedCategoryId === 'no_category') {
+                    categoryName = 'Sans catégorie';
+                  } else {
+                    categoryName = getCategoryName(selectedCategoryId);
 
-                  if (!categoryName) {
-                    console.warn('Catégorie non trouvée:', selectedCategoryId);
-                    categoryName = `Catégorie ${selectedCategoryId.slice(-6)}`;
+                    if (!categoryName) {
+                      const existingFilter = selectedFilters.find(
+                        (f) => f.type === 'category' && f.value === selectedCategoryId
+                      );
+                      categoryName = existingFilter?.label;
+                    }
+
+                    if (!categoryName) {
+                      console.warn('Catégorie non trouvée:', selectedCategoryId);
+                      categoryName = `Catégorie ${selectedCategoryId.slice(-6)}`;
+                    }
                   }
 
                   const newFilter = {
