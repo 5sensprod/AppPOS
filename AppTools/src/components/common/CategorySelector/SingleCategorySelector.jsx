@@ -18,6 +18,8 @@ const SingleCategorySelector = ({
   autoFocusOpen = false,
   variant = 'default',
   theme = 'default',
+  // ✅ NOUVEAU - Props pour le comptage des produits
+  productsData = [], // Array des produits pour compter ceux sans catégorie
 }) => {
   const {
     isOpen,
@@ -37,7 +39,25 @@ const SingleCategorySelector = ({
     disabled,
   });
 
-  // Label sélectionné
+  // ✅ NOUVEAU - Calculer le nombre de produits sans catégorie
+  const noCategoryCount = useMemo(() => {
+    if (!Array.isArray(productsData) || productsData.length === 0) return 0;
+
+    return productsData.filter((product) => {
+      const hasNoMainCategory = !product.category_id || product.category_id === '';
+      const hasNoCategories =
+        !product.categories ||
+        !Array.isArray(product.categories) ||
+        product.categories.length === 0 ||
+        product.categories.every((cat) => !cat || cat === '');
+      const hasNoCategoryInfo =
+        !product.category_info ||
+        !product.category_info.refs ||
+        product.category_info.refs.length === 0;
+
+      return hasNoMainCategory && hasNoCategories && hasNoCategoryInfo;
+    }).length;
+  }, [productsData]);
   const selectedLabel = useMemo(() => {
     if (!value) return '';
     // ✅ NOUVEAU - Gestion spéciale pour "Sans catégorie"
@@ -126,7 +146,7 @@ const SingleCategorySelector = ({
       options.push(
         <div
           key="no_category"
-          className={`flex items-center px-3 py-2 cursor-pointer ${
+          className={`flex items-center justify-between px-3 py-2 cursor-pointer ${
             theme === 'elegant'
               ? 'hover:bg-slate-100 dark:hover:bg-slate-800'
               : theme === 'colorful'
@@ -137,12 +157,19 @@ const SingleCategorySelector = ({
           }`}
           onClick={() => handleSelect('no_category')}
         >
-          <span className="flex items-center">
-            <span className="mr-2">🚫</span>
-            <span className="text-red-600 dark:text-red-400">Sans catégorie</span>
-          </span>
+          <div className="flex items-center">
+            {/* ✅ Icône plus subtile */}
+            <span className="mr-2 text-gray-400">○</span>
+            <span className="text-gray-600 dark:text-gray-300">Sans catégorie</span>
+            {/* ✅ Comptage des produits */}
+            {showCounts && noCategoryCount > 0 && (
+              <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-full">
+                {noCategoryCount}
+              </span>
+            )}
+          </div>
           {value === 'no_category' && (
-            <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 ml-2" />
+            <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           )}
         </div>
       );
