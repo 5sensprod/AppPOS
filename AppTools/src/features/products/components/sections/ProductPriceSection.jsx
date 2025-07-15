@@ -1,5 +1,7 @@
+// src/features/products/components/sections/ProductPriceSection.jsx
 import React from 'react';
-import { Calculator, ArrowRight } from 'lucide-react';
+import { Calculator, ArrowRight, TrendingUp, Tag } from 'lucide-react';
+import { NumberInput, SelectField } from '../../../../components/atoms/Input';
 import { usePriceCalculations } from '../../hooks/usePriceCalculations';
 
 const ProductPriceSection = ({ product, editable = false, register, errors, watch, setValue }) => {
@@ -13,6 +15,7 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
     handleFieldChange,
     getCalculatedValues,
   } = usePriceCalculations({ watch, setValue, product });
+
   // Options pour le taux de TVA
   const taxRateOptions = [
     { value: '', label: 'Sélectionner un taux' },
@@ -21,13 +24,34 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
     { value: 0, label: '0%' },
   ];
 
+  // Options pour le mode de calcul
+  const calculationModeOptions = [
+    { value: 'from_cost', label: 'Calcul depuis le coût' },
+    { value: 'from_price', label: 'Calcul depuis le prix de vente' },
+  ];
+
+  // Options pour le type de marge
+  const marginTypeOptions = [
+    { value: 'percentage', label: '%' },
+    { value: 'amount', label: '€' },
+  ];
+
+  // Options pour le type de promotion
+  const promoTypeOptions = [
+    { value: 'percentage', label: 'Réduction en %' },
+    { value: 'amount', label: 'Réduction en €' },
+  ];
+
   const calculated = getCalculatedValues();
 
   if (!editable) {
     return (
       <div>
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-          Prix et marges
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+          <div className="flex items-center">
+            <Calculator className="h-5 w-5 mr-2" />
+            <span>Prix et marges</span>
+          </div>
         </h2>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -106,98 +130,93 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Prix et marges</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+          <div className="flex items-center">
+            <Calculator className="h-5 w-5 mr-2" />
+            <span>Prix et marges</span>
+          </div>
+        </h2>
 
         <div className="flex items-center space-x-2">
-          <Calculator className="h-4 w-4 text-gray-500" />
-          <select
+          <SelectField
+            name="calculation_mode_select"
             value={calculationMode}
             onChange={(e) => setCalculationMode(e.target.value)}
-            className="text-sm border border-gray-300 rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"
-          >
-            <option value="from_cost">Calcul depuis le coût</option>
-            <option value="from_price">Calcul depuis le prix de vente</option>
-          </select>
+            options={calculationModeOptions}
+            placeholder="Mode de calcul"
+            editable={true}
+            className="min-w-[200px]"
+            icon={Calculator}
+          />
         </div>
       </div>
 
       {/* Mode de calcul depuis le coût */}
       {calculationMode === 'from_cost' && (
-        <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg mb-4">
-          <div className="flex items-center mb-3">
+        <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg mb-6">
+          <div className="flex items-center mb-4">
+            <TrendingUp className="h-4 w-4 mr-2 text-blue-600" />
             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-              📊 Calcul automatique depuis le prix d'achat
+              Calcul automatique depuis le prix d'achat
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Prix d'achat HT (€) *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                {...register('purchase_price')}
-                onChange={(e) => handleFieldChange('purchase_price', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="0.00"
-              />
-            </div>
+            <NumberInput
+              name="purchase_price"
+              label="Prix d'achat HT (€)"
+              placeholder="0.00"
+              editable={true}
+              required={true}
+              allowDecimals={true}
+              onChange={(e) => handleFieldChange('purchase_price', e.target.value)}
+              helpText="Coût d'achat du produit"
+            />
+
+            <SelectField
+              name="tax_rate"
+              label="TVA"
+              options={taxRateOptions}
+              placeholder="Sélectionner un taux"
+              editable={true}
+              onChange={(e) => handleFieldChange('tax_rate', e.target.value)}
+            />
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                TVA
-              </label>
-              <select
-                {...register('tax_rate')}
-                onChange={(e) => handleFieldChange('tax_rate', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                {taxRateOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className="flex items-center mb-1">
+              <div className="flex items-center mb-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Marge
                 </label>
-                <select
+                <SelectField
+                  name="margin_type_select"
                   value={marginType}
                   onChange={(e) => setMarginType(e.target.value)}
-                  className="ml-2 text-xs border border-gray-300 rounded px-1 dark:bg-gray-700 dark:border-gray-600"
-                >
-                  <option value="percentage">%</option>
-                  <option value="amount">€</option>
-                </select>
+                  options={marginTypeOptions}
+                  placeholder=""
+                  editable={true}
+                  className="ml-2 w-16"
+                />
               </div>
 
               {marginType === 'percentage' ? (
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  {...register('margin_rate')}
-                  onChange={(e) => handleFieldChange('margin_rate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                <NumberInput
+                  name="margin_rate"
                   placeholder="0.0"
+                  editable={true}
+                  allowDecimals={true}
+                  min={0}
+                  onChange={(e) => handleFieldChange('margin_rate', e.target.value)}
                 />
               ) : (
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  {...register('margin_amount')}
-                  onChange={(e) => handleFieldChange('margin_amount', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                <NumberInput
+                  name="margin_amount"
                   placeholder="0.00"
+                  editable={true}
+                  allowDecimals={true}
+                  currency={true}
+                  min={0}
+                  onChange={(e) => handleFieldChange('margin_amount', e.target.value)}
                 />
               )}
             </div>
@@ -217,59 +236,43 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
 
       {/* Mode de calcul depuis le prix de vente */}
       {calculationMode === 'from_price' && (
-        <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-lg mb-4">
-          <div className="flex items-center mb-3">
+        <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-lg mb-6">
+          <div className="flex items-center mb-4">
+            <TrendingUp className="h-4 w-4 mr-2 text-green-600" />
             <span className="text-sm font-medium text-green-700 dark:text-green-300">
-              💰 Calcul de marge depuis le prix de vente
+              Calcul de marge depuis le prix de vente
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Prix d'achat HT (€)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                {...register('purchase_price')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="0.00"
-              />
-            </div>
+            <NumberInput
+              name="purchase_price"
+              label="Prix d'achat HT (€)"
+              placeholder="0.00"
+              editable={true}
+              allowDecimals={true}
+              currency={true}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Prix vente TTC (€) *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                {...register('price')}
-                onChange={(e) => handleFieldChange('price', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="0.00"
-              />
-            </div>
+            <NumberInput
+              name="price"
+              label="Prix vente TTC (€)"
+              placeholder="0.00"
+              editable={true}
+              required={true}
+              allowDecimals={true}
+              currency={true}
+              onChange={(e) => handleFieldChange('price', e.target.value)}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                TVA
-              </label>
-              <select
-                {...register('tax_rate')}
-                onChange={(e) => handleFieldChange('tax_rate', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                {taxRateOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SelectField
+              name="tax_rate"
+              label="TVA"
+              options={taxRateOptions}
+              placeholder="Sélectionner un taux"
+              editable={true}
+              onChange={(e) => handleFieldChange('tax_rate', e.target.value)}
+            />
 
             <div className="flex items-center">
               <ArrowRight className="h-4 w-4 text-gray-400 mr-2" />
@@ -286,85 +289,71 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
       )}
 
       {/* Champs optionnels et promotions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Prix régulier TTC (€)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            {...register('regular_price')}
-            onChange={(e) => handleFieldChange('regular_price', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            placeholder="0.00"
-          />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Prix avant promotion (par défaut = prix de vente)
-          </p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <NumberInput
+          name="regular_price"
+          label="Prix régulier TTC (€)"
+          placeholder="0.00"
+          editable={true}
+          allowDecimals={true}
+          currency={true}
+          onChange={(e) => handleFieldChange('regular_price', e.target.value)}
+          helpText="Prix avant promotion (par défaut = prix de vente)"
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Prix promo TTC (€)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            {...register('sale_price')}
-            onChange={(e) => handleFieldChange('sale_price', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            placeholder="0.00"
-          />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Prix en promotion (calculé automatiquement)
-          </p>
-        </div>
+        <NumberInput
+          name="sale_price"
+          label="Prix promo TTC (€)"
+          placeholder="0.00"
+          editable={true}
+          allowDecimals={true}
+          currency={true}
+          onChange={(e) => handleFieldChange('sale_price', e.target.value)}
+          helpText="Prix en promotion (calculé automatiquement)"
+        />
       </div>
 
       {/* Section promotions avancées */}
-      <div className="bg-orange-50 dark:bg-orange-900/10 p-4 rounded-lg mb-4">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-orange-50 dark:bg-orange-900/10 p-4 rounded-lg mb-6">
+        <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium text-orange-700 dark:text-orange-300 flex items-center">
-            🏷️ Calculateur de promotion
+            <Tag className="h-4 w-4 mr-2" />
+            Calculateur de promotion
           </h3>
-          <select
+          <SelectField
+            name="promo_type_select"
             value={promoType}
             onChange={(e) => setPromoType(e.target.value)}
-            className="text-sm border border-orange-300 rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"
-          >
-            <option value="percentage">Réduction en %</option>
-            <option value="amount">Réduction en €</option>
-          </select>
+            options={promoTypeOptions}
+            placeholder="Type de promotion"
+            editable={true}
+            className="min-w-[160px]"
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {promoType === 'percentage' ? 'Réduction (%)' : 'Réduction (€)'}
-            </label>
             {promoType === 'percentage' ? (
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                {...register('promo_rate')}
-                onChange={(e) => handleFieldChange('promo_rate', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              <NumberInput
+                name="promo_rate"
+                label="Réduction (%)"
                 placeholder="0.0"
+                editable={true}
+                allowDecimals={true}
+                min={0}
+                max={100}
+                onChange={(e) => handleFieldChange('promo_rate', e.target.value)}
               />
             ) : (
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                {...register('promo_amount')}
-                onChange={(e) => handleFieldChange('promo_amount', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              <NumberInput
+                name="promo_amount"
+                label="Réduction (€)"
                 placeholder="0.00"
+                editable={true}
+                allowDecimals={true}
+                currency={true}
+                min={0}
+                onChange={(e) => handleFieldChange('promo_amount', e.target.value)}
               />
             )}
           </div>
