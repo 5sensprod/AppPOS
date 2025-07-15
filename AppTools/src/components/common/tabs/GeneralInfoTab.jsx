@@ -273,101 +273,109 @@ const GeneralInfoTab = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div>
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
-          <div className="flex items-center">
-            <Info className="h-5 w-5 mr-2" />
-            <span>Informations générales</span>
-          </div>
-        </h2>
-
-        <div className="space-y-4">
-          {fields.map((field) => (
-            <div key={field}>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-                {fieldLabels[field] || field}
-              </h3>
-
-              {editable ? (
-                // Mode édition - utilise les composants atomiques
-                <div>
-                  {renderEditableField(field)}
-                  {/* Les erreurs sont maintenant gérées par les composants atomiques */}
-                </div>
-              ) : (
-                // Mode lecture - Pour certains champs, utiliser les composants atomiques
-                <div>
-                  {field === 'description' ? (
-                    <TextareaInput
-                      name={field}
-                      value={entity[field]}
-                      editable={false}
-                      emptyText="Aucune description"
-                    />
-                  ) : (
-                    // Pour les autres champs, garder l'affichage simple en mode lecture
-                    <div className="mt-1 text-gray-900 dark:text-gray-100">
-                      {renderReadOnlyField(field, entity[field])}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {productCount !== undefined && !editable && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Nombre {productCount === 1 ? "d'article" : "d'articles"}
-              </h3>
-              <p className="mt-1">
-                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                  {productCount || 0}
-                </span>
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {description !== undefined && !editable ? (
+    <div className="space-y-8">
+      {/* Section Informations générales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
             <div className="flex items-center">
-              <FileText className="h-5 w-5 mr-2" />
-              <span>Description</span>
+              <Info className="h-5 w-5 mr-2" />
+              <span>Informations générales</span>
             </div>
           </h2>
-          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md min-h-[200px]">
-            {description ? (
-              <div dangerouslySetInnerHTML={{ __html: description }} />
-            ) : (
-              <p className="text-gray-500 dark:text-gray-400 italic">Aucune description</p>
+
+          <div className="space-y-4">
+            {fields.map((field) => (
+              <div key={field}>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  {fieldLabels[field] || field}
+                </h3>
+
+                {editable ? (
+                  // Mode édition - utilise les composants atomiques
+                  <div>
+                    {renderEditableField(field)}
+                    {/* Les erreurs sont maintenant gérées par les composants atomiques */}
+                  </div>
+                ) : (
+                  // Mode lecture - Pour certains champs, utiliser les composants atomiques
+                  <div>
+                    {field === 'description' ? (
+                      <TextareaInput
+                        name={field}
+                        value={entity[field]}
+                        editable={false}
+                        emptyText="Aucune description"
+                      />
+                    ) : (
+                      // Pour les autres champs, garder l'affichage simple en mode lecture
+                      <div className="mt-1 text-gray-900 dark:text-gray-100">
+                        {renderReadOnlyField(field, entity[field])}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {productCount !== undefined && !editable && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  Nombre {productCount === 1 ? "d'article" : "d'articles"}
+                </h3>
+                <p className="mt-1">
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    {productCount || 0}
+                  </span>
+                </p>
+              </div>
             )}
           </div>
         </div>
-      ) : editable && description !== undefined ? (
-        <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
-            <div className="flex items-center">
-              <FileText className="h-5 w-5 mr-2" />
-              <span>Description</span>
+
+        {description !== undefined && !editable ? (
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+              <div className="flex items-center">
+                <FileText className="h-5 w-5 mr-2" />
+                <span>Description</span>
+              </div>
+            </h2>
+            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md min-h-[200px]">
+              {description ? (
+                <div dangerouslySetInnerHTML={{ __html: description }} />
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 italic">Aucune description</p>
+              )}
             </div>
-          </h2>
-          <div className="p-4 rounded-md min-h-[200px]">
-            <TextareaInput
-              name="description"
-              placeholder="Entrez une description détaillée..."
-              rows={8}
-              maxLength={2000}
-              editable={true}
-            />
           </div>
+        ) : editable && description !== undefined ? (
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+              <div className="flex items-center">
+                <FileText className="h-5 w-5 mr-2" />
+                <span>Description</span>
+              </div>
+            </h2>
+            <div className="p-4 rounded-md min-h-[200px]">
+              <TextareaInput
+                name="description"
+                placeholder="Entrez une description détaillée..."
+                rows={8}
+                maxLength={2000}
+                editable={true}
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Section additionnelle (ex: Prix) placée EN DESSOUS */}
+      {additionalSection && (
+        <div className="border-t border-gray-200 dark:border-gray-600 pt-8">
+          {additionalSection}
         </div>
-      ) : additionalSection ? (
-        additionalSection
-      ) : null}
+      )}
     </div>
   );
 };
