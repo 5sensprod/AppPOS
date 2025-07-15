@@ -1,6 +1,15 @@
 // src/features/common/tabs/WooCommerceTab.jsx
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, AlertCircle, Wand2 } from 'lucide-react';
+import {
+  CheckCircle,
+  AlertCircle,
+  Wand2,
+  Globe,
+  FileText,
+  Package,
+  BarChart3,
+  RefreshCw,
+} from 'lucide-react';
 import { useFormContext } from 'react-hook-form';
 import apiService from '../../../services/api';
 
@@ -212,16 +221,29 @@ const WooCommerceTab = ({
     if (!editable) {
       return (
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-            Affichage du stock
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+            <div className="flex items-center">
+              <Package className="h-5 w-5 mr-2" />
+              <span>Affichage du stock</span>
+            </div>
           </h2>
           <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              Affichage du stock
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+              <BarChart3 className="inline h-4 w-4 mr-1" />
+              Visibilité sur le site
             </h3>
-            <p className="mt-1 text-gray-900 dark:text-gray-100">
-              {entity.manage_stock ? 'Affiché sur le site' : 'Masqué sur le site'}
-            </p>
+            {entity.manage_stock ? (
+              <div className="inline-flex items-center px-3 py-2 rounded-lg border bg-green-50 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-700">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                <span className="font-medium">Affiché sur le site</span>
+              </div>
+            ) : (
+              <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-md">
+                <span className="text-gray-500 dark:text-gray-400 italic text-sm">
+                  Masqué sur le site
+                </span>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -229,24 +251,33 @@ const WooCommerceTab = ({
 
     return (
       <div>
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-          Affichage du stock
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+          <div className="flex items-center">
+            <Package className="h-5 w-5 mr-2" />
+            <span>Affichage du stock</span>
+          </div>
         </h2>
-        <div className="flex items-center">
-          <label className="inline-flex items-center">
-            <input
-              type="checkbox"
-              {...register('manage_stock')}
-              className="form-checkbox h-5 w-5 text-blue-600"
-            />
-            <span className="ml-2 text-gray-700 dark:text-gray-300">
-              Afficher le stock sur le site
-            </span>
-          </label>
+        <div>
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+            <BarChart3 className="inline h-4 w-4 mr-1" />
+            Visibilité sur le site
+          </h3>
+          <div className="flex items-center">
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                {...register('manage_stock')}
+                className="form-checkbox h-5 w-5 text-blue-600"
+              />
+              <span className="ml-2 text-gray-700 dark:text-gray-300">
+                Afficher le stock sur le site
+              </span>
+            </label>
+          </div>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Si activé, les informations de stock seront visibles sur la boutique en ligne
+          </p>
         </div>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Si activé, les informations de stock seront visibles sur la boutique en ligne
-        </p>
       </div>
     );
   };
@@ -255,40 +286,63 @@ const WooCommerceTab = ({
     <div className="space-y-6">
       {/* Section des informations WooCommerce */}
       <div>
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Informations</h2>
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+          <div className="flex items-center">
+            <Globe className="h-5 w-5 mr-2" />
+            <span>Informations</span>
+          </div>
+        </h2>
 
-        {/* Champ Titre pour le name avec bouton de génération */}
+        {/* Champ Titre harmonisé */}
         <div className="mb-4">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Titre</h3>
-
           {editable ? (
             <div>
-              <div className="flex">
-                <input
-                  type="text"
-                  {...register('name', {
-                    onChange: (e) => {
-                      // Mettre à jour explicitement le slug à chaque frappe
-                      updateSlug(e.target.value);
-                    },
-                  })}
-                  placeholder="Titre sur la boutique en ligne"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                />
+              <div className="flex space-x-2">
+                <div className="flex-1">
+                  {/* Utilisation d'un input manuel car besoin de logique custom pour le slug */}
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <FileText className="inline h-4 w-4 mr-1" />
+                    Titre
+                  </label>
+                  <input
+                    type="text"
+                    {...register('name', {
+                      onChange: (e) => {
+                        // Mettre à jour explicitement le slug à chaque frappe
+                        updateSlug(e.target.value);
+                      },
+                    })}
+                    placeholder="Titre sur la boutique en ligne"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                  {errors && errors.name && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-500">
+                      {errors.name.message}
+                    </p>
+                  )}
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Le titre sera utilisé pour l'URL du produit sur la boutique en ligne
+                    {entityType === 'product' &&
+                      enableTitleGeneration &&
+                      '. Cliquez sur la baguette magique pour générer automatiquement un titre commercial.'}
+                  </p>
+                </div>
+
                 {/* Bouton de génération de titre - affiché seulement si enableTitleGeneration est true */}
                 {enableTitleGeneration && (
                   <button
                     type="button"
                     onClick={generateTitle}
                     disabled={isTitleGenerating}
-                    className="flex items-center justify-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-600 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
+                    className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-6"
                     title="Générer un titre avec l'IA"
                   >
                     {isTitleGenerating ? (
-                      <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                      <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
                     ) : (
                       <Wand2 size={18} />
                     )}
+                    <span className="ml-1">Générer</span>
                   </button>
                 )}
               </div>
@@ -296,20 +350,25 @@ const WooCommerceTab = ({
               {titleError && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-500">{titleError}</p>
               )}
-
-              {errors && errors.name && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-500">{errors.name.message}</p>
-              )}
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Le titre sera utilisé pour l'URL du produit sur la boutique en ligne
-                {entityType === 'product' &&
-                  enableTitleGeneration &&
-                  '. Cliquez sur la baguette magique pour générer automatiquement un titre commercial.'}
-              </p>
             </div>
           ) : (
-            <div className="mt-1 text-gray-900 dark:text-gray-100">
-              {entity.name || 'Pas de titre défini'}
+            // Mode lecture stylé avec header
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                <FileText className="inline h-4 w-4 mr-1" />
+                Titre
+              </h3>
+              {entity.name ? (
+                <div className="inline-flex items-center px-3 py-2 rounded-lg border bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700">
+                  <span className="font-medium">{entity.name}</span>
+                </div>
+              ) : (
+                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-md">
+                  <span className="text-gray-500 dark:text-gray-400 italic text-sm">
+                    Pas de titre défini
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -328,12 +387,18 @@ const WooCommerceTab = ({
       {/* Section du statut de publication - conditionnel */}
       {shouldShowStatus && (
         <div className="border-t border-gray-200 dark:border-gray-600 pt-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-            Statut de publication
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+            <div className="flex items-center">
+              <BarChart3 className="h-5 w-5 mr-2" />
+              <span>Statut de publication</span>
+            </div>
           </h2>
 
           <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Statut</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+              <AlertCircle className="inline h-4 w-4 mr-1" />
+              Statut
+            </h3>
 
             {editable ? (
               <div>
@@ -354,9 +419,7 @@ const WooCommerceTab = ({
                 )}
               </div>
             ) : (
-              <div className="mt-1 text-gray-900 dark:text-gray-100">
-                {renderStatusField(entity.status)}
-              </div>
+              <div className="mt-1">{renderStatusField(entity.status)}</div>
             )}
           </div>
         </div>
@@ -364,8 +427,11 @@ const WooCommerceTab = ({
 
       {/* Section du statut de synchronisation */}
       <div className="border-t border-gray-200 dark:border-gray-600 pt-6">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-          Statut de synchronisation
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+          <div className="flex items-center">
+            <RefreshCw className="h-5 w-5 mr-2" />
+            <span>Statut de synchronisation</span>
+          </div>
         </h2>
 
         {entity.woo_id ? (
