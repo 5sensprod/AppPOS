@@ -6,7 +6,7 @@ import GeneralInfoTab from '../../../components/common/tabs/GeneralInfoTab';
 import InventoryTab from './tabs/InventoryTab';
 import ProductTab from './tabs/ProductTab';
 import WooCommerceTab from '../../../components/common/tabs/WooCommerceTab';
-import ProductPriceSection from './ProductPriceSection';
+import ProductPriceSection from './sections/ProductPriceSection';
 
 function ProductDetail() {
   const {
