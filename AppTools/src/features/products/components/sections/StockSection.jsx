@@ -1,7 +1,7 @@
 // src/features/products/components/sections/StockSection.jsx
 import React from 'react';
 import { Package, AlertTriangle } from 'lucide-react';
-import StockField from '../../../../components/common/fields/StockField';
+import { NumberInput } from '../../../../components/atoms/Input';
 
 // ===== COMPOSANTS UI =====
 
@@ -157,22 +157,24 @@ const EditableView = ({ product }) => {
       <div className="space-y-6">
         {/* Champs de saisie */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <StockField
+          <NumberInput
             name="stock"
             label="Stock actuel"
             placeholder="Nombre de produits en stock"
             editable={true}
-            min={0}
-            step={1}
+            icon={Package}
+            allowNegative={false}
+            helpText="Quantité actuellement disponible en magasin"
           />
 
-          <StockField
+          <NumberInput
             name="min_stock"
             label="Stock minimum"
             placeholder="Seuil d'alerte stock"
             editable={true}
-            min={0}
-            step={1}
+            icon={AlertTriangle}
+            allowNegative={false}
+            helpText="Niveau de stock déclenchant une alerte"
           />
         </div>
 

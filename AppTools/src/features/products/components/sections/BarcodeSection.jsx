@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { QrCode, Barcode, Eye, EyeOff, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import BarcodeSelector from '../../../../components/common/BarcodeSelector';
+import { BarcodeInput } from '../../../../components/atoms/Input';
 import { generateEAN13, validateEAN13, formatEAN13 } from '../../../../utils/barcodeGenerator';
 import { useFormContext } from 'react-hook-form';
 
@@ -278,56 +279,19 @@ const EditableView = ({ product }) => {
       </h2>
 
       <div className="space-y-6">
-        {/* Champ de saisie */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            <Barcode className="inline h-4 w-4 mr-1" />
-            Code-barres EAN-13
-          </label>
-
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              value={localBarcode}
-              onChange={handleBarcodeChange}
-              className={`flex-1 px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                !isValidEAN13
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                  : 'border-gray-300'
-              }`}
-              placeholder="Ex: 2001234567890"
-              maxLength="13"
-            />
-
-            <button
-              type="button"
-              onClick={handleGenerateBarcode}
-              disabled={isGenerating}
-              className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="Générer un code EAN-13 automatiquement"
-            >
-              {isGenerating ? (
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-              ) : (
-                <Barcode className="h-4 w-4" />
-              )}
-              <span className="ml-1">Générer</span>
-            </button>
-          </div>
-
-          {/* Messages d'erreur et d'aide */}
-          {!isValidEAN13 && localBarcode && (
-            <p className="mt-1 text-sm text-red-600 dark:text-red-500">
-              Code EAN-13 invalide (vérifiez la clé de contrôle)
-            </p>
-          )}
-
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {localBarcode && isValidEAN13
-              ? `Formaté: ${formatEAN13(localBarcode)}`
-              : 'Entrez un code EAN-13 ou générez-en un automatiquement'}
-          </p>
-        </div>
+        {/* Champ de saisie avec génération */}
+        <BarcodeInput
+          label="Code-barres EAN-13"
+          value={localBarcode}
+          onChange={handleBarcodeChange}
+          onGenerate={handleGenerateBarcode}
+          isGenerating={isGenerating}
+          validateFn={validateEAN13}
+          formatFn={formatEAN13}
+          placeholder="Ex: 2001234567890"
+          maxLength={13}
+          showGenerateButton={true}
+        />
 
         {/* Prévisualisation en temps réel */}
         {localBarcode && localBarcode.length > 0 && (
