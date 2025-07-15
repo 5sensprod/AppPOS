@@ -13,8 +13,8 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
 
   return (
     <div className="space-y-8">
-      {/* ✅ Section Gestion des stocks (sans la case à cocher manage_stock) */}
-      <StockSection product={product} editable={editable} register={register} errors={errors} />
+      {/* ✅ Section Gestion des stocks - Atomisée */}
+      <StockSection product={product} editable={editable} />
 
       {/* ✅ Section Codes d'identification */}
       <div className="border-t border-gray-200 dark:border-gray-600 pt-8">
@@ -39,7 +39,7 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
         />
       </div>
 
-      {/* ✅ Section Marques et fournisseurs */}
+      {/* ✅ Section Marques et fournisseurs - Déjà atomisée */}
       <div className="border-t border-gray-200 dark:border-gray-600 pt-8">
         <BrandsSuppliersSection
           product={product}
@@ -58,7 +58,7 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Stock */}
+              {/* Stock - Maintenant géré par StockSection */}
               <div>
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Gestion des stocks
