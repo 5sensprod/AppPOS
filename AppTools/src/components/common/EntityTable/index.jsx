@@ -451,6 +451,7 @@ const EntityTable = ({
                   onChange={handleFiltersChangeInternal}
                   enableCategories={enableCategories}
                   enableStatusFilter={enableStatusFilter}
+                  productsData={filteredData}
                 />
               </div>
             )}

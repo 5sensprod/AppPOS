@@ -12,6 +12,7 @@ const UnifiedFilterBar = ({
   onChange,
   enableCategories = true,
   enableStatusFilter = true,
+  productsData = [],
 }) => {
   const [isAddingFilter, setIsAddingFilter] = useState(false);
   const [newFilterType, setNewFilterType] = useState(null);
@@ -50,7 +51,7 @@ const UnifiedFilterBar = ({
     description: 'Description',
     brand: 'Marque',
     category: 'Catégorie',
-    barcode: 'Code barre',
+    barcode: 'Code barre', // ✅ NOUVEAU
   };
 
   const selectedTypes = new Set(selectedFilters.map((f) => f.type));
@@ -59,7 +60,7 @@ const UnifiedFilterBar = ({
   const availableTypes = useMemo(() => {
     const baseTypes = Object.entries(filterGroups)
       .filter(([type]) => {
-        const allowMultiple = ['supplier', 'brand', 'category'].includes(type);
+        const allowMultiple = ['supplier', 'brand', 'category', 'barcode'].includes(type); // ✅ Ajout barcode
         return allowMultiple || !selectedTypes.has(type);
       })
       .map(([type]) => ({
@@ -77,7 +78,16 @@ const UnifiedFilterBar = ({
     }
 
     return baseTypes.sort((a, b) => {
-      const order = ['woo', 'status', 'image', 'description', 'category', 'brand', 'supplier'];
+      const order = [
+        'woo',
+        'status',
+        'image',
+        'description',
+        'category',
+        'brand',
+        'supplier',
+        'barcode',
+      ]; // ✅ Ajout barcode
       return order.indexOf(a.value) - order.indexOf(b.value);
     });
   }, [filterGroups, selectedTypes, enableCategories, categoriesReady]);
@@ -91,7 +101,7 @@ const UnifiedFilterBar = ({
   const handleValueSelect = (selected) => {
     if (!newFilterType || !selected || newFilterType === 'category') return;
 
-    const isMulti = ['supplier', 'brand'].includes(newFilterType);
+    const isMulti = ['supplier', 'brand', 'barcode'].includes(newFilterType); // ✅ Ajout barcode
     const selectedValuesList = Array.isArray(selected) ? selected : [selected];
 
     const newFilters = selectedValuesList
@@ -184,7 +194,7 @@ const UnifiedFilterBar = ({
       {isAddingFilter && newFilterType === 'category' && !categoriesLoading && (
         <div ref={valueSelectRef} className="relative">
           <div className="w-80" style={{ position: 'relative', zIndex: 99999 }}>
-            {/* ✅ CategorySelector simplifié */}
+            {/* ✅ CategorySelector avec productsData */}
             <CategorySelector
               mode="single"
               value={''}
@@ -193,7 +203,7 @@ const UnifiedFilterBar = ({
                 if (selectedCategoryId) {
                   let categoryName;
 
-                  // ✅ NOUVEAU - Gestion spéciale pour "Sans catégorie"
+                  // ✅ Gestion spéciale pour "Sans catégorie"
                   if (selectedCategoryId === 'no_category') {
                     categoryName = 'Sans catégorie';
                   } else {
@@ -230,6 +240,7 @@ const UnifiedFilterBar = ({
               showSearch={true}
               showCounts={true}
               autoFocusOpen={true}
+              productsData={productsData} // ✅ Passer les données des produits filtrés
             />
           </div>
         </div>
@@ -241,7 +252,7 @@ const UnifiedFilterBar = ({
             options={getOptionsForType(newFilterType)}
             onChange={handleValueSelect}
             placeholder={`Choisir ${filterTypeLabels[newFilterType]?.toLowerCase()}`}
-            isMulti={['supplier', 'brand'].includes(newFilterType)}
+            isMulti={['supplier', 'brand', 'barcode'].includes(newFilterType)} // ✅ Ajout barcode
             classNamePrefix="react-select"
             className="w-64"
             autoFocus

@@ -29,7 +29,14 @@ const CategorySelector = ({
   autoFocusOpen = false,
   variant = 'default', // ⚡ NOUVEAU: 'default' | 'compact' | 'portal'
   theme = 'default',
+  productsData = [],
 }) => {
+  console.log('🎯 [CategorySelector] Props reçues:', {
+    mode,
+    productsDataLength: productsData?.length || 0,
+    showCounts,
+    productsDataType: typeof productsData,
+  });
   const { isReady, categoriesLoading } = useCategoryUtils();
 
   // Affichage de chargement
@@ -55,6 +62,7 @@ const CategorySelector = ({
     autoFocusOpen,
     variant,
     theme,
+    productsData,
   };
 
   // Rendu conditionnel selon le mode
