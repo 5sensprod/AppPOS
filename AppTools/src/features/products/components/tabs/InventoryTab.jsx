@@ -13,7 +13,7 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
 
   return (
     <div className="space-y-8">
-      {/* ✅ Section Gestion des stocks */}
+      {/* ✅ Section Gestion des stocks (sans la case à cocher manage_stock) */}
       <StockSection product={product} editable={editable} register={register} errors={errors} />
 
       {/* ✅ Section Codes d'identification */}
@@ -69,17 +69,6 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     Min: <span className="font-medium">{product.min_stock || 'Non défini'}</span>
-                  </div>
-                  <div>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        product.manage_stock
-                          ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
-                      }`}
-                    >
-                      {product.manage_stock ? 'Géré' : 'Non géré'}
-                    </span>
                   </div>
                 </div>
               </div>
@@ -155,7 +144,6 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
                     label: 'Stock défini',
                     condition: product.stock !== undefined && product.stock !== null,
                   },
-                  { label: 'Gestion stock', condition: !!product.manage_stock },
                   {
                     label: 'Code-barres',
                     condition: !!product.meta_data?.find((m) => m.key === 'barcode')?.value,

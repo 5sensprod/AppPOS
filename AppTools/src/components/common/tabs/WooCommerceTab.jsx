@@ -207,6 +207,50 @@ const WooCommerceTab = ({
     );
   };
 
+  // Composant pour la section affichage du stock
+  const StockDisplaySection = () => {
+    if (!editable) {
+      return (
+        <div>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+            Affichage du stock
+          </h2>
+          <div>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Affichage du stock
+            </h3>
+            <p className="mt-1 text-gray-900 dark:text-gray-100">
+              {entity.manage_stock ? 'Affiché sur le site' : 'Masqué sur le site'}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+          Affichage du stock
+        </h2>
+        <div className="flex items-center">
+          <label className="inline-flex items-center">
+            <input
+              type="checkbox"
+              {...register('manage_stock')}
+              className="form-checkbox h-5 w-5 text-blue-600"
+            />
+            <span className="ml-2 text-gray-700 dark:text-gray-300">
+              Afficher le stock sur le site
+            </span>
+          </label>
+        </div>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          Si activé, les informations de stock seront visibles sur la boutique en ligne
+        </p>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Section des informations WooCommerce */}
@@ -274,9 +318,16 @@ const WooCommerceTab = ({
         {editable && <input type="hidden" {...register('slug')} />}
       </div>
 
+      {/* Section Affichage du stock - uniquement pour les produits */}
+      {entityType === 'product' && (
+        <div className="border-t border-gray-200 dark:border-gray-600 pt-6">
+          <StockDisplaySection />
+        </div>
+      )}
+
       {/* Section du statut de publication - conditionnel */}
       {shouldShowStatus && (
-        <div>
+        <div className="border-t border-gray-200 dark:border-gray-600 pt-6">
           <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
             Statut de publication
           </h2>
@@ -312,7 +363,7 @@ const WooCommerceTab = ({
       )}
 
       {/* Section du statut de synchronisation */}
-      <div>
+      <div className="border-t border-gray-200 dark:border-gray-600 pt-6">
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
           Statut de synchronisation
         </h2>
