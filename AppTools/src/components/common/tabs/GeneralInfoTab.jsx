@@ -1,10 +1,12 @@
 // src/components/common/tabs/GeneralInfoTab.jsx
 import React from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
+import { Info, FileText } from 'lucide-react';
 import CategorySelector from '../../common/CategorySelector';
 import BrandSelectField from '../fields/BrandSelectField';
-import imageProxyService from '../../../services/imageProxyService';
 import SupplierSelectField from '../fields/SupplierSelectField';
+import { TextInput, TextareaInput } from '../../atoms/Input';
+import imageProxyService from '../../../services/imageProxyService';
 
 const GeneralInfoTab = ({
   entity,
@@ -112,7 +114,37 @@ const GeneralInfoTab = ({
       );
     }
 
-    return value || '-';
+    // ✅ NOUVELLE LOGIQUE : Affichage stylé pour les champs vides/remplis
+    if (!value || value === '' || value === '-') {
+      return (
+        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-md">
+          <span className="text-gray-500 dark:text-gray-400 italic text-sm">
+            {getEmptyFieldText(field)}
+          </span>
+        </div>
+      );
+    }
+
+    // Si le champ a une valeur, l'afficher dans un chip coloré
+    return (
+      <div className="inline-flex items-center px-3 py-2 rounded-lg border bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700">
+        <span className="font-medium">{value}</span>
+      </div>
+    );
+  };
+
+  // Helper pour les textes de champs vides
+  const getEmptyFieldText = (field) => {
+    const emptyTexts = {
+      name: 'Nom non défini',
+      sku: 'Référence non définie',
+      designation: 'Désignation non définie',
+      supplier_code: 'Code fournisseur non défini',
+      customer_code: 'Code client non défini',
+      slug: 'Slug non défini',
+      description: 'Aucune description',
+    };
+    return emptyTexts[field] || 'Non défini';
   };
 
   // Rendu personnalisé pour les champs en mode édition
@@ -122,7 +154,7 @@ const GeneralInfoTab = ({
       error ? 'border-red-500' : 'border-gray-300'
     } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white`;
 
-    // Champs avec rendu personnalisé
+    // Champs avec rendu personnalisé (complexes - gardés tels quels)
     if (field === 'parent_id') {
       return (
         <Controller
@@ -146,14 +178,56 @@ const GeneralInfoTab = ({
     }
 
     switch (field) {
-      case 'description':
+      // ✅ ATOMISÉ : Champs texte simples
+      case 'name':
+        return <TextInput name={field} placeholder="Entrez le nom..." editable={editable} />;
+
+      case 'sku':
         return (
-          <textarea
-            {...register(field)}
-            className={`${baseInputClass} min-h-[100px]`}
-            placeholder={`Entrez une description...`}
+          <TextInput
+            name={field}
+            placeholder="Entrez la référence..."
+            editable={editable}
+            helpText="Identifiant unique du produit"
           />
         );
+
+      case 'designation':
+        return (
+          <TextInput name={field} placeholder="Entrez la désignation..." editable={editable} />
+        );
+
+      case 'supplier_code':
+        return (
+          <TextInput name={field} placeholder="Code chez le fournisseur..." editable={editable} />
+        );
+
+      case 'customer_code':
+        return <TextInput name={field} placeholder="Code client..." editable={editable} />;
+
+      case 'slug':
+        return (
+          <TextInput
+            name={field}
+            placeholder="slug-url-friendly"
+            editable={editable}
+            helpText="URL conviviale (sans espaces ni accents)"
+          />
+        );
+
+      // ✅ ATOMISÉ : Description avec textarea
+      case 'description':
+        return (
+          <TextareaInput
+            name={field}
+            placeholder="Entrez une description..."
+            editable={editable}
+            rows={4}
+            maxLength={1000}
+          />
+        );
+
+      // Champs complexes gardés tels quels
       case 'brands':
         return (
           <BrandSelectField
@@ -186,12 +260,13 @@ const GeneralInfoTab = ({
           </select>
         );
       default:
+        // Fallback pour les champs non prévus
         return (
-          <input
-            type="text"
-            {...(register ? register(field) : {})}
-            className={baseInputClass}
+          <TextInput
+            name={field}
+            label=""
             placeholder={`Entrez ${fieldLabels[field] ? `le ${fieldLabels[field].toLowerCase()}` : field}...`}
+            editable={editable}
           />
         );
     }
@@ -200,8 +275,11 @@ const GeneralInfoTab = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-          Informations générales
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+          <div className="flex items-center">
+            <Info className="h-5 w-5 mr-2" />
+            <span>Informations générales</span>
+          </div>
         </h2>
 
         <div className="space-y-4">
@@ -212,23 +290,23 @@ const GeneralInfoTab = ({
               </h3>
 
               {editable ? (
-                // Mode édition
+                // Mode édition - utilise les composants atomiques
                 <div>
                   {renderEditableField(field)}
-                  {errors && errors[field] && (
-                    <p className="mt-1 text-sm text-red-600 dark:text-red-500">
-                      {errors[field].message}
-                    </p>
-                  )}
+                  {/* Les erreurs sont maintenant gérées par les composants atomiques */}
                 </div>
               ) : (
-                // Mode lecture
+                // Mode lecture - Pour certains champs, utiliser les composants atomiques
                 <div>
                   {field === 'description' ? (
-                    <div className="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-line">
-                      {renderReadOnlyField(field, entity[field])}
-                    </div>
+                    <TextareaInput
+                      name={field}
+                      value={entity[field]}
+                      editable={false}
+                      emptyText="Aucune description"
+                    />
                   ) : (
+                    // Pour les autres champs, garder l'affichage simple en mode lecture
                     <div className="mt-1 text-gray-900 dark:text-gray-100">
                       {renderReadOnlyField(field, entity[field])}
                     </div>
@@ -255,7 +333,12 @@ const GeneralInfoTab = ({
 
       {description !== undefined && !editable ? (
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Description</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+            <div className="flex items-center">
+              <FileText className="h-5 w-5 mr-2" />
+              <span>Description</span>
+            </div>
+          </h2>
           <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md min-h-[200px]">
             {description ? (
               <div dangerouslySetInnerHTML={{ __html: description }} />
@@ -266,19 +349,20 @@ const GeneralInfoTab = ({
         </div>
       ) : editable && description !== undefined ? (
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Description</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+            <div className="flex items-center">
+              <FileText className="h-5 w-5 mr-2" />
+              <span>Description</span>
+            </div>
+          </h2>
           <div className="p-4 rounded-md min-h-[200px]">
-            <textarea
-              {...register('description')}
-              className="w-full h-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            <TextareaInput
+              name="description"
               placeholder="Entrez une description détaillée..."
               rows={8}
+              maxLength={2000}
+              editable={true}
             />
-            {errors && errors.description && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-500">
-                {errors.description.message}
-              </p>
-            )}
           </div>
         </div>
       ) : additionalSection ? (

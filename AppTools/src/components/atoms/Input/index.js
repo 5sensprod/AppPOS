@@ -5,6 +5,7 @@ export { default as BaseInput } from './BaseInput';
 export { default as InputField } from './InputField';
 export { default as NumberInput } from './NumberInput';
 export { default as TextInput } from './TextInput';
+export { default as TextareaInput } from './TextareaInput';
 export { default as BarcodeInput } from './BarcodeInput';
 
 // Utilitaires de style
