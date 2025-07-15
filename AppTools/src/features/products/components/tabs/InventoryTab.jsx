@@ -16,17 +16,9 @@ const InventoryTab = ({ product, editable, errors, specialFields }) => {
       {/* ✅ Section Gestion des stocks - Atomisée */}
       <StockSection product={product} editable={editable} />
 
-      {/* ✅ Section Codes d'identification */}
+      {/* ✅ Section Codes d'identification - Atomisée */}
       <div className="border-t border-gray-200 dark:border-gray-600 pt-8">
-        <BarcodeSection
-          product={product}
-          editable={editable}
-          register={register}
-          control={control}
-          errors={errors}
-          setValue={setValue}
-          watch={watch}
-        />
+        <BarcodeSection product={product} editable={editable} />
       </div>
 
       {/* ✅ Section Classification et catégories */}
