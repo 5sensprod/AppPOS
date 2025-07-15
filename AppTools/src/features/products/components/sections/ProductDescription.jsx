@@ -1,6 +1,16 @@
 // src/features/products/components/sections/ProductDescription.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, Image, MessageSquare, Paperclip, X, ChevronUp, Check } from 'lucide-react';
+import {
+  Loader2,
+  Image,
+  MessageSquare,
+  Paperclip,
+  X,
+  ChevronUp,
+  Check,
+  FileText,
+  Wand2,
+} from 'lucide-react';
 import apiService from '../../../../services/api';
 import {
   formatDescriptionForDisplay,
@@ -8,7 +18,8 @@ import {
 } from '../../../../utils/formatDescription';
 
 /**
- * Composant unifié pour la gestion des descriptions de produit
+ * Composant unifié harmonisé pour la gestion des descriptions de produit
+ * - Style cohérent avec le système atomique
  * - Gère à la fois l'affichage et l'édition
  * - Intègre l'assistance IA
  */
@@ -228,233 +239,263 @@ const ProductDescription = ({ product, editable = false, register, setValue, wat
     }
   }, [messages]);
 
-  // Rendu en mode lecture seule (non éditable)
+  // Rendu en mode lecture seule (non éditable) - HARMONISÉ
   if (!editable) {
-    if (!product?.description) {
-      return (
-        <div className="mb-6 mt-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-            Description du produit
-          </h3>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-md border dark:border-gray-700">
-            <p className="text-gray-500 dark:text-gray-400 italic">Aucune description disponible</p>
-          </div>
-        </div>
-      );
-    }
-
     return (
-      <div className="mb-6 mt-0 product-description">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">
-          Description du produit
-        </h3>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md border dark:border-gray-700">
-          <div className="prose dark:prose-invert max-w-none">
-            <div
-              dangerouslySetInnerHTML={{ __html: formatDescriptionForDisplay(product.description) }}
-            />
+      <div>
+        {/* ✅ Header harmonisé avec icône */}
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+          <div className="flex items-center">
+            <FileText className="h-5 w-5 mr-2" />
+            <span>Description du produit</span>
           </div>
-        </div>
+        </h2>
+
+        {!product?.description ? (
+          // ✅ Style atomique pour champ vide
+          <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-md min-h-[120px] flex items-center">
+            <span className="text-gray-500 dark:text-gray-400 italic text-sm">
+              Aucune description disponible
+            </span>
+          </div>
+        ) : (
+          // ✅ Style atomique pour contenu (chip bleu)
+          <div className="px-4 py-4 rounded-lg border bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700 min-h-[120px]">
+            <div className="prose dark:prose-invert max-w-none">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: formatDescriptionForDisplay(product.description),
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // Rendu en mode édition
+  // Rendu en mode édition - HARMONISÉ
   return (
-    <div className="mb-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-          Description du produit
-        </h3>
+    <div>
+      {/* ✅ Header harmonisé avec icône et bouton */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+          <div className="flex items-center">
+            <FileText className="h-5 w-5 mr-2" />
+            <span>Description du produit</span>
+          </div>
+        </h2>
+
         <button
           type="button"
           onClick={toggleChatMode}
-          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Générer avec l'IA"
         >
           {chatMode ? (
-            <>Revenir à l'éditeur</>
+            <>
+              <FileText className="h-4 w-4 mr-1" />
+              Éditeur
+            </>
           ) : (
             <>
-              <MessageSquare size={16} className="mr-2" />
+              <Wand2 className="h-4 w-4 mr-1" />
               Générer avec IA
             </>
           )}
         </button>
       </div>
 
-      {/* Mode éditeur standard */}
-      {!chatMode && (
-        <>
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            className="prose dark:prose-invert max-w-none w-full px-6 py-4 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md min-h-[250px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-            dangerouslySetInnerHTML={{
-              __html: formatDescriptionForDisplay(watch('description') || ''),
-            }}
-            onInput={handleEditorInput}
-          />
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Rédigez une description manuellement ou cliquez sur "Générer avec IA" pour une
-            assistance interactive.
-          </p>
-        </>
-      )}
+      <div className="space-y-6">
+        {/* Mode éditeur standard */}
+        {!chatMode && (
+          <div>
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              className="prose dark:prose-invert max-w-none w-full px-4 py-4 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md min-h-[250px] focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              dangerouslySetInnerHTML={{
+                __html: formatDescriptionForDisplay(watch('description') || ''),
+              }}
+              onInput={handleEditorInput}
+            />
 
-      {/* Mode chat avec l'IA */}
-      {chatMode && (
-        <div className="border rounded-lg overflow-hidden dark:border-gray-700 mb-4">
-          {/* En-tête du chat */}
-          <div className="bg-gray-100 dark:bg-gray-800 p-3 border-b border-gray-200 dark:border-gray-700">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Assistant de description produit
-            </h4>
+            {/* ✅ Texte d'aide harmonisé */}
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Rédigez une description manuellement ou cliquez sur "Générer avec IA" pour une
+              assistance interactive.
+            </p>
           </div>
+        )}
 
-          {/* Zone des messages */}
-          <div className="bg-white dark:bg-gray-900 p-4 h-96 overflow-y-auto">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`mb-4 ${message.type === 'user' ? 'flex flex-row-reverse' : 'flex'}`}
-              >
+        {/* Mode chat avec l'IA - Style amélioré */}
+        {chatMode && (
+          <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+            {/* En-tête du chat harmonisé */}
+            <div className="bg-blue-50 dark:bg-blue-900/30 p-4 border-b border-blue-200 dark:border-blue-700">
+              <div className="flex items-center">
+                <Wand2 className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  Assistant de description produit
+                </h3>
+              </div>
+            </div>
+
+            {/* Zone des messages */}
+            <div className="bg-white dark:bg-gray-900 p-4 h-96 overflow-y-auto">
+              {messages.map((message, index) => (
                 <div
-                  className={`max-w-3/4 p-3 rounded-lg ${
-                    message.type === 'user'
-                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100'
-                      : message.type === 'error'
-                        ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100'
-                        : message.type === 'system'
-                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 italic'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
-                  }`}
+                  key={index}
+                  className={`mb-4 ${message.type === 'user' ? 'flex flex-row-reverse' : 'flex'}`}
                 >
-                  {message.type === 'assistant' && message.content?.includes('<') ? (
-                    <div
-                      className="prose dark:prose-invert max-w-none"
-                      dangerouslySetInnerHTML={{
-                        __html: formatDescriptionForDisplay(
-                          cleanAIGeneratedContent(message.content)
-                        ),
-                      }}
-                    />
-                  ) : (
-                    <p>{message.content}</p>
-                  )}
-
-                  {/* Afficher les fichiers attachés aux messages de l'utilisateur */}
-                  {message.files && message.files.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {message.files.map((file, fileIndex) => (
-                        <div
-                          key={fileIndex}
-                          className="bg-white dark:bg-gray-700 rounded p-1 text-xs flex items-center"
-                        >
-                          {file.type.startsWith('image/') ? (
-                            <Image size={12} className="mr-1" />
-                          ) : (
-                            <Paperclip size={12} className="mr-1" />
-                          )}
-                          {file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Bouton pour appliquer la description générée (pour les messages de l'IA) */}
-                  {message.type === 'assistant' && message.description && (
-                    <button
-                      onClick={() => applyGeneratedDescription(message.description)}
-                      className="mt-3 px-4 py-2 bg-green-600 text-white text-sm rounded flex items-center w-full justify-center"
-                    >
-                      <Check size={16} className="mr-2" /> Utiliser cette description
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Zone de saisie et d'envoi */}
-          <div className="bg-gray-50 dark:bg-gray-800 p-3 border-t border-gray-200 dark:border-gray-700">
-            {/* Zone des fichiers attachés */}
-            {attachedFiles.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-2">
-                {attachedFiles.map((file, index) => (
                   <div
-                    key={index}
-                    className="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-xs flex items-center"
+                    className={`max-w-3/4 p-3 rounded-lg ${
+                      message.type === 'user'
+                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100'
+                        : message.type === 'error'
+                          ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100'
+                          : message.type === 'system'
+                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 italic'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+                    }`}
                   >
-                    {file.type.startsWith('image/') ? (
-                      <Image size={12} className="mr-1" />
+                    {message.type === 'assistant' && message.content?.includes('<') ? (
+                      <div
+                        className="prose dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{
+                          __html: formatDescriptionForDisplay(
+                            cleanAIGeneratedContent(message.content)
+                          ),
+                        }}
+                      />
                     ) : (
-                      <Paperclip size={12} className="mr-1" />
+                      <p>{message.content}</p>
                     )}
-                    {file.name.length > 20 ? file.name.substring(0, 17) + '...' : file.name}
-                    <button
-                      onClick={() => removeAttachedFile(index)}
-                      className="ml-1 text-red-500 hover:text-red-700"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
 
-            <div className="flex items-end">
-              <div className="flex-1 mr-2 relative">
-                <textarea
-                  value={userInput}
-                  onChange={(e) => {
-                    setUserInput(e.target.value);
-                    // Ajuster la hauteur automatiquement
-                    e.target.style.height = 'auto';
-                    e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
-                  }}
-                  placeholder="Décrivez votre produit ou posez une question..."
-                  className="w-full p-2 border dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md resize-none overflow-y-auto"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                  rows="1"
-                  style={{ minHeight: '40px', maxHeight: '150px' }}
-                />
+                    {/* Afficher les fichiers attachés aux messages de l'utilisateur */}
+                    {message.files && message.files.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {message.files.map((file, fileIndex) => (
+                          <div
+                            key={fileIndex}
+                            className="bg-white dark:bg-gray-700 rounded p-1 text-xs flex items-center"
+                          >
+                            {file.type.startsWith('image/') ? (
+                              <Image size={12} className="mr-1" />
+                            ) : (
+                              <Paperclip size={12} className="mr-1" />
+                            )}
+                            {file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Bouton pour appliquer la description générée (pour les messages de l'IA) */}
+                    {message.type === 'assistant' && message.description && (
+                      <button
+                        onClick={() => applyGeneratedDescription(message.description)}
+                        className="mt-3 px-4 py-2 bg-green-600 text-white text-sm rounded flex items-center w-full justify-center hover:bg-green-700 transition-colors"
+                      >
+                        <Check size={16} className="mr-2" /> Utiliser cette description
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Zone de saisie et d'envoi */}
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 border-t border-gray-200 dark:border-gray-600">
+              {/* Zone des fichiers attachés */}
+              {attachedFiles.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {attachedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full px-3 py-1 text-xs flex items-center"
+                    >
+                      {file.type.startsWith('image/') ? (
+                        <Image size={12} className="mr-1" />
+                      ) : (
+                        <Paperclip size={12} className="mr-1" />
+                      )}
+                      {file.name.length > 20 ? file.name.substring(0, 17) + '...' : file.name}
+                      <button
+                        onClick={() => removeAttachedFile(index)}
+                        className="ml-2 text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <textarea
+                    value={userInput}
+                    onChange={(e) => {
+                      setUserInput(e.target.value);
+                      // Ajuster la hauteur automatiquement
+                      e.target.style.height = 'auto';
+                      e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
+                    }}
+                    placeholder="Décrivez votre produit ou posez une question..."
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-white rounded-md resize-none overflow-y-auto focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
+                    rows="1"
+                    style={{ minHeight: '44px', maxHeight: '150px' }}
+                  />
+                </div>
+
+                <label className="cursor-pointer p-3 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    multiple
+                  />
+                  <Paperclip size={18} className="text-gray-500 dark:text-gray-400" />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={sendMessage}
+                  disabled={loading}
+                  className="p-3 rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? <Loader2 className="animate-spin h-4 w-4" /> : <ChevronUp size={18} />}
+                </button>
               </div>
-              <label className="cursor-pointer p-2 border rounded-md mr-2 hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-600">
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  multiple
-                />
-                <Paperclip size={18} className="text-gray-500" />
-              </label>
-              <button
-                type="button"
-                onClick={sendMessage}
-                disabled={loading}
-                className="p-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                {loading ? <Loader2 className="animate-spin h-4 w-4" /> : <ChevronUp size={18} />}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {error && <p className="mt-1 text-sm text-red-600 dark:text-red-500">{error}</p>}
-      {success && (
-        <p className="mt-1 text-sm text-green-600 dark:text-green-500">
-          Description mise à jour avec succès!
-        </p>
-      )}
+        {/* Messages d'état harmonisés */}
+        {error && (
+          <div className="px-3 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
+
+        {success && (
+          <div className="px-3 py-2 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-md">
+            <p className="text-sm text-green-600 dark:text-green-400">
+              Description mise à jour avec succès!
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

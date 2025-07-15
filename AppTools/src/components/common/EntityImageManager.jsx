@@ -1,9 +1,19 @@
-// rc\components\common\EntityImageManager.jsx
+// src/components/common/EntityImageManager.jsx
 import React, { useState } from 'react';
-import { Upload, X, CheckCircle, Image as ImageIcon, RefreshCw, Trash, Plus } from 'lucide-react';
+import {
+  Upload,
+  X,
+  CheckCircle,
+  Image as ImageIcon,
+  RefreshCw,
+  Trash,
+  Plus,
+  FileImage,
+  Camera,
+} from 'lucide-react';
 import imageProxyService from '../../services/imageProxyService';
 
-// La fonction formatFileSize existante reste inchangée
+// Fonctions utilitaires existantes
 const formatFileSize = (bytes) => {
   if (!bytes || bytes === 0) return null;
   const k = 1024;
@@ -12,35 +22,23 @@ const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// La fonction getImageSize existante reste inchangée
 const getImageSize = (image) => {
   if (!image) return null;
-
-  // Cas 1: Taille directement à la racine
   if (image.size) return image.size;
-
-  // Cas 2: Taille dans metadata
   if (image.metadata && image.metadata.size) return image.metadata.size;
-
   return null;
 };
 
-// Nouvelle fonction pour obtenir les dimensions de l'image
 const getImageDimensions = (image) => {
   if (!image) return null;
-
-  // Cas 1: Dimensions directement à la racine
   if (image.width && image.height) {
     return { width: image.width, height: image.height };
   }
-
-  // Cas 2: Dimensions dans metadata
   if (image.metadata) {
     if (image.metadata.width && image.metadata.height) {
       return { width: image.metadata.width, height: image.metadata.height };
     }
   }
-
   return null;
 };
 
@@ -164,26 +162,23 @@ const EntityImageManager = ({
   const handleDeleteMainImage = async () => {
     if (!editable) return;
 
-    // ✅ SIMPLE: Pas de window.confirm, action directe
     try {
       await onDeleteImage(entityId);
-      // ✅ Pas de toast ici - géré par EntityDetail via formDirty
     } catch (error) {
       console.error("Erreur lors de la suppression de l'image :", error);
-      // ✅ L'erreur sera gérée par le formulaire parent
     }
   };
 
   const handleDeleteGalleryImage = async (index) => {
     if (!editable) return;
 
-    // ✅ SIMPLE: Action directe
     try {
       await onDeleteImage(entityId, index, true);
     } catch (error) {
       console.error("Erreur lors de la suppression de l'image de galerie :", error);
     }
   };
+
   const getImageUrl = (src) => (src ? imageProxyService.getImageUrl(src) : null);
 
   const renderContent = () => {
@@ -200,240 +195,23 @@ const EntityImageManager = ({
 
     if (galleryMode) {
       return (
-        <div className="space-y-6">
-          <div className="space-y-10">
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                Image principale
-              </h2>
-              <div className="space-y-4">
-                <div className="flex flex-col items-center">
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 w-full">
-                    {mainImage?.src ? (
-                      <div className="relative w-full h-full flex items-center justify-center">
-                        <img
-                          src={getImageUrl(mainImage.src)}
-                          alt={entityType}
-                          className="max-w-full max-h-48 object-contain"
-                        />
-                        {editable && (
-                          <button
-                            onClick={handleDeleteMainImage}
-                            className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors duration-200"
-                            title="Supprimer l'image"
-                            disabled={isLoading}
-                          >
-                            <X size={16} />
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-gray-400 py-8">
-                        <ImageIcon size={48} />
-                        <span className="mt-2 text-sm">Aucune image</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {mainImage?.src && (
-                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                      {getImageSize(mainImage) && (
-                        <span className="mr-3">{formatFileSize(getImageSize(mainImage))}</span>
-                      )}
-                      {getImageDimensions(mainImage) && (
-                        <span>
-                          {getImageDimensions(mainImage).width} ×{' '}
-                          {getImageDimensions(mainImage).height} px
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-4">
-                    Format : {acceptedTypes.map((t) => t.split('/')[1].toUpperCase()).join(', ')}
-                    <br />
-                    Taille maximale : {Math.round(maxFileSize / 1024 / 1024)} Mo
-                  </div>
-
-                  {editable && (
-                    <div className="relative mt-4">
-                      <input
-                        type="file"
-                        accept={acceptedTypes.join(',')}
-                        onChange={handleMainImageUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        disabled={isLoading}
-                      />
-                      <button
-                        className={`flex items-center px-4 py-2 rounded-lg border ${
-                          isLoading ? 'opacity-70 cursor-not-allowed' : ''
-                        }`}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <RefreshCw size={16} className="mr-2 animate-spin" />
-                        ) : (
-                          <Upload size={16} className="mr-2" />
-                        )}
-                        {isLoading ? 'Téléchargement...' : 'Télécharger une image'}
-                      </button>
-                    </div>
-                  )}
-
-                  {uploadProgress > 0 && (
-                    <div className="w-full max-w-xs bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mt-2">
-                      <div
-                        className="bg-blue-600 h-2.5 rounded-full"
-                        style={{ width: `${uploadProgress}%` }}
-                      ></div>
-                    </div>
-                  )}
-
-                  {uploadError && (
-                    <div className="text-sm text-red-600 dark:text-red-400 mt-2">{uploadError}</div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                Galerie d'images
-                <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
-                  ({galleryImages.length}/{maxImages})
-                </span>
-              </h2>
-
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md min-h-[200px]">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-                  {galleryImages.length > 0 ? (
-                    galleryImages.map((image, index) => (
-                      <div key={index} className="relative group">
-                        <div className="w-full h-32 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border flex flex-col">
-                          <div className="flex-grow flex items-center justify-center">
-                            <img
-                              src={getImageUrl(image.src)}
-                              alt={`Image ${index + 1}`}
-                              className="w-full h-24 object-cover"
-                            />
-                          </div>
-                          <div className="p-1 text-center text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {getImageSize(image) && (
-                              <span className="mr-2">{formatFileSize(getImageSize(image))}</span>
-                            )}
-                            {getImageDimensions(image) && (
-                              <span>
-                                {getImageDimensions(image).width} ×{' '}
-                                {getImageDimensions(image).height} px
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {editable && (
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <button
-                              onClick={() => handleSetMainImage(index)}
-                              className="p-1 bg-green-500 text-white rounded-full hover:bg-green-600 mx-1"
-                              title="Définir comme image principale"
-                              disabled={isLoading}
-                            >
-                              <CheckCircle size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteGalleryImage(index)}
-                              className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600 mx-1"
-                              title="Supprimer l'image"
-                              disabled={isLoading}
-                            >
-                              <X size={16} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="col-span-full py-8 text-center text-gray-500 dark:text-gray-400">
-                      <span className="italic">Aucune image dans la galerie</span>
-                    </div>
-                  )}
-
-                  {editable && galleryImages.length < maxImages && (
-                    <div className="relative group">
-                      <div className="w-full h-24 bg-gray-100 dark:bg-gray-700 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400">
-                        <Plus size={20} />
-                        <span className="mt-1 text-xs">Ajouter</span>
-                        <input
-                          type="file"
-                          accept={acceptedTypes.join(',')}
-                          onChange={handleGalleryImageUpload}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          disabled={isLoading}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {editable && galleryImages.length < maxImages && (
-                  <div className="relative mt-4">
-                    <input
-                      type="file"
-                      accept={acceptedTypes.join(',')}
-                      onChange={handleGalleryImageUpload}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      disabled={isLoading}
-                    />
-                    <button
-                      className={`flex items-center px-4 py-2 rounded-lg border ${
-                        isLoading ? 'opacity-70 cursor-not-allowed' : ''
-                      }`}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <RefreshCw size={16} className="mr-2 animate-spin" />
-                      ) : (
-                        <Upload size={16} className="mr-2" />
-                      )}
-                      {isLoading ? 'Téléchargement...' : 'Ajouter à la galerie'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Mode image simple (lecture seule incluse)
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-row items-start">
-          <div className="w-full">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+        <div className="space-y-8">
+          {/* Section Image principale */}
+          <div>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+              <Camera className="inline h-4 w-4 mr-1" />
               Image principale
-            </h2>
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="md:w-1/3 bg-gray-100 dark:bg-gray-700 rounded-lg p-4 flex items-center justify-center">
+            </h3>
+
+            <div className="flex flex-col items-center">
+              <div className="w-full max-w-md">
                 {mainImage?.src ? (
-                  <div className="relative w-full h-full flex items-center justify-center">
+                  <div className="relative bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
                     <img
                       src={getImageUrl(mainImage.src)}
                       alt={entityType}
-                      className="max-w-full max-h-48 object-contain"
+                      className="w-full h-48 object-contain rounded"
                     />
-                    <div className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
-                      {getImageSize(mainImage) && (
-                        <span className="mr-3">{formatFileSize(getImageSize(mainImage))}</span>
-                      )}
-                      {getImageDimensions(mainImage) && (
-                        <span>
-                          {getImageDimensions(mainImage).width} ×{' '}
-                          {getImageDimensions(mainImage).height} px
-                        </span>
-                      )}
-                    </div>
                     {editable && (
                       <button
                         onClick={handleDeleteMainImage}
@@ -444,23 +222,37 @@ const EntityImageManager = ({
                         <X size={16} />
                       </button>
                     )}
+                    {/* Métadonnées de l'image */}
+                    {(getImageSize(mainImage) || getImageDimensions(mainImage)) && (
+                      <div className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                        {getImageSize(mainImage) && (
+                          <div>{formatFileSize(getImageSize(mainImage))}</div>
+                        )}
+                        {getImageDimensions(mainImage) && (
+                          <div>
+                            {getImageDimensions(mainImage).width} ×{' '}
+                            {getImageDimensions(mainImage).height} px
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center text-gray-400 py-8 w-full">
-                    <ImageIcon size={48} />
-                    <span className="mt-2 text-sm">Aucune image</span>
+                  // État vide harmonisé
+                  <div className="px-4 py-8 bg-gray-50 dark:bg-gray-700 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg">
+                    <div className="text-center">
+                      <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
+                      <span className="mt-2 block text-sm text-gray-500 dark:text-gray-400 italic">
+                        Aucune image principale
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
 
-              <div className="md:w-2/3">
-                <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Format : {acceptedTypes.map((t) => t.split('/')[1].toUpperCase()).join(', ')}
-                  <br />
-                  Taille maximale : {Math.round(maxFileSize / 1024 / 1024)} Mo
-                </div>
-
-                {editable && (
+              {/* Zone d'upload */}
+              {editable && (
+                <div className="mt-4 w-full max-w-md">
                   <div className="relative">
                     <input
                       type="file"
@@ -470,7 +262,7 @@ const EntityImageManager = ({
                       disabled={isLoading}
                     />
                     <button
-                      className={`flex items-center px-4 py-2 rounded-lg border ${
+                      className={`w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors ${
                         isLoading ? 'opacity-70 cursor-not-allowed' : ''
                       }`}
                       disabled={isLoading}
@@ -483,27 +275,241 @@ const EntityImageManager = ({
                       {isLoading ? 'Téléchargement...' : 'Télécharger une image'}
                     </button>
                   </div>
-                )}
 
-                {uploadProgress > 0 && (
-                  <div className="w-full max-w-xs bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mt-4">
-                    <div
-                      className="bg-blue-600 h-2.5 rounded-full"
-                      style={{ width: `${uploadProgress}%` }}
-                    ></div>
+                  {/* Barre de progression harmonisée */}
+                  {uploadProgress > 0 && (
+                    <div className="mt-2 w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section Galerie */}
+          <div className="border-t border-gray-200 dark:border-gray-600 pt-6">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+              <FileImage className="inline h-4 w-4 mr-1" />
+              Galerie d'images
+              <span className="text-xs font-normal text-gray-400 ml-2">
+                ({galleryImages.length}/{maxImages})
+              </span>
+            </h3>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {galleryImages.length > 0 ? (
+                galleryImages.map((image, index) => (
+                  <div key={index} className="relative group">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
+                      <div className="aspect-square">
+                        <img
+                          src={getImageUrl(image.src)}
+                          alt={`Image ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      {/* Métadonnées */}
+                      {(getImageSize(image) || getImageDimensions(image)) && (
+                        <div className="p-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                          {getImageSize(image) && <div>{formatFileSize(getImageSize(image))}</div>}
+                          {getImageDimensions(image) && (
+                            <div>
+                              {getImageDimensions(image).width} × {getImageDimensions(image).height}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions en overlay */}
+                    {editable && (
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleSetMainImage(index)}
+                            className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
+                            title="Définir comme image principale"
+                            disabled={isLoading}
+                          >
+                            <CheckCircle size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteGalleryImage(index)}
+                            className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                            title="Supprimer l'image"
+                            disabled={isLoading}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))
+              ) : (
+                <div className="col-span-full py-8 text-center">
+                  <div className="px-4 py-6 bg-gray-50 dark:bg-gray-700 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg">
+                    <FileImage className="mx-auto h-8 w-8 text-gray-400" />
+                    <span className="mt-2 block text-sm text-gray-500 dark:text-gray-400 italic">
+                      Aucune image dans la galerie
+                    </span>
+                  </div>
+                </div>
+              )}
 
-                {uploadError && (
-                  <div className="text-sm text-red-600 dark:text-red-400 mt-2">{uploadError}</div>
-                )}
+              {/* Zone d'ajout d'image */}
+              {editable && galleryImages.length < maxImages && (
+                <div className="relative group">
+                  <div className="aspect-square bg-gray-50 dark:bg-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500 transition-colors cursor-pointer">
+                    <Plus size={24} />
+                    <span className="mt-1 text-xs font-medium">Ajouter</span>
+                    <input
+                      type="file"
+                      accept={acceptedTypes.join(',')}
+                      onChange={handleGalleryImageUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Mode image simple
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+            <Camera className="inline h-4 w-4 mr-1" />
+            Image principale
+          </h3>
+
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="md:w-1/3">
+              {mainImage?.src ? (
+                <div className="relative bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
+                  <img
+                    src={getImageUrl(mainImage.src)}
+                    alt={entityType}
+                    className="w-full h-48 object-contain rounded"
+                  />
+                  {editable && (
+                    <button
+                      onClick={handleDeleteMainImage}
+                      className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors duration-200"
+                      title="Supprimer l'image"
+                      disabled={isLoading}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="px-4 py-8 bg-gray-50 dark:bg-gray-700 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg">
+                  <div className="text-center">
+                    <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
+                    <span className="mt-2 block text-sm text-gray-500 dark:text-gray-400 italic">
+                      Aucune image
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="md:w-2/3 space-y-4">
+              {/* Informations sur l'image */}
+              {mainImage && (getImageSize(mainImage) || getImageDimensions(mainImage)) && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                  <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                    Détails de l'image
+                  </h4>
+                  <div className="text-xs text-blue-600 dark:text-blue-300 space-y-1">
+                    {getImageSize(mainImage) && (
+                      <div>Taille: {formatFileSize(getImageSize(mainImage))}</div>
+                    )}
+                    {getImageDimensions(mainImage) && (
+                      <div>
+                        Dimensions: {getImageDimensions(mainImage).width} ×{' '}
+                        {getImageDimensions(mainImage).height} px
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Contraintes */}
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div>
+                  <strong>Formats acceptés:</strong>{' '}
+                  {acceptedTypes.map((t) => t.split('/')[1].toUpperCase()).join(', ')}
+                </div>
+                <div>
+                  <strong>Taille maximum:</strong> {Math.round(maxFileSize / 1024 / 1024)} Mo
+                </div>
               </div>
+
+              {/* Zone d'upload */}
+              {editable && (
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept={acceptedTypes.join(',')}
+                    onChange={handleMainImageUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    disabled={isLoading}
+                  />
+                  <button
+                    className={`w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors ${
+                      isLoading ? 'opacity-70 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <RefreshCw size={18} className="mr-2 animate-spin" />
+                    ) : (
+                      <Upload size={18} className="mr-2" />
+                    )}
+                    {isLoading ? 'Téléchargement en cours...' : 'Choisir une image'}
+                  </button>
+                </div>
+              )}
+
+              {/* Barre de progression */}
+              {uploadProgress > 0 && (
+                <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
     );
   };
+
+  // Messages d'erreur globaux
+  if (uploadError) {
+    return (
+      <div>
+        {renderContent()}
+        <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+          <div className="text-sm text-red-600 dark:text-red-400">{uploadError}</div>
+        </div>
+      </div>
+    );
+  }
 
   return renderContent();
 };
