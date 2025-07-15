@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import BarcodeSelector from '../../../../components/common/BarcodeSelector';
+import { generateEAN13, validateEAN13, formatEAN13 } from '../../../../utils/barcodeGenerator';
 
 const BarcodeSection = ({ product, editable, register, control, errors, setValue, watch }) => {
   // Extraction du code-barres des métadonnées
@@ -13,6 +14,7 @@ const BarcodeSection = ({ product, editable, register, control, errors, setValue
   const barcodeValue = getBarcodeValue();
   const [localBarcode, setLocalBarcode] = useState(barcodeValue || '');
   const [showBarcodes, setShowBarcodes] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Fonction pour mettre à jour les meta_data
   const updateBarcodeInMetaData = (newValue) => {
@@ -59,6 +61,29 @@ const BarcodeSection = ({ product, editable, register, control, errors, setValue
       console.log('📊 Meta_data après changement:', currentMetaData);
     }, 100);
   };
+
+  // Générer un nouveau code EAN-13
+  const handleGenerateBarcode = () => {
+    setIsGenerating(true);
+    try {
+      const newBarcode = generateEAN13({
+        prefix: '200', // Préfixe pour codes internes
+        productId: product?._id || product?.id,
+        includeTimestamp: true,
+      });
+
+      setLocalBarcode(newBarcode);
+      updateBarcodeInMetaData(newBarcode);
+      console.log('✅ Code-barres généré:', newBarcode);
+    } catch (error) {
+      console.error('❌ Erreur génération code-barres:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Validation du code-barres
+  const isValidEAN13 = localBarcode ? validateEAN13(localBarcode) : true;
 
   if (!editable) {
     return (
@@ -161,22 +186,60 @@ const BarcodeSection = ({ product, editable, register, control, errors, setValue
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Code-barres
+              Code-barres EAN-13
             </label>
-            <input
-              type="text"
-              value={localBarcode}
-              onChange={handleBarcodeChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              placeholder="Ex: 3760010255333"
-            />
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                value={localBarcode}
+                onChange={handleBarcodeChange}
+                className={`flex-1 px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                  !isValidEAN13
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-gray-300'
+                }`}
+                placeholder="Ex: 2001234567890"
+                maxLength="13"
+              />
+              <button
+                type="button"
+                onClick={handleGenerateBarcode}
+                disabled={isGenerating}
+                className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                title="Générer un code EAN-13 automatiquement"
+              >
+                {isGenerating ? (
+                  <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
+                  </svg>
+                )}
+                <span>Générer</span>
+              </button>
+            </div>
+
+            {!isValidEAN13 && localBarcode && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-500">
+                Code EAN-13 invalide (vérifiez la clé de contrôle)
+              </p>
+            )}
+
             {errors?.meta_data?.barcode && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-500">
                 {errors.meta_data.barcode.message}
               </p>
             )}
+
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Entrez le code-barres (EAN-13 recommandé)
+              {localBarcode && isValidEAN13
+                ? `Formaté: ${formatEAN13(localBarcode)}`
+                : 'Entrez un code EAN-13 ou générez-en un automatiquement'}
             </p>
           </div>
         </div>
@@ -185,7 +248,14 @@ const BarcodeSection = ({ product, editable, register, control, errors, setValue
         {localBarcode && localBarcode.length > 0 && (
           <div className="mt-4 p-4 border rounded-lg bg-gray-50">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="text-sm font-medium text-gray-700">Prévisualisation</h3>
+              <h3 className="text-sm font-medium text-gray-700">
+                Prévisualisation
+                {isValidEAN13 ? (
+                  <span className="ml-2 text-green-600 text-xs">✓ Valide</span>
+                ) : (
+                  <span className="ml-2 text-red-600 text-xs">✗ Invalide</span>
+                )}
+              </h3>
               <button
                 type="button"
                 onClick={() => setShowBarcodes(!showBarcodes)}
@@ -265,7 +335,9 @@ const BarcodeSection = ({ product, editable, register, control, errors, setValue
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-500">Valeur: {localBarcode}</p>
+              <p className="text-sm text-gray-500">
+                Valeur: {localBarcode} {isValidEAN13 && `(${formatEAN13(localBarcode)})`}
+              </p>
             )}
           </div>
         )}
