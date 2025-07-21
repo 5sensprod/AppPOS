@@ -1,19 +1,22 @@
-const GeminiDirectService = require('./GeminiDirectService');
-// Créer une instance singleton du service Gemini
-const geminiServiceInstance = new GeminiDirectService();
+// services/gemini/index.js - ADAPTÉ à votre structure existante
+const { getInstance } = require('../ai/AIServiceFactory');
+
+// Obtenir l'instance du factory IA
+const aiServiceFactory = getInstance();
 
 /**
- * Service Gemini exporté avec une interface simplifiée pour les routes
+ * Service unifié exporté avec fallback automatique entre providers
+ * Interface compatible avec l'ancien service Gemini
  */
 module.exports = {
   /**
-   * Génère une description de produit
+   * Génère une description de produit avec fallback automatique
    * @param {Object} productData Données du produit
    * @param {string} imagePath Chemin optionnel vers l'image du produit
    * @returns {Promise<Object>} Résultat de la génération
    */
   generateProductDescription: async (productData, imagePath) => {
-    return geminiServiceInstance.generateProductDescription(productData, imagePath);
+    return aiServiceFactory.generateProductDescription(productData, imagePath);
   },
 
   /**
@@ -25,12 +28,7 @@ module.exports = {
    * @returns {Promise<Object>} Résultat de la génération
    */
   generateChatResponse: async (productData, userMessage, conversation, filePaths) => {
-    return geminiServiceInstance.generateChatResponse(
-      productData,
-      userMessage,
-      conversation,
-      filePaths
-    );
+    return aiServiceFactory.generateChatResponse(productData, userMessage, conversation, filePaths);
   },
 
   /**
@@ -40,9 +38,59 @@ module.exports = {
    * @returns {Promise<Object>} Résultat de la génération contenant le titre
    */
   generateProductTitle: async (productData, imagePath) => {
-    return geminiServiceInstance.generateProductTitle(productData, imagePath);
+    return aiServiceFactory.generateProductTitle(productData, imagePath);
   },
 
-  // Pour accéder directement à l'instance du service si nécessaire
-  service: geminiServiceInstance,
+  /**
+   * Nouvelles fonctionnalités pour gérer les providers IA
+   */
+  ai: {
+    /**
+     * Change le provider IA utilisé
+     * @param {string} provider - 'gemini' ou 'huggingface'
+     */
+    setProvider: (provider) => {
+      return aiServiceFactory.setProvider(provider);
+    },
+
+    /**
+     * Obtient le provider actuellement utilisé
+     */
+    getCurrentProvider: () => {
+      return aiServiceFactory.getCurrentProvider();
+    },
+
+    /**
+     * Obtient la liste des providers disponibles
+     */
+    getAvailableProviders: () => {
+      return aiServiceFactory.getAvailableProviders();
+    },
+
+    /**
+     * Teste la disponibilité d'un service
+     * @param {string} provider Provider à tester
+     */
+    testService: (provider) => {
+      return aiServiceFactory.testService(provider);
+    },
+
+    /**
+     * Teste tous les services disponibles
+     */
+    testAllServices: async () => {
+      const providers = aiServiceFactory.getAvailableProviders();
+      const results = {};
+
+      for (const provider of providers) {
+        results[provider] = await aiServiceFactory.testService(provider);
+      }
+
+      return results;
+    },
+  },
+
+  // Pour accéder directement au factory si nécessaire (rétrocompatibilité)
+  service: aiServiceFactory,
+  factory: aiServiceFactory,
 };
