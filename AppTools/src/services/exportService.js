@@ -245,7 +245,7 @@ class ExportService {
   }
 
   /**
-   * ✅ NOUVEAU : Dessine une étiquette sur le PDF
+   * ✅ Dessine une étiquette sur le PDF
    */
   async drawLabelOnPDF(doc, labelData, position, style, JsBarcode) {
     const { x, y, width, height } = position;
@@ -265,72 +265,88 @@ class ExportService {
       const contentWidth = width - padding * 2;
       const contentHeight = height - padding * 2;
 
-      // ✅ CALCUL INTELLIGENT DE L'ESPACE DISPONIBLE
+      // ✅ NOUVEAU : CALCUL DYNAMIQUE INTELLIGENT
       let currentY = contentY;
-      const elementSpacing = 1; // Espacement entre éléments
+      const elementSpacing = 1;
 
-      // Calculer l'espace nécessaire pour chaque élément (en mm)
-      const priceHeight = style.showPrice ? Math.max(3, (style.priceSize || 14) * 0.35) : 0;
-      const nameHeight = style.showName ? Math.max(2.5, (style.nameSize || 10) * 0.35) : 0;
-      const barcodeHeight = style.showBarcode ? Math.max(8, style.barcodeHeight || 15) : 0;
-      const barcodeTextHeight = style.showBarcode ? 4 : 0; // Hauteur pour les chiffres sous code-barres
+      // ✅ 1. CALCULER LES TAILLES RÉELLES DES ÉLÉMENTS
+      const scale = 1; // On garde l'échelle fixe pour simplifier
 
-      // Espace total nécessaire
-      const totalNeededHeight =
-        priceHeight + nameHeight + barcodeHeight + barcodeTextHeight + elementSpacing * 4;
+      // Tailles effectives des éléments
+      const nameHeight = style.showName ? Math.max(2.5, (style.nameSize || 10) * 0.4) : 0;
+      const priceHeight = style.showPrice ? Math.max(3, (style.priceSize || 14) * 0.4) : 0;
 
-      // ✅ AJUSTEMENT AUTOMATIQUE SI ÇA NE RENTRE PAS
-      let scale = 1;
+      // ✅ HAUTEUR CODE-BARRES DYNAMIQUE (selon le réglage utilisateur)
+      const barcodeBarHeight = style.showBarcode ? (style.barcodeHeight || 15) * 0.3 : 0; // Hauteur des barres
+      const barcodeTextHeight = style.showBarcode ? 4 : 0; // Hauteur fixe pour le texte
+      const totalBarcodeHeight = barcodeBarHeight + barcodeTextHeight;
+
+      // ✅ 2. CALCULER L'ESPACE TOTAL NÉCESSAIRE
+      const totalNeededHeight = nameHeight + priceHeight + totalBarcodeHeight + elementSpacing * 4;
+
+      console.log(`📐 Espace disponible: ${contentHeight}mm, nécessaire: ${totalNeededHeight}mm`);
+      console.log(
+        `📐 Détail: nom=${nameHeight}, prix=${priceHeight}, code-barres=${totalBarcodeHeight}mm`
+      );
+
+      // ✅ 3. AJUSTEMENT INTELLIGENT
+      let finalNameHeight = nameHeight;
+      let finalPriceHeight = priceHeight;
+      let finalBarcodeHeight = totalBarcodeHeight;
+
       if (totalNeededHeight > contentHeight) {
-        scale = Math.max(0.6, contentHeight / totalNeededHeight);
-        console.log(`⚠️ Ajustement échelle: ${scale.toFixed(2)} pour étiquette ${labelData.name}`);
+        // Si ça ne rentre pas, ajuster proportionnellement SAUF le code-barres
+        const availableForFlexible = contentHeight - totalBarcodeHeight - elementSpacing * 3;
+        const flexibleElementsHeight = nameHeight + priceHeight;
+
+        if (flexibleElementsHeight > 0) {
+          const reductionRatio = Math.max(0.5, availableForFlexible / flexibleElementsHeight);
+          finalNameHeight = nameHeight * reductionRatio;
+          finalPriceHeight = priceHeight * reductionRatio;
+
+          console.log(`⚠️ Ajustement: ratio=${reductionRatio.toFixed(2)}, code-barres préservé`);
+        }
       }
+
+      // ✅ 4. PLACEMENT DES ÉLÉMENTS
 
       // ✅ NOM DU PRODUIT (en haut si activé)
       if (style.showName && labelData.name) {
-        const fontSize = Math.max(6, (style.nameSize || 10) * scale);
+        const fontSize = Math.max(6, (style.nameSize || 10) * (finalNameHeight / nameHeight));
         doc.setFontSize(fontSize);
         doc.setFont('helvetica', 'bold');
 
-        // ✅ CROPPING INTELLIGENT DU NOM
+        // Cropping intelligent du nom (code existant)
         let displayName = labelData.name.trim();
         let textWidth = doc.getTextWidth(displayName);
 
-        // Première tentative : raccourcir progressivement
         while (textWidth > contentWidth && displayName.length > 8) {
           displayName = displayName.substring(0, displayName.length - 1);
           textWidth = doc.getTextWidth(displayName + '...');
         }
 
-        // Si encore trop long, ajouter les points de suspension
         if (textWidth > contentWidth) {
           displayName = displayName + '...';
           textWidth = doc.getTextWidth(displayName);
-
-          // Dernier recours : couper encore plus court
           while (textWidth > contentWidth && displayName.length > 6) {
             displayName = displayName.substring(0, displayName.length - 4) + '...';
             textWidth = doc.getTextWidth(displayName);
           }
         } else if (displayName !== labelData.name.trim()) {
-          // Ajouter les points seulement si on a coupé
           displayName = displayName + '...';
-          textWidth = doc.getTextWidth(displayName);
         }
 
         const textX = contentX + (contentWidth - textWidth) / 2;
         doc.text(displayName, textX, currentY + fontSize * 0.35);
-        currentY += nameHeight * scale + elementSpacing;
+        currentY += finalNameHeight + elementSpacing;
 
-        console.log(
-          `📝 Nom affiché: "${displayName}" (original: "${labelData.name}") à (${textX.toFixed(1)}, ${(currentY - nameHeight * scale - elementSpacing + fontSize * 0.35).toFixed(1)})`
-        );
+        console.log(`📝 Nom: "${displayName}" hauteur=${finalNameHeight}mm`);
       }
 
       // ✅ PRIX (style proéminent)
       if (style.showPrice && labelData.price) {
         const priceText = `${labelData.price.toFixed(2)} €`;
-        const fontSize = Math.max(8, (style.priceSize || 14) * scale);
+        const fontSize = Math.max(8, (style.priceSize || 14) * (finalPriceHeight / priceHeight));
 
         doc.setFontSize(fontSize);
         doc.setFont('helvetica', 'bold');
@@ -339,75 +355,92 @@ class ExportService {
         const textX = contentX + (contentWidth - textWidth) / 2;
 
         doc.text(priceText, textX, currentY + fontSize * 0.35);
-        currentY += priceHeight * scale + elementSpacing;
+        currentY += finalPriceHeight + elementSpacing;
 
-        console.log(
-          `💰 Prix affiché: "${priceText}" à (${textX.toFixed(1)}, ${(currentY - priceHeight * scale - elementSpacing + fontSize * 0.35).toFixed(1)})`
-        );
+        console.log(`💰 Prix: "${priceText}" hauteur=${finalPriceHeight}mm`);
       }
 
-      // ✅ CODE-BARRES AMÉLIORÉ AVEC CHIFFRES LISIBLES - FIX POSITION
+      // ✅ CODE-BARRES (TOUJOURS RESPECTER LA TAILLE DEMANDÉE)
       if (style.showBarcode && labelData.barcode && labelData.barcode.trim() !== '') {
         try {
-          // Créer un canvas temporaire pour le code-barres
           const canvas = document.createElement('canvas');
 
-          // ✅ DIMENSIONS ADAPTÉES À LA CELLULE
-          const targetBarcodeWidth = Math.min(contentWidth - 1, 35); // ✅ FIX : Plus petit pour mieux rentrer
-          const targetBarcodeHeight = Math.min(barcodeHeight * scale, contentHeight * 0.4); // ✅ FIX : Plus petit
+          // ✅ UTILISER LA VRAIE HAUTEUR DEMANDÉE PAR L'UTILISATEUR
+          const userBarcodeHeight = (style.barcodeHeight || 15) * 0.25; // Conversion plus réaliste
+          const targetBarcodeWidth = Math.min(contentWidth - 1, 35);
 
-          // ✅ RÉSOLUTION ÉLEVÉE POUR QUALITÉ
-          canvas.width = targetBarcodeWidth * 12; // ✅ FIX : Résolution adaptée
-          canvas.height = (targetBarcodeHeight + 4) * 6; // ✅ FIX : Espace pour les chiffres
+          canvas.width = targetBarcodeWidth * 10;
+          canvas.height = userBarcodeHeight * 8;
 
-          // ✅ GÉNÉRATION CODE-BARRES AVEC CHIFFRES LISIBLES
+          // Générer les barres avec la hauteur demandée
           JsBarcode(canvas, labelData.barcode, {
             format: 'EAN13',
-            width: 2, // ✅ FIX : Barres plus fines
-            height: targetBarcodeHeight * 3, // ✅ FIX : Hauteur des barres adaptée
-            displayValue: true, // ✅ AFFICHER les chiffres
-            fontSize: Math.max(10, 12 * scale), // ✅ FIX : Chiffres plus petits mais lisibles
-            textMargin: 2, // ✅ FIX : Marge entre barres et chiffres réduite
-            fontOptions: 'bold', // ✅ Chiffres en gras
+            width: 2,
+            height: userBarcodeHeight * 6, // ✅ Proportionnel à la demande utilisateur
+            displayValue: false,
             background: '#ffffff',
             lineColor: '#000000',
-            margin: 2, // ✅ FIX : Marge réduite
+            margin: 2,
           });
 
-          // Convertir en image et ajouter au PDF
+          // Position du code-barres (en bas de l'étiquette)
           const imgData = canvas.toDataURL('image/png');
           const barcodeX = contentX + (contentWidth - targetBarcodeWidth) / 2;
+          const barcodeY = contentY + contentHeight - finalBarcodeHeight;
 
-          // ✅ FIX : Ajuster la position Y pour être en bas de l'étiquette
-          const remainingHeight = contentY + contentHeight - currentY;
-          const totalBarcodeHeight = targetBarcodeHeight + 3; // Inclut l'espace pour les chiffres
-          const barcodeY = Math.max(currentY, contentY + contentHeight - totalBarcodeHeight);
+          doc.addImage(imgData, 'PNG', barcodeX, barcodeY, targetBarcodeWidth, userBarcodeHeight);
 
-          doc.addImage(imgData, 'PNG', barcodeX, barcodeY, targetBarcodeWidth, totalBarcodeHeight);
+          // Texte sous le code-barres
+          function formatEAN13Text(barcode) {
+            const cleanBarcode = barcode.replace(/[\s-]/g, '');
+            if (cleanBarcode.length === 13 && /^\d+$/.test(cleanBarcode)) {
+              return `${cleanBarcode[0]} ${cleanBarcode.slice(1, 7)} ${cleanBarcode.slice(7)}`;
+            }
+            if (cleanBarcode.length === 8 && /^\d+$/.test(cleanBarcode)) {
+              return `${cleanBarcode.slice(0, 4)} ${cleanBarcode.slice(4)}`;
+            }
+            if (cleanBarcode.length === 12 && /^\d+$/.test(cleanBarcode)) {
+              const ean13 = '0' + cleanBarcode;
+              return `${ean13[0]} ${ean13.slice(1, 7)} ${ean13.slice(7)}`;
+            }
+            return cleanBarcode;
+          }
+
+          const formattedText = formatEAN13Text(labelData.barcode);
+          const fontSize = Math.max(7, 9);
+          doc.setFontSize(fontSize);
+          doc.setFont('helvetica', 'normal');
+
+          const textWidth = doc.getTextWidth(formattedText);
+          const textX = contentX + (contentWidth - textWidth) / 2;
+          const textY = barcodeY + userBarcodeHeight + 3;
+
+          doc.text(formattedText, textX, textY);
 
           console.log(
-            `🏷️ Code-barres affiché: "${labelData.barcode}" à (${barcodeX.toFixed(1)}, ${barcodeY.toFixed(1)}) taille: ${targetBarcodeWidth}×${totalBarcodeHeight}mm`
+            `🏷️ Code-barres: hauteur demandée=${style.barcodeHeight}mm, appliquée=${userBarcodeHeight}mm`
           );
         } catch (barcodeError) {
-          console.warn('Erreur génération code-barres pour', labelData.barcode, barcodeError);
-
-          // Fallback : afficher le code en texte
-          const fontSize = Math.max(6, 8 * scale);
+          console.warn('Erreur génération code-barres:', barcodeError);
+          // Fallback simple
+          const fontSize = Math.max(8, 10);
           doc.setFontSize(fontSize);
           doc.setFont('helvetica', 'normal');
           const codeWidth = doc.getTextWidth(labelData.barcode);
           const codeX = contentX + (contentWidth - codeWidth) / 2;
-          doc.text(labelData.barcode, codeX, currentY + fontSize * 0.35);
-          currentY += fontSize + elementSpacing;
+          doc.text(labelData.barcode, codeX, contentY + contentHeight - 5);
         }
       }
+
+      console.log(
+        `✅ Étiquette "${labelData.name}" - Espace: ${contentHeight}mm, utilisé: ${totalNeededHeight}mm`
+      );
     } catch (error) {
       console.error('Erreur dessin étiquette:', error);
-
-      // Fallback : étiquette simple avec prix uniquement
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
+      // Fallback minimal
       if (labelData.price) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
         const priceText = `${labelData.price.toFixed(2)} €`;
         const textWidth = doc.getTextWidth(priceText);
         const textX = x + (width - textWidth) / 2;
