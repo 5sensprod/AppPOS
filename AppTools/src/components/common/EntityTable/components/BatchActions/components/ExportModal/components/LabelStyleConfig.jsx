@@ -1,4 +1,4 @@
-LabelStyleConfig.jsx; // 📁 components/LabelStyleConfig.jsx
+// 📁 components/LabelStyleConfig.jsx
 import React from 'react';
 import { Palette } from 'lucide-react';
 
