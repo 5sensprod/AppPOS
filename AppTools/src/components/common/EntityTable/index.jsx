@@ -106,7 +106,12 @@ const EntityTable = ({
     toggleSelection,
     selectAll,
     preserveSelectionOnNextDataChange,
-  } = useTableSelection(data, filteredData);
+    selectionInfo,
+  } = useTableSelection(data, filteredData, {
+    persist: true,
+    entityName: entityName.toLowerCase(), // 'product', 'category', etc.
+    pageKey: `${paginationEntityId}_${JSON.stringify(currentSelectedFilters)}`, // pour séparer par contexte/filtres
+  });
 
   const { toastActions, removeToast } = useActionToasts();
 
