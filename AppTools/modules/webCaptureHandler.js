@@ -120,7 +120,7 @@ function setupWebCaptureListener(ipcMainInstance) {
     });
 
     // Pour déboguer
-    captureWindow.webContents.openDevTools();
+    // captureWindow.webContents.openDevTools();
 
     // 2) Extrait la liste des produits depuis l'URL
     const match = url.match(/#APP_PRODUCTS_DATA=([^&]+)/);
