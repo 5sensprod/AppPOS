@@ -1,15 +1,13 @@
-// services/gemini/GeminiDirectService.js - Avec validation HTML améliorée
+// services/gemini/GeminiDirectService.js - Version nettoyée et fonctionnelle
 const axios = require('axios');
 const fs = require('fs');
 const apiConfig = require('./config/apiConfig');
 const { cleanGeneratedDescription } = require('./utils/cleanGeneratedDescription');
 const { getMimeType } = require('./utils/mimeTypeHelper');
 const { getChatResponsePrompt } = require('./prompts/chatResponse');
-// Ajout du service de validation HTML
-const htmlValidatorService = require('./utils/htmlValidatorService');
 
 /**
- * Service pour interagir avec l'API Gemini et générer des descriptions de produits
+ * Service pour interagir avec l'API Gemini
  */
 class GeminiDirectService {
   constructor() {
@@ -19,12 +17,7 @@ class GeminiDirectService {
   }
 
   /**
-   * Génère une réponse de chat adaptative basée sur le contexte de la conversation
-   * @param {Object} productData Les données du produit
-   * @param {string} userMessage Le message de l'utilisateur
-   * @param {Array} conversation L'historique de la conversation
-   * @param {Array} filePaths Les chemins des fichiers téléchargés
-   * @returns {Object} La réponse et la description générée
+   * Génère une réponse de chat
    */
   async generateChatResponse(productData, userMessage, conversation, filePaths) {
     try {
@@ -65,15 +58,12 @@ class GeminiDirectService {
       if (this._isValidResponse(response)) {
         const generatedText = response.data.candidates[0].content.parts[0].text;
 
-        // Utiliser cleanGeneratedDescription pour le nettoyage initial
+        // Nettoyer la description
         const cleanedDescription = cleanGeneratedDescription(generatedText);
-
-        // NOUVEAU : Validation supplémentaire avec le service de validation HTML
-        const validatedDescription = htmlValidatorService.validateAndClean(cleanedDescription);
 
         return {
           message: generatedText,
-          description: validatedDescription,
+          description: cleanedDescription,
           product_name: productData.name,
         };
       } else {
@@ -87,9 +77,6 @@ class GeminiDirectService {
 
   /**
    * Génère uniquement un titre pour un produit
-   * @param {Object} productData Données du produit
-   * @param {string} imagePath Chemin optionnel vers l'image du produit (non utilisé)
-   * @returns {Promise<Object>} Résultat de la génération
    */
   async generateProductTitle(productData, imagePath = null) {
     try {
@@ -135,11 +122,8 @@ class GeminiDirectService {
 
   /**
    * Nettoie la réponse de l'API pour extraire uniquement le titre
-   * @param {string} response Réponse brute de l'API
-   * @returns {string} Titre nettoyé
    */
   _cleanResponse(response) {
-    // Retirer les guillemets si présents
     let cleaned = response.trim();
     if (
       (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
@@ -148,9 +132,7 @@ class GeminiDirectService {
       cleaned = cleaned.substring(1, cleaned.length - 1);
     }
 
-    // Retirer les préfixes potentiels comme "Titre: " ou "Title: "
     cleaned = cleaned.replace(/^(titre\s*:|title\s*:)/i, '').trim();
-
     return cleaned;
   }
 

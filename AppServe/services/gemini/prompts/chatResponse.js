@@ -1,66 +1,59 @@
-// services/gemini/prompts/chatResponse.js
-const styleConfig = require('../config/styleConfig');
-const { createUniversalProductTemplate } = require('./promptTemplates');
+// services/gemini/prompts/chatResponse.js - Version ultra-légère
 
 /**
- * Génère un prompt pour les réponses de chat
+ * Génère un prompt simplifié pour les réponses de chat
  * @param {Object} productData Les données du produit
- * @returns {string} Le prompt formaté
+ * @returns {string} Le prompt formaté avec template intégré
  */
 function getChatResponsePrompt(productData) {
-  // Obtenir les styles inline
-  const styles = styleConfig.getInlineStyles();
-  // Créer le template de base
-  let template = createUniversalProductTemplate(styles);
-  // Construire le prompt spécifique au chat
-  const optimizedPrompt = `
-Crée une fiche produit e-commerce complète et détaillée pour ce ${productData.category || 'produit'} avec la structure HTML EXACTE suivante:
-${template}
-RÈGLES STRICTES:
-1. Pour le titre principal (h1):
-   - Crée un titre court et commercial (généralement 2-5 mots)
-   - Évite d'y mettre le numéro de référence ou SKU
-   - Prends en compte le message de l'utilisateur pour choisir ce titre
+  return `
+Crée une fiche produit e-commerce HTML complète pour "${productData.name || 'ce produit'}" avec cette structure :
 
-2. Pour la description:
-   - TRÈS IMPORTANT: La description DOIT commencer par "Le/La [type de produit]"
-   - Exemple: "Le casque 3000B offre..." ou "La perceuse XDR-500 combine..."
-   - Utilise le bon article (Le/La/L') selon le type de produit
-   - Évite d'y mettre le numéro de référence ou SKU
-   - DÉVELOPPE une description riche et commerciale (100-150 mots)
-   - Structure la description en 2-3 paragraphes avec des éléments convaincants
-   - Met en avant l'expertise, la qualité, les matériaux et l'usage du produit
-   - Inspire-toi de l'exemple: "Chez Prodipe Guitars, nous aimons les défis et nous préférons faire des basses à partir de 229 € qui défient celles à 400 ou 600 €..."
+<div class="wc-product-container" style="font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0;">
+  <h1 style="font-size: 24px; margin: 0 0 15px 0; padding: 0; color: #333;">[Titre court et commercial]</h1>
+  
+  <div class="wc-product-description" style="margin: 0 0 20px 0;">
+    <p style="margin: 0; padding: 0;">[Description commençant par "Le/La [produit]" - 2-3 phrases commerciales]</p>
+    <p style="margin: 0; padding: 0;">[2ème paragraphe développant qualités et usage]</p>
+  </div>
+  
+  <h2 style="font-size: 20px; margin: 25px 0 15px 0; padding: 0; color: #333;">Points Forts</h2>
+  <ul style="margin: 0 0 20px 0; padding: 0 0 0 20px; list-style-type: disc;">
+    <li style="margin: 0 0 8px 0; padding: 0;">[Avantage 1]</li>
+    <li style="margin: 0 0 8px 0; padding: 0;">[Avantage 2]</li>
+    <li style="margin: 0 0 8px 0; padding: 0;">[Avantage 3]</li>
+    <li style="margin: 0 0 8px 0; padding: 0;">[Avantage 4]</li>
+    <li style="margin: 0 0 0 0; padding: 0;">[Plus d'avantages si pertinent]</li>
+  </ul>
+  
+  <h2 style="font-size: 20px; margin: 25px 0 15px 0; padding: 0; color: #333;">Caractéristiques Techniques</h2>
+  <table style="width: 100%; border-collapse: collapse; margin: 0 0 20px 0;">
+    <tr style="background-color: #f5f5f5;">
+      <th style="text-align: left; padding: 10px; border: 1px solid #ddd; width: 40%;">Caractéristique</th>
+      <th style="text-align: left; padding: 10px; border: 1px solid #ddd; width: 60%;">Détail</th>
+    </tr>
+    <tr><td style="padding: 10px; border: 1px solid #ddd;">[Spec 1]</td><td style="padding: 10px; border: 1px solid #ddd;">[Valeur 1]</td></tr>
+    <tr><td style="padding: 10px; border: 1px solid #ddd;">[Spec 2]</td><td style="padding: 10px; border: 1px solid #ddd;">[Valeur 2]</td></tr>
+    [Ajoute 6-10 spécifications selon le produit]
+  </table>
+  
+  <h2 style="font-size: 20px; margin: 25px 0 15px 0; padding: 0; color: #333;">Conseils d'utilisation</h2>
+  <p style="margin: 0; padding: 0;">[2-3 conseils pratiques en 30-50 mots pour optimiser l'usage du produit]</p>
+</div>
 
-3. Points forts:
-   - Inclus entre 4 et 8 points forts pertinents selon la complexité du produit
-   - Chaque point fort doit être percutant et unique (une phrase par point)
-   - Ne liste que les caractéristiques vraiment différenciantes pour le client
+RÈGLES :
+- Remplace les textes entre crochets par du contenu réel
+- La description DOIT commencer par "Le/La [type de produit]"
+- Conserve TOUS les styles CSS exactement comme indiqués
+- 4-8 points forts percutants selon la complexité du produit
+- 8-12 spécifications techniques pertinentes
+- Réponds UNIQUEMENT avec le HTML final, sans commentaires
 
-4. Caractéristiques techniques:
-   - Inclus entre 8 et 13 caractéristiques techniques pertinentes
-   - Adapte les spécifications au type de produit concerné
-   - Privilégie les spécifications qui aident à la décision d'achat
-   - Organise-les des plus importantes aux moins importantes
-   - Ne laisse jamais de ligne avec une cellule detail vide
-
-5. Conseils d'utilisation:
-   - Rédige entre 30 et 50 mots de conseils pratiques
-   - Inclus au moins 2 conseils spécifiques et utiles
-   - Aide l'utilisateur à tirer le meilleur parti du produit
-   - La dernière ohrase doit être complete
-
-6. Formatage général:
-   - Remplace les instructions entre crochets par du contenu réel, puis SUPPRIME les crochets
-   - Conserve TOUS les attributs style="..." exactement comme indiqués
-   - Ne génère AUCUN texte ou commentaire en dehors de cette structure HTML
-   - N'utilise PAS de balises \`\`\`html ou \`\`\` autour du contenu
-
-Utilise les informations du produit fournies: ${JSON.stringify(productData)}
-Prends également en compte toutes les informations fournies par l'utilisateur dans son message et les images s'il en a envoyé.
-Ta réponse doit contenir UNIQUEMENT le HTML pur tel que montré, sans introduction ni conclusion.`;
-
-  return optimizedPrompt;
+Informations produit disponibles :
+${productData.category ? `- Catégorie: ${productData.category}` : ''}
+${productData.brand ? `- Marque: ${productData.brand}` : ''}
+${productData.price ? `- Prix: ${productData.price}€` : ''}
+${productData.currentDescription ? `- Description existante: ${productData.currentDescription.replace(/<[^>]*>/g, ' ').trim()}` : ''}`;
 }
 
 module.exports = { getChatResponsePrompt };

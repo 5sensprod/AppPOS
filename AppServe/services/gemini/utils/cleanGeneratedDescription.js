@@ -1,7 +1,4 @@
-// services/gemini/utils/cleanGeneratedDescription.js
-
-// Importer le nouveau service de validation
-const htmlValidatorService = require('./htmlValidatorService');
+// services/gemini/utils/cleanGeneratedDescription.js - Version ultra-simplifiée
 
 /**
  * Nettoie la description générée par l'IA pour supprimer les symboles Markdown
@@ -11,12 +8,13 @@ const htmlValidatorService = require('./htmlValidatorService');
  */
 function cleanGeneratedDescription(description) {
   if (!description) return '';
+
   let cleaned = description;
 
-  // 1. Supprimer tous les blocs de code markdown complètement
+  // 1. Supprimer les blocs de code markdown
   cleaned = cleaned.replace(/```[a-z]*\s*([\s\S]*?)```/g, '$1');
 
-  // 2. Extraire uniquement le contenu du body si structure HTML complète
+  // 2. Extraire le contenu du body si structure HTML complète
   if (cleaned.includes('<!DOCTYPE html>') || cleaned.includes('<html')) {
     const bodyMatch = cleaned.match(/<body>([\s\S]*?)<\/body>/i);
     if (bodyMatch && bodyMatch[1]) {
@@ -24,110 +22,81 @@ function cleanGeneratedDescription(description) {
     }
   }
 
-  // 3. Nettoyer les numéros de section et les explications
+  // 3. Supprimer les commentaires et explications
   cleaned = cleaned.replace(/^\s*\d+\.\s*/gm, '');
-
-  // 4. Supprimer les lignes qui sont des instructions ou des commentaires
   cleaned = cleaned.replace(/^(Voici|Voilà|Ici|J'ai créé|J'ai généré|Voici le code HTML).*$/gm, '');
   cleaned = cleaned.replace(/^(Note|Important|Remarque):.*$/gm, '');
-
-  // 5. Supprimer les balises script et commentaires HTML
-  cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
 
-  // 6. Protéger les attributs style avant conversions Markdown
-  const styleMatches = [];
-  let counter = 0;
-  cleaned = cleaned.replace(
-    /<([a-z0-9]+)([^>]*?style=["'](?:[^"'\\]|\\.)*["'])([^>]*)>/gi,
-    (match, tag, styleAttr, rest) => {
-      const placeholder = `__STYLE_PLACEHOLDER_${counter}__`;
-      styleMatches[counter] = { tag, styleAttr, rest };
-      counter++;
-      return placeholder;
-    }
-  );
+  // 4. Supprimer les balises dangereuses
+  const forbiddenTags = ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'];
+  forbiddenTags.forEach((tag) => {
+    const regex = new RegExp(`<${tag}[^>]*>.*?</${tag}>`, 'gi');
+    cleaned = cleaned.replace(regex, '');
+  });
 
-  // 7. Convertir le format Markdown pour les points forts et autres sections
+  // 5. Convertir Markdown en HTML simple
   cleaned = cleaned.replace(/\*\*([^*]+):\*\*/g, '<strong>$1:</strong>');
   cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   cleaned = cleaned.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
-  // 8. Restaurer les balises avec attributs style
-  for (let i = 0; i < styleMatches.length; i++) {
-    const { tag, styleAttr, rest } = styleMatches[i];
-    const placeholder = `__STYLE_PLACEHOLDER_${i}__`;
-    cleaned = cleaned.replace(placeholder, `<${tag}${styleAttr}${rest}>`);
+  // 6. Convertir listes Markdown en HTML (si pas déjà en HTML)
+  if (!cleaned.includes('<ul') && !cleaned.includes('<ol')) {
+    // Remplacer les listes à puces simples
+    cleaned = cleaned.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>');
+
+    // Envelopper les li consécutifs dans des ul
+    cleaned = cleaned.replace(/(<li>.*?<\/li>)(\s*<li>.*?<\/li>)+/gs, '<ul>$&</ul>');
   }
 
-  // 9. Remplacer les listes à puces Markdown par du HTML si non déjà formaté
-  if (!cleaned.includes('<ul style=')) {
-    cleaned = cleaned.replace(
-      /^\s*-\s+(.+)$/gm,
-      '<li style="margin: 0 0 8px 0; padding: 0;">$1</li>'
-    );
-    cleaned = cleaned.replace(
-      /^\s*\*\s+(.+)$/gm,
-      '<li style="margin: 0 0 8px 0; padding: 0;">$1</li>'
-    );
+  // 7. Nettoyer les événements JavaScript
+  cleaned = cleaned.replace(/\s(on\w+)=["'][^"']*["']/gi, '');
 
-    // Envelopper les items dans des balises ul
-    const liPattern = '(<li style[^>]*>[^<]*<\\/li>)';
-    const liRegex = new RegExp(`${liPattern}(\\s*${liPattern})*`, 'g');
-    cleaned = cleaned.replace(
-      liRegex,
-      '<ul style="margin: 0 0 20px 0; padding: 0 0 0 20px; list-style-type: disc;">$&</ul>'
-    );
-  }
-
-  // 10. S'assurer que les tableaux HTML sont bien formés
-  cleaned = cleaned.replace(/<table>\s*<tbody>/g, '<table>');
-  cleaned = cleaned.replace(/<\/tbody>\s*<\/table>/g, '</table>');
-  cleaned = cleaned.replace(/^```html\s*/i, '');
-
-  // Supprimer toute présence résiduelle de balises <html> ou <head>
-  cleaned = cleaned.replace(/<html[^>]*>/gi, '');
-  cleaned = cleaned.replace(/<\/html>/gi, '');
-  cleaned = cleaned.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
-
-  // 11. Échapper les chevrons isolés qui ne font pas partie de balises HTML
-  cleaned = cleaned.replace(/([^<])<([^a-z\/!\s])/gi, '$1&lt;$2');
-  cleaned = cleaned.replace(/([^0-9a-z"\/])>([^>])/gi, '$1&gt;$2');
-
-  // 12. Supprimer les balises non autorisées
-  const forbiddenTags = [
-    'iframe',
-    'object',
-    'embed',
-    'form',
-    'input',
-    'button',
-    'meta',
-    'link',
-    'style',
-    'head',
-    'html',
-    'body',
-  ];
-  forbiddenTags.forEach((tag) => {
-    const openTagRegex = new RegExp(`<${tag}[^>]*>`, 'gi');
-    const closeTagRegex = new RegExp(`</${tag}>`, 'gi');
-    cleaned = cleaned.replace(openTagRegex, '');
-    cleaned = cleaned.replace(closeTagRegex, '');
-  });
-
-  // 13. Nettoyer les événements JavaScript dans les attributs
-  cleaned = cleaned.replace(/\s(on\w+)="[^"]*"/gi, '');
-  cleaned = cleaned.replace(/\s(on\w+)='[^']*'/gi, '');
-
-  // 14. Nettoyer les espaces inutiles, les lignes vides multiples
+  // 8. Nettoyer les espaces et lignes vides multiples
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  cleaned = cleaned.replace(/\s{3,}/g, ' ');
   cleaned = cleaned.trim();
 
-  // 15. NOUVEAU : Validation finale et correction de la structure avec le service de validation
-  cleaned = htmlValidatorService.validateAndClean(cleaned);
+  // 9. Correction basique des balises non fermées
+  cleaned = fixBasicHtmlStructure(cleaned);
 
   return cleaned;
+}
+
+/**
+ * Correction basique des balises HTML mal fermées
+ * @param {string} html Le HTML à corriger
+ * @returns {string} Le HTML corrigé
+ */
+function fixBasicHtmlStructure(html) {
+  // Correction simple pour les balises les plus courantes
+  const tagPairs = [
+    ['<div', '</div>'],
+    ['<p', '</p>'],
+    ['<ul', '</ul>'],
+    ['<ol', '</ol>'],
+    ['<table', '</table>'],
+    ['<tr', '</tr>'],
+    ['<td', '</td>'],
+    ['<th', '</th>'],
+  ];
+
+  let fixed = html;
+
+  tagPairs.forEach(([openTag, closeTag]) => {
+    const openCount = (fixed.match(new RegExp(openTag, 'gi')) || []).length;
+    const closeCount = (fixed.match(new RegExp(closeTag.replace('</', '<\\/'), 'gi')) || []).length;
+
+    // Ajouter les balises fermantes manquantes
+    if (openCount > closeCount) {
+      const missing = openCount - closeCount;
+      for (let i = 0; i < missing; i++) {
+        fixed += closeTag;
+      }
+    }
+  });
+
+  return fixed;
 }
 
 module.exports = { cleanGeneratedDescription };
