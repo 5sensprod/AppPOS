@@ -1,11 +1,14 @@
+// routes/productTitleRoutes.js - Version nettoyée (Gemini direct)
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const ResponseHandler = require('../handlers/ResponseHandler');
+
+// Importer le service Gemini directement
 const geminiService = require('../services/gemini');
 
-// Configuration de Multer pour le stockage temporaire des fichiers
+// Configuration Multer
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/temp/');
@@ -17,13 +20,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-/**
- * Route pour générer uniquement un titre de produit
- * POST /api/product-title/generate
- */
+// Route pour générer un titre (utilisée par WooCommerceTab.jsx)
 router.post('/generate', upload.single('image'), async (req, res) => {
   try {
-    // Préparation des données du produit
+    console.log('🏷️ Génération de titre avec Gemini...');
+
     const productData = {
       name: req.body.name,
       category: req.body.category,
@@ -32,33 +33,17 @@ router.post('/generate', upload.single('image'), async (req, res) => {
       sku: req.body.sku,
       currentDescription: req.body.currentDescription,
       specifications: req.body.specifications ? JSON.parse(req.body.specifications) : {},
-      targetAudience: req.body.targetAudience || 'consommateurs',
     };
 
-    // Chemin de l'image téléchargée
     const imagePath = req.file ? req.file.path : null;
 
-    // Générer uniquement le titre en utilisant le service
+    // Appel direct au service Gemini
     const result = await geminiService.generateProductTitle(productData, imagePath);
 
+    console.log('✅ Titre Gemini généré:', result.success ? 'Succès' : 'Échec');
     return ResponseHandler.success(res, result);
   } catch (error) {
-    console.error('Erreur lors de la génération du titre:', error);
-    return ResponseHandler.error(res, error);
-  }
-});
-
-router.post('/generate-json', express.json(), async (req, res) => {
-  try {
-    // Récupérer les données directement depuis req.body qui est déjà un objet JSON
-    const productData = req.body;
-
-    // Générer uniquement le titre en utilisant le service
-    const result = await geminiService.generateProductTitle(productData);
-
-    return ResponseHandler.success(res, result);
-  } catch (error) {
-    console.error('Erreur lors de la génération du titre:', error);
+    console.error('❌ Erreur génération titre Gemini:', error);
     return ResponseHandler.error(res, error);
   }
 });

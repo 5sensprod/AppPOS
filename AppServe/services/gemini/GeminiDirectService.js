@@ -4,7 +4,6 @@ const fs = require('fs');
 const apiConfig = require('./config/apiConfig');
 const { cleanGeneratedDescription } = require('./utils/cleanGeneratedDescription');
 const { getMimeType } = require('./utils/mimeTypeHelper');
-const { getProductDescriptionPrompt } = require('./prompts/productDescription');
 const { getChatResponsePrompt } = require('./prompts/chatResponse');
 // Ajout du service de validation HTML
 const htmlValidatorService = require('./utils/htmlValidatorService');
@@ -17,51 +16,6 @@ class GeminiDirectService {
     this.apiKey = process.env.GEMINI_API_KEY;
     this.apiBaseUrl = apiConfig.baseUrl;
     this.modelName = apiConfig.modelName;
-  }
-
-  /**
-   * Génère une description de produit basée sur les données fournies
-   * @param {Object} productData Les données du produit
-   * @param {string} imagePath Chemin de l'image du produit (optionnel)
-   * @returns {Object} Description générée
-   */
-  async generateProductDescription(productData, imagePath) {
-    try {
-      // Obtenir le prompt formaté pour la description du produit
-      const textPrompt = getProductDescriptionPrompt(productData);
-
-      // Préparer la requête
-      const requestData = this._prepareApiRequest(textPrompt, 0.3);
-
-      // Ajouter une image si fournie
-      if (imagePath && fs.existsSync(imagePath)) {
-        this._addImageToRequest(requestData, imagePath);
-      }
-
-      // Envoyer la requête à l'API Gemini
-      const response = await this._sendApiRequest(requestData);
-
-      // Traiter la réponse
-      if (this._isValidResponse(response)) {
-        const rawDescription = response.data.candidates[0].content.parts[0].text;
-
-        // Utiliser cleanGeneratedDescription pour le nettoyage initial
-        const cleanedDescription = cleanGeneratedDescription(rawDescription);
-
-        // NOUVEAU : Validation supplémentaire avec le service de validation HTML
-        const validatedDescription = htmlValidatorService.validateAndClean(cleanedDescription);
-
-        return {
-          product_name: productData.name,
-          description: validatedDescription,
-        };
-      } else {
-        throw new Error('Format de réponse inattendu de Gemini');
-      }
-    } catch (error) {
-      console.error('Erreur lors de la génération de la description:', error);
-      throw new Error(`Échec de la génération de description: ${error.message}`);
-    }
   }
 
   /**
