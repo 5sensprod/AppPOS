@@ -93,7 +93,6 @@ app.use(
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
-app.use('/api/ai-admin', authMiddleware, require('./routes/aiAdminRoutes'));
 // Routes API (protégées par authentification)
 const categoryRoutes = require('./routes/categoryRoutes');
 const productRoutes = require('./routes/productRoutes');
