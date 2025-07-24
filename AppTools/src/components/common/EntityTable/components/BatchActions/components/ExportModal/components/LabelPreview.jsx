@@ -324,17 +324,6 @@ const LabelPreview = ({ labelData, customLayout, labelStyle }) => {
           </div>
         </div>
       </div>
-
-      {/* Avertissement de cohérence */}
-      <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded text-xs">
-        <div className="flex items-start">
-          <div className="text-amber-600 dark:text-amber-400 mr-2">⚠️</div>
-          <div className="text-amber-700 dark:text-amber-300">
-            <strong>Important:</strong> Cet aperçu utilise les dimensions exactes du PDF final. Le
-            code-barres est généré avec JsBarcode (identique au PDF).
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

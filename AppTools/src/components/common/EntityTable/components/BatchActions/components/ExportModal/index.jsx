@@ -8,7 +8,6 @@ import ExportTypeSelector from './components/ExportTypeSelector';
 import ExportFormatSelector from './components/ExportFormatSelector';
 import ExportOrientationSelector from './components/ExportOrientationSelector';
 import TableOptionsPanel from './components/TableOptionsPanel';
-import LabelsPreviewPanel from './components/LabelsPreviewPanel';
 import LabelsLayoutConfigurator from './components/LabelsLayoutConfigurator';
 import ExportSummary from './components/ExportSummary';
 import { useExportModal } from './hooks/useExportModal';
@@ -249,11 +248,6 @@ const ExportModal = ({
         {/* ✅ APERÇU DES ÉTIQUETTES (affiché seulement pour les étiquettes) */}
         {exportType === 'labels' && selectedItems.length > 0 && (
           <>
-            {/* <LabelsPreviewPanel
-              labelData={extractLabelData()}
-              selectedCount={selectedItems.length}
-            /> */}
-
             {/* ✅ NOUVEAU : CONFIGURATEUR DE MISE EN PAGE */}
             <LabelsLayoutConfigurator
               orientation={orientation}
