@@ -15,6 +15,7 @@ class Database {
       'drawer_sessions',
       'drawer_movements',
       'session_reports',
+      'label_presets',
     ];
     this.stores = {};
     this.initialized = false;
@@ -130,6 +131,12 @@ class Database {
       this.stores.drawer_movements.ensureIndex({ fieldName: 'cashier_id', unique: false });
       this.stores.drawer_movements.ensureIndex({ fieldName: 'created_at', unique: false });
       this.stores.drawer_movements.ensureIndex({ fieldName: 'type', unique: false });
+
+      // ✅ NOUVEAU : Index pour label_presets
+      this.stores.label_presets.ensureIndex({ fieldName: 'name', unique: false });
+      this.stores.label_presets.ensureIndex({ fieldName: 'user_id', unique: false });
+      this.stores.label_presets.ensureIndex({ fieldName: 'is_public', unique: false });
+      this.stores.label_presets.ensureIndex({ fieldName: 'created_at', unique: false });
 
       console.log('✅ [DATABASE] Index créés avec succès');
     } catch (error) {

@@ -1,13 +1,38 @@
 // 📁 components/LabelStyleConfig.jsx
 import React from 'react';
-import { Palette } from 'lucide-react';
+import { Palette, RotateCcw, Save } from 'lucide-react';
+import PresetManager from './PresetManager';
 
-const LabelStyleConfig = ({ labelStyle, onStyleChange }) => (
+const LabelStyleConfig = ({
+  labelStyle,
+  onStyleChange,
+  onReset,
+  // 🆕 Props pour presets
+  savedPresets = [],
+  onSavePreset,
+  onLoadPreset,
+  onDeletePreset,
+}) => (
   <div className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-600">
-    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-      <Palette className="h-4 w-4 mr-2" />
-      Style des étiquettes
-    </h4>
+    <div className="flex items-center justify-between mb-3">
+      <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center">
+        <Palette className="h-4 w-4 mr-2" />
+        Style des étiquettes
+      </h4>
+
+      {/* Bouton de réinitialisation */}
+      {onReset && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="flex items-center text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title="Réinitialiser aux valeurs par défaut"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          Réinitialiser
+        </button>
+      )}
+    </div>
 
     <div className="space-y-3">
       {/* Éléments à afficher */}
@@ -98,6 +123,24 @@ const LabelStyleConfig = ({ labelStyle, onStyleChange }) => (
           </div>
         )}
       </div>
+
+      {/* Indicateur de sauvegarde automatique */}
+      <div className="flex items-center justify-center pt-2 border-t border-gray-200 dark:border-gray-600">
+        <div className="flex items-center text-xs text-green-600 dark:text-green-400">
+          <Save className="h-3 w-3 mr-1" />
+          Paramètres sauvegardés automatiquement
+        </div>
+      </div>
+
+      {/* 🆕 Gestion des presets */}
+      {onSavePreset && (
+        <PresetManager
+          savedPresets={savedPresets}
+          onSavePreset={onSavePreset}
+          onLoadPreset={onLoadPreset}
+          onDeletePreset={onDeletePreset}
+        />
+      )}
     </div>
   </div>
 );

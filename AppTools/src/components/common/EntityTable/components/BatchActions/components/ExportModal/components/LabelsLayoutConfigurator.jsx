@@ -1,4 +1,4 @@
-// 📁 LabelsLayoutConfigurator.jsx (Version refactorisée)
+// 📁 LabelsLayoutConfigurator.jsx (Version avec presets)
 import React from 'react';
 import { Grid } from 'lucide-react';
 import { useLabelConfiguration } from '../hooks/useLabelConfiguration';
@@ -12,6 +12,8 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
   const {
     customLayout,
     labelStyle,
+    savedPresets,
+    loading,
     enableCellSelection,
     disabledCells,
     setEnableCellSelection,
@@ -19,6 +21,11 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
     calculateGridDimensions,
     handleCustomLayoutChange,
     handleStyleChange,
+    // 🆕 Fonctions pour presets via API
+    savePreset,
+    loadPreset,
+    deletePreset,
+    resetStyle,
   } = useLabelConfiguration(onLayoutChange);
 
   const gridDimensions = calculateGridDimensions();
@@ -33,7 +40,6 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
   const handleToggleCellSelection = (cellIndex, event) => {
     event.preventDefault();
     event.stopPropagation();
-
     const newDisabledCells = new Set(disabledCells);
     if (newDisabledCells.has(cellIndex)) {
       newDisabledCells.delete(cellIndex);
@@ -41,7 +47,6 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
       newDisabledCells.add(cellIndex);
     }
     setDisabledCells(newDisabledCells);
-
     if (onLayoutChange) {
       onLayoutChange({
         preset: 'custom',
@@ -72,7 +77,17 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
         onStyleChange={handleStyleChange}
       />
 
-      <LabelStyleConfig labelStyle={labelStyle} onStyleChange={handleStyleChange} />
+      {/* ✅ LabelStyleConfig avec toutes les fonctions de presets */}
+      <LabelStyleConfig
+        labelStyle={labelStyle}
+        onStyleChange={handleStyleChange}
+        onReset={resetStyle}
+        savedPresets={savedPresets}
+        loading={loading}
+        onSavePreset={savePreset}
+        onLoadPreset={loadPreset}
+        onDeletePreset={deletePreset}
+      />
 
       {labelData.length > 0 && (
         <LabelPreview labelData={labelData} customLayout={customLayout} labelStyle={labelStyle} />
