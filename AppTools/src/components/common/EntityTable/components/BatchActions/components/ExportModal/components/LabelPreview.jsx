@@ -75,15 +75,6 @@ const LabelPreview = ({ labelData, customLayout, labelStyle }) => {
   const previewWidth = customLayout.width * mmToPx;
   const previewHeight = customLayout.height * mmToPx;
 
-  // Calcul des dimensions de grille pour informations
-  const pageWidth = 210; // A4 en mm
-  const pageHeight = 297;
-  const usableWidth = pageWidth - customLayout.offsetLeft * 2;
-  const usableHeight = pageHeight - customLayout.offsetTop * 2;
-  const columns = Math.floor(usableWidth / (customLayout.width + customLayout.spacingH));
-  const rows = Math.floor(usableHeight / (customLayout.height + customLayout.spacingV));
-  const labelsPerPage = columns * rows;
-
   // ✅ Styles exacts avec gestion des marges identique au PDF
   const contentPadding = labelStyle.padding || 1; // Padding en mm, converti en px
   const labelStyles = {
@@ -218,110 +209,10 @@ const LabelPreview = ({ labelData, customLayout, labelStyle }) => {
         </div>
       </div>
 
-      {/* Informations de contexte détaillées */}
-      <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-xs">
-        <div className="grid grid-cols-2 gap-3 text-gray-600 dark:text-gray-400">
-          <div className="space-y-1">
-            <div className="flex items-center">
-              📄{' '}
-              <span className="ml-1">
-                Grille: {columns} × {rows}
-              </span>
-            </div>
-            <div className="flex items-center">
-              🏷️ <span className="ml-1">Par page: {labelsPerPage}</span>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center">
-              📊 <span className="ml-1">Total étiquettes: {labelData.length}</span>
-            </div>
-            <div className="flex items-center">
-              📑{' '}
-              <span className="ml-1">
-                Pages nécessaires: {Math.ceil(labelData.length / labelsPerPage)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Contexte de l'étiquette exemple */}
-        <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-600">
-          <div className="text-gray-700 dark:text-gray-300 font-medium mb-1">
-            Étiquette exemple: "{sampleLabel.name}"
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-gray-600 dark:text-gray-400">
-            <div>💰 Prix: {sampleLabel.price.toFixed(2)} €</div>
-            <div>📱 Code: {sampleLabel.barcode || 'Aucun'}</div>
-            <div>🏷️ SKU: {sampleLabel.sku || 'N/A'}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Aperçu de l'étiquette */}
+      {/* Aperçu de l'étiquette - Focus principal */}
       <div className="flex justify-center">
         <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
           <div style={labelStyles}>{renderLabelContent()}</div>
-
-          {/* Légende */}
-          <div className="mt-3 text-center">
-            <div className="text-xs text-gray-600 font-medium">
-              Aperçu 1:1 (taille exacte sur votre écran)
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              Cette vue correspond exactement au PDF généré
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Configuration active avec plus de détails */}
-      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-        <h5 className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-2 flex items-center">
-          <Eye className="h-3 w-3 mr-1" />
-          Configuration active:
-        </h5>
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div className="space-y-1">
-            {labelStyle.showPrice && (
-              <div className="text-blue-700 dark:text-blue-300">
-                ✓ Prix: {labelStyle.priceSize}px, gras
-              </div>
-            )}
-            {labelStyle.showName && (
-              <div className="text-blue-700 dark:text-blue-300">✓ Nom: {labelStyle.nameSize}px</div>
-            )}
-          </div>
-          <div className="space-y-1">
-            {labelStyle.showBarcode && (
-              <div className="text-blue-700 dark:text-blue-300">
-                ✓ Code-barres: {labelStyle.barcodeHeight}px (JsBarcode)
-              </div>
-            )}
-            {labelStyle.showBorder && (
-              <div className="text-blue-700 dark:text-blue-300">
-                ✓ Bordure: {labelStyle.borderWidth}px
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Dimensions et espacement */}
-        <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
-          <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">
-            Dimensions:
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-xs text-blue-700 dark:text-blue-300">
-            <div>
-              📐 {customLayout.width} × {customLayout.height} mm
-            </div>
-            <div>
-              📏 Offset: {customLayout.offsetTop}/{customLayout.offsetLeft} mm
-            </div>
-            <div>
-              ↔️ Espacement: {customLayout.spacingH}/{customLayout.spacingV} mm
-            </div>
-          </div>
         </div>
       </div>
     </div>

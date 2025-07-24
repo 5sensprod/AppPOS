@@ -1,5 +1,4 @@
 // AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\index.js
-// VERSION COMPLÈTE AVEC TOUS LES COMPOSANTS MODULAIRES
 
 import React, { useState, useEffect } from 'react';
 import { Download } from 'lucide-react';
