@@ -1,6 +1,8 @@
 // 📁 hooks/useLabelConfiguration.js
 import { useState, useEffect, useCallback } from 'react';
-import labelPresetService from '../../../../../../../../services/labelPresetService';
+import userPresetService from '../../../../../../../../services/userPresetService';
+
+const CATEGORY = 'label_style';
 
 // Valeurs par défaut
 const DEFAULT_STYLE = {
@@ -47,8 +49,8 @@ export const useLabelConfiguration = (onLayoutChange) => {
           setLabelStyle({ ...DEFAULT_STYLE, ...JSON.parse(savedStyle) });
         }
 
-        // Charger les presets depuis l'API
-        const presets = await labelPresetService.refreshPresets();
+        // Charger les presets depuis l'API générique
+        const presets = await userPresetService.refreshPresets(CATEGORY);
         setSavedPresets(presets);
 
         console.log('✅ Configuration étiquettes chargée:', {
@@ -113,7 +115,7 @@ export const useLabelConfiguration = (onLayoutChange) => {
     [labelStyle, customLayout, disabledCells, onLayoutChange]
   );
 
-  // 💾 SAUVEGARDER un preset via API
+  // 💾 SAUVEGARDER un preset via API générique
   const savePreset = useCallback(
     async (presetName, isPublic = false) => {
       if (!presetName.trim()) return false;
@@ -125,10 +127,15 @@ export const useLabelConfiguration = (onLayoutChange) => {
           layout: { ...customLayout },
         };
 
-        const newPreset = await labelPresetService.savePreset(presetName, configData, isPublic);
+        const newPreset = await userPresetService.savePreset(
+          CATEGORY,
+          presetName,
+          configData,
+          isPublic
+        );
 
         // Rafraîchir la liste locale
-        const updatedPresets = await labelPresetService.refreshPresets();
+        const updatedPresets = await userPresetService.refreshPresets(CATEGORY);
         setSavedPresets(updatedPresets);
 
         return newPreset;
@@ -142,15 +149,15 @@ export const useLabelConfiguration = (onLayoutChange) => {
     [labelStyle, customLayout]
   );
 
-  // 📂 CHARGER un preset via API
+  // 📂 CHARGER un preset via API générique
   const loadPreset = useCallback(
     async (presetId) => {
       setLoading(true);
       try {
-        const preset = await labelPresetService.loadPreset(presetId, savedPresets);
+        const preset = await userPresetService.loadPreset(CATEGORY, presetId, savedPresets);
         if (!preset) return false;
 
-        const { style, layout } = preset.config_data;
+        const { style, layout } = preset.preset_data;
 
         if (style) {
           setLabelStyle({ ...DEFAULT_STYLE, ...style });
@@ -182,14 +189,14 @@ export const useLabelConfiguration = (onLayoutChange) => {
     [savedPresets, customLayout, labelStyle, disabledCells, onLayoutChange]
   );
 
-  // 🗑️ SUPPRIMER un preset via API
+  // 🗑️ SUPPRIMER un preset via API générique
   const deletePreset = useCallback(async (presetId) => {
     setLoading(true);
     try {
-      await labelPresetService.deletePreset(presetId);
+      await userPresetService.deletePreset(CATEGORY, presetId);
 
       // Rafraîchir la liste locale
-      const updatedPresets = await labelPresetService.refreshPresets();
+      const updatedPresets = await userPresetService.refreshPresets(CATEGORY);
       setSavedPresets(updatedPresets);
 
       return true;
@@ -224,7 +231,7 @@ export const useLabelConfiguration = (onLayoutChange) => {
     handleCustomLayoutChange,
     handleStyleChange,
 
-    // 🆕 Fonctions pour presets via API
+    // 🆕 Fonctions pour presets via API générique
     savePreset,
     loadPreset,
     deletePreset,

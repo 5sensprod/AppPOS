@@ -1,4 +1,4 @@
-// 📁 components/PresetManager.jsx
+// 📁 components/PresetManager.jsx - Version générique
 import React, { useState } from 'react';
 import { Save, FolderOpen, Trash2, Plus } from 'lucide-react';
 
@@ -8,6 +8,8 @@ const PresetManager = ({
   onSavePreset,
   onLoadPreset,
   onDeletePreset,
+  title = 'Mes presets',
+  emptyMessage = 'Aucun preset sauvegardé',
 }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [presetName, setPresetName] = useState('');
@@ -39,7 +41,7 @@ const PresetManager = ({
   return (
     <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
       <div className="flex items-center justify-between mb-2">
-        <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300">Mes presets</h5>
+        <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300">{title}</h5>
 
         {!isCreating && (
           <button
@@ -107,9 +109,16 @@ const PresetManager = ({
                 <span className="truncate text-gray-700 dark:text-gray-300 font-medium">
                   {preset.name}
                 </span>
-                <span className="text-gray-500 dark:text-gray-400 text-xs">
-                  {preset.is_public ? '🌐 Public' : '👤 Personnel'}
-                </span>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {preset.is_public ? '🌐 Public' : '👤 Personnel'}
+                  </span>
+                  {preset.metadata?.support_type && (
+                    <span className="text-gray-500 dark:text-gray-400">
+                      📄 {preset.metadata.support_type}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex gap-1">
                 <button
@@ -135,7 +144,7 @@ const PresetManager = ({
           ))}
         </div>
       ) : (
-        <p className="text-xs text-gray-500 italic">Aucun preset sauvegardé</p>
+        <p className="text-xs text-gray-500 italic">{emptyMessage}</p>
       )}
     </div>
   );

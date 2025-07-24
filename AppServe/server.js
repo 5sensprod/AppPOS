@@ -105,6 +105,7 @@ const saleRoutes = require('./routes/saleRoutes');
 const timeRoutes = require('./routes/timeRoutes');
 const backupRoutes = require('./routes/backupRoutes');
 const labelPresetRoutes = require('./routes/labelPresetRoutes');
+const userPresetRoutes = require('./routes/userPresetRoutes');
 
 const wordpressMenuRoutes = require('./routes/wordpress/menuRoutes');
 
@@ -123,6 +124,7 @@ app.use('/api/backup', authMiddleware, backupRoutes);
 app.use('/api/reports', authMiddleware, require('./routes/reportsRoutes'));
 
 app.use('/api/presets/labels', labelPresetRoutes);
+app.use('/api/presets', userPresetRoutes);
 app.use('/api/wordpress/menu', authMiddleware, wordpressMenuRoutes);
 
 const dataCopyRoutes = require('./routes/dataCopyRoutes');
