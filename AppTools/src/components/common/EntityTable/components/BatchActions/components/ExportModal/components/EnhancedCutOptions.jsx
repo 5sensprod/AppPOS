@@ -22,28 +22,43 @@ const EnhancedCutOptions = ({ currentLayout, onLayoutChange }) => {
       name: "Groupes d'étiquettes",
       description: 'Plusieurs étiquettes puis coupure',
       icon: <Layers className="h-4 w-4" />,
-      settings: { cutPerLabel: false, labelsPerGroup: currentLayout.labelsPerGroup || 3 },
+      settings: { cutPerLabel: false, labelsPerGroup: 3 }, // ✅ Mettre 3 au lieu de currentLayout.labelsPerGroup
     },
   ];
 
   // Déterminer le mode actuel
   const getCurrentMode = () => {
+    console.log('🔍 Détection mode actuel:', {
+      cutPerLabel: currentLayout.cutPerLabel,
+      labelsPerGroup: currentLayout.labelsPerGroup,
+    });
+
     if (currentLayout.cutPerLabel === true) {
+      console.log('✅ Mode détecté: cut_per_label');
       return cutModes.find((m) => m.id === 'cut_per_label');
     }
-    if (currentLayout.labelsPerGroup > 1) {
+
+    // ✅ Changer la condition : si labelsPerGroup existe ET est différent de 1
+    if (currentLayout.labelsPerGroup && currentLayout.labelsPerGroup > 1) {
+      console.log('✅ Mode détecté: groups');
       return cutModes.find((m) => m.id === 'groups');
     }
+
+    console.log('✅ Mode détecté: continuous (par défaut)');
     return cutModes.find((m) => m.id === 'continuous');
   };
 
   const currentMode = getCurrentMode() || cutModes[0];
 
   const handleModeChange = (mode) => {
+    console.log('🔄 Changement de mode:', mode.id, mode.settings);
+
     const newSettings = {
       ...currentLayout,
       ...mode.settings,
     };
+
+    console.log('📤 Nouveaux paramètres:', newSettings);
 
     // Utiliser la clé spéciale 'cutMode' pour déclencher la logique dans le hook
     onLayoutChange('cutMode', newSettings);
