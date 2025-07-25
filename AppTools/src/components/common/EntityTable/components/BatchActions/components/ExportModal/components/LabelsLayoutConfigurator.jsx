@@ -1,4 +1,4 @@
-// 📁 LabelsLayoutConfigurator.jsx - Version nettoyée
+// LabelsLayoutConfigurator.jsx
 import React, { useEffect } from 'react';
 import { Grid } from 'lucide-react';
 import { useLabelConfiguration } from '../hooks/useLabelConfiguration';
@@ -10,7 +10,6 @@ import LabelPreview from './LabelPreview';
 import CellSelectionGrid from './CellSelectionGrid';
 
 const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, labelData = [] }) => {
-  // Hook pour les styles d'étiquettes
   const {
     labelStyle,
     savedPresets,
@@ -22,7 +21,6 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
     resetStyle,
   } = useLabelConfiguration();
 
-  // Hook pour les layouts de support (avec supportType)
   const {
     currentLayout,
     savedPresets: layoutPresets,
@@ -37,13 +35,11 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
     calculateGridDimensions,
   } = usePrintLayoutConfiguration();
 
-  // États locaux pour la sélection de cellules
   const [enableCellSelection, setEnableCellSelection] = React.useState(false);
   const [disabledCells, setDisabledCells] = React.useState(new Set());
 
   const gridDimensions = calculateGridDimensions();
 
-  // Transmission du layout complet vers le parent
   useEffect(() => {
     if (onLayoutChange && currentLayout) {
       onLayoutChange({
@@ -73,7 +69,6 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
     }
     setDisabledCells(newDisabledCells);
 
-    // Transmission immédiate des changements
     if (onLayoutChange) {
       onLayoutChange({
         preset: 'custom',
@@ -93,7 +88,6 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
         </h3>
       </div>
 
-      {/* Configuration des dimensions et support */}
       <LabelDimensionsConfig
         customLayout={currentLayout}
         onLayoutChange={handleLayoutChange}
@@ -107,14 +101,12 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
         onDeletePreset={deleteLayoutPreset}
       />
 
-      {/* Options d'impression */}
       <PrintOptionsConfig
         labelStyle={labelStyle}
         labelDataLength={labelData.length}
         onStyleChange={handleStyleChange}
       />
 
-      {/* Configuration des styles */}
       <LabelStyleConfig
         labelStyle={labelStyle}
         onStyleChange={handleStyleChange}
@@ -126,19 +118,20 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
         onDeletePreset={deletePreset}
       />
 
-      {/* Aperçu des étiquettes */}
       {labelData.length > 0 && (
         <LabelPreview labelData={labelData} customLayout={currentLayout} labelStyle={labelStyle} />
       )}
 
-      {/* Grille de sélection des cellules */}
-      <CellSelectionGrid
-        enableCellSelection={enableCellSelection}
-        disabledCells={disabledCells}
-        gridDimensions={gridDimensions}
-        onEnableCellSelection={handleEnableCellSelection}
-        onToggleCellSelection={handleToggleCellSelection}
-      />
+      {/* ✅ Afficher uniquement si ce n’est PAS un rouleau */}
+      {currentLayout?.supportType !== 'rouleau' && (
+        <CellSelectionGrid
+          enableCellSelection={enableCellSelection}
+          disabledCells={disabledCells}
+          gridDimensions={gridDimensions}
+          onEnableCellSelection={handleEnableCellSelection}
+          onToggleCellSelection={handleToggleCellSelection}
+        />
+      )}
     </div>
   );
 };

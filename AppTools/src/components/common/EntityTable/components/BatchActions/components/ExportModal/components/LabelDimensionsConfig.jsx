@@ -1,4 +1,4 @@
-// 📁 components/LabelDimensionsConfig.jsx - Version nettoyée
+//components/LabelDimensionsConfig.jsx
 import React from 'react';
 import { Settings, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
@@ -19,19 +19,39 @@ const LabelDimensionsConfig = ({
   onLoadPreset,
   onDeletePreset,
 }) => {
-  // Calcul des dimensions de grille
+  // Calcul des dimensions selon le type de support
   const calculateGridDimensions = () => {
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const usableWidth = pageWidth - (customLayout.offsetLeft || 8) * 2;
-    const usableHeight = pageHeight - (customLayout.offsetTop || 22) * 2;
-    const columns = Math.floor(
-      usableWidth / ((customLayout.width || 48.5) + (customLayout.spacingH || 0))
-    );
-    const rows = Math.floor(
-      usableHeight / ((customLayout.height || 25) + (customLayout.spacingV || 0))
-    );
-    return { columns, rows, total: columns * rows };
+    if (customLayout.supportType === 'rouleau') {
+      // Mode rouleau : 1 colonne, hauteur infinie
+      const rouleauWidth = customLayout.rouleau?.width || 58;
+      const labelWidth = customLayout.width || 48.5;
+      const offsetLeft = customLayout.offsetLeft || 5;
+
+      // Vérifier si l'étiquette rentre dans le rouleau
+      const maxLabelWidth = rouleauWidth - offsetLeft * 2;
+      const canFit = labelWidth <= maxLabelWidth;
+
+      return {
+        columns: 1,
+        rows: '∞',
+        total: '1 par ligne',
+        canFit,
+        maxLabelWidth: maxLabelWidth.toFixed(1),
+      };
+    } else {
+      // Mode A4 : grille classique
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const usableWidth = pageWidth - (customLayout.offsetLeft || 8) * 2;
+      const usableHeight = pageHeight - (customLayout.offsetTop || 22) * 2;
+      const columns = Math.floor(
+        usableWidth / ((customLayout.width || 48.5) + (customLayout.spacingH || 0))
+      );
+      const rows = Math.floor(
+        usableHeight / ((customLayout.height || 25) + (customLayout.spacingV || 0))
+      );
+      return { columns, rows, total: columns * rows, canFit: true };
+    }
   };
 
   const gridDimensions = calculateGridDimensions();
@@ -50,7 +70,10 @@ const LabelDimensionsConfig = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-600">
+    <div
+      key={`config-${customLayout?.supportType || 'default'}`}
+      className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-600"
+    >
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center">
           <Settings className="h-4 w-4 mr-2" />
@@ -70,17 +93,30 @@ const LabelDimensionsConfig = ({
         )}
       </div>
 
-      {/* Informations de grille */}
-      <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
-        <div className="flex items-center justify-between">
-          <span className="text-blue-700 dark:text-blue-300 font-medium">
-            📐 Grille: {gridDimensions.columns} × {gridDimensions.rows}
-          </span>
-          <span className="text-blue-600 dark:text-blue-400">
-            🏷️ Total: {gridDimensions.total} étiquettes/page
-          </span>
+      {/* Informations selon le type de support */}
+      {customLayout.supportType === 'rouleau' ? (
+        // Mode rouleau : informations simplifiées
+        <div className="mb-3 p-2 bg-green-50 dark:bg-green-900/20 rounded text-xs border border-green-200 dark:border-green-800">
+          <div className="flex items-center justify-between">
+            <span className="text-green-700 dark:text-green-300 font-medium">
+              Mode rouleau: 1 étiquette par ligne
+            </span>
+            <span className="text-green-600 dark:text-green-400">Impression continue</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        // Mode A4 : grille classique
+        <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-blue-700 dark:text-blue-300 font-medium">
+              Grille: {gridDimensions.columns} × {gridDimensions.rows}
+            </span>
+            <span className="text-blue-600 dark:text-blue-400">
+              Total: {gridDimensions.total} étiquettes/page
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Sélecteur de type de support */}
       <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded">
@@ -103,28 +139,23 @@ const LabelDimensionsConfig = ({
       {/* Configuration spécifique au rouleau */}
       {customLayout.supportType === 'rouleau' && (
         <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-700">
-          <h5 className="text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-2 flex items-center">
-            🎞️ Configuration rouleau
+          <h5 className="text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+            Configuration rouleau
           </h5>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-yellow-700 dark:text-yellow-300 mb-1">
-                Largeur rouleau (mm)
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                value={customLayout.rouleau?.width || 58}
-                onChange={(e) => handleChange('rouleau.width', e.target.value)}
-                className="w-full px-2 py-1 text-sm border border-yellow-300 dark:border-yellow-600 rounded focus:ring-1 focus:ring-yellow-500 bg-white dark:bg-gray-700"
-                placeholder="58"
-              />
-            </div>
-            <div className="flex items-end">
-              <div className="text-xs text-yellow-600 dark:text-yellow-400">
-                💡 Largeur standard: 58mm
-              </div>
-            </div>
+          <div>
+            <label className="block text-xs text-yellow-700 dark:text-yellow-300 mb-1">
+              Largeur rouleau (mm)
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              min="20"
+              max="200"
+              value={customLayout.rouleau?.width || 58}
+              onChange={(e) => handleChange('rouleau.width', e.target.value)}
+              className="w-full px-2 py-1 text-sm border border-yellow-300 dark:border-yellow-600 rounded focus:ring-1 focus:ring-yellow-500 bg-white dark:bg-gray-700"
+              placeholder="58"
+            />
           </div>
         </div>
       )}
