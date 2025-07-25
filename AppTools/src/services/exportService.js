@@ -1,5 +1,6 @@
 // src/services/exportService.js - Version nettoyée avec support rouleau
 import apiService from './api';
+import { formatCurrency } from '../utils/formatters';
 
 /**
  * Service pour gérer les exports de données
@@ -335,7 +336,7 @@ class ExportService {
 
       // Prix
       if (style.showPrice && labelData.price) {
-        const priceText = `${labelData.price.toFixed(2)} €`;
+        const priceText = formatCurrency(labelData.price); // ✅ Utilise votre formatter existant
         const fontSize = Math.max(8, (style.priceSize || 14) * (finalPriceHeight / priceHeight));
 
         doc.setFontSize(fontSize);
