@@ -1,6 +1,6 @@
-// 📁 components/LabelDimensionsConfig.jsx - Version sans hook propre
+// 📁 components/LabelDimensionsConfig.jsx - Version nettoyée
 import React from 'react';
-import { Settings, RotateCcw, Save } from 'lucide-react';
+import { Settings, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
 
 const LabelDimensionsConfig = ({
@@ -13,15 +13,12 @@ const LabelDimensionsConfig = ({
   ],
   onSupportTypeChange,
   onReset,
-  // 🆕 Props pour presets
   savedPresets = [],
   loading = false,
   onSavePreset,
   onLoadPreset,
   onDeletePreset,
 }) => {
-  console.log('🔍 LabelDimensionsConfig - customLayout reçu:', customLayout);
-
   // Calcul des dimensions de grille
   const calculateGridDimensions = () => {
     const pageWidth = 210;
@@ -39,19 +36,14 @@ const LabelDimensionsConfig = ({
 
   const gridDimensions = calculateGridDimensions();
 
-  // Wrapper pour les changements de layout
+  // Gestion des changements
   const handleChange = (field, value) => {
-    console.log('🔄 LabelDimensionsConfig handleChange:', field, value);
-
     if (onLayoutChange && typeof onLayoutChange === 'function') {
       onLayoutChange(field, value);
     }
   };
 
-  // Gestion du changement de type de support
   const handleSupportTypeChange = (newType) => {
-    console.log('🔄 LabelDimensionsConfig - Type de support changé vers:', newType);
-
     if (onSupportTypeChange && typeof onSupportTypeChange === 'function') {
       onSupportTypeChange(newType);
     }
@@ -65,7 +57,6 @@ const LabelDimensionsConfig = ({
           Configuration du support
         </h4>
 
-        {/* Bouton de réinitialisation */}
         {onReset && (
           <button
             type="button"
@@ -124,9 +115,7 @@ const LabelDimensionsConfig = ({
                 type="number"
                 step="0.1"
                 value={customLayout.rouleau?.width || 58}
-                onChange={(e) =>
-                  handleChange('rouleau', { width: parseFloat(e.target.value) || 58 })
-                }
+                onChange={(e) => handleChange('rouleau.width', e.target.value)}
                 className="w-full px-2 py-1 text-sm border border-yellow-300 dark:border-yellow-600 rounded focus:ring-1 focus:ring-yellow-500 bg-white dark:bg-gray-700"
                 placeholder="58"
               />
@@ -217,6 +206,8 @@ const LabelDimensionsConfig = ({
             value={customLayout.spacingH}
             onChange={(e) => handleChange('spacingH', e.target.value)}
             className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
+            disabled={customLayout.supportType === 'rouleau'}
+            title={customLayout.supportType === 'rouleau' ? 'Non applicable en mode rouleau' : ''}
           />
         </div>
       </div>

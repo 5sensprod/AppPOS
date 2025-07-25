@@ -1,10 +1,9 @@
-// 📁 hooks/usePrintLayoutConfiguration.js
+// 📁 hooks/usePrintLayoutConfiguration.js - Version nettoyée
 import { useState, useEffect, useCallback } from 'react';
 import userPresetService from '../../../../../../../../services/userPresetService';
 
 const CATEGORY = 'print_layout';
 
-// Valeurs par défaut pour A4
 const DEFAULT_LAYOUT = {
   width: 48.5,
   height: 25,
@@ -41,38 +40,26 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     },
   ]);
 
-  // 📥 CHARGER au démarrage
+  // Charger au démarrage
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        // Charger layout depuis localStorage (fallback)
         const savedLayout = localStorage.getItem('printLayoutSettings');
         if (savedLayout) {
           const parsed = JSON.parse(savedLayout);
-          // ✅ S'assurer que la structure est complète et que supportType est préservé
           const completeLayout = {
             ...DEFAULT_LAYOUT,
             ...parsed,
-            // Garantir que rouleau existe même si pas dans le localStorage
             rouleau: { ...DEFAULT_LAYOUT.rouleau, ...parsed.rouleau },
           };
           setCurrentLayout(completeLayout);
-          console.log('📥 Layout chargé depuis localStorage:', completeLayout);
-        } else {
-          console.log('📥 Utilisation du layout par défaut');
         }
 
-        // Charger les presets depuis l'API
         const presets = await userPresetService.refreshPresets(CATEGORY);
         setSavedPresets(presets);
-
-        console.log('✅ Configuration layout chargée:', {
-          layoutLocal: !!savedLayout,
-          presetsAPI: presets.length,
-        });
       } catch (error) {
-        console.warn('⚠️ Erreur chargement configurations layout:', error);
+        console.warn('Erreur chargement configurations layout:', error);
       } finally {
         setLoading(false);
       }
@@ -81,7 +68,7 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     loadData();
   }, []);
 
-  // 🔄 CHANGEMENT de type de support
+  // Changement de type de support
   const handleSupportTypeChange = useCallback(
     (newType) => {
       const supportType = supportTypes.find((t) => t.id === newType);
@@ -98,33 +85,48 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
       try {
         localStorage.setItem('printLayoutSettings', JSON.stringify(newLayout));
       } catch (error) {
-        console.warn('⚠️ Erreur sauvegarde layout local:', error);
+        console.warn('Erreur sauvegarde layout local:', error);
       }
 
-      // Notifier le parent
       if (onLayoutChange) {
         onLayoutChange(newLayout);
       }
-
-      console.log(`🔄 Support changé vers ${newType}:`, newLayout);
     },
     [currentLayout, onLayoutChange, supportTypes]
   );
+
+  // Changement de layout
   const handleLayoutChange = useCallback(
     (field, value) => {
-      const updatedLayout = {
-        ...currentLayout,
-        [field]: parseFloat(value) || 0,
-      };
+      let updatedLayout = { ...currentLayout };
+
+      // 🆕 Gérer les champs imbriqués (comme rouleau.width)
+      if (field === 'rouleau') {
+        // Si on passe un objet complet pour rouleau
+        updatedLayout.rouleau = {
+          ...currentLayout.rouleau,
+          ...value,
+        };
+      } else if (field.startsWith('rouleau.')) {
+        // Si on passe rouleau.width directement
+        const rouleauField = field.split('.')[1];
+        updatedLayout.rouleau = {
+          ...currentLayout.rouleau,
+          [rouleauField]: parseFloat(value) || 0,
+        };
+      } else {
+        // Champs simples
+        updatedLayout[field] = parseFloat(value) || 0;
+      }
+
       setCurrentLayout(updatedLayout);
 
       try {
         localStorage.setItem('printLayoutSettings', JSON.stringify(updatedLayout));
       } catch (error) {
-        console.warn('⚠️ Erreur sauvegarde layout local:', error);
+        console.warn('Erreur sauvegarde layout local:', error);
       }
 
-      // Notifier le parent
       if (onLayoutChange) {
         onLayoutChange(updatedLayout);
       }
@@ -132,7 +134,7 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     [currentLayout, onLayoutChange]
   );
 
-  // 💾 SAUVEGARDER un preset via API générique
+  // Sauvegarder un preset
   const savePreset = useCallback(
     async (presetName, isPublic = false) => {
       if (!presetName.trim()) return false;
@@ -150,13 +152,12 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
           metadata
         );
 
-        // Rafraîchir la liste locale
         const updatedPresets = await userPresetService.refreshPresets(CATEGORY);
         setSavedPresets(updatedPresets);
 
         return newPreset;
       } catch (error) {
-        console.error('❌ Erreur sauvegarde preset layout:', error);
+        console.error('Erreur sauvegarde preset layout:', error);
         return false;
       } finally {
         setLoading(false);
@@ -165,7 +166,7 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     [currentLayout]
   );
 
-  // 📂 CHARGER un preset via API générique
+  // Charger un preset
   const loadPreset = useCallback(
     async (presetId) => {
       setLoading(true);
@@ -176,30 +177,23 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
         const layoutData = preset.preset_data;
 
         if (layoutData) {
-          // ✅ S'assurer que la structure est complète
           const newLayout = {
             ...DEFAULT_LAYOUT,
             ...layoutData,
-            // Garantir que rouleau existe
             rouleau: { ...DEFAULT_LAYOUT.rouleau, ...layoutData.rouleau },
           };
 
           setCurrentLayout(newLayout);
-
-          // Sauvegarder aussi en local
           localStorage.setItem('printLayoutSettings', JSON.stringify(newLayout));
 
-          // Notifier le parent
           if (onLayoutChange) {
             onLayoutChange(newLayout);
           }
-
-          console.log('📂 Preset chargé:', newLayout);
         }
 
         return true;
       } catch (error) {
-        console.error('❌ Erreur chargement preset layout:', error);
+        console.error('Erreur chargement preset layout:', error);
         return false;
       } finally {
         setLoading(false);
@@ -208,32 +202,29 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     [savedPresets, onLayoutChange]
   );
 
-  // 🗑️ SUPPRIMER un preset via API générique
+  // Supprimer un preset
   const deletePreset = useCallback(async (presetId) => {
     setLoading(true);
     try {
       await userPresetService.deletePreset(CATEGORY, presetId);
-
-      // Rafraîchir la liste locale
       const updatedPresets = await userPresetService.refreshPresets(CATEGORY);
       setSavedPresets(updatedPresets);
-
       return true;
     } catch (error) {
-      console.error('❌ Erreur suppression preset layout:', error);
+      console.error('Erreur suppression preset layout:', error);
       return false;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 🔄 RÉINITIALISER le layout
+  // Réinitialiser le layout
   const resetLayout = useCallback(() => {
     setCurrentLayout(DEFAULT_LAYOUT);
     try {
       localStorage.removeItem('printLayoutSettings');
     } catch (error) {
-      console.warn('⚠️ Erreur réinitialisation layout:', error);
+      console.warn('Erreur réinitialisation layout:', error);
     }
 
     if (onLayoutChange) {
@@ -241,9 +232,9 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     }
   }, [onLayoutChange]);
 
-  // 📏 CALCULER les dimensions de grille
+  // Calculer les dimensions de grille
   const calculateGridDimensions = useCallback(() => {
-    const pageWidth = 210; // A4 en mm
+    const pageWidth = 210;
     const pageHeight = 297;
     const usableWidth = pageWidth - currentLayout.offsetLeft * 2;
     const usableHeight = pageHeight - currentLayout.offsetTop * 2;
@@ -260,8 +251,6 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     calculateGridDimensions,
     handleLayoutChange,
     handleSupportTypeChange,
-
-    // 🆕 Fonctions pour presets via API générique
     savePreset,
     loadPreset,
     deletePreset,

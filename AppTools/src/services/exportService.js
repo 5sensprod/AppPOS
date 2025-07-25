@@ -1,4 +1,4 @@
-// src/services/exportService.js - Version étendue avec support des étiquettes
+// src/services/exportService.js - Version nettoyée avec support rouleau
 import apiService from './api';
 
 /**
@@ -7,21 +7,15 @@ import apiService from './api';
 class ExportService {
   /**
    * Exporte les produits selon la configuration fournie
-   *
-   * @param {Object} exportConfig - Configuration de l'export
-   * @returns {Promise} - Promise qui résout à un Blob du fichier exporté
    */
   async exportProducts(exportConfig) {
     try {
       const { format = 'pdf', exportType = 'table' } = exportConfig;
 
-      // ✅ NOUVEAU : Gestion des étiquettes
       if (exportType === 'labels') {
-        console.log("🏷️ Export d'étiquettes demandé");
         return this.exportLabels(exportConfig);
       }
 
-      // Export classique (tableau)
       if (format === 'pdf') {
         return this.exportProductsToPDF(exportConfig);
       } else if (format === 'csv') {
@@ -36,31 +30,18 @@ class ExportService {
   }
 
   /**
-   * ✅ NOUVEAU : Exporte les étiquettes des produits
-   *
-   * @param {Object} exportConfig - Configuration de l'export
-   * @param {Array} exportConfig.selectedItems - IDs des produits sélectionnés
-   * @param {Array} exportConfig.labelData - Données des étiquettes extraites
-   * @param {Object} exportConfig.labelLayout - Configuration de mise en page
-   * @param {String} exportConfig.orientation - 'portrait' ou 'landscape'
-   * @param {String} exportConfig.title - Titre du document
-   * @returns {Promise} - Promise qui résout à un Blob PDF
+   * Exporte les étiquettes des produits
    */
   async exportLabels(exportConfig) {
     try {
-      console.log('🏷️ Début export étiquettes avec config:', exportConfig);
-
-      // ✅ VÉRIFICATION DES DONNÉES
       if (!exportConfig.labelData || exportConfig.labelData.length === 0) {
         throw new Error("Aucune donnée d'étiquette à exporter");
       }
 
-      // ✅ OPTION 1 : Export côté serveur (recommandé pour la production)
       if (this.shouldUseServerSideExport()) {
         return this.exportLabelsServerSide(exportConfig);
       }
 
-      // ✅ OPTION 2 : Export côté client (pour test et développement)
       return this.exportLabelsClientSide(exportConfig);
     } catch (error) {
       console.error("Erreur lors de l'export d'étiquettes:", error);
@@ -69,11 +50,10 @@ class ExportService {
   }
 
   /**
-   * ✅ NOUVEAU : Export d'étiquettes côté serveur
+   * Export d'étiquettes côté serveur
    */
   async exportLabelsServerSide(exportConfig) {
     try {
-      // Configuration pour l'API
       const serverConfig = {
         selectedItems: exportConfig.selectedItems,
         labelLayout: exportConfig.labelLayout || this.getDefaultLabelLayout(),
@@ -82,9 +62,6 @@ class ExportService {
         exportType: 'labels',
       };
 
-      console.log('🚀 Envoi vers serveur:', serverConfig);
-
-      // Appel API pour générer les étiquettes
       const response = await apiService.post('/api/products/export/labels', serverConfig, {
         responseType: 'blob',
       });
@@ -95,22 +72,15 @@ class ExportService {
       return response.data;
     } catch (error) {
       console.error('Erreur export étiquettes serveur:', error);
-      // Fallback vers export client
-      console.log('📱 Fallback vers export client...');
       return this.exportLabelsClientSide(exportConfig);
     }
   }
 
   /**
-   * ✅ NOUVEAU : Export d'étiquettes côté client (avec jsPDF)
-   */
-  /**
-   * ✅ NOUVEAU : Export d'étiquettes côté client (avec jsPDF)
+   * Export d'étiquettes côté client avec support rouleau
    */
   async exportLabelsClientSide(exportConfig) {
     try {
-      console.log('📱 Export côté client avec jsPDF');
-
       // Import dynamique des dépendances
       const { jsPDF } = await import('jspdf');
       const JsBarcode = (await import('jsbarcode')).default;
@@ -118,42 +88,22 @@ class ExportService {
       // Configuration
       const layout = exportConfig.labelLayout?.layout || this.getDefaultLabelLayout();
       const style = exportConfig.labelLayout?.style || this.getDefaultLabelStyle();
-      // ✅ DEBUGGING COMPLET
-      console.log('🔍 DEBUG exportConfig.labelLayout:', exportConfig.labelLayout);
-      console.log('🔍 DEBUG exportConfig.labelLayout.layout:', exportConfig.labelLayout?.layout);
-      console.log('🔍 DEBUG layout extrait:', layout);
-      console.log('🔍 DEBUG layout.supportType:', layout.supportType);
       const labelData = exportConfig.labelData;
-
-      // ✅ FIX : Récupérer les cases désactivées
       const disabledCells = exportConfig.labelLayout?.disabledCells || [];
-      console.log('🚫 Cases désactivées:', disabledCells);
 
-      // 🆕 DÉTECTER LE MODE ROULEAU
+      // Détecter le mode rouleau
       const isRollMode = layout.supportType === 'rouleau';
-      console.log('🔍 Mode détecté:', isRollMode ? 'ROULEAU' : 'A4');
-      console.log('🔍 layout.supportType:', layout.supportType);
-      console.log('🔍 layout complet:', layout);
 
-      // ✅ NOUVEAU : Dupliquer les étiquettes selon duplicateCount
+      // Dupliquer les étiquettes selon duplicateCount
       const duplicateCount = style.duplicateCount || 1;
       const duplicatedLabelData = [];
-
       for (const label of labelData) {
         for (let i = 0; i < duplicateCount; i++) {
           duplicatedLabelData.push(label);
         }
       }
 
-      console.log(
-        `🔄 Duplication: ${labelData.length} produits × ${duplicateCount} = ${duplicatedLabelData.length} étiquettes`
-      );
-
-      console.log('🎨 Layout:', layout);
-      console.log('🎨 Style:', style);
-      console.log('📋 Données:', duplicatedLabelData.length, 'étiquettes');
-
-      // 🆕 CALCUL DES DIMENSIONS SELON LE MODE
+      // Calcul des dimensions selon le mode
       let pageWidth,
         pageHeight,
         columns,
@@ -165,55 +115,35 @@ class ExportService {
         spacingV;
 
       if (isRollMode) {
-        // 🎗️ MODE ROULEAU : 1 colonne centrée
+        // Mode rouleau : 1 colonne centrée
         pageWidth = layout.rouleau?.width || 58;
-        pageHeight = 297; // Hauteur par défaut, sera ajustée si nécessaire
-
-        columns = 1; // ✅ UNE SEULE COLONNE
-        offsetLeft = (pageWidth - layout.width) / 2; // Centrer l'étiquette
+        pageHeight = 297;
+        columns = 1;
+        offsetLeft = (pageWidth - layout.width) / 2;
         offsetTop = layout.offsetTop || 5;
-        spacingH = 0; // Pas d'espacement horizontal
+        spacingH = 0;
         spacingV = layout.spacingV || 2;
 
-        // Calcul des lignes possibles
         const usableHeight = pageHeight - offsetTop * 2;
         rows = Math.floor(usableHeight / (layout.height + spacingV));
-        labelsPerPage = rows; // 1 colonne × rows lignes
-
-        console.log(`🎗️ MODE ROULEAU:`);
-        console.log(`  - Largeur rouleau: ${pageWidth}mm`);
-        console.log(`  - 1 colonne centrée`);
-        console.log(`  - ${rows} lignes par page = ${labelsPerPage} étiquettes/page`);
+        labelsPerPage = rows;
       } else {
-        // 📄 MODE A4 : Grille classique
-        pageWidth = 210; // A4 en mm
-        pageHeight = 297; // A4 en mm
-
+        // Mode A4 : Grille classique
+        pageWidth = 210;
+        pageHeight = 297;
         offsetLeft = layout.offsetLeft || 8;
         offsetTop = layout.offsetTop || 22;
         spacingH = layout.spacingH || 0;
         spacingV = layout.spacingV || 0;
 
-        // Largeur et hauteur utilisables
         const usableWidth = pageWidth - offsetLeft * 2;
         const usableHeight = pageHeight - offsetTop * 2;
-
-        // Nombre de colonnes/lignes possibles
         columns = Math.floor(usableWidth / (layout.width + spacingH));
         rows = Math.floor(usableHeight / (layout.height + spacingV));
         labelsPerPage = columns * rows;
-
-        console.log(`📄 MODE A4:`);
-        console.log(
-          `  - ${columns} colonnes × ${rows} lignes = ${labelsPerPage} étiquettes par page`
-        );
       }
 
-      console.log(
-        `📐 Dimensions: ${layout.width}×${layout.height}mm, Espacement: ${spacingH}×${spacingV}mm`
-      );
-
-      // Créer le PDF avec les bonnes dimensions
+      // Créer le PDF
       const doc = new jsPDF({
         orientation: isRollMode
           ? 'portrait'
@@ -224,23 +154,17 @@ class ExportService {
         format: isRollMode ? [pageWidth, pageHeight] : 'a4',
       });
 
-      // Vérifier la création du PDF
-      console.log('📄 PDF créé avec format:', isRollMode ? `${pageWidth}×${pageHeight}mm` : 'A4');
-
-      // ✅ FIX : Gérer les cases désactivées lors du placement
-      let labelIndex = 0; // Index dans duplicatedLabelData
+      // Placer les étiquettes
+      let labelIndex = 0;
       let currentPage = 0;
-      let totalCellsProcessed = 0;
 
       while (labelIndex < duplicatedLabelData.length) {
-        // Nouvelle page si nécessaire
         if (currentPage > 0) {
           if (isRollMode) {
             doc.addPage([pageWidth, pageHeight]);
           } else {
             doc.addPage();
           }
-          console.log(`📄 Nouvelle page ${currentPage + 1}`);
         }
 
         // Traiter chaque cellule de la page
@@ -251,34 +175,25 @@ class ExportService {
         ) {
           const absoluteCellIndex = currentPage * labelsPerPage + cellInPage;
 
-          // ✅ FIX : Vérifier si cette cellule est désactivée (seulement en mode A4)
+          // Vérifier si cette cellule est désactivée (seulement en mode A4)
           if (!isRollMode && disabledCells.includes(absoluteCellIndex)) {
-            console.log(`🚫 Case ${absoluteCellIndex} ignorée (désactivée)`);
-            totalCellsProcessed++;
-            continue; // Passer à la cellule suivante sans placer d'étiquette
+            continue;
           }
 
-          // Placer l'étiquette dans cette cellule
           const label = duplicatedLabelData[labelIndex];
-
           let x, y;
 
           if (isRollMode) {
-            // 🎗️ MODE ROULEAU : Position simple en colonne unique
-            x = offsetLeft; // Position X fixe (centrée)
+            // Mode rouleau : Position simple en colonne unique
+            x = offsetLeft;
             y = offsetTop + cellInPage * (layout.height + spacingV);
           } else {
-            // 📄 MODE A4 : Position en grille
+            // Mode A4 : Position en grille
             const col = cellInPage % columns;
             const row = Math.floor(cellInPage / columns);
-
             x = offsetLeft + col * (layout.width + spacingH);
             y = offsetTop + row * (layout.height + spacingV);
           }
-
-          console.log(
-            `🏷️ ${isRollMode ? 'ROULEAU' : 'A4'} - Étiquette ${labelIndex + 1} ("${label.name}") → ${isRollMode ? 'Position' : 'Case'} ${isRollMode ? cellInPage : absoluteCellIndex} à (${x.toFixed(1)}, ${y.toFixed(1)})`
-          );
 
           // Dessiner l'étiquette
           await this.drawLabelOnPDF(
@@ -289,23 +204,17 @@ class ExportService {
             JsBarcode
           );
 
-          labelIndex++; // Passer à l'étiquette suivante
-          totalCellsProcessed++;
+          labelIndex++;
         }
 
         currentPage++;
       }
-
-      console.log(
-        `✅ Export ${isRollMode ? 'ROULEAU' : 'A4'} terminé: ${labelIndex} étiquettes placées, ${totalCellsProcessed} positions traitées`
-      );
 
       // Sauvegarder le PDF
       const modeLabel = isRollMode ? 'rouleau' : 'A4';
       const filename = `${exportConfig.title || 'Etiquettes'}_${modeLabel}_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
 
-      console.log('✅ Export client terminé:', filename);
       return { success: true, filename };
     } catch (error) {
       console.error('Erreur export client:', error);
@@ -314,57 +223,42 @@ class ExportService {
   }
 
   /**
-   * ✅ Dessine une étiquette sur le PDF
+   * Dessine une étiquette sur le PDF
    */
   async drawLabelOnPDF(doc, labelData, position, style, JsBarcode) {
     const { x, y, width, height } = position;
 
     try {
-      // ✅ BORDURE (si activée)
+      // Bordure
       if (style.showBorder) {
         doc.setDrawColor('#000000');
         doc.setLineWidth(0.1);
         doc.rect(x, y, width, height);
       }
 
-      // ✅ ZONES DE CONTENU AVEC PADDING
+      // Zones de contenu avec padding
       const padding = style.padding || 1;
       const contentX = x + padding;
       const contentY = y + padding;
       const contentWidth = width - padding * 2;
       const contentHeight = height - padding * 2;
 
-      // ✅ NOUVEAU : CALCUL DYNAMIQUE INTELLIGENT
       let currentY = contentY;
       const elementSpacing = 1;
 
-      // ✅ 1. CALCULER LES TAILLES RÉELLES DES ÉLÉMENTS
-      const scale = 1; // On garde l'échelle fixe pour simplifier
-
-      // Tailles effectives des éléments
+      // Calcul des hauteurs
       const nameHeight = style.showName ? Math.max(2.5, (style.nameSize || 10) * 0.4) : 0;
       const priceHeight = style.showPrice ? Math.max(3, (style.priceSize || 14) * 0.4) : 0;
-
-      // ✅ HAUTEUR CODE-BARRES DYNAMIQUE (selon le réglage utilisateur)
-      const barcodeBarHeight = style.showBarcode ? (style.barcodeHeight || 15) * 0.3 : 0; // Hauteur des barres
-      const barcodeTextHeight = style.showBarcode ? 4 : 0; // Hauteur fixe pour le texte
+      const barcodeBarHeight = style.showBarcode ? (style.barcodeHeight || 15) * 0.3 : 0;
+      const barcodeTextHeight = style.showBarcode ? 4 : 0;
       const totalBarcodeHeight = barcodeBarHeight + barcodeTextHeight;
 
-      // ✅ 2. CALCULER L'ESPACE TOTAL NÉCESSAIRE
+      // Ajustement si nécessaire
       const totalNeededHeight = nameHeight + priceHeight + totalBarcodeHeight + elementSpacing * 4;
-
-      console.log(`📐 Espace disponible: ${contentHeight}mm, nécessaire: ${totalNeededHeight}mm`);
-      console.log(
-        `📐 Détail: nom=${nameHeight}, prix=${priceHeight}, code-barres=${totalBarcodeHeight}mm`
-      );
-
-      // ✅ 3. AJUSTEMENT INTELLIGENT
       let finalNameHeight = nameHeight;
       let finalPriceHeight = priceHeight;
-      let finalBarcodeHeight = totalBarcodeHeight;
 
       if (totalNeededHeight > contentHeight) {
-        // Si ça ne rentre pas, ajuster proportionnellement SAUF le code-barres
         const availableForFlexible = contentHeight - totalBarcodeHeight - elementSpacing * 3;
         const flexibleElementsHeight = nameHeight + priceHeight;
 
@@ -372,20 +266,15 @@ class ExportService {
           const reductionRatio = Math.max(0.5, availableForFlexible / flexibleElementsHeight);
           finalNameHeight = nameHeight * reductionRatio;
           finalPriceHeight = priceHeight * reductionRatio;
-
-          console.log(`⚠️ Ajustement: ratio=${reductionRatio.toFixed(2)}, code-barres préservé`);
         }
       }
 
-      // ✅ 4. PLACEMENT DES ÉLÉMENTS
-
-      // ✅ NOM DU PRODUIT (en haut si activé)
+      // Nom du produit
       if (style.showName && labelData.name) {
         const fontSize = Math.max(6, (style.nameSize || 10) * (finalNameHeight / nameHeight));
         doc.setFontSize(fontSize);
         doc.setFont('helvetica', 'bold');
 
-        // Cropping intelligent du nom (code existant)
         let displayName = labelData.name.trim();
         let textWidth = doc.getTextWidth(displayName);
 
@@ -408,11 +297,9 @@ class ExportService {
         const textX = contentX + (contentWidth - textWidth) / 2;
         doc.text(displayName, textX, currentY + fontSize * 0.35);
         currentY += finalNameHeight + elementSpacing;
-
-        console.log(`📝 Nom: "${displayName}" hauteur=${finalNameHeight}mm`);
       }
 
-      // ✅ PRIX (style proéminent)
+      // Prix
       if (style.showPrice && labelData.price) {
         const priceText = `${labelData.price.toFixed(2)} €`;
         const fontSize = Math.max(8, (style.priceSize || 14) * (finalPriceHeight / priceHeight));
@@ -425,57 +312,36 @@ class ExportService {
 
         doc.text(priceText, textX, currentY + fontSize * 0.35);
         currentY += finalPriceHeight + elementSpacing;
-
-        console.log(`💰 Prix: "${priceText}" hauteur=${finalPriceHeight}mm`);
       }
 
-      // ✅ CODE-BARRES (TOUJOURS RESPECTER LA TAILLE DEMANDÉE)
+      // Code-barres
       if (style.showBarcode && labelData.barcode && labelData.barcode.trim() !== '') {
         try {
           const canvas = document.createElement('canvas');
-
-          // ✅ UTILISER LA VRAIE HAUTEUR DEMANDÉE PAR L'UTILISATEUR
-          const userBarcodeHeight = (style.barcodeHeight || 15) * 0.25; // Conversion plus réaliste
+          const userBarcodeHeight = (style.barcodeHeight || 15) * 0.25;
           const targetBarcodeWidth = Math.min(contentWidth - 1, 35);
 
           canvas.width = targetBarcodeWidth * 10;
           canvas.height = userBarcodeHeight * 8;
 
-          // Générer les barres avec la hauteur demandée
           JsBarcode(canvas, labelData.barcode, {
             format: 'EAN13',
             width: 2,
-            height: userBarcodeHeight * 6, // ✅ Proportionnel à la demande utilisateur
+            height: userBarcodeHeight * 6,
             displayValue: false,
             background: '#ffffff',
             lineColor: '#000000',
             margin: 2,
           });
 
-          // Position du code-barres (en bas de l'étiquette)
           const imgData = canvas.toDataURL('image/png');
           const barcodeX = contentX + (contentWidth - targetBarcodeWidth) / 2;
-          const barcodeY = contentY + contentHeight - finalBarcodeHeight;
+          const barcodeY = contentY + contentHeight - totalBarcodeHeight;
 
           doc.addImage(imgData, 'PNG', barcodeX, barcodeY, targetBarcodeWidth, userBarcodeHeight);
 
           // Texte sous le code-barres
-          function formatEAN13Text(barcode) {
-            const cleanBarcode = barcode.replace(/[\s-]/g, '');
-            if (cleanBarcode.length === 13 && /^\d+$/.test(cleanBarcode)) {
-              return `${cleanBarcode[0]} ${cleanBarcode.slice(1, 7)} ${cleanBarcode.slice(7)}`;
-            }
-            if (cleanBarcode.length === 8 && /^\d+$/.test(cleanBarcode)) {
-              return `${cleanBarcode.slice(0, 4)} ${cleanBarcode.slice(4)}`;
-            }
-            if (cleanBarcode.length === 12 && /^\d+$/.test(cleanBarcode)) {
-              const ean13 = '0' + cleanBarcode;
-              return `${ean13[0]} ${ean13.slice(1, 7)} ${ean13.slice(7)}`;
-            }
-            return cleanBarcode;
-          }
-
-          const formattedText = formatEAN13Text(labelData.barcode);
+          const formattedText = this.formatEAN13Text(labelData.barcode);
           const fontSize = Math.max(7, 9);
           doc.setFontSize(fontSize);
           doc.setFont('helvetica', 'normal');
@@ -485,13 +351,9 @@ class ExportService {
           const textY = barcodeY + userBarcodeHeight + 3;
 
           doc.text(formattedText, textX, textY);
-
-          console.log(
-            `🏷️ Code-barres: hauteur demandée=${style.barcodeHeight}mm, appliquée=${userBarcodeHeight}mm`
-          );
         } catch (barcodeError) {
           console.warn('Erreur génération code-barres:', barcodeError);
-          // Fallback simple
+          // Fallback
           const fontSize = Math.max(8, 10);
           doc.setFontSize(fontSize);
           doc.setFont('helvetica', 'normal');
@@ -500,10 +362,6 @@ class ExportService {
           doc.text(labelData.barcode, codeX, contentY + contentHeight - 5);
         }
       }
-
-      console.log(
-        `✅ Étiquette "${labelData.name}" - Espace: ${contentHeight}mm, utilisé: ${totalNeededHeight}mm`
-      );
     } catch (error) {
       console.error('Erreur dessin étiquette:', error);
       // Fallback minimal
@@ -519,7 +377,25 @@ class ExportService {
   }
 
   /**
-   * ✅ NOUVEAU : Configuration par défaut pour les étiquettes
+   * Formatage du texte EAN13
+   */
+  formatEAN13Text(barcode) {
+    const cleanBarcode = barcode.replace(/[\s-]/g, '');
+    if (cleanBarcode.length === 13 && /^\d+$/.test(cleanBarcode)) {
+      return `${cleanBarcode[0]} ${cleanBarcode.slice(1, 7)} ${cleanBarcode.slice(7)}`;
+    }
+    if (cleanBarcode.length === 8 && /^\d+$/.test(cleanBarcode)) {
+      return `${cleanBarcode.slice(0, 4)} ${cleanBarcode.slice(4)}`;
+    }
+    if (cleanBarcode.length === 12 && /^\d+$/.test(cleanBarcode)) {
+      const ean13 = '0' + cleanBarcode;
+      return `${ean13[0]} ${ean13.slice(1, 7)} ${ean13.slice(7)}`;
+    }
+    return cleanBarcode;
+  }
+
+  /**
+   * Configuration par défaut
    */
   getDefaultLabelLayout() {
     return {
@@ -529,6 +405,8 @@ class ExportService {
       offsetLeft: 8,
       spacingH: 0,
       spacingV: 0,
+      supportType: 'A4',
+      rouleau: { width: 58 },
     };
   }
 
@@ -536,31 +414,26 @@ class ExportService {
     return {
       fontSize: 12,
       fontFamily: 'Arial',
-      showBorder: false, // ✅ Désactivé par défaut
+      showBorder: false,
       borderWidth: 0.5,
       borderColor: '#000000',
       padding: 2,
       alignment: 'center',
-      showBarcode: true, // ✅ Activé par défaut
+      showBarcode: true,
       barcodeHeight: 15,
-      showPrice: true, // ✅ Activé par défaut
+      showPrice: true,
       priceSize: 14,
-      showName: false, // ✅ Désactivé par défaut
+      showName: false,
       nameSize: 10,
     };
   }
 
-  /**
-   * ✅ NOUVEAU : Détermine si on utilise l'export serveur
-   */
   shouldUseServerSideExport() {
-    // Pour l'instant, utiliser côté client pour le développement
-    // En production, vous pourrez activer le serveur
-    return false; // Changez en true quand l'API serveur sera prête
+    return false; // Client-side pour l'instant
   }
 
   /**
-   * Exporte les produits au format PDF (méthode existante)
+   * Export PDF classique
    */
   async exportProductsToPDF(exportConfig) {
     try {
@@ -571,8 +444,6 @@ class ExportService {
         title: exportConfig.title,
         customColumn: exportConfig.customColumn,
       };
-
-      console.log("Demande d'export PDF avec configuration optimisée:", streamlinedConfig);
 
       const response = await apiService.post('/api/products/export/pdf', streamlinedConfig, {
         responseType: 'blob',
@@ -589,7 +460,7 @@ class ExportService {
   }
 
   /**
-   * Exporte des produits au format CSV (méthode existante)
+   * Export CSV
    */
   async exportProductsToCSV(exportConfig) {
     try {
@@ -599,8 +470,6 @@ class ExportService {
         title: exportConfig.title,
         customColumn: exportConfig.customColumn,
       };
-
-      console.log("Demande d'export CSV avec configuration optimisée:", streamlinedConfig);
 
       const response = await apiService.post('/api/products/export/csv', streamlinedConfig, {
         responseType: 'blob',
@@ -617,7 +486,7 @@ class ExportService {
   }
 
   /**
-   * Télécharge un blob comme fichier (méthode existante)
+   * Télécharge un blob comme fichier
    */
   downloadBlob(blob, filename, mimeType) {
     const url = window.URL.createObjectURL(new Blob([blob], { type: mimeType }));
