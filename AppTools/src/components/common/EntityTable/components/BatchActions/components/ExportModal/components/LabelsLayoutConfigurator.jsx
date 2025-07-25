@@ -1,7 +1,8 @@
-// 📁 LabelsLayoutConfigurator.jsx (Version avec presets)
-import React from 'react';
+// 📁 LabelsLayoutConfigurator.jsx (Version avec presets + fix supportType)
+import React, { useEffect } from 'react';
 import { Grid } from 'lucide-react';
 import { useLabelConfiguration } from '../hooks/useLabelConfiguration';
+import { usePrintLayoutConfiguration } from '../hooks/usePrintLayoutConfiguration';
 import LabelDimensionsConfig from './LabelDimensionsConfig';
 import PrintOptionsConfig from './PrintOptionsConfig';
 import LabelStyleConfig from './LabelStyleConfig';
@@ -9,26 +10,51 @@ import LabelPreview from './LabelPreview';
 import CellSelectionGrid from './CellSelectionGrid';
 
 const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, labelData = [] }) => {
+  // 🎨 Hook pour les styles d'étiquettes
   const {
-    customLayout,
     labelStyle,
     savedPresets,
     loading,
-    enableCellSelection,
-    disabledCells,
-    setEnableCellSelection,
-    setDisabledCells,
-    calculateGridDimensions,
-    handleCustomLayoutChange,
     handleStyleChange,
-    // 🆕 Fonctions pour presets via API
     savePreset,
     loadPreset,
     deletePreset,
     resetStyle,
-  } = useLabelConfiguration(onLayoutChange);
+  } = useLabelConfiguration();
+
+  // 📏 Hook pour les layouts de support (avec supportType)
+  const {
+    currentLayout,
+    savedPresets: layoutPresets,
+    supportTypes,
+    loading: layoutLoading,
+    handleLayoutChange,
+    handleSupportTypeChange,
+    savePreset: saveLayoutPreset,
+    loadPreset: loadLayoutPreset,
+    deletePreset: deleteLayoutPreset,
+    resetLayout,
+    calculateGridDimensions,
+  } = usePrintLayoutConfiguration();
+
+  // 🔧 États locaux pour la sélection de cellules
+  const [enableCellSelection, setEnableCellSelection] = React.useState(false);
+  const [disabledCells, setDisabledCells] = React.useState(new Set());
 
   const gridDimensions = calculateGridDimensions();
+
+  // ✅ TRANSMISSION : Layout complet avec supportType vers le parent
+  useEffect(() => {
+    if (onLayoutChange && currentLayout) {
+      console.log('🔄 Transmission layout complet vers parent:', currentLayout);
+      onLayoutChange({
+        preset: 'custom',
+        layout: currentLayout, // ✅ Contient supportType, rouleau, etc.
+        style: labelStyle,
+        disabledCells: Array.from(disabledCells),
+      });
+    }
+  }, [currentLayout, labelStyle, disabledCells, onLayoutChange]);
 
   const handleEnableCellSelection = (enabled) => {
     setEnableCellSelection(enabled);
@@ -47,10 +73,12 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
       newDisabledCells.add(cellIndex);
     }
     setDisabledCells(newDisabledCells);
+
+    // ✅ Transmission immédiate des changements
     if (onLayoutChange) {
       onLayoutChange({
         preset: 'custom',
-        layout: customLayout,
+        layout: currentLayout, // ✅ Avec supportType
         style: labelStyle,
         disabledCells: Array.from(newDisabledCells),
       });
@@ -66,9 +94,19 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
         </h3>
       </div>
 
+      {/* ✅ Layout avec supportType */}
       <LabelDimensionsConfig
-        customLayout={customLayout}
-        onLayoutChange={handleCustomLayoutChange}
+        customLayout={currentLayout}
+        onLayoutChange={handleLayoutChange}
+        supportTypes={supportTypes}
+        onSupportTypeChange={handleSupportTypeChange}
+        onReset={resetLayout}
+        // 🆕 Presets de layout
+        savedPresets={layoutPresets}
+        loading={layoutLoading}
+        onSavePreset={saveLayoutPreset}
+        onLoadPreset={loadLayoutPreset}
+        onDeletePreset={deleteLayoutPreset}
       />
 
       <PrintOptionsConfig
@@ -77,7 +115,7 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
         onStyleChange={handleStyleChange}
       />
 
-      {/* ✅ LabelStyleConfig avec toutes les fonctions de presets */}
+      {/* ✅ Styles avec presets */}
       <LabelStyleConfig
         labelStyle={labelStyle}
         onStyleChange={handleStyleChange}
@@ -90,7 +128,7 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
       />
 
       {labelData.length > 0 && (
-        <LabelPreview labelData={labelData} customLayout={customLayout} labelStyle={labelStyle} />
+        <LabelPreview labelData={labelData} customLayout={currentLayout} labelStyle={labelStyle} />
       )}
 
       <CellSelectionGrid

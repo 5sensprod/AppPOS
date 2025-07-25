@@ -13,6 +13,7 @@ const DEFAULT_LAYOUT = {
   spacingV: 0,
   spacingH: 0,
   supportType: 'A4',
+  rouleau: { width: 58 },
 };
 
 export const usePrintLayoutConfiguration = (onLayoutChange) => {
@@ -24,16 +25,19 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
       id: 'A4',
       name: 'A4 (210×297mm)',
       description: 'Feuille A4 standard',
+      defaults: { width: 48.5, height: 25, offsetTop: 22, offsetLeft: 8, spacingV: 0, spacingH: 0 },
     },
     {
       id: 'rouleau',
       name: "Rouleau d'étiquettes",
       description: 'Support rouleau continu',
+      defaults: { width: 50, height: 30, offsetTop: 5, offsetLeft: 5, spacingV: 2, spacingH: 0 },
     },
     {
       id: 'custom',
       name: 'Format personnalisé',
       description: 'Dimensions sur mesure',
+      defaults: { width: 50, height: 25, offsetTop: 10, offsetLeft: 10, spacingV: 0, spacingH: 0 },
     },
   ]);
 
@@ -45,7 +49,18 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
         // Charger layout depuis localStorage (fallback)
         const savedLayout = localStorage.getItem('printLayoutSettings');
         if (savedLayout) {
-          setCurrentLayout({ ...DEFAULT_LAYOUT, ...JSON.parse(savedLayout) });
+          const parsed = JSON.parse(savedLayout);
+          // ✅ S'assurer que la structure est complète et que supportType est préservé
+          const completeLayout = {
+            ...DEFAULT_LAYOUT,
+            ...parsed,
+            // Garantir que rouleau existe même si pas dans le localStorage
+            rouleau: { ...DEFAULT_LAYOUT.rouleau, ...parsed.rouleau },
+          };
+          setCurrentLayout(completeLayout);
+          console.log('📥 Layout chargé depuis localStorage:', completeLayout);
+        } else {
+          console.log('📥 Utilisation du layout par défaut');
         }
 
         // Charger les presets depuis l'API
@@ -66,7 +81,35 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     loadData();
   }, []);
 
-  // 💾 SAUVEGARDER automatiquement le layout (localStorage pour réactivité)
+  // 🔄 CHANGEMENT de type de support
+  const handleSupportTypeChange = useCallback(
+    (newType) => {
+      const supportType = supportTypes.find((t) => t.id === newType);
+      if (!supportType) return;
+
+      const newLayout = {
+        ...currentLayout,
+        supportType: newType,
+        ...supportType.defaults,
+      };
+
+      setCurrentLayout(newLayout);
+
+      try {
+        localStorage.setItem('printLayoutSettings', JSON.stringify(newLayout));
+      } catch (error) {
+        console.warn('⚠️ Erreur sauvegarde layout local:', error);
+      }
+
+      // Notifier le parent
+      if (onLayoutChange) {
+        onLayoutChange(newLayout);
+      }
+
+      console.log(`🔄 Support changé vers ${newType}:`, newLayout);
+    },
+    [currentLayout, onLayoutChange, supportTypes]
+  );
   const handleLayoutChange = useCallback(
     (field, value) => {
       const updatedLayout = {
@@ -133,7 +176,14 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
         const layoutData = preset.preset_data;
 
         if (layoutData) {
-          const newLayout = { ...DEFAULT_LAYOUT, ...layoutData };
+          // ✅ S'assurer que la structure est complète
+          const newLayout = {
+            ...DEFAULT_LAYOUT,
+            ...layoutData,
+            // Garantir que rouleau existe
+            rouleau: { ...DEFAULT_LAYOUT.rouleau, ...layoutData.rouleau },
+          };
+
           setCurrentLayout(newLayout);
 
           // Sauvegarder aussi en local
@@ -143,6 +193,8 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
           if (onLayoutChange) {
             onLayoutChange(newLayout);
           }
+
+          console.log('📂 Preset chargé:', newLayout);
         }
 
         return true;
@@ -207,6 +259,7 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     loading,
     calculateGridDimensions,
     handleLayoutChange,
+    handleSupportTypeChange,
 
     // 🆕 Fonctions pour presets via API générique
     savePreset,

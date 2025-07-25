@@ -104,6 +104,9 @@ class ExportService {
   /**
    * ✅ NOUVEAU : Export d'étiquettes côté client (avec jsPDF)
    */
+  /**
+   * ✅ NOUVEAU : Export d'étiquettes côté client (avec jsPDF)
+   */
   async exportLabelsClientSide(exportConfig) {
     try {
       console.log('📱 Export côté client avec jsPDF');
@@ -115,11 +118,22 @@ class ExportService {
       // Configuration
       const layout = exportConfig.labelLayout?.layout || this.getDefaultLabelLayout();
       const style = exportConfig.labelLayout?.style || this.getDefaultLabelStyle();
+      // ✅ DEBUGGING COMPLET
+      console.log('🔍 DEBUG exportConfig.labelLayout:', exportConfig.labelLayout);
+      console.log('🔍 DEBUG exportConfig.labelLayout.layout:', exportConfig.labelLayout?.layout);
+      console.log('🔍 DEBUG layout extrait:', layout);
+      console.log('🔍 DEBUG layout.supportType:', layout.supportType);
       const labelData = exportConfig.labelData;
 
       // ✅ FIX : Récupérer les cases désactivées
       const disabledCells = exportConfig.labelLayout?.disabledCells || [];
       console.log('🚫 Cases désactivées:', disabledCells);
+
+      // 🆕 DÉTECTER LE MODE ROULEAU
+      const isRollMode = layout.supportType === 'rouleau';
+      console.log('🔍 Mode détecté:', isRollMode ? 'ROULEAU' : 'A4');
+      console.log('🔍 layout.supportType:', layout.supportType);
+      console.log('🔍 layout complet:', layout);
 
       // ✅ NOUVEAU : Dupliquer les étiquettes selon duplicateCount
       const duplicateCount = style.duplicateCount || 1;
@@ -139,38 +153,79 @@ class ExportService {
       console.log('🎨 Style:', style);
       console.log('📋 Données:', duplicatedLabelData.length, 'étiquettes');
 
-      // ✅ CALCUL FIXE DES DIMENSIONS ET POSITIONS
-      const pageWidth = 210; // A4 en mm
-      const pageHeight = 297; // A4 en mm
+      // 🆕 CALCUL DES DIMENSIONS SELON LE MODE
+      let pageWidth,
+        pageHeight,
+        columns,
+        rows,
+        labelsPerPage,
+        offsetLeft,
+        offsetTop,
+        spacingH,
+        spacingV;
 
-      // ✅ CALCUL SIMPLE DU NOMBRE D'ÉTIQUETTES QUI TIENNENT
-      const offsetLeft = layout.offsetLeft || 8;
-      const offsetTop = layout.offsetTop || 22;
-      const spacingH = layout.spacingH || 0;
-      const spacingV = layout.spacingV || 0;
+      if (isRollMode) {
+        // 🎗️ MODE ROULEAU : 1 colonne centrée
+        pageWidth = layout.rouleau?.width || 58;
+        pageHeight = 297; // Hauteur par défaut, sera ajustée si nécessaire
 
-      // Largeur et hauteur utilisables
-      const usableWidth = pageWidth - offsetLeft * 2;
-      const usableHeight = pageHeight - offsetTop * 2;
+        columns = 1; // ✅ UNE SEULE COLONNE
+        offsetLeft = (pageWidth - layout.width) / 2; // Centrer l'étiquette
+        offsetTop = layout.offsetTop || 5;
+        spacingH = 0; // Pas d'espacement horizontal
+        spacingV = layout.spacingV || 2;
 
-      // Nombre de colonnes/lignes possibles
-      const columns = Math.floor(usableWidth / (layout.width + spacingH));
-      const rows = Math.floor(usableHeight / (layout.height + spacingV));
-      const labelsPerPage = columns * rows;
+        // Calcul des lignes possibles
+        const usableHeight = pageHeight - offsetTop * 2;
+        rows = Math.floor(usableHeight / (layout.height + spacingV));
+        labelsPerPage = rows; // 1 colonne × rows lignes
 
-      console.log(
-        `📐 Calculé: ${columns} colonnes × ${rows} lignes = ${labelsPerPage} étiquettes par page`
-      );
+        console.log(`🎗️ MODE ROULEAU:`);
+        console.log(`  - Largeur rouleau: ${pageWidth}mm`);
+        console.log(`  - 1 colonne centrée`);
+        console.log(`  - ${rows} lignes par page = ${labelsPerPage} étiquettes/page`);
+      } else {
+        // 📄 MODE A4 : Grille classique
+        pageWidth = 210; // A4 en mm
+        pageHeight = 297; // A4 en mm
+
+        offsetLeft = layout.offsetLeft || 8;
+        offsetTop = layout.offsetTop || 22;
+        spacingH = layout.spacingH || 0;
+        spacingV = layout.spacingV || 0;
+
+        // Largeur et hauteur utilisables
+        const usableWidth = pageWidth - offsetLeft * 2;
+        const usableHeight = pageHeight - offsetTop * 2;
+
+        // Nombre de colonnes/lignes possibles
+        columns = Math.floor(usableWidth / (layout.width + spacingH));
+        rows = Math.floor(usableHeight / (layout.height + spacingV));
+        labelsPerPage = columns * rows;
+
+        console.log(`📄 MODE A4:`);
+        console.log(
+          `  - ${columns} colonnes × ${rows} lignes = ${labelsPerPage} étiquettes par page`
+        );
+      }
+
       console.log(
         `📐 Dimensions: ${layout.width}×${layout.height}mm, Espacement: ${spacingH}×${spacingV}mm`
       );
 
-      // Créer le PDF
+      // Créer le PDF avec les bonnes dimensions
       const doc = new jsPDF({
-        orientation: exportConfig.orientation === 'landscape' ? 'landscape' : 'portrait',
+        orientation: isRollMode
+          ? 'portrait'
+          : exportConfig.orientation === 'landscape'
+            ? 'landscape'
+            : 'portrait',
         unit: 'mm',
-        format: 'a4',
+        format: isRollMode ? [pageWidth, pageHeight] : 'a4',
       });
+
+      // Vérifier la création du PDF
+      console.log('📄 PDF créé avec format:', isRollMode ? `${pageWidth}×${pageHeight}mm` : 'A4');
 
       // ✅ FIX : Gérer les cases désactivées lors du placement
       let labelIndex = 0; // Index dans duplicatedLabelData
@@ -180,7 +235,11 @@ class ExportService {
       while (labelIndex < duplicatedLabelData.length) {
         // Nouvelle page si nécessaire
         if (currentPage > 0) {
-          doc.addPage();
+          if (isRollMode) {
+            doc.addPage([pageWidth, pageHeight]);
+          } else {
+            doc.addPage();
+          }
           console.log(`📄 Nouvelle page ${currentPage + 1}`);
         }
 
@@ -192,8 +251,8 @@ class ExportService {
         ) {
           const absoluteCellIndex = currentPage * labelsPerPage + cellInPage;
 
-          // ✅ FIX : Vérifier si cette cellule est désactivée
-          if (disabledCells.includes(absoluteCellIndex)) {
+          // ✅ FIX : Vérifier si cette cellule est désactivée (seulement en mode A4)
+          if (!isRollMode && disabledCells.includes(absoluteCellIndex)) {
             console.log(`🚫 Case ${absoluteCellIndex} ignorée (désactivée)`);
             totalCellsProcessed++;
             continue; // Passer à la cellule suivante sans placer d'étiquette
@@ -201,15 +260,24 @@ class ExportService {
 
           // Placer l'étiquette dans cette cellule
           const label = duplicatedLabelData[labelIndex];
-          const col = cellInPage % columns;
-          const row = Math.floor(cellInPage / columns);
 
-          // ✅ CALCUL POSITION PRÉCIS
-          const x = offsetLeft + col * (layout.width + spacingH);
-          const y = offsetTop + row * (layout.height + spacingV);
+          let x, y;
+
+          if (isRollMode) {
+            // 🎗️ MODE ROULEAU : Position simple en colonne unique
+            x = offsetLeft; // Position X fixe (centrée)
+            y = offsetTop + cellInPage * (layout.height + spacingV);
+          } else {
+            // 📄 MODE A4 : Position en grille
+            const col = cellInPage % columns;
+            const row = Math.floor(cellInPage / columns);
+
+            x = offsetLeft + col * (layout.width + spacingH);
+            y = offsetTop + row * (layout.height + spacingV);
+          }
 
           console.log(
-            `🏷️ Étiquette ${labelIndex + 1} ("${label.name}") → Case ${absoluteCellIndex} à (${x.toFixed(1)}, ${y.toFixed(1)}) - Col ${col}, Row ${row}`
+            `🏷️ ${isRollMode ? 'ROULEAU' : 'A4'} - Étiquette ${labelIndex + 1} ("${label.name}") → ${isRollMode ? 'Position' : 'Case'} ${isRollMode ? cellInPage : absoluteCellIndex} à (${x.toFixed(1)}, ${y.toFixed(1)})`
           );
 
           // Dessiner l'étiquette
@@ -229,11 +297,12 @@ class ExportService {
       }
 
       console.log(
-        `✅ Export terminé: ${labelIndex} étiquettes placées, ${totalCellsProcessed} cases traitées`
+        `✅ Export ${isRollMode ? 'ROULEAU' : 'A4'} terminé: ${labelIndex} étiquettes placées, ${totalCellsProcessed} positions traitées`
       );
 
       // Sauvegarder le PDF
-      const filename = `${exportConfig.title || 'Etiquettes'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const modeLabel = isRollMode ? 'rouleau' : 'A4';
+      const filename = `${exportConfig.title || 'Etiquettes'}_${modeLabel}_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
 
       console.log('✅ Export client terminé:', filename);
