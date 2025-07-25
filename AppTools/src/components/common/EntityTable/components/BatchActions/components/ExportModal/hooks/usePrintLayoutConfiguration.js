@@ -13,6 +13,8 @@ const DEFAULT_LAYOUT = {
   spacingH: 0,
   supportType: 'A4',
   rouleau: { width: 58 },
+  cutPerLabel: false,
+  labelsPerGroup: 3,
 };
 
 export const usePrintLayoutConfiguration = (onLayoutChange) => {
@@ -100,22 +102,32 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     (field, value) => {
       let updatedLayout = { ...currentLayout };
 
-      // 🆕 Gérer les champs imbriqués (comme rouleau.width)
-      if (field === 'rouleau') {
-        // Si on passe un objet complet pour rouleau
+      // ✅ Gestion spéciale pour les nouvelles options
+      if (field === 'cutMode') {
+        // Quand on change le mode via le composant EnhancedCutOptions
+        updatedLayout = { ...currentLayout, ...value };
+      }
+      // ✅ Gestion des booléens
+      else if (field === 'cutPerLabel') {
+        updatedLayout.cutPerLabel = !!value;
+      }
+      // ✅ Gestion des entiers
+      else if (field === 'labelsPerGroup') {
+        updatedLayout.labelsPerGroup = parseInt(value) || 3;
+      }
+      // 🧩 Gérer rouleau.{...}
+      else if (field === 'rouleau') {
         updatedLayout.rouleau = {
           ...currentLayout.rouleau,
           ...value,
         };
       } else if (field.startsWith('rouleau.')) {
-        // Si on passe rouleau.width directement
         const rouleauField = field.split('.')[1];
         updatedLayout.rouleau = {
           ...currentLayout.rouleau,
           [rouleauField]: parseFloat(value) || 0,
         };
       } else {
-        // Champs simples
         updatedLayout[field] = parseFloat(value) || 0;
       }
 

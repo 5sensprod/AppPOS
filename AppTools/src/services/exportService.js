@@ -94,6 +94,9 @@ class ExportService {
       // Détecter le mode rouleau
       const isRollMode = layout.supportType === 'rouleau';
 
+      // ✅ AJOUT - Détecter le mode de coupure
+      const cutMode = this.determineCutMode(layout);
+
       // Dupliquer les étiquettes selon duplicateCount
       const duplicateCount = style.duplicateCount || 1;
       const duplicatedLabelData = [];
@@ -126,7 +129,15 @@ class ExportService {
 
         const usableHeight = pageHeight - offsetTop * 2;
         rows = Math.floor(usableHeight / (layout.height + spacingV));
-        labelsPerPage = rows;
+
+        // ✅ MODIFICATION ICI - Appliquer la logique de coupure
+        if (cutMode.id === 'cut_per_label') {
+          labelsPerPage = 1; // Une étiquette par page
+        } else if (cutMode.id === 'groups') {
+          labelsPerPage = cutMode.labelsPerGroup || 3; // X étiquettes par page
+        } else {
+          labelsPerPage = rows; // Mode continu (votre logique originale)
+        }
       } else {
         // Mode A4 : Grille classique
         pageWidth = 210;
@@ -154,7 +165,7 @@ class ExportService {
         format: isRollMode ? [pageWidth, pageHeight] : 'a4',
       });
 
-      // Placer les étiquettes
+      // ✅ VOTRE LOGIQUE ORIGINALE - AUCUN CHANGEMENT
       let labelIndex = 0;
       let currentPage = 0;
 
@@ -210,8 +221,8 @@ class ExportService {
         currentPage++;
       }
 
-      // Sauvegarder le PDF
-      const modeLabel = isRollMode ? 'rouleau' : 'A4';
+      // ✅ MODIFICATION - Nom de fichier avec mode de coupure
+      const modeLabel = isRollMode ? `rouleau_${cutMode.id}` : 'A4';
       const filename = `${exportConfig.title || 'Etiquettes'}_${modeLabel}_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
 
@@ -220,6 +231,29 @@ class ExportService {
       console.error('Erreur export client:', error);
       throw error;
     }
+  }
+
+  // ✅ AJOUT - Méthode simple pour déterminer le mode de coupure
+  determineCutMode(layout) {
+    if (layout.cutPerLabel === true) {
+      return {
+        id: 'cut_per_label',
+        name: 'Une page par étiquette',
+      };
+    }
+
+    if (layout.labelsPerGroup && layout.labelsPerGroup > 1) {
+      return {
+        id: 'groups',
+        name: `Groupes de ${layout.labelsPerGroup}`,
+        labelsPerGroup: layout.labelsPerGroup,
+      };
+    }
+
+    return {
+      id: 'continuous',
+      name: 'Continu',
+    };
   }
 
   /**
