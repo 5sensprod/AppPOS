@@ -70,6 +70,8 @@ class LabelRenderer {
   /**
    * 📄 EXPORT PDF - AVEC SUPPORT COMPLET DES FONCTIONNALITÉS
    */
+
+  // nouvelle version
   async exportLabelsToPDF(exportConfig) {
     try {
       const { jsPDF } = await import('jspdf');
@@ -105,16 +107,19 @@ class LabelRenderer {
         barcodeHeight: 15,
       };
 
-      // ✅ Récupérer les cases désactivées
-      let disabledCellsArray = [];
-      if (labelLayout.disabledCells) {
-        disabledCellsArray = labelLayout.disabledCells;
-      } else if (labelLayout.layout?.disabledCells) {
-        disabledCellsArray = labelLayout.layout.disabledCells;
-      } else if (labelLayout.style?.disabledCells) {
-        disabledCellsArray = labelLayout.style.disabledCells;
+      // ✅ Récupérer les cases désactivées (UNIQUEMENT pour A4)
+      let disabledCells = new Set();
+      if (layout.supportType !== 'rouleau') {
+        let disabledCellsArray = [];
+        if (labelLayout.disabledCells) {
+          disabledCellsArray = labelLayout.disabledCells;
+        } else if (labelLayout.layout?.disabledCells) {
+          disabledCellsArray = labelLayout.layout.disabledCells;
+        } else if (labelLayout.style?.disabledCells) {
+          disabledCellsArray = labelLayout.style.disabledCells;
+        }
+        disabledCells = new Set(disabledCellsArray);
       }
-      const disabledCells = new Set(disabledCellsArray);
 
       // ✅ Duplication des étiquettes
       const duplicateCount = style.duplicateCount || 1;
@@ -125,94 +130,117 @@ class LabelRenderer {
         }
       }
 
-      // ✅ Configuration page
+      // ✅ Configuration page - LOGIQUE ORIGINALE
       const pageConfig = this._calculatePageLayout(layout, duplicatedLabels.length);
-
-      // ✅ Format PDF adaptatif
-      let pdfFormat;
-      if (pageConfig.isRollMode) {
-        const totalLabels = duplicatedLabels.length;
-        const labelHeight = layout.height || 25;
-        const spacing = layout.spacingV || 2;
-        const offsetTop = layout.offsetTop || 5;
-        const offsetBottom = 5;
-
-        const dynamicHeight =
-          offsetTop + totalLabels * labelHeight + (totalLabels - 1) * spacing + offsetBottom;
-        pdfFormat = [pageConfig.pageWidth, Math.max(dynamicHeight, 50)];
-      } else {
-        pdfFormat = 'a4';
-      }
 
       const doc = new jsPDF({
         orientation: pageConfig.isRollMode ? 'portrait' : orientation,
         unit: 'mm',
-        format: pdfFormat,
+        format: pageConfig.isRollMode ? [pageConfig.pageWidth, pageConfig.pageHeight] : 'a4',
       });
 
-      // ✅ Génération avec gestion des cases vides
+      // ✅ Génération page par page - LOGIQUE ORIGINALE EXACTE
       let labelIndex = 0;
       let currentPage = 0;
-      let cellIndex = 0;
 
       while (labelIndex < duplicatedLabels.length) {
-        if (currentPage > 0 && !pageConfig.isRollMode) {
+        if (currentPage > 0) {
           doc.addPage();
-          cellIndex = 0;
         }
 
+        // ✅ Canvas temporaire pour cette page
         const tempCanvas = document.createElement('canvas');
-        const labelsForThisPage = pageConfig.isRollMode
-          ? duplicatedLabels.length
-          : pageConfig.labelsPerPage;
 
-        while (cellIndex < labelsForThisPage && labelIndex < duplicatedLabels.length) {
-          // ✅ Ignorer les cases désactivées
-          if (disabledCells.has(cellIndex)) {
+        if (pageConfig.isRollMode) {
+          // ✅ MODE ROULEAU : Logique simple et originale (pas de cases vides)
+          for (
+            let cellInPage = 0;
+            cellInPage < pageConfig.labelsPerPage && labelIndex < duplicatedLabels.length;
+            cellInPage++
+          ) {
+            const label = duplicatedLabels[labelIndex];
+
+            try {
+              const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
+                highRes: true,
+              });
+
+              const canvasElement = fabricCanvas.toCanvasElement();
+              const imgData = canvasElement.toDataURL('image/png', 1.0);
+              const position = this._calculateLabelPosition(cellInPage, pageConfig, layout);
+
+              doc.addImage(
+                imgData,
+                'PNG',
+                position.x,
+                position.y,
+                layout.width,
+                layout.height,
+                undefined,
+                'FAST'
+              );
+
+              fabricCanvas.dispose();
+            } catch (error) {
+              console.error(`❌ Erreur étiquette ${label.name}:`, error);
+            }
+
+            labelIndex++;
+          }
+        } else {
+          // ✅ MODE A4 : Logique avec gestion des cases vides
+          let cellIndex = 0;
+          let labelsPlacedOnPage = 0;
+
+          while (
+            cellIndex < pageConfig.labelsPerPage &&
+            labelIndex < duplicatedLabels.length &&
+            labelsPlacedOnPage < pageConfig.labelsPerPage
+          ) {
+            // ✅ Ignorer les cases désactivées (uniquement en mode A4)
+            if (disabledCells.has(cellIndex)) {
+              cellIndex++;
+              continue;
+            }
+
+            const label = duplicatedLabels[labelIndex];
+
+            try {
+              const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
+                highRes: true,
+              });
+
+              const canvasElement = fabricCanvas.toCanvasElement();
+              const imgData = canvasElement.toDataURL('image/png', 1.0);
+              const position = this._calculateLabelPosition(cellIndex, pageConfig, layout);
+
+              doc.addImage(
+                imgData,
+                'PNG',
+                position.x,
+                position.y,
+                layout.width,
+                layout.height,
+                undefined,
+                'FAST'
+              );
+
+              fabricCanvas.dispose();
+            } catch (error) {
+              console.error(`❌ Erreur étiquette ${label.name}:`, error);
+            }
+
+            labelIndex++;
+            labelsPlacedOnPage++;
             cellIndex++;
-            continue;
           }
-
-          const label = duplicatedLabels[labelIndex];
-
-          try {
-            const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
-              highRes: true,
-            });
-
-            const canvasElement = fabricCanvas.toCanvasElement();
-            const imgData = canvasElement.toDataURL('image/png', 1.0);
-            const position = this._calculateLabelPosition(cellIndex, pageConfig, layout);
-
-            doc.addImage(
-              imgData,
-              'PNG',
-              position.x,
-              position.y,
-              layout.width,
-              layout.height,
-              undefined,
-              'FAST'
-            );
-
-            fabricCanvas.dispose();
-          } catch (error) {
-            console.error(`❌ Erreur étiquette ${label.name}:`, error);
-          }
-
-          labelIndex++;
-          cellIndex++;
         }
 
         currentPage++;
-
-        if (pageConfig.isRollMode) {
-          break;
-        }
       }
 
       // ✅ Sauvegarde
-      const filename = `${title}_${pageConfig.isRollMode ? 'rouleau_continu' : 'feuilles'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `${title}_${pageConfig.isRollMode ? 'rouleau' : 'feuilles'}_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
 
       return { success: true, filename };

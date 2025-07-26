@@ -105,12 +105,6 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
         onDeletePreset={deleteLayoutPreset}
       />
 
-      <PrintOptionsConfig
-        labelStyle={labelStyle}
-        labelDataLength={labelData.length}
-        onStyleChange={handleStyleChange}
-      />
-
       <LabelStyleConfig
         labelStyle={labelStyle}
         onStyleChange={handleStyleChange}
@@ -134,6 +128,12 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
       {currentLayout?.supportType === 'rouleau' && (
         <EnhancedCutOptions currentLayout={currentLayout} onLayoutChange={handleLayoutChange} />
       )}
+
+      <PrintOptionsConfig
+        labelStyle={labelStyle}
+        labelDataLength={labelData.length}
+        onStyleChange={handleStyleChange}
+      />
 
       {currentLayout?.supportType !== 'rouleau' && (
         <CellSelectionGrid
