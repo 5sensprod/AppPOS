@@ -1,6 +1,6 @@
-// FabricLabelCanvas.jsx - Version avec capture des positions personnalisées
+// AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\FabricLabelCanvas.jsx
 import React, { useEffect, useRef } from 'react';
-import LabelRenderer from '../../../../../../../../services/LabelRenderer';
+import LabelRenderer from '@services/LabelRenderer';
 
 const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
   const canvasRef = useRef();
