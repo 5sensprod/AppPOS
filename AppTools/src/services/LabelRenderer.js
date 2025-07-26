@@ -1,4 +1,4 @@
-// 📁 services/LabelRenderer.js - Canvas vers PDF unifié
+// 📁 services/LabelRenderer.js - Version finale avec support complet
 import JsBarcode from 'jsbarcode';
 import { formatCurrency } from '../utils/formatters.js';
 
@@ -13,7 +13,7 @@ class LabelRenderer {
   }
 
   /**
-   * 🎨 RENDU CANVAS UNIQUE - Source de vérité
+   * 🎨 RENDU CANVAS UNIQUE - AVEC SUPPORT DES POSITIONS PERSONNALISÉES
    */
   async renderToCanvas(canvasElement, label, layout, style, options = {}) {
     const fabric = await import('fabric');
@@ -39,15 +39,16 @@ class LabelRenderer {
     });
     canvasElement.__fabricCanvas__ = fabricCanvas;
 
-    // ✅ Calculs unifiés en pixels avec facteur de résolution
-    const elements = this._calculateElements(layout, style, scaleFactor);
+    // ✅ Calculs unifiés avec positions personnalisées
+    const customPositions = style.customPositions || {};
+    const elements = this._calculateElements(layout, style, scaleFactor, customPositions);
 
     // ✅ Bordure optionnelle
     if (style.showBorder) {
       await this._addBorder(fabricCanvas, canvasWidth, canvasHeight, style, fabric, scaleFactor);
     }
 
-    // ✅ Rendu des éléments avec haute résolution
+    // ✅ Rendu des éléments avec positions personnalisées
     if (style.showName && label.name) {
       await this._addName(fabricCanvas, label, elements.name, style, fabric, scaleFactor);
     }
@@ -67,7 +68,7 @@ class LabelRenderer {
   }
 
   /**
-   * 📄 EXPORT PDF via Canvas - Cohérence garantie
+   * 📄 EXPORT PDF - AVEC SUPPORT COMPLET DES FONCTIONNALITÉS
    */
   async exportLabelsToPDF(exportConfig) {
     try {
@@ -104,6 +105,17 @@ class LabelRenderer {
         barcodeHeight: 15,
       };
 
+      // ✅ Récupérer les cases désactivées
+      let disabledCellsArray = [];
+      if (labelLayout.disabledCells) {
+        disabledCellsArray = labelLayout.disabledCells;
+      } else if (labelLayout.layout?.disabledCells) {
+        disabledCellsArray = labelLayout.layout.disabledCells;
+      } else if (labelLayout.style?.disabledCells) {
+        disabledCellsArray = labelLayout.style.disabledCells;
+      }
+      const disabledCells = new Set(disabledCellsArray);
+
       // ✅ Duplication des étiquettes
       const duplicateCount = style.duplicateCount || 1;
       const duplicatedLabels = [];
@@ -113,54 +125,65 @@ class LabelRenderer {
         }
       }
 
-      // ✅ Configuration page - LOGIQUE ORIGINALE
+      // ✅ Configuration page
       const pageConfig = this._calculatePageLayout(layout, duplicatedLabels.length);
+
+      // ✅ Format PDF adaptatif
+      let pdfFormat;
+      if (pageConfig.isRollMode) {
+        const totalLabels = duplicatedLabels.length;
+        const labelHeight = layout.height || 25;
+        const spacing = layout.spacingV || 2;
+        const offsetTop = layout.offsetTop || 5;
+        const offsetBottom = 5;
+
+        const dynamicHeight =
+          offsetTop + totalLabels * labelHeight + (totalLabels - 1) * spacing + offsetBottom;
+        pdfFormat = [pageConfig.pageWidth, Math.max(dynamicHeight, 50)];
+      } else {
+        pdfFormat = 'a4';
+      }
 
       const doc = new jsPDF({
         orientation: pageConfig.isRollMode ? 'portrait' : orientation,
         unit: 'mm',
-        format: pageConfig.isRollMode ? [pageConfig.pageWidth, pageConfig.pageHeight] : 'a4',
+        format: pdfFormat,
       });
 
-      // ✅ Génération page par page - LOGIQUE ORIGINALE EXACTE
+      // ✅ Génération avec gestion des cases vides
       let labelIndex = 0;
       let currentPage = 0;
+      let cellIndex = 0;
 
       while (labelIndex < duplicatedLabels.length) {
-        if (currentPage > 0) {
+        if (currentPage > 0 && !pageConfig.isRollMode) {
           doc.addPage();
+          cellIndex = 0;
         }
 
-        // ✅ Canvas temporaire pour cette page
         const tempCanvas = document.createElement('canvas');
+        const labelsForThisPage = pageConfig.isRollMode
+          ? duplicatedLabels.length
+          : pageConfig.labelsPerPage;
 
-        for (
-          let cellInPage = 0;
-          cellInPage < pageConfig.labelsPerPage && labelIndex < duplicatedLabels.length;
-          cellInPage++
-        ) {
+        while (cellIndex < labelsForThisPage && labelIndex < duplicatedLabels.length) {
+          // ✅ Ignorer les cases désactivées
+          if (disabledCells.has(cellIndex)) {
+            cellIndex++;
+            continue;
+          }
+
           const label = duplicatedLabels[labelIndex];
 
           try {
-            // ✅ Rendu Canvas HAUTE RÉSOLUTION pour cette étiquette
-            const fabricCanvas = await this.renderToCanvas(
-              tempCanvas,
-              label,
-              layout,
-              style,
-              { highRes: true } // ✅ Mode haute résolution pour PDF
-            );
+            const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
+              highRes: true,
+            });
 
-            // ✅ Conversion Canvas -> Image HAUTE QUALITÉ -> PDF
             const canvasElement = fabricCanvas.toCanvasElement();
+            const imgData = canvasElement.toDataURL('image/png', 1.0);
+            const position = this._calculateLabelPosition(cellIndex, pageConfig, layout);
 
-            // ✅ Export haute qualité avec paramètres optimisés
-            const imgData = canvasElement.toDataURL('image/png', 1.0); // Qualité maximale
-
-            // ✅ Position dans la page PDF - LOGIQUE ORIGINALE EXACTE
-            const position = this._calculateLabelPosition(cellInPage, pageConfig, layout);
-
-            // ✅ Ajout dans le PDF avec résolution optimale
             doc.addImage(
               imgData,
               'PNG',
@@ -168,24 +191,28 @@ class LabelRenderer {
               position.y,
               layout.width,
               layout.height,
-              undefined, // alias
-              'FAST' // Mode de compression optimisé
+              undefined,
+              'FAST'
             );
 
-            // ✅ Nettoyage Canvas
             fabricCanvas.dispose();
           } catch (error) {
             console.error(`❌ Erreur étiquette ${label.name}:`, error);
           }
 
           labelIndex++;
+          cellIndex++;
         }
 
         currentPage++;
+
+        if (pageConfig.isRollMode) {
+          break;
+        }
       }
 
       // ✅ Sauvegarde
-      const filename = `${title}_canvas_unified_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `${title}_${pageConfig.isRollMode ? 'rouleau_continu' : 'feuilles'}_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
 
       return { success: true, filename };
@@ -196,70 +223,109 @@ class LabelRenderer {
   }
 
   /**
-   * 🧮 CALCULS D'ÉLÉMENTS - En pixels (unité Canvas) avec facteur résolution
+   * 🧮 CALCULS D'ÉLÉMENTS - LOGIQUE ORIGINALE + positions personnalisées
    */
-  _calculateElements(layout, style, scaleFactor = 1) {
+  _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
     const canvasHeight = layout.height * this.mmToPx * scaleFactor;
     const padding = (style.padding || 1) * this.mmToPx * scaleFactor;
     const contentWidth = canvasWidth - padding * 2;
-    const contentHeight = canvasHeight - padding * 2;
 
     const elements = {};
     let currentY = padding;
-    const spacing = 8 * scaleFactor; // Espacement proportionnel
+    const spacing = 8 * scaleFactor;
 
     // 🏷️ Nom du produit
     if (style.showName) {
       const nameHeight = Math.max(15, (style.nameSize || 10) * 1.2) * scaleFactor;
-      elements.name = {
-        x: padding,
-        y: currentY,
-        width: contentWidth,
-        height: nameHeight,
-        fontSize: (style.nameSize || 10) * scaleFactor,
-        centerX: padding + contentWidth / 2,
-      };
-      currentY += nameHeight + spacing;
+      const customNamePos = customPositions.name;
+
+      if (customNamePos) {
+        elements.name = {
+          x: customNamePos.x * this.mmToPx * scaleFactor,
+          y: customNamePos.y * this.mmToPx * scaleFactor,
+          width: contentWidth,
+          height: nameHeight,
+          fontSize: (style.nameSize || 10) * scaleFactor,
+          centerX: customNamePos.centerX * this.mmToPx * scaleFactor,
+        };
+      } else {
+        elements.name = {
+          x: padding,
+          y: currentY,
+          width: contentWidth,
+          height: nameHeight,
+          fontSize: (style.nameSize || 10) * scaleFactor,
+          centerX: padding + contentWidth / 2,
+        };
+        currentY += nameHeight + spacing;
+      }
     }
 
     // 💰 Prix
     if (style.showPrice) {
       const priceHeight = Math.max(20, (style.priceSize || 14) * 1.4) * scaleFactor;
-      elements.price = {
-        x: padding,
-        y: currentY,
-        width: contentWidth,
-        height: priceHeight,
-        fontSize: (style.priceSize || 14) * scaleFactor,
-        centerX: padding + contentWidth / 2,
-      };
-      currentY += priceHeight + spacing;
+      const customPricePos = customPositions.price;
+
+      if (customPricePos) {
+        elements.price = {
+          x: customPricePos.x * this.mmToPx * scaleFactor,
+          y: customPricePos.y * this.mmToPx * scaleFactor,
+          width: contentWidth,
+          height: priceHeight,
+          fontSize: (style.priceSize || 14) * scaleFactor,
+          centerX: customPricePos.centerX * this.mmToPx * scaleFactor,
+        };
+      } else {
+        elements.price = {
+          x: padding,
+          y: currentY,
+          width: contentWidth,
+          height: priceHeight,
+          fontSize: (style.priceSize || 14) * scaleFactor,
+          centerX: padding + contentWidth / 2,
+        };
+        currentY += priceHeight + spacing;
+      }
     }
 
-    // 📊 Code-barres (position fixe en bas)
+    // 📊 Code-barres
     if (style.showBarcode) {
       const barcodeHeight = (style.barcodeHeight || 15) * this.mmToPx * 0.4 * scaleFactor;
       const textHeight = 12 * scaleFactor;
       const totalHeight = barcodeHeight + textHeight + 4 * scaleFactor;
+      const customBarcodePos = customPositions.barcode;
 
-      elements.barcode = {
-        x: padding,
-        y: canvasHeight - padding - totalHeight,
-        width: contentWidth,
-        height: totalHeight,
-        barcodeHeight: barcodeHeight,
-        textHeight: textHeight,
-        centerX: padding + contentWidth / 2,
-        scaleFactor: scaleFactor,
-      };
+      if (customBarcodePos) {
+        elements.barcode = {
+          x: customBarcodePos.x * this.mmToPx * scaleFactor,
+          y: customBarcodePos.y * this.mmToPx * scaleFactor,
+          width: contentWidth,
+          height: totalHeight,
+          barcodeHeight: barcodeHeight,
+          textHeight: textHeight,
+          centerX: customBarcodePos.centerX * this.mmToPx * scaleFactor,
+          scaleFactor: scaleFactor,
+        };
+      } else {
+        elements.barcode = {
+          x: padding,
+          y: canvasHeight - padding - totalHeight,
+          width: contentWidth,
+          height: totalHeight,
+          barcodeHeight: barcodeHeight,
+          textHeight: textHeight,
+          centerX: padding + contentWidth / 2,
+          scaleFactor: scaleFactor,
+        };
+      }
     }
 
     return elements;
   }
 
   /**
-   * 🎨 AJOUT BORDURE - Solution simple et efficace
+   * 🎨 AJOUT BORDURE
    */
   async _addBorder(fabricCanvas, width, height, style, fabric, scaleFactor = 1) {
     const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor;
@@ -284,7 +350,7 @@ class LabelRenderer {
   }
 
   /**
-   * 📝 AJOUT NOM avec résolution adaptative
+   * 📝 AJOUT NOM
    */
   async _addName(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const nameText = new fabric.Text(label.name, {
@@ -296,14 +362,13 @@ class LabelRenderer {
       fontWeight: 'bold',
       fill: '#000000',
       selectable: false,
-      // ✅ Anti-aliasing pour haute résolution
       paintFirst: 'fill',
     });
     fabricCanvas.add(nameText);
   }
 
   /**
-   * 💰 AJOUT PRIX avec résolution adaptative
+   * 💰 AJOUT PRIX
    */
   async _addPrice(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const priceText = formatCurrency(label.price);
@@ -316,50 +381,42 @@ class LabelRenderer {
       fontWeight: 'bold',
       fill: '#000000',
       selectable: false,
-      // ✅ Anti-aliasing pour haute résolution
       paintFirst: 'fill',
     });
     fabricCanvas.add(price);
   }
 
   /**
-   * 📊 AJOUT CODE-BARRES avec résolution adaptative
+   * 📊 AJOUT CODE-BARRES
    */
   async _addBarcode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     try {
-      // ✅ Génération code-barres HAUTE RÉSOLUTION
       const barcodeCanvas = document.createElement('canvas');
       const barcodeWidth = Math.min(element.width - 10 * scaleFactor, 150 * scaleFactor);
 
-      // ✅ Résolution proportionnelle au facteur de scale
       barcodeCanvas.width = barcodeWidth;
       barcodeCanvas.height = element.barcodeHeight;
 
-      // ✅ Configuration JsBarcode pour haute qualité
       JsBarcode(barcodeCanvas, label.barcode, {
         format: 'EAN13',
-        width: 1.5 * scaleFactor, // Largeur des barres proportionnelle
+        width: 1.5 * scaleFactor,
         height: element.barcodeHeight * 0.9,
         displayValue: false,
         background: '#ffffff',
         lineColor: '#000000',
         margin: 0,
-        // ✅ Options qualité
-        flat: true, // Pas de dégradé
+        flat: true,
       });
 
-      // ✅ Image du code-barres
       const barcodeImg = new fabric.Image(barcodeCanvas, {
         left: element.centerX,
         top: element.y,
         originX: 'center',
         selectable: false,
-        // ✅ Pas de lissage pour les codes-barres (netteté maximale)
         imageSmoothing: false,
       });
       fabricCanvas.add(barcodeImg);
 
-      // ✅ Texte sous le code-barres avec taille proportionnelle
       const barcodeText = new fabric.Text(this.formatEAN13Text(label.barcode), {
         left: element.centerX,
         top: element.y + element.barcodeHeight + 2 * scaleFactor,
@@ -373,7 +430,6 @@ class LabelRenderer {
       fabricCanvas.add(barcodeText);
     } catch (error) {
       console.warn('⚠️ Erreur code-barres:', error);
-      // Fallback texte simple avec résolution adaptée
       const fallbackText = new fabric.Text(label.barcode, {
         left: element.centerX,
         top: element.y,
@@ -388,23 +444,21 @@ class LabelRenderer {
   }
 
   /**
-   * 📐 CALCUL MISE EN PAGE - LOGIQUE ORIGINALE avec cutPerLabel restauré
+   * 📐 CALCUL MISE EN PAGE
    */
   _calculatePageLayout(layout, totalLabels = 1) {
     const isRollMode = layout.supportType === 'rouleau';
 
     if (isRollMode) {
-      // ✅ LOGIQUE ORIGINALE : cutPerLabel = 1 étiquette par page
       if (layout.cutPerLabel) {
         return {
           isRollMode: true,
           pageWidth: layout.rouleau?.width || 58,
-          pageHeight: 297, // ✅ Page normale pour coupes individuelles
-          labelsPerPage: 1, // ✅ 1 étiquette par page
+          pageHeight: 297,
+          labelsPerPage: 1,
         };
       }
 
-      // ✅ MODIFICATION : Mode continu = toutes les étiquettes ensemble
       const labelHeight = layout.height || 25;
       const spacing = layout.spacingV || 2;
       const offsetTop = layout.offsetTop || 5;
@@ -416,11 +470,10 @@ class LabelRenderer {
       return {
         isRollMode: true,
         pageWidth: layout.rouleau?.width || 58,
-        pageHeight: Math.max(dynamicHeight, 297), // ✅ Hauteur dynamique pour mode continu
-        labelsPerPage: totalLabels, // ✅ Toutes les étiquettes en continu
+        pageHeight: Math.max(dynamicHeight, 297),
+        labelsPerPage: totalLabels,
       };
     } else {
-      // ✅ Mode feuilles - LOGIQUE ORIGINALE EXACTE
       const pageWidth = 210;
       const pageHeight = 297;
       const usableWidth = pageWidth - (layout.offsetLeft || 8) * 2;
@@ -440,13 +493,13 @@ class LabelRenderer {
   }
 
   /**
-   * 📍 POSITION ÉTIQUETTE SUR PAGE - LOGIQUE ORIGINALE EXACTE
+   * 📍 POSITION ÉTIQUETTE SUR PAGE
    */
   _calculateLabelPosition(cellIndex, pageConfig, layout) {
     if (pageConfig.isRollMode) {
       return {
-        x: (pageConfig.pageWidth - layout.width) / 2, // ✅ CENTRAGE ORIGINAL
-        y: (layout.offsetTop ?? 5) + cellIndex * (layout.height + (layout.spacingV ?? 2)), // ✅ POSITION ORIGINALE
+        x: (pageConfig.pageWidth - layout.width) / 2,
+        y: (layout.offsetTop ?? 5) + cellIndex * (layout.height + (layout.spacingV ?? 2)),
       };
     } else {
       const col = cellIndex % pageConfig.columns;

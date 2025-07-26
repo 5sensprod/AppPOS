@@ -1,53 +1,106 @@
-// FabricLabelCanvas.jsx - Version refactorisée avec LabelRenderer
+// FabricLabelCanvas.jsx - Version avec capture des positions personnalisées
 import React, { useEffect, useRef } from 'react';
 import LabelRenderer from '../../../../../../../../services/LabelRenderer';
 
-const FabricLabelCanvas = ({ label, layout, style }) => {
+const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
   const canvasRef = useRef();
   const fabricCanvasRef = useRef();
 
   useEffect(() => {
     const canvasEl = canvasRef.current;
     if (!canvasEl || !label) {
-      console.log('❌ Canvas ou label manquant:', { canvasEl: !!canvasEl, label: !!label });
       return;
     }
 
-    console.log('🎨 Rendu Canvas avec:', { label: label.name, layout, style });
-
-    // ✅ Nettoyage de l'ancien canvas
     if (fabricCanvasRef.current) {
       fabricCanvasRef.current.dispose();
     }
 
-    // ✅ Rendu unifié via LabelRenderer
     const renderCanvas = async () => {
       try {
-        // ✅ Résolution normale pour aperçu (pas de highRes)
-        const fabricCanvas = await LabelRenderer.renderToCanvas(
-          canvasEl,
-          label,
-          layout,
-          style,
-          { highRes: false } // ✅ Résolution normale pour l'aperçu
-        );
+        const fabricCanvas = await LabelRenderer.renderToCanvas(canvasEl, label, layout, style, {
+          highRes: false,
+        });
         fabricCanvasRef.current = fabricCanvas;
-        console.log('✅ Canvas rendu avec succès');
+
+        makeObjectsMovable(fabricCanvas);
       } catch (error) {
-        console.error('❌ Erreur rendu Canvas:', error);
+        // L'erreur est silencieusement ignorée ici — vous pouvez la traiter autrement si nécessaire
       }
+    };
+
+    const makeObjectsMovable = (fabricCanvas) => {
+      fabricCanvas.getObjects().forEach((obj) => {
+        let objectType = 'unknown';
+
+        if (obj.type === 'text') {
+          const text = obj.text;
+          if (text === label.name) {
+            objectType = 'name';
+          } else if (text.includes('€') || text.includes(label.price)) {
+            objectType = 'price';
+          } else {
+            objectType = 'barcodeText';
+          }
+        } else if (obj.type === 'image') {
+          objectType = 'barcode';
+        }
+
+        obj.set({
+          selectable: true,
+          moveable: true,
+          hasControls: false,
+          hasBorders: true,
+          borderColor: '#0084ff',
+          cornerColor: '#0084ff',
+          borderDashArray: [5, 5],
+        });
+
+        obj.objectType = objectType;
+        obj.originalLeft = obj.left;
+        obj.originalTop = obj.top;
+
+        obj.on('mouseover', function () {
+          this.set('borderColor', '#00ff00');
+          fabricCanvas.renderAll();
+        });
+
+        obj.on('mouseout', function () {
+          this.set('borderColor', '#0084ff');
+          fabricCanvas.renderAll();
+        });
+      });
+
+      fabricCanvas.on('object:modified', (e) => {
+        const obj = e.target;
+        if (obj && obj.objectType && onPositionChange) {
+          const mmToPx = 3.779527559;
+          const leftMm = obj.left / mmToPx;
+          const topMm = obj.top / mmToPx;
+
+          onPositionChange({
+            objectType: obj.objectType,
+            position: {
+              x: leftMm,
+              y: topMm,
+              centerX: leftMm,
+            },
+          });
+        }
+      });
+
+      fabricCanvas.selection = true;
     };
 
     renderCanvas();
 
-    // ✅ Cleanup
     return () => {
       if (fabricCanvasRef.current) {
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
     };
-  }, [label, layout, style]);
+  }, [label, layout, style, onPositionChange]);
 
   const mmToPx = 3.779527559;
 
@@ -59,11 +112,13 @@ const FabricLabelCanvas = ({ label, layout, style }) => {
           width: `${layout.width * mmToPx}px`,
           height: `${layout.height * mmToPx}px`,
           border: '1px solid #ccc',
+          cursor: 'move',
         }}
       />
-      {/* Debug info */}
       <div style={{ fontSize: '10px', color: '#666', marginTop: '5px' }}>
         {label?.name || 'Pas de label'} - {layout.width}×{layout.height}mm
+        <br />
+        <span style={{ color: '#0084ff' }}>💡 Cliquez et déplacez les éléments</span>
       </div>
     </div>
   );

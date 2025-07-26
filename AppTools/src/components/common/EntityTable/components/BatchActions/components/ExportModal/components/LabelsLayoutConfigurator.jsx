@@ -42,12 +42,14 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
 
   useEffect(() => {
     if (onLayoutChange && currentLayout) {
-      onLayoutChange({
+      const config = {
         preset: 'custom',
         layout: currentLayout,
         style: labelStyle,
         disabledCells: Array.from(disabledCells),
-      });
+      };
+
+      onLayoutChange(config);
     }
   }, [currentLayout, labelStyle, disabledCells, onLayoutChange]);
 
@@ -70,12 +72,14 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
     setDisabledCells(newDisabledCells);
 
     if (onLayoutChange) {
-      onLayoutChange({
+      const config = {
         preset: 'custom',
         layout: currentLayout,
         style: labelStyle,
         disabledCells: Array.from(newDisabledCells),
-      });
+      };
+
+      onLayoutChange(config);
     }
   };
 
@@ -119,15 +123,18 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
       />
 
       {labelData.length > 0 && (
-        <LabelPreview labelData={labelData} customLayout={currentLayout} labelStyle={labelStyle} />
+        <LabelPreview
+          labelData={labelData}
+          customLayout={currentLayout}
+          labelStyle={labelStyle}
+          onStyleChange={handleStyleChange}
+        />
       )}
 
-      {/* ✅ Afficher uniquement si ce n’est PAS un rouleau */}
       {currentLayout?.supportType === 'rouleau' && (
         <EnhancedCutOptions currentLayout={currentLayout} onLayoutChange={handleLayoutChange} />
       )}
 
-      {/* ✅ Afficher la grille seulement si ce n’est PAS un rouleau */}
       {currentLayout?.supportType !== 'rouleau' && (
         <CellSelectionGrid
           enableCellSelection={enableCellSelection}
