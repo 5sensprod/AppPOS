@@ -212,11 +212,13 @@ const ExportModal = ({
         <ExportTypeSelector exportType={exportType} onExportTypeChange={setExportType} />
 
         {/* ✅ SÉLECTEUR DE FORMAT */}
-        <ExportFormatSelector
-          exportFormat={exportFormat}
-          onFormatChange={setExportFormat}
-          exportType={exportType}
-        />
+        {exportType === 'table' && (
+          <ExportFormatSelector
+            exportFormat={exportFormat}
+            onFormatChange={setExportFormat}
+            exportType={exportType}
+          />
+        )}
 
         {/* ✅ SÉLECTEUR D'ORIENTATION (PDF uniquement) */}
         {exportFormat === 'pdf' && (

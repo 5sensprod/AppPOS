@@ -25,7 +25,7 @@ const ExportOrientationSelector = ({ orientation, onOrientationChange, exportTyp
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-        Orientation (PDF uniquement)
+        Orientation PDF
       </label>
       <div className="space-y-2">
         {orientations.map((orient) => (

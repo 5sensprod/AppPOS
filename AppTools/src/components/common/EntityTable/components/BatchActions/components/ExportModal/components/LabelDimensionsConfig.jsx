@@ -139,9 +139,9 @@ const LabelDimensionsConfig = ({
       {/* Configuration spécifique au rouleau */}
       {customLayout.supportType === 'rouleau' && (
         <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-700">
-          <h5 className="text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+          {/* <h5 className="text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-2">
             Configuration rouleau
-          </h5>
+          </h5> */}
           <div>
             <label className="block text-xs text-yellow-700 dark:text-yellow-300 mb-1">
               Largeur rouleau (mm)
