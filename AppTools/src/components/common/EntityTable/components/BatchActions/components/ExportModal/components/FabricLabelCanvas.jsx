@@ -32,15 +32,18 @@ const FabricLabelCanvas = ({ label, layout, style }) => {
     });
 
     if (style.showBorder) {
+      const borderWidth = (style.borderWidth || 1) * mmToPx;
+      const offset = borderWidth / 100; // ✅ Votre ajustement qui fonctionne
+
       canvas.add(
         new fabric.Rect({
-          left: 0,
-          top: 0,
-          width: canvasWidth,
-          height: canvasHeight,
+          left: offset,
+          top: offset,
+          width: canvasWidth - borderWidth,
+          height: canvasHeight - borderWidth,
           fill: 'transparent',
           stroke: style.borderColor || '#000',
-          strokeWidth: style.borderWidth || 1,
+          strokeWidth: borderWidth,
           selectable: false,
         })
       );
@@ -56,7 +59,7 @@ const FabricLabelCanvas = ({ label, layout, style }) => {
 
     // Calculs de hauteur IDENTIQUES au PDF
     const nameHeight = style.showName ? Math.max(2.5, (style.nameSize || 10) * 0.4) * mmToPx : 0;
-    const priceHeight = style.showPrice ? Math.max(3, (style.priceSize || 14) * 0.4) * mmToPx : 0;
+    const priceHeight = style.showPrice ? Math.max(3, (style.priceSize || 14) * 0.3) * mmToPx : 0;
     const barcodeBarHeight = style.showBarcode ? (style.barcodeHeight || 15) * 0.3 * mmToPx : 0;
     const barcodeTextHeight = style.showBarcode ? 4 * mmToPx : 0;
     const totalBarcodeHeight = barcodeBarHeight + barcodeTextHeight;
@@ -82,12 +85,13 @@ const FabricLabelCanvas = ({ label, layout, style }) => {
       const fontSize = Math.max(6, (style.nameSize || 10) * (finalNameHeight / nameHeight));
 
       const nameBox = new fabric.Textbox(label.name, {
-        top: currentY,
+        top: currentY + 2,
         left: padding,
         width: contentWidth,
         fontSize: fontSize,
         fontWeight: 'bold',
-        fontFamily: style.fontFamily || 'Arial',
+        fontSize: '10',
+        fontFamily: style.fontFamily || 'helvetica',
         fill: '#000',
         textAlign: 'center',
         selectable: false,
@@ -107,7 +111,7 @@ const FabricLabelCanvas = ({ label, layout, style }) => {
         left: canvasWidth / 2,
         originX: 'center',
         fontSize: fontSize,
-        fontFamily: style.fontFamily || 'Arial',
+        fontFamily: style.fontFamily || 'helvetica',
         fontWeight: 'bold',
         fill: '#000',
         selectable: false,
@@ -139,7 +143,7 @@ const FabricLabelCanvas = ({ label, layout, style }) => {
       const barcodeY = padding + contentHeight - totalBarcodeHeight;
 
       const img = new fabric.Image(temp, {
-        top: barcodeY,
+        top: barcodeY - 3,
         left: (canvasWidth - targetBarcodeWidth) / 2,
         scaleX: targetBarcodeWidth / temp.width,
         scaleY: userBarcodeHeight / temp.height,
@@ -150,11 +154,11 @@ const FabricLabelCanvas = ({ label, layout, style }) => {
 
       // Texte sous le code-barres
       const barcodeText = new fabric.Text(formatEAN13Text(label.barcode), {
-        fontFamily: 'arial', // ✅ Même police que le PDF
-        fontSize: Math.max(7, 9), // ✅ Même taille que le PDF
+        fontFamily: 'Arial', // ✅ Même police que le PDF
+        fontSize: Math.max(9, 12), // ✅ Même taille que le PDF
         fill: '#000',
         left: canvasWidth / 2,
-        top: barcodeY + userBarcodeHeight + 3, // ✅ Même espacement que le PDF
+        top: barcodeY + userBarcodeHeight - 1, // ✅ Même espacement que le PDF
         originX: 'center',
         selectable: false,
       });
