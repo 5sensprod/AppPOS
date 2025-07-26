@@ -258,13 +258,13 @@ class LabelRenderer {
    */
   async _addBorder(fabricCanvas, width, height, style, fabric, scaleFactor = 1) {
     const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor;
-    const halfStroke = borderWidth / 100;
+    const halfStroke = borderWidth / 60;
 
     width = Math.floor(fabricCanvas.getWidth());
     height = Math.floor(fabricCanvas.getHeight());
 
     const border = new fabric.Rect({
-      left: halfStroke,
+      left: halfStroke - 1,
       top: halfStroke,
       width: width - borderWidth,
       height: height - borderWidth,
@@ -421,7 +421,7 @@ class LabelRenderer {
     if (pageConfig.isRollMode) {
       return {
         x: (pageConfig.pageWidth - layout.width) / 2,
-        y: (layout.offsetTop || 5) + cellIndex * (layout.height + (layout.spacingV || 2)),
+        y: (layout.offsetTop ?? 5) + cellIndex * (layout.height + (layout.spacingV ?? 2)),
       };
     } else {
       const col = cellIndex % pageConfig.columns;
