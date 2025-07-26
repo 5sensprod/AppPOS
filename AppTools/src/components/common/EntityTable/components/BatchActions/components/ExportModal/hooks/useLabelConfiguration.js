@@ -9,9 +9,9 @@ const DEFAULT_STYLE = {
   fontSize: 12,
   fontFamily: 'Arial',
   showBorder: false,
-  borderWidth: 1,
+  borderWidth: 0.1,
   borderColor: '#000000',
-  padding: 2,
+  padding: 3,
   alignment: 'center',
   showBarcode: true,
   barcodeHeight: 15,
@@ -20,6 +20,7 @@ const DEFAULT_STYLE = {
   showName: false,
   nameSize: 10,
   duplicateCount: 1,
+  contentRotation: 0,
 };
 
 export const useLabelConfiguration = (onLayoutChange) => {

@@ -17,54 +17,205 @@ class LabelRenderer {
    */
   async renderToCanvas(canvasElement, label, layout, style, options = {}) {
     const fabric = await import('fabric');
-    if (canvasElement.__fabricCanvas__) {
-      canvasElement.__fabricCanvas__.dispose();
-      canvasElement.__fabricCanvas__ = null;
-    }
 
-    // ✅ HAUTE RÉSOLUTION pour PDF (facteur de zoom)
-    const scaleFactor = options.highRes ? 4 : 1; // 4x pour PDF, 1x pour aperçu
+    const scaleFactor = options.highRes ? 4 : 1;
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
     const canvasHeight = layout.height * this.mmToPx * scaleFactor;
 
-    // ✅ Créer ou réutiliser le canvas Fabric avec haute résolution
     const fabricCanvas = new fabric.Canvas(canvasElement, {
       width: canvasWidth,
       height: canvasHeight,
       backgroundColor: '#ffffff',
       selection: false,
-      // ✅ Paramètres pour haute qualité
       enableRetinaScaling: true,
       imageSmoothingEnabled: false,
     });
-    canvasElement.__fabricCanvas__ = fabricCanvas;
 
-    // ✅ Calculs unifiés avec positions personnalisées
+    // ✅ Calculs normaux des éléments
     const customPositions = style.customPositions || {};
     const elements = this._calculateElements(layout, style, scaleFactor, customPositions);
 
-    // ✅ Bordure optionnelle
+    // ✅ Bordure TOUJOURS normale (ne pivote jamais)
     if (style.showBorder) {
       await this._addBorder(fabricCanvas, canvasWidth, canvasHeight, style, fabric, scaleFactor);
     }
 
-    // ✅ Rendu des éléments avec positions personnalisées
-    if (style.showName && label.name) {
-      await this._addName(fabricCanvas, label, elements.name, style, fabric, scaleFactor);
+    // 🔄 GESTION DE LA ROTATION - 2 approches selon le cas
+    const isRotated = style.contentRotation === 90;
+
+    if (isRotated) {
+      // ✅ APPROCHE 1 : Rotation avec transformation directe de chaque objet
+      if (style.showName && label.name) {
+        const nameObj = await this._createNameObject(
+          label,
+          elements.name,
+          style,
+          fabric,
+          scaleFactor
+        );
+        this._applyRotationToObject(nameObj, canvasWidth, canvasHeight);
+        fabricCanvas.add(nameObj);
+      }
+
+      if (style.showPrice && label.price !== undefined) {
+        const priceObj = await this._createPriceObject(
+          label,
+          elements.price,
+          style,
+          fabric,
+          scaleFactor
+        );
+        this._applyRotationToObject(priceObj, canvasWidth, canvasHeight);
+        fabricCanvas.add(priceObj);
+      }
+
+      if (style.showBarcode && label.barcode?.trim()) {
+        const barcodeObjs = await this._createBarcodeObjects(
+          label,
+          elements.barcode,
+          style,
+          fabric,
+          scaleFactor
+        );
+        barcodeObjs.forEach((obj) => {
+          this._applyRotationToObject(obj, canvasWidth, canvasHeight);
+          fabricCanvas.add(obj);
+        });
+      }
+    } else {
+      // ✅ APPROCHE 2 : Mode normal (logique existante)
+      if (style.showName && label.name) {
+        await this._addName(fabricCanvas, label, elements.name, style, fabric, scaleFactor);
+      }
+
+      if (style.showPrice && label.price !== undefined) {
+        await this._addPrice(fabricCanvas, label, elements.price, style, fabric, scaleFactor);
+      }
+
+      if (style.showBarcode && label.barcode?.trim()) {
+        await this._addBarcode(fabricCanvas, label, elements.barcode, style, fabric, scaleFactor);
+      }
     }
 
-    if (style.showPrice && label.price !== undefined) {
-      await this._addPrice(fabricCanvas, label, elements.price, style, fabric, scaleFactor);
-    }
-
-    if (style.showBarcode && label.barcode?.trim()) {
-      await this._addBarcode(fabricCanvas, label, elements.barcode, style, fabric, scaleFactor);
-    }
-
-    // ✅ Rendu immédiat pour s'assurer que tout est prêt
     fabricCanvas.renderAll();
-
     return fabricCanvas;
+  }
+
+  // 🔄 NOUVELLE FONCTION : Appliquer rotation à un objet individuel
+  _applyRotationToObject(obj, canvasWidth, canvasHeight) {
+    // Centre du canvas
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 2;
+
+    // Position actuelle de l'objet
+    const currentLeft = obj.left;
+    const currentTop = obj.top;
+
+    // ✅ ROTATION 90° : transformer les coordonnées
+    // x devient y, y devient (largeur - x)
+    const newLeft = centerX + (currentTop - centerY);
+    const newTop = centerY - (currentLeft - centerX);
+
+    obj.set({
+      left: newLeft,
+      top: newTop,
+      angle: 90,
+      originX: 'center',
+      originY: 'center',
+    });
+  }
+
+  // 🔧 GARDER les fonctions de création existantes SIMPLES
+  async _createNameObject(label, element, style, fabric, scaleFactor) {
+    return new fabric.Text(label.name, {
+      left: element.centerX,
+      top: element.y,
+      originX: 'center',
+      originY: 'top',
+      fontSize: element.fontSize,
+      fontFamily: style.fontFamily || 'Arial',
+      fontWeight: 'bold',
+      fill: '#000000',
+      selectable: false,
+    });
+  }
+
+  async _createPriceObject(label, element, style, fabric, scaleFactor) {
+    const priceText = formatCurrency(label.price);
+    return new fabric.Text(priceText, {
+      left: element.centerX,
+      top: element.y,
+      originX: 'center',
+      originY: 'top',
+      fontSize: element.fontSize,
+      fontFamily: style.fontFamily || 'Arial',
+      fontWeight: 'bold',
+      fill: '#000000',
+      selectable: false,
+    });
+  }
+
+  async _createBarcodeObjects(label, element, style, fabric, scaleFactor) {
+    try {
+      const objects = [];
+
+      // Image du code-barres
+      const barcodeCanvas = document.createElement('canvas');
+      const barcodeWidth = Math.min(element.width - 10 * scaleFactor, 150 * scaleFactor);
+
+      barcodeCanvas.width = barcodeWidth;
+      barcodeCanvas.height = element.barcodeHeight;
+
+      JsBarcode(barcodeCanvas, label.barcode, {
+        format: 'EAN13',
+        width: 1.5 * scaleFactor,
+        height: element.barcodeHeight * 0.9,
+        displayValue: false,
+        background: '#ffffff',
+        lineColor: '#000000',
+        margin: 0,
+        flat: true,
+      });
+
+      const barcodeImg = new fabric.Image(barcodeCanvas, {
+        left: element.centerX,
+        top: element.y,
+        originX: 'center',
+        originY: 'top',
+        selectable: false,
+        imageSmoothing: false,
+      });
+      objects.push(barcodeImg);
+
+      // Texte du code-barres
+      const barcodeText = new fabric.Text(this.formatEAN13Text(label.barcode), {
+        left: element.centerX,
+        top: element.y + element.barcodeHeight + 2 * scaleFactor,
+        originX: 'center',
+        originY: 'top',
+        fontSize: 9 * scaleFactor,
+        fontFamily: 'Arial',
+        fill: '#000000',
+        selectable: false,
+      });
+      objects.push(barcodeText);
+
+      return objects;
+    } catch (error) {
+      console.warn('⚠️ Erreur code-barres:', error);
+      return [
+        new fabric.Text(label.barcode, {
+          left: element.centerX,
+          top: element.y,
+          originX: 'center',
+          originY: 'top',
+          fontSize: 10 * scaleFactor,
+          fontFamily: 'Arial',
+          fill: '#000000',
+          selectable: false,
+        }),
+      ];
+    }
   }
 
   /**
