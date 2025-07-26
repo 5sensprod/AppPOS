@@ -6,6 +6,13 @@ const os = require('os');
 const Product = require('../models/Product');
 const ResponseHandler = require('../handlers/ResponseHandler');
 
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(amount);
+}
+
 // Déplacer tempDir en dehors de la classe comme variable globale
 const tempDir = os.tmpdir();
 
@@ -620,7 +627,7 @@ class ProductExportController {
 
       case 'purchase_price':
       case 'price':
-        return product[key] ? `${product[key].toFixed(2)} €` : '0.00 €';
+        return product[key] ? formatCurrency(product[key]) : formatCurrency(0);
 
       case 'stock':
         return product[key]?.toString() || '0';

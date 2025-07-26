@@ -28,6 +28,7 @@
     "electron-log": "^5.3.1",
     "electron-updater": "^6.3.9",
     "express": "^4.21.2",
+    "fabric": "^6.4.3",
     "http-proxy-middleware": "^3.0.3",
     "jsbarcode": "^3.11.6",
     "jspdf": "^3.0.1",

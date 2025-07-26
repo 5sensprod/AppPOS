@@ -1,4 +1,4 @@
-// ProductTable.jsx - MODIFICATION FINALE pour supporter les étiquettes
+// ProductTable.jsx - INTÉGRATION fabricExportService
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useProduct, useProductDataStore } from '../stores/productStore';
@@ -9,7 +9,8 @@ import { useProductFilters } from '../hooks/useProductFilters';
 import { useStockOperations } from '../hooks/useStockOperations';
 import { useEntityTable } from '../../../hooks/useEntityTable';
 import { useCategoryUtils } from '../../../components/hooks/useCategoryUtils';
-import exportService from '../../../services/exportService'; // ✅ Service mis à jour
+import exportService from '../../../services/exportService'; // ✅ Service classique
+import fabricExportService from '../../../services/fabricExportService'; // ✅ NOUVEAU service Fabric
 import { useWebCapture } from '../hooks/useWebCapture';
 import StockModal from '../../../components/common/EntityTable/components/BatchActions/components/StockModal';
 import ToastContainer from '../../../components/common/EntityTable/components/BatchActions/components/ToastContainer';
@@ -139,7 +140,7 @@ function ProductTable(props) {
 
   const loading = productsLoading || operationLoading || categoriesLoading || stockLoading;
 
-  // ✅ FONCTION D'EXPORT MISE À JOUR POUR SUPPORTER LES ÉTIQUETTES
+  // ✅ FONCTION D'EXPORT MISE À JOUR AVEC FABRIC
   const handleProductExport = useCallback(
     async (exportConfig) => {
       console.log('📤 Configuration export reçue:', exportConfig);
@@ -155,10 +156,10 @@ function ProductTable(props) {
 
         // ✅ GESTION DIFFÉRENCIÉE SELON LE TYPE D'EXPORT
         if (exportConfig.exportType === 'labels') {
-          console.log("🏷️ Export d'étiquettes demandé");
+          console.log("🏷️ Export d'étiquettes via Fabric.js");
           console.log('📋 Données étiquettes avant filtrage:', exportConfig.labelData);
 
-          // ✅ FILTRAGE PRÉALABLE DES PRODUITS VALIDES
+          // ✅ FILTRAGE PRÉALABLE DES PRODUITS VALIDES (même logique)
           const validLabels = exportConfig.labelData.filter((label) => {
             const hasPrice = label.price && label.price > 0;
             const hasBarcode = label.barcode && label.barcode.trim() !== '';
@@ -194,15 +195,15 @@ function ProductTable(props) {
             labelData: validLabels,
           };
 
-          console.log('🎨 Configuration layout:', filteredConfig.labelLayout);
+          console.log('🎨 Configuration layout Fabric:', filteredConfig.labelLayout);
 
-          // ✅ APPEL DU SERVICE D'EXPORT D'ÉTIQUETTES
-          result = await exportService.exportProducts(filteredConfig);
+          // ✅ APPEL DU NOUVEAU SERVICE FABRIC POUR LES ÉTIQUETTES
+          result = await fabricExportService.exportLabelsToPDF(filteredConfig);
 
-          console.log('✅ Export étiquettes terminé:', result);
+          console.log('✅ Export étiquettes Fabric terminé:', result);
         } else {
-          // ✅ Export tableau classique (existant)
-          console.log('📊 Export tableau classique');
+          // ✅ Export tableau classique (service original)
+          console.log('📊 Export tableau classique via exportService');
           result = await exportService.exportProducts(exportConfig);
         }
 
@@ -211,7 +212,9 @@ function ProductTable(props) {
 
         // ✅ TOAST DE SUCCÈS DIFFÉRENCIÉ
         if (exportConfig.exportType === 'labels') {
-          toastActions.export.success(`Étiquettes ${exportConfig.format.toUpperCase()}`);
+          toastActions.export.success(
+            `Étiquettes ${exportConfig.format.toUpperCase()} (Fabric.js)`
+          );
         } else {
           toastActions.export.success(exportConfig.format);
         }
@@ -224,7 +227,7 @@ function ProductTable(props) {
 
         // ✅ MESSAGE D'ERREUR SPÉCIFIQUE AUX ÉTIQUETTES
         if (exportConfig.exportType === 'labels') {
-          toastActions.export.error(`Erreur export étiquettes: ${error.message}`);
+          toastActions.export.error(`Erreur export étiquettes Fabric: ${error.message}`);
         } else {
           toastActions.export.error(error.message);
         }
@@ -346,7 +349,7 @@ function ProductTable(props) {
         showActions={false}
         onSync={handleSyncEntity}
         onBatchSync={handleBatchSyncEntities}
-        onExport={handleProductExport} // ✅ Fonction mise à jour
+        onExport={handleProductExport} // ✅ Fonction mise à jour avec Fabric
         onBatchStatusChange={handleBatchStatusChange}
         onBatchCategoryChange={handleBatchCategoryChange}
         onBatchStockChange={handleStockAction}
