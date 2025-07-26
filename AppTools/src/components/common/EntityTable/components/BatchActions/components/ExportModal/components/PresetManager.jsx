@@ -1,6 +1,6 @@
-// 📁 components/PresetManager.jsx - Version générique
+// 📁 components/PresetManager.jsx - Avec indication des positions personnalisées
 import React, { useState } from 'react';
-import { Save, FolderOpen, Trash2, Plus } from 'lucide-react';
+import { Save, FolderOpen, Trash2, Plus, Move } from 'lucide-react';
 
 const PresetManager = ({
   savedPresets,
@@ -36,6 +36,12 @@ const PresetManager = ({
       setIsCreating(false);
       setPresetName('');
     }
+  };
+
+  // ✅ Vérifier si un preset contient des positions personnalisées
+  const hasCustomPositions = (preset) => {
+    const positions = preset.preset_data?.style?.customPositions;
+    return positions && Object.keys(positions).length > 0;
   };
 
   return (
@@ -106,9 +112,18 @@ const PresetManager = ({
               className="flex items-center justify-between text-xs bg-gray-50 dark:bg-gray-700 rounded px-2 py-1"
             >
               <div className="flex-1 flex flex-col">
-                <span className="truncate text-gray-700 dark:text-gray-300 font-medium">
-                  {preset.name}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="truncate text-gray-700 dark:text-gray-300 font-medium">
+                    {preset.name}
+                  </span>
+                  {/* ✅ NOUVEAU : Indicateur positions personnalisées */}
+                  {hasCustomPositions(preset) && (
+                    <Move
+                      className="h-3 w-3 text-orange-500"
+                      title="Contient des positions personnalisées"
+                    />
+                  )}
+                </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-gray-500 dark:text-gray-400">
                     {preset.is_public ? '🌐 Public' : '👤 Personnel'}
@@ -116,6 +131,12 @@ const PresetManager = ({
                   {preset.metadata?.support_type && (
                     <span className="text-gray-500 dark:text-gray-400">
                       📄 {preset.metadata.support_type}
+                    </span>
+                  )}
+                  {/* ✅ NOUVEAU : Détail positions */}
+                  {hasCustomPositions(preset) && (
+                    <span className="text-orange-600 dark:text-orange-400">
+                      📍 Positions custom
                     </span>
                   )}
                 </div>
