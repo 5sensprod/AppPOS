@@ -113,8 +113,8 @@ class LabelRenderer {
         }
       }
 
-      // ✅ Configuration page
-      const pageConfig = this._calculatePageLayout(layout);
+      // ✅ Configuration page - LOGIQUE ORIGINALE
+      const pageConfig = this._calculatePageLayout(layout, duplicatedLabels.length);
 
       const doc = new jsPDF({
         orientation: pageConfig.isRollMode ? 'portrait' : orientation,
@@ -122,7 +122,7 @@ class LabelRenderer {
         format: pageConfig.isRollMode ? [pageConfig.pageWidth, pageConfig.pageHeight] : 'a4',
       });
 
-      // ✅ Génération page par page
+      // ✅ Génération page par page - LOGIQUE ORIGINALE EXACTE
       let labelIndex = 0;
       let currentPage = 0;
 
@@ -157,7 +157,7 @@ class LabelRenderer {
             // ✅ Export haute qualité avec paramètres optimisés
             const imgData = canvasElement.toDataURL('image/png', 1.0); // Qualité maximale
 
-            // ✅ Position dans la page PDF
+            // ✅ Position dans la page PDF - LOGIQUE ORIGINALE EXACTE
             const position = this._calculateLabelPosition(cellInPage, pageConfig, layout);
 
             // ✅ Ajout dans le PDF avec résolution optimale
@@ -388,19 +388,39 @@ class LabelRenderer {
   }
 
   /**
-   * 📐 CALCUL MISE EN PAGE
+   * 📐 CALCUL MISE EN PAGE - LOGIQUE ORIGINALE avec cutPerLabel restauré
    */
-  _calculatePageLayout(layout) {
+  _calculatePageLayout(layout, totalLabels = 1) {
     const isRollMode = layout.supportType === 'rouleau';
 
     if (isRollMode) {
+      // ✅ LOGIQUE ORIGINALE : cutPerLabel = 1 étiquette par page
+      if (layout.cutPerLabel) {
+        return {
+          isRollMode: true,
+          pageWidth: layout.rouleau?.width || 58,
+          pageHeight: 297, // ✅ Page normale pour coupes individuelles
+          labelsPerPage: 1, // ✅ 1 étiquette par page
+        };
+      }
+
+      // ✅ MODIFICATION : Mode continu = toutes les étiquettes ensemble
+      const labelHeight = layout.height || 25;
+      const spacing = layout.spacingV || 2;
+      const offsetTop = layout.offsetTop || 5;
+      const offsetBottom = 5;
+
+      const dynamicHeight =
+        offsetTop + totalLabels * labelHeight + (totalLabels - 1) * spacing + offsetBottom;
+
       return {
         isRollMode: true,
         pageWidth: layout.rouleau?.width || 58,
-        pageHeight: 297,
-        labelsPerPage: layout.cutPerLabel ? 1 : layout.labelsPerGroup || 10,
+        pageHeight: Math.max(dynamicHeight, 297), // ✅ Hauteur dynamique pour mode continu
+        labelsPerPage: totalLabels, // ✅ Toutes les étiquettes en continu
       };
     } else {
+      // ✅ Mode feuilles - LOGIQUE ORIGINALE EXACTE
       const pageWidth = 210;
       const pageHeight = 297;
       const usableWidth = pageWidth - (layout.offsetLeft || 8) * 2;
@@ -420,13 +440,13 @@ class LabelRenderer {
   }
 
   /**
-   * 📍 POSITION ÉTIQUETTE SUR PAGE
+   * 📍 POSITION ÉTIQUETTE SUR PAGE - LOGIQUE ORIGINALE EXACTE
    */
   _calculateLabelPosition(cellIndex, pageConfig, layout) {
     if (pageConfig.isRollMode) {
       return {
-        x: (pageConfig.pageWidth - layout.width) / 2,
-        y: (layout.offsetTop ?? 5) + cellIndex * (layout.height + (layout.spacingV ?? 2)),
+        x: (pageConfig.pageWidth - layout.width) / 2, // ✅ CENTRAGE ORIGINAL
+        y: (layout.offsetTop ?? 5) + cellIndex * (layout.height + (layout.spacingV ?? 2)), // ✅ POSITION ORIGINALE
       };
     } else {
       const col = cellIndex % pageConfig.columns;
