@@ -17,6 +17,10 @@ class LabelRenderer {
    */
   async renderToCanvas(canvasElement, label, layout, style, options = {}) {
     const fabric = await import('fabric');
+    if (canvasElement.__fabricCanvas__) {
+      canvasElement.__fabricCanvas__.dispose();
+      canvasElement.__fabricCanvas__ = null;
+    }
 
     // ✅ HAUTE RÉSOLUTION pour PDF (facteur de zoom)
     const scaleFactor = options.highRes ? 4 : 1; // 4x pour PDF, 1x pour aperçu
@@ -33,6 +37,7 @@ class LabelRenderer {
       enableRetinaScaling: true,
       imageSmoothingEnabled: false,
     });
+    canvasElement.__fabricCanvas__ = fabricCanvas;
 
     // ✅ Calculs unifiés en pixels avec facteur de résolution
     const elements = this._calculateElements(layout, style, scaleFactor);
@@ -258,13 +263,13 @@ class LabelRenderer {
    */
   async _addBorder(fabricCanvas, width, height, style, fabric, scaleFactor = 1) {
     const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor;
-    const halfStroke = borderWidth / 100;
+    const halfStroke = borderWidth / 60;
 
     width = Math.floor(fabricCanvas.getWidth());
     height = Math.floor(fabricCanvas.getHeight());
 
     const border = new fabric.Rect({
-      left: halfStroke,
+      left: halfStroke - 1,
       top: halfStroke,
       width: width - borderWidth,
       height: height - borderWidth,
@@ -421,7 +426,7 @@ class LabelRenderer {
     if (pageConfig.isRollMode) {
       return {
         x: (pageConfig.pageWidth - layout.width) / 2,
-        y: (layout.offsetTop || 5) + cellIndex * (layout.height + (layout.spacingV || 2)),
+        y: (layout.offsetTop ?? 5) + cellIndex * (layout.height + (layout.spacingV ?? 2)),
       };
     } else {
       const col = cellIndex % pageConfig.columns;
