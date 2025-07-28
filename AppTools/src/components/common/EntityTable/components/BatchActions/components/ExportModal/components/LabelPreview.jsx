@@ -70,12 +70,6 @@ const LabelPreview = ({ labelData, customLayout, labelStyle, onStyleChange }) =>
             <Ruler className="h-3 w-3 mr-1" />
             {customLayout.width} × {customLayout.height} mm
           </div>
-          {labelStyle.contentRotation === 90 && (
-            <div className="flex items-center text-purple-600">
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Contenu pivoté 90°
-            </div>
-          )}
           {customPositionCount > 0 && (
             <div className="flex items-center">
               <Move className="h-3 w-3 mr-1" />

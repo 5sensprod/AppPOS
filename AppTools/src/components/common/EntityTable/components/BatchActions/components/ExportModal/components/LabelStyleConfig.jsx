@@ -142,46 +142,6 @@ const LabelStyleConfig = ({
         />
       )}
     </div>
-    <div className="mb-4">
-      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-2">
-        Rotation du contenu de l'étiquette
-      </label>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => onStyleChange({ contentRotation: 0 })}
-          className={`flex-1 px-3 py-2 text-xs rounded border flex items-center justify-center ${
-            labelStyle.contentRotation === 0
-              ? 'bg-blue-100 border-blue-300 text-blue-700'
-              : 'bg-gray-50 border-gray-300 text-gray-600'
-          }`}
-        >
-          <div className="w-8 h-5 border border-current mr-2 flex items-center justify-center text-xs">
-            ABC
-          </div>
-          Normal
-        </button>
-        <button
-          type="button"
-          onClick={() => onStyleChange({ contentRotation: 90 })}
-          className={`flex-1 px-3 py-2 text-xs rounded border flex items-center justify-center ${
-            labelStyle.contentRotation === 90
-              ? 'bg-blue-100 border-blue-300 text-blue-700'
-              : 'bg-gray-50 border-gray-300 text-gray-600'
-          }`}
-        >
-          <div className="w-5 h-8 border border-current mr-2 flex items-center justify-center text-xs transform rotate-90">
-            ABC
-          </div>
-          Pivoté 90°
-        </button>
-      </div>
-      <p className="text-xs text-gray-500 mt-1">
-        {labelStyle.contentRotation === 90
-          ? "🔄 Le texte s'affiche verticalement dans l'étiquette"
-          : "➡️ Le texte s'affiche horizontalement dans l'étiquette"}
-      </p>
-    </div>
   </div>
 );
 
