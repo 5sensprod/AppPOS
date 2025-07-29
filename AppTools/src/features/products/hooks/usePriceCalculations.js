@@ -1,10 +1,46 @@
-// ✅ Hook : usePriceCalculations.js
-import { useState } from 'react';
+// ✅ Hook : usePriceCalculations.js - Avec persistance localStorage
+import { useState, useEffect, useCallback } from 'react';
+
+// ✅ Clé localStorage et valeurs par défaut
+const STORAGE_KEY = 'priceCalculationMode';
+const DEFAULT_CALCULATION_MODE = 'from_cost';
 
 export function usePriceCalculations({ watch, setValue, product }) {
-  const [calculationMode, setCalculationMode] = useState('from_cost');
+  // ✅ Initialiser avec la valeur sauvegardée ou le défaut
+  const [calculationMode, setCalculationModeState] = useState(DEFAULT_CALCULATION_MODE);
   const [marginType, setMarginType] = useState('percentage');
   const [promoType, setPromoType] = useState('percentage');
+
+  // ✅ Charger la préférence au démarrage
+  useEffect(() => {
+    try {
+      const savedMode = localStorage.getItem(STORAGE_KEY);
+      if (savedMode && (savedMode === 'from_cost' || savedMode === 'from_price')) {
+        setCalculationModeState(savedMode);
+        console.log('✅ Mode de calcul chargé:', savedMode);
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur chargement mode de calcul:', error);
+    }
+  }, []);
+
+  // ✅ Sauvegarder le mode de calcul uniquement
+  const saveCalculationMode = useCallback((mode) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, mode);
+    } catch (error) {
+      console.warn('⚠️ Erreur sauvegarde mode de calcul:', error);
+    }
+  }, []);
+
+  // ✅ Wrapper avec sauvegarde automatique pour le mode de calcul
+  const setCalculationMode = useCallback(
+    (mode) => {
+      setCalculationModeState(mode);
+      saveCalculationMode(mode);
+    },
+    [saveCalculationMode]
+  );
 
   const watchedValues = watch
     ? {
@@ -202,6 +238,18 @@ export function usePriceCalculations({ watch, setValue, product }) {
     };
   };
 
+  // ✅ Fonction pour réinitialiser le mode de calcul
+  const resetCalculationMode = useCallback(() => {
+    setCalculationModeState(DEFAULT_CALCULATION_MODE);
+
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      console.log('✅ Mode de calcul réinitialisé');
+    } catch (error) {
+      console.warn('⚠️ Erreur réinitialisation mode de calcul:', error);
+    }
+  }, []);
+
   return {
     calculationMode,
     setCalculationMode,
@@ -212,5 +260,6 @@ export function usePriceCalculations({ watch, setValue, product }) {
     watchedValues,
     handleFieldChange,
     getCalculatedValues,
+    resetCalculationMode, // ✅ Fonction utilitaire pour le mode uniquement
   };
 }
