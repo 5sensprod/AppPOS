@@ -46,13 +46,29 @@ export const getValidationSchema = (isNew = true) => {
       )
       .nullable()
       .typeError('Le prix promotionnel doit être un nombre'),
-    purchase_price: yup
-      .number()
-      .transform((value, originalValue) =>
-        originalValue === '' || originalValue === null || originalValue === undefined ? null : value
-      )
-      .nullable()
-      .typeError("Le prix d'achat doit être un nombre"),
+
+    // ✅ CORRECTION : Ajouter .required() pour purchase_price en mode création
+    purchase_price: isNew
+      ? yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null || originalValue === undefined
+              ? null
+              : value
+          )
+          .required("Le prix d'achat est obligatoire") // ← AJOUTÉ
+          .positive("Le prix d'achat doit être supérieur à 0") // ← AJOUTÉ
+          .typeError("Le prix d'achat doit être un nombre")
+      : yup
+          .number()
+          .transform((value, originalValue) =>
+            originalValue === '' || originalValue === null || originalValue === undefined
+              ? null
+              : value
+          )
+          .nullable()
+          .positive("Le prix d'achat doit être supérieur à 0 s'il est renseigné")
+          .typeError("Le prix d'achat doit être un nombre"),
 
     // Stock
     stock: yup
@@ -122,11 +138,16 @@ export const getValidationSchema = (isNew = true) => {
     return yup.object().shape(commonSchema);
   }
 
-  // Schéma pour l'édition (tous les champs optionnels)
+  // Schéma pour l'édition (tous les champs optionnels sauf purchase_price qui garde sa validation conditionnelle)
   return yup.object().shape(
     Object.entries(commonSchema).reduce((schema, [key, value]) => {
-      // Pour chaque champ du schéma commun, le rendre optionnel
-      schema[key] = value.optional();
+      // Pour purchase_price, garder la validation conditionnelle définie ci-dessus
+      if (key === 'purchase_price') {
+        schema[key] = value;
+      } else {
+        // Pour les autres champs, les rendre optionnels
+        schema[key] = value.optional();
+      }
       return schema;
     }, {})
   );
