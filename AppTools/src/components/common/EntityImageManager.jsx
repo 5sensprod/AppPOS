@@ -42,6 +42,34 @@ const getImageDimensions = (image) => {
   return null;
 };
 
+// Fonction pour valider les dimensions d'une image
+const validateImageDimensions = (file, minWidth = 800, minHeight = 800) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      if (img.width < minWidth || img.height < minHeight) {
+        reject(
+          new Error(
+            `L'image doit faire au minimum ${minWidth}x${minHeight} pixels. Dimensions actuelles: ${img.width}x${img.height} pixels.`
+          )
+        );
+      } else {
+        resolve({ width: img.width, height: img.height });
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Impossible de lire les dimensions de l'image."));
+    };
+
+    img.src = url;
+  });
+};
+
 const EntityImageManager = ({
   entity,
   entityId,
@@ -50,6 +78,8 @@ const EntityImageManager = ({
   maxImages = 10,
   acceptedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
   maxFileSize = 5 * 1024 * 1024,
+  minWidth = 800,
+  minHeight = 800,
   onUploadImage,
   onDeleteImage,
   onSetMainImage,
@@ -63,29 +93,37 @@ const EntityImageManager = ({
   const mainImage = entity?.image;
   const galleryImages = entity?.gallery_images || [];
 
+  const validateFile = async (file) => {
+    // Validation du type de fichier
+    if (!acceptedTypes.includes(file.type)) {
+      throw new Error(
+        `Type de fichier non supporté. Types acceptés: ${acceptedTypes.map((t) => t.split('/')[1]).join(', ')}`
+      );
+    }
+
+    // Validation de la taille du fichier
+    if (file.size > maxFileSize) {
+      throw new Error(
+        `Fichier trop volumineux. Taille maximale: ${Math.round(maxFileSize / 1024 / 1024)}Mo`
+      );
+    }
+
+    // Validation des dimensions
+    await validateImageDimensions(file, minWidth, minHeight);
+  };
+
   const handleMainImageUpload = async (e) => {
     if (!editable) return;
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!acceptedTypes.includes(file.type)) {
-      setUploadError(
-        `Type de fichier non supporté. Types acceptés: ${acceptedTypes.map((t) => t.split('/')[1]).join(', ')}`
-      );
-      return;
-    }
-
-    if (file.size > maxFileSize) {
-      setUploadError(
-        `Fichier trop volumineux. Taille maximale: ${Math.round(maxFileSize / 1024 / 1024)}Mo`
-      );
-      return;
-    }
-
     setUploadError(null);
     setUploadProgress(10);
 
     try {
+      // Validation complète du fichier
+      await validateFile(file);
+
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) =>
           prev >= 90 ? (clearInterval(progressInterval), 90) : prev + 10
@@ -99,7 +137,7 @@ const EntityImageManager = ({
       setTimeout(() => setUploadProgress(0), 500);
     } catch (error) {
       console.error("Erreur lors du téléchargement de l'image :", error);
-      setUploadError(error.message || "Erreur lors du téléchargement de l'image");
+      setUploadError(error.message);
       setUploadProgress(0);
     }
   };
@@ -108,20 +146,6 @@ const EntityImageManager = ({
     if (!editable) return;
     const file = e.target.files[0];
     if (!file) return;
-
-    if (!acceptedTypes.includes(file.type)) {
-      setUploadError(
-        `Type de fichier non supporté. Types acceptés: ${acceptedTypes.map((t) => t.split('/')[1]).join(', ')}`
-      );
-      return;
-    }
-
-    if (file.size > maxFileSize) {
-      setUploadError(
-        `Fichier trop volumineux. Taille maximale: ${Math.round(maxFileSize / 1024 / 1024)}Mo`
-      );
-      return;
-    }
 
     if (galleryImages.length >= maxImages) {
       setUploadError(`Nombre maximum d'images atteint (${maxImages})`);
@@ -132,6 +156,9 @@ const EntityImageManager = ({
     setUploadProgress(10);
 
     try {
+      // Validation complète du fichier
+      await validateFile(file);
+
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) =>
           prev >= 90 ? (clearInterval(progressInterval), 90) : prev + 10
@@ -144,7 +171,7 @@ const EntityImageManager = ({
       setTimeout(() => setUploadProgress(0), 500);
     } catch (error) {
       console.error("Erreur lors du téléchargement de l'image de galerie :", error);
-      setUploadError(error.message || "Erreur lors du téléchargement de l'image");
+      setUploadError(error.message);
       setUploadProgress(0);
     }
   };
@@ -446,7 +473,7 @@ const EntityImageManager = ({
                 </div>
               )}
 
-              {/* Contraintes */}
+              {/* Contraintes mises à jour */}
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 <div>
                   <strong>Formats acceptés:</strong>{' '}
@@ -454,6 +481,9 @@ const EntityImageManager = ({
                 </div>
                 <div>
                   <strong>Taille maximum:</strong> {Math.round(maxFileSize / 1024 / 1024)} Mo
+                </div>
+                <div>
+                  <strong>Dimensions minimales:</strong> {minWidth}x{minHeight} pixels
                 </div>
               </div>
 
