@@ -3,6 +3,7 @@ import React from 'react';
 import { Calculator, ArrowRight, TrendingUp, Tag } from 'lucide-react';
 import { NumberInput, SelectField } from '../../../../components/atoms/Input';
 import { usePriceCalculations } from '../../hooks/usePriceCalculations';
+import { formatCurrency, formatPercentage } from '../../../../utils/formatters';
 
 const ProductPriceSection = ({ product, editable = false, register, errors, watch, setValue }) => {
   const {
@@ -60,7 +61,7 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
               Prix d'achat HT
             </h3>
             <p className="text-lg font-bold text-blue-900 dark:text-blue-100">
-              {calculated.purchasePrice}€
+              {formatCurrency(calculated.purchasePrice)}
             </p>
           </div>
 
@@ -69,7 +70,7 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
               Prix vente HT
             </h3>
             <p className="text-lg font-bold text-green-900 dark:text-green-100">
-              {calculated.priceHT}€
+              {formatCurrency(calculated.priceHT)}
             </p>
           </div>
 
@@ -78,7 +79,7 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
               Prix vente TTC
             </h3>
             <p className="text-lg font-bold text-purple-900 dark:text-purple-100">
-              {calculated.priceTTC}€
+              {formatCurrency(calculated.priceTTC)}
             </p>
           </div>
 
@@ -88,7 +89,7 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
                 Prix régulier TTC
               </h3>
               <p className="text-lg font-bold text-orange-900 dark:text-orange-100">
-                {calculated.regularPrice}€
+                {formatCurrency(calculated.regularPrice)}
               </p>
             </div>
           )}
@@ -99,13 +100,14 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
                 Prix promotionnel
               </h3>
               <p className="text-lg font-bold text-red-900 dark:text-red-100">
-                {calculated.salePrice}€
+                {formatCurrency(calculated.salePrice)}
               </p>
               <p className="text-xs text-red-600 dark:text-red-400">
-                -{calculated.promoAmount}€ ({calculated.promoRate}%)
+                -{formatCurrency(calculated.promoAmount)} ({formatPercentage(calculated.promoRate)})
               </p>
               <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                Marge promo: {calculated.promoMarginAmount}€ ({calculated.promoMarginRate}%)
+                Marge promo: {formatCurrency(calculated.promoMarginAmount)} (
+                {formatPercentage(calculated.promoMarginRate)})
               </p>
             </div>
           )}
@@ -113,14 +115,14 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
           <div>
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Marge</h3>
             <p className="text-gray-900 dark:text-gray-100">
-              {calculated.marginAmount}€ ({calculated.marginRate}%)
+              {formatCurrency(calculated.marginAmount)} ({formatPercentage(calculated.marginRate)})
             </p>
           </div>
 
           <div>
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">TVA</h3>
             <p className="text-gray-900 dark:text-gray-100">
-              {calculated.taxAmount}€ ({calculated.taxRate}%)
+              {formatCurrency(calculated.taxAmount)} ({formatPercentage(calculated.taxRate)})
             </p>
           </div>
         </div>
@@ -162,32 +164,70 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <NumberInput
-              name="purchase_price"
-              label="Prix d'achat HT (€)"
-              placeholder="0.00"
-              editable={true}
-              required={true}
-              allowDecimals={true}
-              onChange={(e) => handleFieldChange('purchase_price', e.target.value)}
-              helpText="Coût d'achat du produit"
-            />
+          <div className="space-y-4">
+            {/* Labels */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Prix d'achat HT (€) <span className="text-red-500">*</span>
+              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                TVA
+              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Marge
+              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Prix de vente TTC
+              </label>
+            </div>
 
-            <SelectField
-              name="tax_rate"
-              label="TVA"
-              options={taxRateOptions}
-              placeholder="Sélectionner un taux"
-              editable={true}
-              onChange={(e) => handleFieldChange('tax_rate', e.target.value)}
-            />
+            {/* Champs d'input */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+              <NumberInput
+                name="purchase_price"
+                placeholder="0.00"
+                editable={true}
+                required={true}
+                allowDecimals={true}
+                onChange={(e) => handleFieldChange('purchase_price', e.target.value)}
+              />
 
-            <div>
-              <div className="flex items-center mb-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Marge
-                </label>
+              <SelectField
+                name="tax_rate"
+                options={taxRateOptions}
+                placeholder="Sélectionner un taux"
+                editable={true}
+                value={watch('tax_rate') || ''}
+                onChange={(e) => {
+                  setValue('tax_rate', e.target.value);
+                  handleFieldChange('tax_rate', e.target.value);
+                }}
+                error={errors?.tax_rate?.message}
+              />
+
+              <div className="flex items-center space-x-2">
+                {marginType === 'percentage' ? (
+                  <NumberInput
+                    name="margin_rate"
+                    placeholder="0.0"
+                    editable={true}
+                    allowDecimals={true}
+                    min={0}
+                    onChange={(e) => handleFieldChange('margin_rate', e.target.value)}
+                    className="flex-1"
+                  />
+                ) : (
+                  <NumberInput
+                    name="margin_amount"
+                    placeholder="0.00"
+                    editable={true}
+                    allowDecimals={true}
+                    currency={true}
+                    min={0}
+                    onChange={(e) => handleFieldChange('margin_amount', e.target.value)}
+                    className="flex-1"
+                  />
+                )}
                 <SelectField
                   name="margin_type_select"
                   value={marginType}
@@ -195,40 +235,23 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
                   options={marginTypeOptions}
                   placeholder=""
                   editable={true}
-                  className="ml-2 w-16"
+                  className="w-16 flex-shrink-0"
                 />
               </div>
 
-              {marginType === 'percentage' ? (
-                <NumberInput
-                  name="margin_rate"
-                  placeholder="0.0"
-                  editable={true}
-                  allowDecimals={true}
-                  min={0}
-                  onChange={(e) => handleFieldChange('margin_rate', e.target.value)}
-                />
-              ) : (
-                <NumberInput
-                  name="margin_amount"
-                  placeholder="0.00"
-                  editable={true}
-                  allowDecimals={true}
-                  currency={true}
-                  min={0}
-                  onChange={(e) => handleFieldChange('margin_amount', e.target.value)}
-                />
-              )}
+              <div className="h-[38px] bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700 flex items-center justify-center">
+                <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                  {formatCurrency(calculated.priceTTC)}
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center">
-              <ArrowRight className="h-4 w-4 text-gray-400 mr-2" />
-              <div>
-                <div className="text-xs text-gray-500">Prix de vente TTC</div>
-                <div className="text-lg font-bold text-green-600 dark:text-green-400">
-                  {calculated.priceTTC}€
-                </div>
-              </div>
+            {/* Texte d'aide sous le premier champ uniquement */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Coût d'achat du produit</p>
+              <div></div>
+              <div></div>
+              <div></div>
             </div>
           </div>
         </div>
@@ -271,7 +294,12 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
               options={taxRateOptions}
               placeholder="Sélectionner un taux"
               editable={true}
-              onChange={(e) => handleFieldChange('tax_rate', e.target.value)}
+              value={watch('tax_rate') || ''}
+              onChange={(e) => {
+                setValue('tax_rate', e.target.value);
+                handleFieldChange('tax_rate', e.target.value);
+              }}
+              error={errors?.tax_rate?.message}
             />
 
             <div className="flex items-center">
@@ -279,9 +307,11 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
               <div>
                 <div className="text-xs text-gray-500">Marge calculée</div>
                 <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                  {calculated.marginAmount}€
+                  {formatCurrency(calculated.marginAmount)}
                 </div>
-                <div className="text-sm text-gray-500">({calculated.marginRate}%)</div>
+                <div className="text-sm text-gray-500">
+                  ({formatPercentage(calculated.marginRate)})
+                </div>
               </div>
             </div>
           </div>
@@ -363,13 +393,16 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
             <div>
               <div className="text-xs text-gray-500">Prix après promo</div>
               <div className="text-lg font-bold text-red-600 dark:text-red-400">
-                {calculated.salePrice}€
+                {formatCurrency(calculated.salePrice)}
               </div>
               {calculated.hasPromo && (
                 <>
-                  <div className="text-sm text-green-600">Économie: {calculated.promoAmount}€</div>
+                  <div className="text-sm text-green-600">
+                    Économie: {formatCurrency(calculated.promoAmount)}
+                  </div>
                   <div className="text-xs text-orange-600 mt-1">
-                    Marge promo: {calculated.promoMarginAmount}€ ({calculated.promoMarginRate}%)
+                    Marge promo: {formatCurrency(calculated.promoMarginAmount)} (
+                    {formatPercentage(calculated.promoMarginRate)})
                   </div>
                   {calculated.promoMarginRate < 0 && (
                     <div className="text-xs text-red-600 font-medium">⚠️ Marge négative !</div>
@@ -383,7 +416,7 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
             <div>
               <div className="text-xs text-gray-500">Réduction calculée</div>
               <div className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                {calculated.promoAmount}€ ({calculated.promoRate}%)
+                {formatCurrency(calculated.promoAmount)} ({formatPercentage(calculated.promoRate)})
               </div>
             </div>
           </div>
@@ -396,24 +429,24 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
           <div>
             <span className="text-gray-500">Achat HT:</span>
-            <div className="font-medium">{calculated.purchasePrice}€</div>
+            <div className="font-medium">{formatCurrency(calculated.purchasePrice)}</div>
           </div>
           <div>
             <span className="text-gray-500">Vente HT:</span>
-            <div className="font-medium">{calculated.priceHT}€</div>
+            <div className="font-medium">{formatCurrency(calculated.priceHT)}</div>
           </div>
           <div>
             <span className="text-gray-500">TVA:</span>
-            <div className="font-medium">{calculated.taxAmount}€</div>
+            <div className="font-medium">{formatCurrency(calculated.taxAmount)}</div>
           </div>
           <div>
             <span className="text-gray-500">Vente TTC:</span>
-            <div className="font-medium">{calculated.priceTTC}€</div>
+            <div className="font-medium">{formatCurrency(calculated.priceTTC)}</div>
           </div>
           <div>
             <span className="text-gray-500">Marge:</span>
             <div className="font-medium text-green-600">
-              {calculated.marginAmount}€ ({calculated.marginRate}%)
+              {formatCurrency(calculated.marginAmount)} ({formatPercentage(calculated.marginRate)})
             </div>
           </div>
         </div>
