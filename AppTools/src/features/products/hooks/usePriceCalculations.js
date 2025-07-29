@@ -56,6 +56,61 @@ export function usePriceCalculations({ watch, setValue, product }) {
       }
     : {};
 
+  // ✅ SURVEILLANCE AUTOMATIQUE : Recalcul dès que les valeurs changent
+  useEffect(() => {
+    if (!setValue || !watch) return;
+
+    // Mode calcul depuis le prix de vente - recalcul automatique
+    if (calculationMode === 'from_price') {
+      // Utiliser directement watch() pour avoir les valeurs en temps réel
+      const currentPrice = watch('price') || 0;
+      const currentPurchasePrice = watch('purchase_price') || 0;
+      const currentTaxRate = watch('tax_rate') || 20;
+
+      console.log('🔄 Recalcul marge:', { currentPrice, currentPurchasePrice, currentTaxRate });
+
+      if (currentPrice > 0 && currentPurchasePrice > 0) {
+        const sellPriceHT = currentPrice / (1 + currentTaxRate / 100);
+        const marginAmount = sellPriceHT - currentPurchasePrice;
+        const marginRate = (marginAmount / currentPurchasePrice) * 100;
+
+        const newMarginAmount = Math.round(marginAmount * 100) / 100;
+        const newMarginRate = Math.round(marginRate * 100) / 100;
+
+        console.log('✅ Nouvelle marge calculée:', { newMarginAmount, newMarginRate });
+
+        // Mettre à jour les valeurs du formulaire
+        setValue('margin_amount', newMarginAmount);
+        setValue('margin_rate', newMarginRate);
+      }
+    }
+  }, [calculationMode, setValue, watch]);
+
+  // ✅ SURVEILLANCE des champs spécifiques
+  const priceValue = watch ? watch('price') : 0;
+  const purchasePriceValue = watch ? watch('purchase_price') : 0;
+  const taxRateValue = watch ? watch('tax_rate') : 20;
+
+  useEffect(() => {
+    if (!setValue || calculationMode !== 'from_price') return;
+
+    console.log('📊 Valeurs changées:', { priceValue, purchasePriceValue, taxRateValue });
+
+    if (priceValue > 0 && purchasePriceValue > 0) {
+      const sellPriceHT = priceValue / (1 + taxRateValue / 100);
+      const marginAmount = sellPriceHT - purchasePriceValue;
+      const marginRate = (marginAmount / purchasePriceValue) * 100;
+
+      const newMarginAmount = Math.round(marginAmount * 100) / 100;
+      const newMarginRate = Math.round(marginRate * 100) / 100;
+
+      setValue('margin_amount', newMarginAmount);
+      setValue('margin_rate', newMarginRate);
+
+      console.log('✅ Marge mise à jour:', { newMarginAmount, newMarginRate });
+    }
+  }, [priceValue, purchasePriceValue, taxRateValue, calculationMode, setValue]);
+
   const calculatePrices = (sourceField, value) => {
     const taxRate = watchedValues.tax_rate || 20;
     const taxMultiplier = 1 + taxRate / 100;
@@ -171,14 +226,16 @@ export function usePriceCalculations({ watch, setValue, product }) {
         }
       }
     } else if (calculationMode === 'from_price') {
-      if (['price', 'tax_rate'].includes(field)) {
+      if (['price', 'purchase_price', 'tax_rate'].includes(field)) {
         const sellPriceTTC = field === 'price' ? parseFloat(value) || 0 : watchedValues.price || 0;
+        const purchasePriceHT =
+          field === 'purchase_price' ? parseFloat(value) || 0 : watchedValues.purchase_price || 0;
         const taxRate =
           field === 'tax_rate' ? parseFloat(value) || 20 : watchedValues.tax_rate || 20;
-        const sellPriceHT = sellPriceTTC / (1 + taxRate / 100);
-        const purchasePriceHT = watchedValues.purchase_price || 0;
 
-        if (purchasePriceHT > 0) {
+        const sellPriceHT = sellPriceTTC / (1 + taxRate / 100);
+
+        if (purchasePriceHT > 0 && sellPriceTTC > 0) {
           const marginAmount = sellPriceHT - purchasePriceHT;
           const marginRate = (marginAmount / purchasePriceHT) * 100;
 
@@ -204,6 +261,10 @@ export function usePriceCalculations({ watch, setValue, product }) {
     const marginRate = purchasePrice > 0 ? (marginAmount / purchasePrice) * 100 : 0;
     const taxAmount = priceTTC - priceHT;
 
+    const hasValidData = priceTTC > 0 && purchasePrice > 0;
+    const displayMarginAmount = hasValidData ? marginAmount : 0;
+    const displayMarginRate = hasValidData ? marginRate : 0;
+
     const regularPriceHT = regularPrice / (1 + taxRate / 100);
     const regularMarginAmount = regularPriceHT - purchasePrice;
     const regularMarginRate = purchasePrice > 0 ? (regularMarginAmount / purchasePrice) * 100 : 0;
@@ -224,8 +285,8 @@ export function usePriceCalculations({ watch, setValue, product }) {
       salePrice: Math.round(salePrice * 100) / 100,
       salePriceHT: Math.round(salePriceHT * 100) / 100,
       purchasePrice: Math.round(purchasePrice * 100) / 100,
-      marginAmount: Math.round(marginAmount * 100) / 100,
-      marginRate: Math.round(marginRate * 100) / 100,
+      marginAmount: Math.round(displayMarginAmount * 100) / 100,
+      marginRate: Math.round(displayMarginRate * 100) / 100,
       regularMarginAmount: Math.round(regularMarginAmount * 100) / 100,
       regularMarginRate: Math.round(regularMarginRate * 100) / 100,
       promoMarginAmount: Math.round(promoMarginAmount * 100) / 100,
@@ -235,13 +296,12 @@ export function usePriceCalculations({ watch, setValue, product }) {
       promoAmount: Math.round(promoAmount * 100) / 100,
       promoRate: Math.round(promoRate * 100) / 100,
       hasPromo,
+      hasValidData,
     };
   };
 
-  // ✅ Fonction pour réinitialiser le mode de calcul
   const resetCalculationMode = useCallback(() => {
     setCalculationModeState(DEFAULT_CALCULATION_MODE);
-
     try {
       localStorage.removeItem(STORAGE_KEY);
       console.log('✅ Mode de calcul réinitialisé');
@@ -260,6 +320,6 @@ export function usePriceCalculations({ watch, setValue, product }) {
     watchedValues,
     handleFieldChange,
     getCalculatedValues,
-    resetCalculationMode, // ✅ Fonction utilitaire pour le mode uniquement
+    resetCalculationMode,
   };
 }

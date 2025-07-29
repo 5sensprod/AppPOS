@@ -285,7 +285,12 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
               required={true}
               allowDecimals={true}
               currency={true}
-              onChange={(e) => handleFieldChange('price', e.target.value)}
+              value={watch('price') || ''}
+              onChange={(e) => {
+                setValue('price', e.target.value);
+                handleFieldChange('price', e.target.value);
+              }}
+              error={errors?.price?.message}
             />
 
             <SelectField
@@ -306,12 +311,19 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
               <ArrowRight className="h-4 w-4 text-gray-400 mr-2" />
               <div>
                 <div className="text-xs text-gray-500">Marge calculée</div>
-                <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                <div
+                  className={`text-lg font-bold ${calculated.marginAmount >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}
+                >
                   {formatCurrency(calculated.marginAmount)}
                 </div>
-                <div className="text-sm text-gray-500">
+                <div
+                  className={`text-sm ${calculated.marginRate >= 0 ? 'text-gray-500' : 'text-red-500'}`}
+                >
                   ({formatPercentage(calculated.marginRate)})
                 </div>
+                {calculated.marginAmount < 0 && (
+                  <div className="text-xs text-red-600 font-medium mt-1">⚠️ Marge négative</div>
+                )}
               </div>
             </div>
           </div>
