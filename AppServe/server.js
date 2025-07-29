@@ -44,6 +44,29 @@ const corsOptions = {
 // Initialiser PathManager avant tout
 pathManager.initialize();
 
+// ✅ DÉTECTION DE L'ENVIRONNEMENT DE PRODUCTION
+function isProductionEnvironment() {
+  // Méthode 1: Variable d'environnement
+  if (process.env.NODE_ENV === 'production') {
+    return true;
+  }
+
+  // Méthode 2: Vérification du chemin AppData (utilisation du PathManager)
+  if (pathManager.useAppData) {
+    console.log('🏭 [BACKUP] Mode production détecté (AppData)');
+    return true;
+  }
+
+  // Méthode 3: Variable spécifique pour forcer la production
+  if (process.env.ENABLE_BACKUP === 'true') {
+    console.log('🏭 [BACKUP] Mode production forcé par ENABLE_BACKUP');
+    return true;
+  }
+
+  console.log('🔧 [BACKUP] Mode développement détecté - Sauvegardes désactivées');
+  return false;
+}
+
 // ✅ FONCTION D'INITIALISATION SIMPLIFIÉE
 async function initializeServer() {
   try {
@@ -129,10 +152,12 @@ app.use('/api/wordpress/menu', authMiddleware, wordpressMenuRoutes);
 const dataCopyRoutes = require('./routes/dataCopyRoutes');
 app.use('/api/data-copy', authMiddleware, dataCopyRoutes);
 
-// ✅ ROUTE D'INFO SERVEUR AVEC ID D'AUTH
+// ✅ ROUTE D'INFO SERVEUR AVEC ID D'AUTH ET STATUS BACKUP
 app.get('/api/server-info', (req, res) => {
   const ipAddress = getLocalIpAddress();
   const port = req.socket.localPort;
+  const isProduction = isProductionEnvironment();
+
   res.json({
     ip: ipAddress,
     port: port,
@@ -142,6 +167,8 @@ app.get('/api/server-info', (req, res) => {
     publicPath: pathManager.getPublicPath(),
     useAppData: pathManager.useAppData,
     mode: pathManager.useAppData ? 'AppData' : 'Local',
+    environment: isProduction ? 'production' : 'development',
+    backupEnabled: isProduction,
   });
 });
 
@@ -164,23 +191,47 @@ app.use('/api/lcd', authMiddleware, lcdRoutes);
 const posPrinterRoutes = require('./routes/posPrinterRoutes');
 app.use('/api/printer', posPrinterRoutes);
 
-// Configuration du CRON pour la sauvegarde à 18h quotidiennement
-cron.schedule('30 18 * * *', async () => {
-  console.log(`[${new Date().toISOString()}] Sauvegarde planifiée...`);
-  try {
-    await performBackup();
-    console.log(`[${new Date().toISOString()}] Sauvegarde des BDD terminée avec succès`);
+// ✅ CONFIGURATION DU CRON UNIQUEMENT EN PRODUCTION
+if (isProductionEnvironment()) {
+  // Configuration du CRON pour la sauvegarde à 18h quotidiennement
+  cron.schedule('30 18 * * *', async () => {
+    console.log(`[${new Date().toISOString()}] 🏭 PRODUCTION - Sauvegarde planifiée démarrée...`);
+    try {
+      await performBackup();
+      console.log(`[${new Date().toISOString()}] ✅ Sauvegarde des BDD terminée avec succès`);
 
-    await performImagesBackup();
-    console.log(`[${new Date().toISOString()}] Sauvegarde des images terminée avec succès`);
+      await performImagesBackup();
+      console.log(`[${new Date().toISOString()}] ✅ Sauvegarde des images terminée avec succès`);
 
-    console.log(`[${new Date().toISOString()}] Sauvegarde complète terminée avec succès`);
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Erreur de sauvegarde:`, error);
+      console.log(`[${new Date().toISOString()}] 🎉 Sauvegarde complète terminée avec succès`);
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] ❌ Erreur de sauvegarde:`, error);
+    }
+  });
+
+  console.log(
+    '🏭 [BACKUP] Sauvegarde automatique configurée pour 18h30 quotidiennement (PRODUCTION)'
+  );
+
+  // Option: Sauvegarde au démarrage en production (facultatif)
+  if (process.env.BACKUP_ON_STARTUP === 'true') {
+    setTimeout(async () => {
+      console.log('[STARTUP] Sauvegarde de démarrage en cours...');
+      try {
+        await performBackup();
+        await performImagesBackup();
+        console.log('[STARTUP] ✅ Sauvegarde de démarrage terminée');
+      } catch (error) {
+        console.error('[STARTUP] ❌ Erreur sauvegarde de démarrage:', error);
+      }
+    }, 30000); // 30 secondes après le démarrage
   }
-});
-
-console.log('Sauvegarde automatique configurée pour 18h quotidiennement');
+} else {
+  console.log('🔧 [BACKUP] Mode développement - Sauvegardes automatiques désactivées');
+  console.log(
+    '   ↳ Pour activer les sauvegardes en dev, définir NODE_ENV=production ou ENABLE_BACKUP=true'
+  );
+}
 
 // ✅ DÉMARRAGE SERVEUR SIMPLIFIÉ
 const startServer = async () => {
