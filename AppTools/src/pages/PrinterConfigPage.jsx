@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Printer,
   Upload,
+  Eye,
   Settings,
   RefreshCw,
   CheckCircle,
@@ -19,11 +20,16 @@ const PrinterConfigPage = () => {
   const [templates, setTemplates] = useState([]);
   const [settings, setSettings] = useState({});
   const [healthStatus, setHealthStatus] = useState(null);
+  const [templateInfo, setTemplateInfo] = useState(null);
 
   // États pour le formulaire
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [templateData, setTemplateData] = useState('{}');
+  const [templateData, setTemplateData] = useState(
+    '{\n  "objCompany": "Ma Société",\n  "Code à barres5": "1234567890123"\n}'
+  );
+  const [previewData, setPreviewData] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
 
   // États pour les modales
@@ -31,7 +37,6 @@ const PrinterConfigPage = () => {
   const [templateObjectsModal, setTemplateObjectsModal] = useState({
     visible: false,
     template: null,
-    objects: null,
   });
 
   // États pour les messages
@@ -67,10 +72,14 @@ const PrinterConfigPage = () => {
   const loadHealthStatus = async () => {
     try {
       const result = await brotherService.checkHealth();
-      setHealthStatus(result.data);
+      if (result.success) {
+        setHealthStatus(result.data);
+      } else {
+        setHealthStatus(result.data || { status: 'error', error: 'Erreur connexion' });
+      }
     } catch (error) {
       console.error('Erreur health check:', error);
-      setHealthStatus({ status: 'error', error: error.message });
+      setHealthStatus({ status: 'error', error: error.message, bridgeAvailable: false });
     }
   };
 
@@ -82,6 +91,8 @@ const PrinterConfigPage = () => {
         if (result.data.defaultPrinter) {
           setSelectedPrinter(result.data.defaultPrinter);
         }
+      } else {
+        showMessage('error', 'Erreur chargement imprimantes');
       }
     } catch (error) {
       console.error('Erreur chargement imprimantes:', error);
@@ -94,6 +105,8 @@ const PrinterConfigPage = () => {
       const result = await brotherService.getTemplates();
       if (result.success) {
         setTemplates(result.data || []);
+      } else {
+        showMessage('error', 'Erreur chargement templates');
       }
     } catch (error) {
       console.error('Erreur chargement templates:', error);
@@ -112,6 +125,8 @@ const PrinterConfigPage = () => {
         if (result.data.defaultTemplate) {
           setSelectedTemplate(result.data.defaultTemplate);
         }
+      } else {
+        showMessage('error', 'Erreur chargement paramètres');
       }
     } catch (error) {
       console.error('Erreur chargement paramètres:', error);
@@ -127,7 +142,7 @@ const PrinterConfigPage = () => {
     try {
       const result = await brotherService.uploadTemplate(file);
       if (result.success) {
-        showMessage('success', 'Template uploadé avec succès');
+        showMessage('success', result.data.message || 'Template uploadé avec succès');
         await loadTemplates();
       } else {
         throw new Error(result.message || 'Erreur upload');
@@ -138,6 +153,45 @@ const PrinterConfigPage = () => {
 
     // Reset input
     event.target.value = '';
+  };
+
+  const handlePreview = async () => {
+    if (!selectedTemplate || !templateData.trim()) {
+      showMessage('warning', 'Sélectionnez un template et remplissez les données');
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      const parsedData = JSON.parse(templateData);
+      const result = await brotherService.generatePreview(selectedTemplate, parsedData, {
+        dpi: settings.dpi || 300,
+      });
+
+      console.log('Réponse preview complète:', result); // Debug
+
+      if (result.success) {
+        // CORRECTION ICI: La structure est result.data.data et non result.data
+        const previewImageData = result.data.data || result.data;
+
+        console.log('Données image:', previewImageData); // Debug
+
+        if (previewImageData && previewImageData.imageBase64) {
+          setPreviewData(previewImageData);
+          showMessage('success', 'Aperçu généré');
+        } else {
+          console.error('Structure de données inattendue:', result);
+          throw new Error("Données d'image manquantes dans la réponse");
+        }
+      } else {
+        throw new Error(result.message || 'Erreur aperçu');
+      }
+    } catch (error) {
+      console.error('Erreur handlePreview:', error);
+      showMessage('error', error.message);
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   const handlePrint = async () => {
@@ -155,7 +209,7 @@ const PrinterConfigPage = () => {
       });
 
       if (result.success) {
-        showMessage('success', 'Étiquette imprimée avec succès');
+        showMessage('success', result.data.message || 'Étiquette imprimée avec succès');
       } else {
         throw new Error(result.message || 'Erreur impression');
       }
@@ -170,17 +224,41 @@ const PrinterConfigPage = () => {
     try {
       const result = await brotherService.getTemplateObjects(templateName);
       if (result.success) {
-        setTemplateObjectsModal({
-          visible: true,
-          template: templateName,
-          objects: result.data,
-        });
-      } else {
-        throw new Error(result.message || 'Erreur objets template');
+        setTemplateObjectsModal({ visible: true, template: result.data });
+        setTemplateInfo(result.data.templateInfo); // NOUVEAU
       }
     } catch (error) {
       showMessage('error', error.message);
     }
+  };
+
+  const generateSampleData = (templateObjects) => {
+    if (!templateObjects || !templateObjects.foundObjects) return '{}';
+
+    const sampleData = {};
+    templateObjects.foundObjects.forEach((obj) => {
+      if (obj.type === 'Text') {
+        if (
+          obj.name.toLowerCase().includes('company') ||
+          obj.name.toLowerCase().includes('societe')
+        ) {
+          sampleData[obj.name] = 'Ma Société';
+        } else if (
+          obj.name.toLowerCase().includes('name') ||
+          obj.name.toLowerCase().includes('nom')
+        ) {
+          sampleData[obj.name] = 'Jean Dupont';
+        } else if (obj.name.toLowerCase().includes('date')) {
+          sampleData[obj.name] = new Date().toLocaleDateString('fr-FR');
+        } else {
+          sampleData[obj.name] = `Exemple ${obj.name}`;
+        }
+      } else if (obj.type === 'Barcode') {
+        sampleData[obj.name] = '1234567890123';
+      }
+    });
+
+    return JSON.stringify(sampleData, null, 2);
   };
 
   // Composant Message
@@ -214,10 +292,10 @@ const PrinterConfigPage = () => {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
-        <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-lg font-semibold">{title}</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">
               ×
             </button>
           </div>
@@ -387,11 +465,11 @@ const PrinterConfigPage = () => {
           </div>
         </div>
 
-        {/* Colonne droite - Test et impression */}
+        {/* Colonne droite - Test et aperçu */}
         <div className="space-y-6">
           {/* Configuration étiquette */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold mb-4">Impression Étiquette</h2>
+            <h2 className="text-xl font-semibold mb-4">Test Étiquette</h2>
 
             <div className="space-y-4">
               <div>
@@ -412,80 +490,149 @@ const PrinterConfigPage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Données (JSON)
+                  Données Test (JSON)
                 </label>
                 <textarea
                   rows={8}
                   value={templateData}
                   onChange={(e) => setTemplateData(e.target.value)}
-                  placeholder={JSON.stringify(
-                    {
-                      objCompany: 'Ma Société',
-                      'Code à barres6': '1234567890123',
-                    },
-                    null,
-                    2
-                  )}
                   className="w-full p-3 border border-gray-300 rounded-md font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
-              <button
-                onClick={handlePrint}
-                disabled={!selectedTemplate || !selectedPrinter || printLoading}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white rounded-md transition-colors"
-              >
-                <Printer className="w-4 h-4" />
-                <span>{printLoading ? 'Impression...' : 'Imprimer'}</span>
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={handlePreview}
+                  disabled={!selectedTemplate || previewLoading}
+                  className="flex items-center justify-center space-x-2 px-4 py-3 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white rounded-md transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>{previewLoading ? 'Génération...' : 'Aperçu'}</span>
+                </button>
+
+                <button
+                  onClick={handlePrint}
+                  disabled={!selectedTemplate || !selectedPrinter || printLoading}
+                  className="flex items-center justify-center space-x-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white rounded-md transition-colors"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>{printLoading ? 'Impression...' : 'Imprimer'}</span>
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Aperçu */}
+          {(previewData || previewLoading) && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-xl font-semibold mb-4">Aperçu Étiquette</h2>
+              <div className="text-center">
+                {previewLoading ? (
+                  <div className="flex items-center justify-center h-32">
+                    <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+                    <span className="ml-2 text-gray-500">Génération de l'aperçu...</span>
+                  </div>
+                ) : previewData ? (
+                  <div>
+                    <img
+                      src={`data:${previewData.mimeType};base64,${previewData.imageBase64}`}
+                      alt="Aperçu étiquette"
+                      className="max-w-full border border-gray-300 rounded mx-auto bg-white"
+                      style={{ maxHeight: '400px' }}
+                    />
+                    <div className="mt-3 text-sm text-gray-500 space-y-1">
+                      <p>Template: {previewData.templateName}</p>
+                      <p>Résolution: {previewData.dpi} DPI</p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {templateInfo && selectedTemplate && (
+            <div className="mt-2 p-3 bg-gray-50 rounded text-sm">
+              <p>
+                <strong>Dimensions:</strong> {templateInfo.width} x {templateInfo.length} mm
+              </p>
+              <p>
+                <strong>Orientation:</strong> {templateInfo.orientation}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Modal Objets Template */}
       <Modal
         isOpen={templateObjectsModal.visible}
-        onClose={() => setTemplateObjectsModal({ visible: false, template: null, objects: null })}
-        title={`Objets du template: ${templateObjectsModal.template}`}
+        onClose={() => setTemplateObjectsModal({ visible: false, template: null })}
+        title="Objets du Template"
       >
-        {templateObjectsModal.objects && (
+        {templateObjectsModal.template && (
           <div className="space-y-4">
-            <div className="text-sm text-gray-600 mb-4">
-              {templateObjectsModal.objects.totalFound} objet(s) trouvé(s)
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-medium">Template:</span>{' '}
+                {templateObjectsModal.template.templateName}
+              </div>
+              <div>
+                <span className="font-medium">Objets trouvés:</span>{' '}
+                {templateObjectsModal.template.totalFound}
+              </div>
             </div>
 
-            {templateObjectsModal.objects.foundObjects?.length > 0 ? (
-              <table className="w-full border border-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left p-3 text-sm font-medium text-gray-700">Index</th>
-                    <th className="text-left p-3 text-sm font-medium text-gray-700">Type</th>
-                    <th className="text-left p-3 text-sm font-medium text-gray-700">Nom</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {templateObjectsModal.objects.foundObjects.map((obj, i) => (
-                    <tr key={i} className="border-b">
-                      <td className="p-3 text-sm">{obj.index}</td>
-                      <td className="p-3 text-sm">
-                        <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            obj.type === 'Text'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {obj.type}
-                        </span>
-                      </td>
-                      <td className="p-3 text-sm font-mono">{obj.name}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {templateObjectsModal.template.foundObjects &&
+            templateObjectsModal.template.foundObjects.length > 0 ? (
+              <div>
+                <h4 className="font-medium mb-2">Objets disponibles:</h4>
+                <div className="border rounded-md">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="text-left p-3">Nom</th>
+                        <th className="text-left p-3">Type</th>
+                        <th className="text-left p-3">Index</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {templateObjectsModal.template.foundObjects.map((obj, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="p-3 font-mono">{obj.name}</td>
+                          <td className="p-3">
+                            <span
+                              className={`px-2 py-1 rounded text-xs ${
+                                obj.type === 'Text'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}
+                            >
+                              {obj.type}
+                            </span>
+                          </td>
+                          <td className="p-3 text-gray-500">{obj.index}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4">
+                  <h4 className="font-medium mb-2">Données d'exemple:</h4>
+                  <textarea
+                    rows={6}
+                    value={generateSampleData(templateObjectsModal.template)}
+                    readOnly
+                    onClick={(e) => e.target.select()}
+                    className="w-full p-3 border border-gray-300 rounded-md font-mono text-sm bg-gray-50"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Cliquez pour sélectionner et copier ces données d'exemple
+                  </p>
+                </div>
+              </div>
             ) : (
-              <div className="text-center text-gray-500 py-4">Aucun objet trouvé</div>
+              <p className="text-gray-500">Aucun objet trouvé dans ce template.</p>
             )}
           </div>
         )}

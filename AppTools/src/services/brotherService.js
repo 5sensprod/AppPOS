@@ -100,6 +100,20 @@ class BrotherService {
       throw new Error(`Erreur impression: ${error.message}`);
     }
   }
+
+  // Générer un aperçu d'étiquette
+  async generatePreview(template, data, options = {}) {
+    try {
+      const response = await apiService.post('/api/brother/preview', {
+        template,
+        data,
+        options,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(`Erreur aperçu: ${error.message}`);
+    }
+  }
 }
 
 export default new BrotherService();

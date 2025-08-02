@@ -127,6 +127,29 @@ router.post('/print', async (req, res) => {
 });
 
 /**
+ * POST /api/brother/preview
+ * Générer un aperçu d'une étiquette
+ * Body: { template, data, options?: { dpi? } }
+ */
+router.post('/preview', async (req, res) => {
+  try {
+    const { template, data, options = {} } = req.body;
+
+    if (!template) {
+      return ResponseHandler.badRequest(res, 'Template requis');
+    }
+    if (!data) {
+      return ResponseHandler.badRequest(res, 'Données requis');
+    }
+
+    const result = await brotherService.generatePreview(template, data, options);
+    return ResponseHandler.success(res, result);
+  } catch (error) {
+    return ResponseHandler.error(res, error);
+  }
+});
+
+/**
  * GET /api/brother/settings
  * Obtenir les paramètres de configuration actuels
  */
