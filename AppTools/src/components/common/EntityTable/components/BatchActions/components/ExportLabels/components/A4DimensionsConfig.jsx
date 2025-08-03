@@ -6,8 +6,6 @@ import PresetManager from './PresetManager';
 const A4DimensionsConfig = ({
   customLayout,
   onLayoutChange,
-  supportTypes,
-  onSupportTypeChange,
   onReset,
   savedPresets = [],
   loading = false,
@@ -34,12 +32,6 @@ const A4DimensionsConfig = ({
   const handleChange = (field, value) => {
     if (onLayoutChange && typeof onLayoutChange === 'function') {
       onLayoutChange(field, value);
-    }
-  };
-
-  const handleSupportTypeChange = (newType) => {
-    if (onSupportTypeChange && typeof onSupportTypeChange === 'function') {
-      onSupportTypeChange(newType);
     }
   };
 

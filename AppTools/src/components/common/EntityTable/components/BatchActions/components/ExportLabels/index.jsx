@@ -129,16 +129,6 @@ const ExportLabelsModal = ({
         Annuler
       </button>
 
-      {/* 🆕 NOUVEAU: Bouton reset manuel */}
-      <button
-        type="button"
-        onClick={handleReset}
-        className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600"
-        title="Réinitialiser tous les réglages"
-      >
-        🔄 Reset
-      </button>
-
       <button
         type="submit"
         disabled={loading || selectedItems.length === 0}
@@ -220,7 +210,7 @@ const ExportLabelsModal = ({
             onSaveLayoutPreset={saveLayoutPreset}
             onLoadLayoutPreset={loadLayoutPreset}
             onDeleteLayoutPreset={deleteLayoutPreset}
-            onResetForm={handleReset} // 🔧 Utiliser le nouveau reset complet
+            onResetForm={handleReset}
           />
         )}
 
