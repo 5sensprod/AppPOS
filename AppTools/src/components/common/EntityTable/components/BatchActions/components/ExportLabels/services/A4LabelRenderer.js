@@ -1,4 +1,4 @@
-//services/A4LabelRenderer.js
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\services\A4LabelRenderer.js
 import BaseLabelRenderer from './BaseLabelRenderer.js';
 
 /**

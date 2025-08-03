@@ -1,4 +1,4 @@
-//services/RollLabelRenderer.js
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\services\RollLabelRenderer.js
 import BaseLabelRenderer from './BaseLabelRenderer.js';
 
 /**

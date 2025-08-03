@@ -1,4 +1,4 @@
-//services/BaseLabelRenderer.js
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\services\BaseLabelRenderer.js
 import JsBarcode from 'jsbarcode';
 import { formatCurrency } from '../../../../../../../../utils/formatters.js';
 
