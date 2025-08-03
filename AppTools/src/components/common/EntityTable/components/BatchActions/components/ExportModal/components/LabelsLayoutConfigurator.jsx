@@ -1,4 +1,4 @@
-// LabelsLayoutConfigurator.jsx
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\LabelsLayoutConfigurator.jsx
 import React, { useEffect } from 'react';
 import { Grid } from 'lucide-react';
 import { useLabelConfiguration } from '../hooks/useLabelConfiguration';

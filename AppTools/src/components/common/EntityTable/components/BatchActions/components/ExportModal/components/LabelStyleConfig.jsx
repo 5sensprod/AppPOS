@@ -1,4 +1,4 @@
-// 📁 components/LabelStyleConfig.jsx
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\LabelStyleConfig.jsx
 import React from 'react';
 import { Palette, RotateCcw, Save } from 'lucide-react';
 import PresetManager from './PresetManager';
@@ -7,7 +7,6 @@ const LabelStyleConfig = ({
   labelStyle,
   onStyleChange,
   onReset,
-  // 🆕 Props pour presets
   savedPresets = [],
   onSavePreset,
   onLoadPreset,
@@ -20,7 +19,6 @@ const LabelStyleConfig = ({
         Style des étiquettes
       </h4>
 
-      {/* Bouton de réinitialisation */}
       {onReset && (
         <button
           type="button"
@@ -35,7 +33,6 @@ const LabelStyleConfig = ({
     </div>
 
     <div className="space-y-3">
-      {/* Éléments à afficher */}
       <div className="flex flex-wrap gap-4">
         <label className="flex items-center">
           <input
@@ -75,7 +72,6 @@ const LabelStyleConfig = ({
         </label>
       </div>
 
-      {/* Tailles de police */}
       <div className="grid grid-cols-3 gap-3">
         {labelStyle.showName && (
           <div>
@@ -124,7 +120,6 @@ const LabelStyleConfig = ({
         )}
       </div>
 
-      {/* Indicateur de sauvegarde automatique */}
       <div className="flex items-center justify-center pt-2 border-t border-gray-200 dark:border-gray-600">
         <div className="flex items-center text-xs text-green-600 dark:text-green-400">
           <Save className="h-3 w-3 mr-1" />
@@ -132,7 +127,6 @@ const LabelStyleConfig = ({
         </div>
       </div>
 
-      {/* 🆕 Gestion des presets */}
       {onSavePreset && (
         <PresetManager
           savedPresets={savedPresets}
@@ -141,46 +135,6 @@ const LabelStyleConfig = ({
           onDeletePreset={onDeletePreset}
         />
       )}
-    </div>
-    <div className="mb-4">
-      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-2">
-        Rotation du contenu de l'étiquette
-      </label>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => onStyleChange({ contentRotation: 0 })}
-          className={`flex-1 px-3 py-2 text-xs rounded border flex items-center justify-center ${
-            labelStyle.contentRotation === 0
-              ? 'bg-blue-100 border-blue-300 text-blue-700'
-              : 'bg-gray-50 border-gray-300 text-gray-600'
-          }`}
-        >
-          <div className="w-8 h-5 border border-current mr-2 flex items-center justify-center text-xs">
-            ABC
-          </div>
-          Normal
-        </button>
-        <button
-          type="button"
-          onClick={() => onStyleChange({ contentRotation: 90 })}
-          className={`flex-1 px-3 py-2 text-xs rounded border flex items-center justify-center ${
-            labelStyle.contentRotation === 90
-              ? 'bg-blue-100 border-blue-300 text-blue-700'
-              : 'bg-gray-50 border-gray-300 text-gray-600'
-          }`}
-        >
-          <div className="w-5 h-8 border border-current mr-2 flex items-center justify-center text-xs transform rotate-90">
-            ABC
-          </div>
-          Pivoté 90°
-        </button>
-      </div>
-      <p className="text-xs text-gray-500 mt-1">
-        {labelStyle.contentRotation === 90
-          ? "🔄 Le texte s'affiche verticalement dans l'étiquette"
-          : "➡️ Le texte s'affiche horizontalement dans l'étiquette"}
-      </p>
     </div>
   </div>
 );

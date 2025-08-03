@@ -1,10 +1,9 @@
-// 📁 hooks/useLabelConfiguration.js
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\hooks\useLabelConfiguration.js
 import { useState, useEffect, useCallback } from 'react';
 import userPresetService from '../../../../../../../../services/userPresetService';
 
 const CATEGORY = 'label_style';
 
-// Valeurs par défaut
 const DEFAULT_STYLE = {
   fontSize: 12,
   fontFamily: 'Arial',
@@ -20,7 +19,6 @@ const DEFAULT_STYLE = {
   showName: false,
   nameSize: 10,
   duplicateCount: 1,
-  contentRotation: 0,
 };
 
 export const useLabelConfiguration = (onLayoutChange) => {
@@ -39,27 +37,19 @@ export const useLabelConfiguration = (onLayoutChange) => {
   const [enableCellSelection, setEnableCellSelection] = useState(false);
   const [disabledCells, setDisabledCells] = useState(new Set());
 
-  // 📥 CHARGER au démarrage
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        // Charger le style depuis localStorage (fallback)
         const savedStyle = localStorage.getItem('labelStyleSettings');
         if (savedStyle) {
           setLabelStyle({ ...DEFAULT_STYLE, ...JSON.parse(savedStyle) });
         }
 
-        // Charger les presets depuis l'API générique
         const presets = await userPresetService.refreshPresets(CATEGORY);
         setSavedPresets(presets);
-
-        console.log('✅ Configuration étiquettes chargée:', {
-          styleLocal: !!savedStyle,
-          presetsAPI: presets.length,
-        });
       } catch (error) {
-        console.warn('⚠️ Erreur chargement configurations:', error);
+        console.warn('Erreur chargement configurations:', error);
       } finally {
         setLoading(false);
       }
@@ -92,7 +82,6 @@ export const useLabelConfiguration = (onLayoutChange) => {
     }
   };
 
-  // 💾 SAUVEGARDER automatiquement le style (localStorage pour réactivité)
   const handleStyleChange = useCallback(
     (newStyle) => {
       const updatedStyle = { ...labelStyle, ...newStyle };
@@ -101,7 +90,7 @@ export const useLabelConfiguration = (onLayoutChange) => {
       try {
         localStorage.setItem('labelStyleSettings', JSON.stringify(updatedStyle));
       } catch (error) {
-        console.warn('⚠️ Erreur sauvegarde style local:', error);
+        console.warn('Erreur sauvegarde style local:', error);
       }
 
       if (onLayoutChange) {
@@ -116,7 +105,6 @@ export const useLabelConfiguration = (onLayoutChange) => {
     [labelStyle, customLayout, disabledCells, onLayoutChange]
   );
 
-  // 💾 SAUVEGARDER un preset via API générique
   const savePreset = useCallback(
     async (presetName, isPublic = false) => {
       if (!presetName.trim()) return false;
@@ -135,13 +123,12 @@ export const useLabelConfiguration = (onLayoutChange) => {
           isPublic
         );
 
-        // Rafraîchir la liste locale
         const updatedPresets = await userPresetService.refreshPresets(CATEGORY);
         setSavedPresets(updatedPresets);
 
         return newPreset;
       } catch (error) {
-        console.error('❌ Erreur sauvegarde preset:', error);
+        console.error('Erreur sauvegarde preset:', error);
         return false;
       } finally {
         setLoading(false);
@@ -150,7 +137,6 @@ export const useLabelConfiguration = (onLayoutChange) => {
     [labelStyle, customLayout]
   );
 
-  // 📂 CHARGER un preset via API générique
   const loadPreset = useCallback(
     async (presetId) => {
       setLoading(true);
@@ -162,7 +148,6 @@ export const useLabelConfiguration = (onLayoutChange) => {
 
         if (style) {
           setLabelStyle({ ...DEFAULT_STYLE, ...style });
-          // Sauvegarder aussi en local
           localStorage.setItem('labelStyleSettings', JSON.stringify(style));
         }
 
@@ -181,7 +166,7 @@ export const useLabelConfiguration = (onLayoutChange) => {
 
         return true;
       } catch (error) {
-        console.error('❌ Erreur chargement preset:', error);
+        console.error('Erreur chargement preset:', error);
         return false;
       } finally {
         setLoading(false);
@@ -190,32 +175,27 @@ export const useLabelConfiguration = (onLayoutChange) => {
     [savedPresets, customLayout, labelStyle, disabledCells, onLayoutChange]
   );
 
-  // 🗑️ SUPPRIMER un preset via API générique
   const deletePreset = useCallback(async (presetId) => {
     setLoading(true);
     try {
       await userPresetService.deletePreset(CATEGORY, presetId);
-
-      // Rafraîchir la liste locale
       const updatedPresets = await userPresetService.refreshPresets(CATEGORY);
       setSavedPresets(updatedPresets);
-
       return true;
     } catch (error) {
-      console.error('❌ Erreur suppression preset:', error);
+      console.error('Erreur suppression preset:', error);
       return false;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 🔄 RÉINITIALISER le style
   const resetStyle = useCallback(() => {
     setLabelStyle(DEFAULT_STYLE);
     try {
       localStorage.removeItem('labelStyleSettings');
     } catch (error) {
-      console.warn('⚠️ Erreur réinitialisation:', error);
+      console.warn('Erreur réinitialisation:', error);
     }
   }, []);
 
@@ -231,8 +211,6 @@ export const useLabelConfiguration = (onLayoutChange) => {
     calculateGridDimensions,
     handleCustomLayoutChange,
     handleStyleChange,
-
-    // 🆕 Fonctions pour presets via API générique
     savePreset,
     loadPreset,
     deletePreset,

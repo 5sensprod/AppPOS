@@ -39,7 +39,8 @@ const ExportSummary = ({
             • Contenu: <strong>Prix et codes-barres</strong> pour chaque produit
           </p>
         )}
-        {exportFormat === 'pdf' && (
+        {/* ✅ ORIENTATION UNIQUEMENT POUR LES TABLEAUX PDF */}
+        {exportFormat === 'pdf' && exportType === 'table' && (
           <p>
             • Orientation: <strong>{orientation === 'portrait' ? 'Portrait' : 'Paysage'}</strong>
           </p>

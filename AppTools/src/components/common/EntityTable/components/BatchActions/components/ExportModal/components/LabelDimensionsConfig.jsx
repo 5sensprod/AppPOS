@@ -1,4 +1,4 @@
-//components/LabelDimensionsConfig.jsx
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\LabelDimensionsConfig.jsx
 import React from 'react';
 import { Settings, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';

@@ -9,16 +9,16 @@ const ExportOrientationSelector = ({ orientation, onOrientationChange, exportTyp
 
   const orientations = [
     {
-      value: 'portrait',
-      label: 'Portrait',
-      description:
-        exportType === 'labels' ? 'Étiquettes verticales' : 'Vertical (hauteur > largeur)',
-    },
-    {
       value: 'landscape',
       label: 'Paysage',
       description:
         exportType === 'labels' ? 'Étiquettes horizontales' : 'Horizontal (largeur > hauteur)',
+    },
+    {
+      value: 'portrait',
+      label: 'Portrait',
+      description:
+        exportType === 'labels' ? 'Étiquettes verticales' : 'Vertical (hauteur > largeur)',
     },
   ];
 

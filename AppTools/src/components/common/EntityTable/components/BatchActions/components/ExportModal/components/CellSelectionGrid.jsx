@@ -1,4 +1,4 @@
-// 📁 components/CellSelectionGrid.jsx
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\CellSelectionGrid.jsx
 import React from 'react';
 import { Grid } from 'lucide-react';
 

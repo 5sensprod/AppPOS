@@ -1,4 +1,4 @@
-// 📁 hooks/usePrintLayoutConfiguration.js - Version POS simplifiée
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\hooks\usePrintLayoutConfiguration.js
 import { useState, useEffect, useCallback } from 'react';
 import userPresetService from '../../../../../../../../services/userPresetService';
 

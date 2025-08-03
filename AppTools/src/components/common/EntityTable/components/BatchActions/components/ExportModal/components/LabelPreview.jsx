@@ -1,4 +1,4 @@
-//LabelPreview.jsx - Avec restoration des positions depuis les presets
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\LabelPreview.jsx
 import React, { useState, useEffect } from 'react';
 import { Eye, Ruler, Move, RotateCcw, Save } from 'lucide-react';
 import FabricLabelCanvas from './FabricLabelCanvas';
@@ -18,16 +18,11 @@ const LabelPreview = ({ labelData, customLayout, labelStyle, onStyleChange }) =>
   }, [labelStyle.customPositions]);
 
   useEffect(() => {
-    const shouldReset = true;
-
-    if (shouldReset) {
-      setCustomPositions({});
-
-      if (onStyleChange) {
-        onStyleChange({
-          customPositions: {},
-        });
-      }
+    setCustomPositions({});
+    if (onStyleChange) {
+      onStyleChange({
+        customPositions: {},
+      });
     }
   }, [customLayout.supportType, customLayout.width, customLayout.height, sampleLabel.id]);
 
@@ -70,12 +65,6 @@ const LabelPreview = ({ labelData, customLayout, labelStyle, onStyleChange }) =>
             <Ruler className="h-3 w-3 mr-1" />
             {customLayout.width} × {customLayout.height} mm
           </div>
-          {labelStyle.contentRotation === 90 && (
-            <div className="flex items-center text-purple-600">
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Contenu pivoté 90°
-            </div>
-          )}
           {customPositionCount > 0 && (
             <div className="flex items-center">
               <Move className="h-3 w-3 mr-1" />
@@ -113,8 +102,8 @@ const LabelPreview = ({ labelData, customLayout, labelStyle, onStyleChange }) =>
           <div className="flex items-center">
             <Save className="h-3 w-3 mr-1 text-green-600" />
             <span className="text-green-700 dark:text-green-300">
-              💡 <strong>Astuce :</strong> Vous pouvez sauvegarder cette disposition personnalisée
-              en créant un nouveau preset dans "Style des étiquettes"
+              Astuce : Vous pouvez sauvegarder cette disposition personnalisée en créant un nouveau
+              preset dans "Style des étiquettes"
             </span>
           </div>
         </div>

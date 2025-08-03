@@ -1,4 +1,4 @@
-// 📁 components/PresetManager.jsx - Avec indication des positions personnalisées
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\PresetManager.jsx
 import React, { useState } from 'react';
 import { Save, FolderOpen, Trash2, Plus, Move } from 'lucide-react';
 

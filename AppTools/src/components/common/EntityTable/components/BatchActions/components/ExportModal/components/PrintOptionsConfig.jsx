@@ -1,4 +1,4 @@
-// 📁 components/PrintOptionsConfig.jsx
+//I:\AppPOS\AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\PrintOptionsConfig.jsx
 import React from 'react';
 import { Grid } from 'lucide-react';
 

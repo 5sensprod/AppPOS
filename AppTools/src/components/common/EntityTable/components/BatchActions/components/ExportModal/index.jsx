@@ -1,5 +1,4 @@
 // AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\index.js
-
 import React, { useState, useEffect } from 'react';
 import { Download } from 'lucide-react';
 import BaseModal from '../../../../../ui/BaseModal';
@@ -22,10 +21,7 @@ const ExportModal = ({
   activeFilters = [],
   productsData = [],
 }) => {
-  console.log('🔄 [DEBUG] ExportModal rendu, isOpen:', isOpen);
-  // ✅ HOOK PERSONNALISÉ pour gérer l'état de la modal
   const {
-    // États principaux
     exportType,
     setExportType,
     exportFormat,
@@ -36,8 +32,6 @@ const ExportModal = ({
     setExportTitle,
     loading,
     setLoading,
-
-    // États pour les tableaux
     selectedColumns,
     setSelectedColumns,
     includeId,
@@ -46,12 +40,8 @@ const ExportModal = ({
     setUseCustomColumn,
     customColumnTitle,
     setCustomColumnTitle,
-
-    // États pour les étiquettes
     labelLayout,
     setLabelLayout,
-
-    // Fonctions utilitaires
     extractLabelData,
     resetForm,
     generateExportTitle,
@@ -63,26 +53,18 @@ const ExportModal = ({
     productsData,
   });
 
-  console.log('📊 [DEBUG] État exportType:', exportType);
-  console.log('📊 [DEBUG] selectedItems:', selectedItems.length);
-  console.log('📊 [DEBUG] productsData:', productsData.length);
-
-  // Réinitialiser les champs quand la modal s'ouvre
   useEffect(() => {
     if (isOpen) {
-      // ✅ NE PAS APPELER resetForm() à chaque ouverture
       generateExportTitle();
     }
   }, [isOpen, generateExportTitle]);
 
-  // ✅ RÉINITIALISER SEULEMENT QUAND LA MODAL SE FERME
   useEffect(() => {
     if (!isOpen) {
       resetForm();
     }
   }, [isOpen, resetForm]);
 
-  // Fonction pour fermer et réinitialiser
   const handleClose = () => {
     resetForm();
     onClose();
@@ -91,7 +73,6 @@ const ExportModal = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // ✅ VALIDATION SELON LE TYPE D'EXPORT
     if (exportType === 'table' && !selectedColumns.length) {
       alert('Veuillez sélectionner au moins une colonne à exporter');
       return;
@@ -104,24 +85,22 @@ const ExportModal = ({
 
     setLoading(true);
     try {
-      // ✅ CONFIGURATION SELON LE TYPE
       const exportConfig = {
         selectedItems,
         exportType,
-        orientation,
         title: exportTitle.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_'),
         format: exportFormat,
       };
 
       if (exportType === 'table') {
-        // Configuration pour table classique
+        exportConfig.orientation = orientation; // ✅ ORIENTATION POUR TABLEAUX
         const cols = includeId ? ['_id', ...selectedColumns] : selectedColumns;
         exportConfig.selectedColumns = cols;
         exportConfig.customColumn = useCustomColumn ? { title: customColumnTitle } : null;
       } else if (exportType === 'labels') {
-        // Configuration pour étiquettes
+        // ✅ PAS D'ORIENTATION POUR ÉTIQUETTES (toujours portrait)
         exportConfig.labelData = extractLabelData();
-        exportConfig.labelLayout = labelLayout; // ✅ NOUVEAU : Configuration de mise en page
+        exportConfig.labelLayout = labelLayout;
       }
 
       await onExport(exportConfig);
@@ -136,7 +115,6 @@ const ExportModal = ({
   const selectedCount = selectedItems.length;
   const itemLabel = selectedCount === 1 ? entityName : entityNamePlural;
 
-  // Footer avec les boutons
   const footer = (
     <>
       <button
@@ -179,7 +157,6 @@ const ExportModal = ({
       maxWidth="max-w-2xl"
     >
       <form id="export-form" onSubmit={handleSubmit}>
-        {/* Informations sur la sélection */}
         <div className="mb-4">
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             <span className="font-semibold">{selectedCount}</span> {itemLabel} sélectionné
@@ -193,7 +170,6 @@ const ExportModal = ({
             )}
           </p>
 
-          {/* Titre du document */}
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Titre du document
           </label>
@@ -208,28 +184,27 @@ const ExportModal = ({
           />
         </div>
 
-        {/* ✅ SÉLECTEUR DE TYPE D'EXPORT */}
         <ExportTypeSelector exportType={exportType} onExportTypeChange={setExportType} />
 
-        {/* ✅ SÉLECTEUR DE FORMAT */}
         {exportType === 'table' && (
-          <ExportFormatSelector
-            exportFormat={exportFormat}
-            onFormatChange={setExportFormat}
-            exportType={exportType}
-          />
+          <>
+            <ExportFormatSelector
+              exportFormat={exportFormat}
+              onFormatChange={setExportFormat}
+              exportType={exportType}
+            />
+
+            {/* ✅ ORIENTATION UNIQUEMENT POUR LES TABLEAUX */}
+            {exportFormat === 'pdf' && (
+              <ExportOrientationSelector
+                orientation={orientation}
+                onOrientationChange={setOrientation}
+                exportType={exportType}
+              />
+            )}
+          </>
         )}
 
-        {/* ✅ SÉLECTEUR D'ORIENTATION (PDF uniquement) */}
-        {exportFormat === 'pdf' && (
-          <ExportOrientationSelector
-            orientation={orientation}
-            onOrientationChange={setOrientation}
-            exportType={exportType}
-          />
-        )}
-
-        {/* ✅ PANNEAU OPTIONS TABLEAUX (affiché seulement pour les tableaux) */}
         {exportType === 'table' && (
           <TableOptionsPanel
             selectedColumns={selectedColumns}
@@ -246,19 +221,13 @@ const ExportModal = ({
           />
         )}
 
-        {/* ✅ APERÇU DES ÉTIQUETTES (affiché seulement pour les étiquettes) */}
         {exportType === 'labels' && selectedItems.length > 0 && (
-          <>
-            {/* ✅ NOUVEAU : CONFIGURATEUR DE MISE EN PAGE */}
-            <LabelsLayoutConfigurator
-              orientation={orientation}
-              onLayoutChange={setLabelLayout}
-              labelData={extractLabelData()}
-            />
-          </>
+          <LabelsLayoutConfigurator
+            onLayoutChange={setLabelLayout}
+            labelData={extractLabelData()}
+          />
         )}
 
-        {/* ✅ RÉSUMÉ DE L'EXPORT */}
         <ExportSummary
           exportType={exportType}
           selectedCount={selectedCount}
