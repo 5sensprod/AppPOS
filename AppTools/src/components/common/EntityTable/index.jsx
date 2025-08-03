@@ -7,6 +7,7 @@ import { TableHeader } from './components/TableHeader';
 import { TableRow } from './components/TableRow';
 import { Pagination } from './components/Pagination';
 import { LoadingState } from './components/LoadingState';
+import ExportTableModal from './components/BatchActions/components/ExportTable';
 import ExportModal from './components/BatchActions/components/ExportModal';
 import { useTableSelection } from './hooks/useTableSelection';
 import { useTableSort } from './hooks/useTableSort';
@@ -551,7 +552,7 @@ const EntityTable = ({
       )}
 
       {/* Modal d'export */}
-      <ExportModal
+      <ExportTableModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
         onExport={handleExportConfirm}
@@ -559,7 +560,6 @@ const EntityTable = ({
         entityName={entityName}
         entityNamePlural={entityNamePlural}
         activeFilters={filtersToUse}
-        productsData={productsData}
       />
 
       {/* Modal de confirmation pour les suppressions par lot */}
