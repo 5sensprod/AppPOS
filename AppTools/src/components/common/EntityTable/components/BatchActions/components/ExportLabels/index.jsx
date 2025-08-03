@@ -37,6 +37,7 @@ const ExportLabelsModal = ({
     extractLabelData,
     buildLabelLayout,
     resetForm,
+    clearLocalStorage, // 🆕 Nouvelle fonction pour nettoyer manuellement
 
     // Style et layout avec fallbacks
     labelStyle,
@@ -62,15 +63,19 @@ const ExportLabelsModal = ({
     deleteLayoutPreset,
   } = hookResult;
 
+  // 🔧 MODIFIÉ: Ne plus appeler resetForm lors de la fermeture/ouverture
   useEffect(() => {
     if (!isOpen) {
-      resetForm();
+      // ❌ NE PAS appeler resetForm ici car ça efface localStorage
+      setLoading(false); // Juste arrêter le loading si nécessaire
     }
-  }, [isOpen, resetForm]);
+  }, [isOpen, setLoading]);
 
+  // 🔧 MODIFIÉ: handleClose ne fait plus de reset
   const handleClose = () => {
-    resetForm();
-    onClose();
+    setLoading(false); // Arrêter le loading
+    onClose(); // Fermer le modal
+    // ❌ NE PAS appeler resetForm() ici
   };
 
   const handleSubmit = async (e) => {
@@ -93,12 +98,20 @@ const ExportLabelsModal = ({
       };
 
       await onExport(exportConfig);
-      resetForm();
-      onClose();
+
+      // ✅ Après export réussi, fermer sans reset
+      handleClose();
     } catch (error) {
       console.error("Erreur lors de l'export:", error);
       setLoading(false);
     }
+  };
+
+  // 🆕 NOUVEAU: Fonction pour réinitialiser complètement
+  const handleReset = () => {
+    resetForm(); // Reset du state
+    clearLocalStorage(); // Nettoyage localStorage
+    console.log('🔄 Reset complet effectué');
   };
 
   const selectedCount = selectedItems.length;
@@ -113,6 +126,17 @@ const ExportLabelsModal = ({
       >
         Annuler
       </button>
+
+      {/* 🆕 NOUVEAU: Bouton reset manuel */}
+      <button
+        type="button"
+        onClick={handleReset}
+        className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md border border-gray-300 dark:border-gray-600"
+        title="Réinitialiser tous les réglages"
+      >
+        🔄 Reset
+      </button>
+
       <button
         type="submit"
         disabled={loading || selectedItems.length === 0}
@@ -194,6 +218,7 @@ const ExportLabelsModal = ({
             onSaveLayoutPreset={saveLayoutPreset}
             onLoadLayoutPreset={loadLayoutPreset}
             onDeleteLayoutPreset={deleteLayoutPreset}
+            onResetForm={handleReset} // 🔧 Utiliser le nouveau reset complet
           />
         )}
 

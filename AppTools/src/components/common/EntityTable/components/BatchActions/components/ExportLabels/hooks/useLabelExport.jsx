@@ -33,6 +33,34 @@ const DEFAULT_LAYOUT = {
   rouleau: { width: 58 },
 };
 
+// 🔧 HELPER: Sauvegarde sécurisée dans localStorage
+const saveToLocalStorage = (key, data) => {
+  try {
+    const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
+    localStorage.setItem(
+      'lastLabelChoices',
+      JSON.stringify({
+        ...current,
+        [key]: data,
+      })
+    );
+    console.log(`💾 Sauvegardé ${key}:`, data);
+  } catch (error) {
+    console.warn('⚠️ Erreur sauvegarde localStorage:', error);
+  }
+};
+
+// 🔧 HELPER: Chargement sécurisé depuis localStorage
+const loadFromLocalStorage = () => {
+  try {
+    const lastChoices = localStorage.getItem('lastLabelChoices');
+    return lastChoices ? JSON.parse(lastChoices) : {};
+  } catch (error) {
+    console.warn('⚠️ Erreur chargement localStorage:', error);
+    return {};
+  }
+};
+
 export const useLabelExport = ({
   isOpen,
   activeFilters = [],
@@ -72,20 +100,39 @@ export const useLabelExport = ({
   useEffect(() => {
     const loadData = async () => {
       try {
-        const lastChoices = localStorage.getItem('lastLabelChoices');
-        if (lastChoices) {
-          const { style, layout } = JSON.parse(lastChoices);
-          if (style) setLabelStyle({ ...DEFAULT_STYLE, ...style, duplicateCount: 1 });
-          if (layout) setCurrentLayout({ ...DEFAULT_LAYOUT, ...layout });
+        // 1️⃣ Chargement depuis localStorage
+        const savedData = loadFromLocalStorage();
+        console.log('🔍 Données localStorage récupérées:', savedData);
+
+        if (savedData.style) {
+          const restoredStyle = {
+            ...DEFAULT_STYLE,
+            ...savedData.style,
+            duplicateCount: 1, // Toujours réinitialiser le count
+          };
+          setLabelStyle(restoredStyle);
+          console.log('✅ Style restauré:', restoredStyle);
         }
 
+        if (savedData.layout) {
+          const restoredLayout = {
+            ...DEFAULT_LAYOUT,
+            ...savedData.layout,
+          };
+          setCurrentLayout(restoredLayout);
+          console.log('✅ Layout restauré:', restoredLayout);
+        }
+
+        // 2️⃣ Chargement des presets depuis l'API
         const stylePresets = await userPresetService.refreshPresets(LABEL_STYLE_CATEGORY);
         setSavedStylePresets(stylePresets);
 
         const layoutPresets = await userPresetService.refreshPresets(PRINT_LAYOUT_CATEGORY);
         setSavedLayoutPresets(layoutPresets);
+
+        console.log('✅ Presets chargés:', { stylePresets, layoutPresets });
       } catch (error) {
-        console.warn('Erreur chargement:', error);
+        console.warn('⚠️ Erreur chargement:', error);
       }
     };
 
@@ -135,25 +182,23 @@ export const useLabelExport = ({
     };
   }, [currentLayout, labelStyle, disabledCells]);
 
+  // 🔧 MODIFIÉ: handleStyleChange avec persistance complète
   const handleStyleChange = useCallback(
     (newStyle) => {
       const updatedStyle = { ...labelStyle, ...newStyle };
       setLabelStyle(updatedStyle);
 
-      try {
-        const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
-        localStorage.setItem(
-          'lastLabelChoices',
-          JSON.stringify({
-            ...current,
-            style: { ...updatedStyle, duplicateCount: 1 },
-          })
-        );
-      } catch (error) {}
+      // 💾 Sauvegarde immédiate dans localStorage (SANS duplicateCount)
+      const styleToSave = { ...updatedStyle };
+      delete styleToSave.duplicateCount; // Ne pas persister le count
+      saveToLocalStorage('style', styleToSave);
+
+      console.log('🎨 Style mis à jour et sauvegardé:', updatedStyle);
     },
     [labelStyle]
   );
 
+  // 🔧 MODIFIÉ: handleLayoutChange avec logs améliorés
   const handleLayoutChange = useCallback(
     (field, value) => {
       let updatedLayout = { ...currentLayout };
@@ -172,16 +217,10 @@ export const useLabelExport = ({
 
       setCurrentLayout(updatedLayout);
 
-      try {
-        const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
-        localStorage.setItem(
-          'lastLabelChoices',
-          JSON.stringify({
-            ...current,
-            layout: updatedLayout,
-          })
-        );
-      } catch (error) {}
+      // 💾 Sauvegarde immédiate dans localStorage
+      saveToLocalStorage('layout', updatedLayout);
+
+      console.log('📐 Layout mis à jour et sauvegardé:', updatedLayout);
     },
     [currentLayout]
   );
@@ -194,16 +233,10 @@ export const useLabelExport = ({
       const newLayout = { ...currentLayout, supportType: newType, ...supportType.defaults };
       setCurrentLayout(newLayout);
 
-      try {
-        const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
-        localStorage.setItem(
-          'lastLabelChoices',
-          JSON.stringify({
-            ...current,
-            layout: newLayout,
-          })
-        );
-      } catch (error) {}
+      // 💾 Sauvegarde immédiate dans localStorage
+      saveToLocalStorage('layout', newLayout);
+
+      console.log('🔄 Type de support changé et sauvegardé:', newLayout);
     },
     [currentLayout, supportTypes]
   );
@@ -248,17 +281,18 @@ export const useLabelExport = ({
           savedStylePresets
         );
         if (!preset) return false;
+
         const { style } = preset.preset_data;
         if (style) {
-          setLabelStyle({ ...DEFAULT_STYLE, ...style });
-          const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
-          localStorage.setItem(
-            'lastLabelChoices',
-            JSON.stringify({
-              ...current,
-              style: { ...style, duplicateCount: 1 },
-            })
-          );
+          const loadedStyle = { ...DEFAULT_STYLE, ...style };
+          setLabelStyle(loadedStyle);
+
+          // 💾 Sauvegarder aussi dans localStorage
+          const styleToSave = { ...loadedStyle };
+          delete styleToSave.duplicateCount;
+          saveToLocalStorage('style', styleToSave);
+
+          console.log('📂 Preset style chargé et sauvegardé:', loadedStyle);
         }
         return true;
       } catch (error) {
@@ -311,6 +345,7 @@ export const useLabelExport = ({
           savedLayoutPresets
         );
         if (!preset) return false;
+
         const layoutData = preset.preset_data;
         if (layoutData) {
           const newLayout = {
@@ -319,14 +354,11 @@ export const useLabelExport = ({
             rouleau: { ...DEFAULT_LAYOUT.rouleau, ...layoutData.rouleau },
           };
           setCurrentLayout(newLayout);
-          const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
-          localStorage.setItem(
-            'lastLabelChoices',
-            JSON.stringify({
-              ...current,
-              layout: newLayout,
-            })
-          );
+
+          // 💾 Sauvegarder aussi dans localStorage
+          saveToLocalStorage('layout', newLayout);
+
+          console.log('📂 Preset layout chargé et sauvegardé:', newLayout);
         }
         return true;
       } catch (error) {
@@ -347,11 +379,24 @@ export const useLabelExport = ({
     }
   }, []);
 
+  // 🔧 MODIFIÉ: resetForm SANS nettoyer localStorage automatiquement
   const resetForm = useCallback(() => {
     setLoading(false);
     setLabelStyle(DEFAULT_STYLE);
     setCurrentLayout(DEFAULT_LAYOUT);
     setDisabledCells(new Set());
+    // ❌ NE PAS nettoyer localStorage ici car resetForm est appelé à l'ouverture
+    console.log('🔄 Formulaire réinitialisé (localStorage préservé)');
+  }, []);
+
+  // 🗑️ NOUVEAU: Fonction pour nettoyer localStorage manuellement
+  const clearLocalStorage = useCallback(() => {
+    try {
+      localStorage.removeItem('lastLabelChoices');
+      console.log('🗑️ localStorage nettoyé manuellement');
+    } catch (error) {
+      console.warn('⚠️ Erreur nettoyage localStorage:', error);
+    }
   }, []);
 
   useEffect(() => {
@@ -387,6 +432,7 @@ export const useLabelExport = ({
     disabledCells,
     setDisabledCells,
     resetForm,
+    clearLocalStorage, // 🆕 Fonction pour nettoyer manuellement
     generateExportTitle,
   };
 };
