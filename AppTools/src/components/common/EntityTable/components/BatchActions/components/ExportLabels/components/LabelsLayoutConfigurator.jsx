@@ -24,9 +24,11 @@ const LabelsLayoutConfigurator = ({
   savedStylePresets,
   onSaveStylePreset,
   onLoadStylePreset,
+  onDeleteStylePreset,
   savedLayoutPresets,
   onSaveLayoutPreset,
   onLoadLayoutPreset,
+  onDeleteLayoutPreset,
 }) => {
   const gridDimensions = calculateGridDimensions();
 
@@ -76,7 +78,7 @@ const LabelsLayoutConfigurator = ({
         loading={false}
         onSavePreset={onSaveLayoutPreset}
         onLoadPreset={onLoadLayoutPreset}
-        onDeletePreset={() => {}} // À implémenter si nécessaire
+        onDeletePreset={onDeleteLayoutPreset}
       />
 
       <LabelStyleConfig
@@ -87,7 +89,7 @@ const LabelsLayoutConfigurator = ({
         loading={false}
         onSavePreset={onSaveStylePreset}
         onLoadPreset={onLoadStylePreset}
-        onDeletePreset={() => {}} // À implémenter si nécessaire
+        onDeletePreset={onDeleteStylePreset}
       />
 
       {labelData.length > 0 && (

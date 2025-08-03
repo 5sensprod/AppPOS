@@ -55,9 +55,11 @@ const ExportLabelsModal = ({
     savedStylePresets = [],
     saveStylePreset,
     loadStylePreset,
+    deleteStylePreset,
     savedLayoutPresets = [],
     saveLayoutPreset,
     loadLayoutPreset,
+    deleteLayoutPreset,
   } = hookResult;
 
   useEffect(() => {
@@ -187,9 +189,11 @@ const ExportLabelsModal = ({
             savedStylePresets={savedStylePresets}
             onSaveStylePreset={saveStylePreset}
             onLoadStylePreset={loadStylePreset}
+            onDeleteStylePreset={deleteStylePreset}
             savedLayoutPresets={savedLayoutPresets}
             onSaveLayoutPreset={saveLayoutPreset}
             onLoadLayoutPreset={loadLayoutPreset}
+            onDeleteLayoutPreset={deleteLayoutPreset}
           />
         )}
 

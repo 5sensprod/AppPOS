@@ -291,6 +291,19 @@ export const useLabelExport = ({
     [savedStylePresets]
   );
 
+  // ✅ SUPPRESSION PRESET STYLE
+  const deleteStylePreset = useCallback(async (presetId) => {
+    try {
+      await userPresetService.deletePreset(LABEL_STYLE_CATEGORY, presetId);
+      const updatedPresets = await userPresetService.refreshPresets(LABEL_STYLE_CATEGORY);
+      setSavedStylePresets(updatedPresets);
+      return true;
+    } catch (error) {
+      console.error('Erreur suppression preset style:', error);
+      return false;
+    }
+  }, []);
+
   // ✅ PRESETS LAYOUT
   const saveLayoutPreset = useCallback(
     async (presetName, isPublic = false) => {
@@ -349,6 +362,19 @@ export const useLabelExport = ({
     [savedLayoutPresets]
   );
 
+  // ✅ SUPPRESSION PRESET LAYOUT
+  const deleteLayoutPreset = useCallback(async (presetId) => {
+    try {
+      await userPresetService.deletePreset(PRINT_LAYOUT_CATEGORY, presetId);
+      const updatedPresets = await userPresetService.refreshPresets(PRINT_LAYOUT_CATEGORY);
+      setSavedLayoutPresets(updatedPresets);
+      return true;
+    } catch (error) {
+      console.error('Erreur suppression preset layout:', error);
+      return false;
+    }
+  }, []);
+
   // ✅ RÉINITIALISATION
   const resetForm = useCallback(() => {
     setLoading(false);
@@ -386,6 +412,7 @@ export const useLabelExport = ({
     savedStylePresets,
     saveStylePreset,
     loadStylePreset,
+    deleteStylePreset,
 
     // Layout impression
     currentLayout,
@@ -395,6 +422,7 @@ export const useLabelExport = ({
     savedLayoutPresets,
     saveLayoutPreset,
     loadLayoutPreset,
+    deleteLayoutPreset,
     calculateGridDimensions,
 
     // Cases désactivées
