@@ -1,27 +1,35 @@
-//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\RollDimensionsConfig.jsx
+// components/RollDimensionsConfig.jsx - CORRIGÉ avec reset spécifique
 import React from 'react';
 import { Printer, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
+import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const RollDimensionsConfig = ({
-  customLayout,
-  onLayoutChange,
-  onReset,
   savedPresets = [],
   loading = false,
   onSavePreset,
   onLoadPreset,
   onDeletePreset,
 }) => {
+  const {
+    currentLayout,
+    updateLayout,
+    resetRollLayoutOnly, // 🎯 Reset ciblé pour le layout rouleau
+  } = useLabelExportStore();
+
   const handleChange = (field, value) => {
-    if (onLayoutChange && typeof onLayoutChange === 'function') {
-      onLayoutChange(field, value);
-    }
+    updateLayout(field, value);
+  };
+
+  // 🆕 NOUVEAU: Reset spécifique au rouleau
+  const handleResetRollLayout = () => {
+    resetRollLayoutOnly();
+    console.log('🎞️ Layout Rouleau réinitialisé aux valeurs par défaut');
   };
 
   // Calculs automatiques
-  const rouleauWidth = customLayout.rouleau?.width || 58;
-  const offsetLeft = Math.max(customLayout.offsetLeft || 5, 3); // Minimum 3mm
+  const rouleauWidth = currentLayout.rouleau?.width || 58;
+  const offsetLeft = Math.max(currentLayout.offsetLeft || 5, 3); // Minimum 3mm
   const calculatedLabelWidth = rouleauWidth - offsetLeft * 2;
 
   // Mettre à jour automatiquement la largeur d'étiquette calculée
@@ -29,7 +37,7 @@ const RollDimensionsConfig = ({
     if (calculatedLabelWidth > 0) {
       handleChange('width', calculatedLabelWidth.toFixed(1));
     }
-  }, [rouleauWidth, offsetLeft]);
+  }, [rouleauWidth, offsetLeft, calculatedLabelWidth]);
 
   const isValidConfig = calculatedLabelWidth > 10; // Au moins 10mm d'étiquette utile
 
@@ -41,17 +49,16 @@ const RollDimensionsConfig = ({
           Configuration Rouleau - Impression continue
         </h4>
 
-        {onReset && (
-          <button
-            type="button"
-            onClick={onReset}
-            className="flex items-center text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            title="Réinitialiser aux valeurs par défaut"
-          >
-            <RotateCcw className="h-3 w-3 mr-1" />
-            Réinitialiser
-          </button>
-        )}
+        {/* 🎯 BOUTON RESET SPÉCIFIQUE AU ROULEAU */}
+        <button
+          type="button"
+          onClick={handleResetRollLayout}
+          className="flex items-center text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title="Réinitialiser les dimensions rouleau aux valeurs par défaut"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          Réinitialiser Rouleau
+        </button>
       </div>
 
       {/* Status impression */}
@@ -168,7 +175,7 @@ const RollDimensionsConfig = ({
               step="0.1"
               min="15"
               max="200"
-              value={customLayout.height || 29}
+              value={currentLayout.height || 29}
               onChange={(e) => handleChange('height', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
@@ -184,7 +191,7 @@ const RollDimensionsConfig = ({
         <div className="text-xs text-gray-600 dark:text-gray-400">
           📋 L'aperçu reflète l'impression réelle : étiquette de{' '}
           <strong>
-            {calculatedLabelWidth.toFixed(1)}×{customLayout.height || 29}mm
+            {calculatedLabelWidth.toFixed(1)}×{currentLayout.height || 29}mm
           </strong>
           centrée dans un rouleau de <strong>{rouleauWidth}mm</strong>
         </div>

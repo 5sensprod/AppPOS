@@ -1,10 +1,10 @@
-//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\index.jsx
+// components/ExportLabels/index.jsx
 import React, { useEffect } from 'react';
 import { Tags } from 'lucide-react';
 import BaseModal from '../../../../../ui/BaseModal';
 import LabelsLayoutConfigurator from './components/LabelsLayoutConfigurator';
 import LabelExportSummary from './components/LabelExportSummary';
-import { useLabelExport } from './hooks/useLabelExport';
+import { useLabelExportStore } from './stores/useLabelExportStore';
 
 const ExportLabelsModal = ({
   isOpen,
@@ -16,68 +16,38 @@ const ExportLabelsModal = ({
   activeFilters = [],
   productsData = [],
 }) => {
-  const hookResult = useLabelExport({
-    isOpen,
-    activeFilters,
-    entityNamePlural,
-    selectedItems,
-    productsData,
-  });
-
-  // ✅ GUARD : Vérifier que le hook est prêt
-  if (!hookResult || !hookResult.labelStyle || !hookResult.currentLayout) {
-    return null; // ou un loading
-  }
-
   const {
+    // État
     exportTitle,
-    setExportTitle,
     loading,
+
+    // Actions
+    setExportTitle,
     setLoading,
+    initializeForModal,
+    resetTemporaryState,
     extractLabelData,
     buildLabelLayout,
-    resetForm,
-    clearLocalStorage, // 🆕 Nouvelle fonction pour nettoyer manuellement
+    resetAll,
+  } = useLabelExportStore();
 
-    // Style et layout avec fallbacks
-    labelStyle,
-    handleStyleChange,
-    currentLayout,
-    handleLayoutChange,
-    handleSupportTypeChange,
-    supportTypes,
-    calculateGridDimensions,
-    enableCellSelection,
-    setEnableCellSelection,
-    disabledCells,
-    setDisabledCells,
+  // Initialisation à l'ouverture
+  useEffect(() => {
+    if (isOpen) {
+      initializeForModal(selectedItems, productsData, activeFilters, entityNamePlural);
+    }
+  }, [isOpen, selectedItems, productsData, activeFilters, entityNamePlural, initializeForModal]);
 
-    // Presets
-    savedStylePresets = [],
-    saveStylePreset,
-    loadStylePreset,
-    deleteStylePreset,
-    savedLayoutPresets = [],
-    saveLayoutPreset,
-    loadLayoutPreset,
-    deleteLayoutPreset,
-  } = hookResult;
-
-  // 🔧 MODIFIÉ: Reset des états non-persistés à la fermeture
+  // Reset des états temporaires à la fermeture
   useEffect(() => {
     if (!isOpen) {
-      setLoading(false); // Arrêter le loading
-      // 🔄 Reset des états temporaires (non-persistés)
-      setDisabledCells(new Set()); // Cases vides remises à zéro
-      setEnableCellSelection(false); // Mode sélection désactivé
+      resetTemporaryState();
     }
-  }, [isOpen, setLoading, setDisabledCells, setEnableCellSelection]);
+  }, [isOpen, resetTemporaryState]);
 
-  // 🔧 MODIFIÉ: handleClose ne fait plus de reset
   const handleClose = () => {
-    setLoading(false); // Arrêter le loading
-    onClose(); // Fermer le modal
-    // ❌ NE PAS appeler resetForm() ici
+    setLoading(false);
+    onClose();
   };
 
   const handleSubmit = async (e) => {
@@ -100,8 +70,6 @@ const ExportLabelsModal = ({
       };
 
       await onExport(exportConfig);
-
-      // ✅ Après export réussi, fermer sans reset
       handleClose();
     } catch (error) {
       console.error("Erreur lors de l'export:", error);
@@ -109,10 +77,8 @@ const ExportLabelsModal = ({
     }
   };
 
-  // 🆕 NOUVEAU: Fonction pour réinitialiser complètement
   const handleReset = () => {
-    resetForm(); // Reset du state
-    clearLocalStorage(); // Nettoyage localStorage
+    resetAll();
     console.log('🔄 Reset complet effectué');
   };
 
@@ -187,39 +153,13 @@ const ExportLabelsModal = ({
           />
         </div>
 
-        {/* ✅ GUARD sur LabelsLayoutConfigurator */}
-        {labelStyle && currentLayout && calculateGridDimensions && (
-          <LabelsLayoutConfigurator
-            labelData={extractLabelData()}
-            labelStyle={labelStyle}
-            onStyleChange={handleStyleChange}
-            currentLayout={currentLayout}
-            onLayoutChange={handleLayoutChange}
-            onSupportTypeChange={handleSupportTypeChange}
-            supportTypes={supportTypes}
-            calculateGridDimensions={calculateGridDimensions}
-            enableCellSelection={enableCellSelection}
-            setEnableCellSelection={setEnableCellSelection}
-            disabledCells={disabledCells}
-            setDisabledCells={setDisabledCells}
-            savedStylePresets={savedStylePresets}
-            onSaveStylePreset={saveStylePreset}
-            onLoadStylePreset={loadStylePreset}
-            onDeleteStylePreset={deleteStylePreset}
-            savedLayoutPresets={savedLayoutPresets}
-            onSaveLayoutPreset={saveLayoutPreset}
-            onLoadLayoutPreset={loadLayoutPreset}
-            onDeleteLayoutPreset={deleteLayoutPreset}
-            onResetForm={handleReset}
-          />
-        )}
+        {/* Plus besoin de passer autant de props ! */}
+        <LabelsLayoutConfigurator onResetForm={handleReset} />
 
         <LabelExportSummary
           selectedCount={selectedCount}
           itemLabel={itemLabel}
           activeFilters={activeFilters}
-          labelStyle={labelStyle}
-          currentLayout={currentLayout}
         />
       </form>
     </BaseModal>

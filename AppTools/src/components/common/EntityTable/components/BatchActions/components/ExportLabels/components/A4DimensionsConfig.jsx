@@ -1,38 +1,32 @@
-//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\A4DimensionsConfig.jsx
+// components/A4DimensionsConfig.jsx - VERSION CORRIGÉE
 import React from 'react';
 import { Grid, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
+import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const A4DimensionsConfig = ({
-  customLayout,
-  onLayoutChange,
-  onReset,
   savedPresets = [],
   loading = false,
   onSavePreset,
   onLoadPreset,
   onDeletePreset,
 }) => {
-  const calculateGridDimensions = () => {
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const usableWidth = pageWidth - (customLayout.offsetLeft || 8) * 2;
-    const usableHeight = pageHeight - (customLayout.offsetTop || 22) * 2;
-    const columns = Math.floor(
-      usableWidth / ((customLayout.width || 48.5) + (customLayout.spacingH || 0))
-    );
-    const rows = Math.floor(
-      usableHeight / ((customLayout.height || 25) + (customLayout.spacingV || 0))
-    );
-    return { columns, rows, total: columns * rows };
-  };
+  const {
+    currentLayout,
+    updateLayout,
+    getGridDimensions,
+    resetA4LayoutOnly, // 🎯 Reset ciblé pour le layout A4 spécifiquement
+  } = useLabelExportStore();
 
-  const gridDimensions = calculateGridDimensions();
+  const gridDimensions = getGridDimensions();
 
   const handleChange = (field, value) => {
-    if (onLayoutChange && typeof onLayoutChange === 'function') {
-      onLayoutChange(field, value);
-    }
+    updateLayout(field, value);
+  };
+
+  const handleResetA4Layout = () => {
+    resetA4LayoutOnly();
+    console.log('📐 Layout A4 réinitialisé aux valeurs par défaut');
   };
 
   return (
@@ -43,17 +37,15 @@ const A4DimensionsConfig = ({
           Configuration A4 - Planches d'étiquettes
         </h4>
 
-        {onReset && (
-          <button
-            type="button"
-            onClick={onReset}
-            className="flex items-center text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            title="Réinitialiser aux valeurs par défaut"
-          >
-            <RotateCcw className="h-3 w-3 mr-1" />
-            Réinitialiser
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleResetA4Layout} // 🎯 Reset spécifique au layout A4
+          className="flex items-center text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title="Réinitialiser les dimensions A4 aux valeurs par défaut"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          Réinitialiser A4
+        </button>
       </div>
 
       {/* Informations grille A4 */}
@@ -86,7 +78,7 @@ const A4DimensionsConfig = ({
               step="0.1"
               min="10"
               max="200"
-              value={customLayout.width || 48.5}
+              value={currentLayout.width || 48.5}
               onChange={(e) => handleChange('width', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
@@ -101,7 +93,7 @@ const A4DimensionsConfig = ({
               step="0.1"
               min="10"
               max="200"
-              value={customLayout.height || 25}
+              value={currentLayout.height || 25}
               onChange={(e) => handleChange('height', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
@@ -124,7 +116,7 @@ const A4DimensionsConfig = ({
               step="0.1"
               min="0"
               max="50"
-              value={customLayout.offsetTop || 22}
+              value={currentLayout.offsetTop || 22}
               onChange={(e) => handleChange('offsetTop', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
@@ -139,7 +131,7 @@ const A4DimensionsConfig = ({
               step="0.1"
               min="0"
               max="50"
-              value={customLayout.offsetLeft || 8}
+              value={currentLayout.offsetLeft || 8}
               onChange={(e) => handleChange('offsetLeft', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
@@ -154,7 +146,7 @@ const A4DimensionsConfig = ({
               step="0.1"
               min="0"
               max="10"
-              value={customLayout.spacingV || 0}
+              value={currentLayout.spacingV || 0}
               onChange={(e) => handleChange('spacingV', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
@@ -169,7 +161,7 @@ const A4DimensionsConfig = ({
               step="0.1"
               min="0"
               max="10"
-              value={customLayout.spacingH || 0}
+              value={currentLayout.spacingH || 0}
               onChange={(e) => handleChange('spacingH', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />

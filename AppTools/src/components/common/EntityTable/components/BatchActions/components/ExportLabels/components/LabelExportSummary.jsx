@@ -1,12 +1,10 @@
+// ===== LabelExportSummary.jsx REFACTORISÉ =====
 import React from 'react';
+import { useLabelExportStore } from '../stores/useLabelExportStore';
 
-const LabelExportSummary = ({
-  selectedCount,
-  itemLabel,
-  activeFilters = [],
-  labelStyle = {},
-  currentLayout = {},
-}) => {
+const LabelExportSummary = ({ selectedCount, itemLabel, activeFilters = [] }) => {
+  const { labelStyle, currentLayout } = useLabelExportStore();
+
   const duplicateCount = labelStyle.duplicateCount || 1;
   const totalLabels = selectedCount * duplicateCount;
   const supportType = currentLayout.supportType || 'A4';

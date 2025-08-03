@@ -1,14 +1,32 @@
-//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\CellSelectionGrid.jsx
 import React from 'react';
 import { Grid } from 'lucide-react';
+import { useLabelExportStore } from '../stores/useLabelExportStore';
 
-const CellSelectionGrid = ({
-  enableCellSelection,
-  disabledCells,
-  gridDimensions,
-  onEnableCellSelection,
-  onToggleCellSelection,
-}) => {
+const CellSelectionGrid = () => {
+  const {
+    enableCellSelection,
+    disabledCells,
+    setEnableCellSelection,
+    toggleCellSelection,
+    clearCellSelection,
+    getGridDimensions,
+  } = useLabelExportStore();
+
+  const gridDimensions = getGridDimensions();
+
+  const handleEnableCellSelection = (enabled) => {
+    setEnableCellSelection(enabled);
+    if (!enabled) {
+      clearCellSelection();
+    }
+  };
+
+  const handleToggleCellSelection = (cellIndex, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleCellSelection(cellIndex);
+  };
+
   const renderGrid = () => {
     if (!enableCellSelection) return null;
 
@@ -22,7 +40,7 @@ const CellSelectionGrid = ({
         <button
           key={i}
           type="button"
-          onClick={(e) => onToggleCellSelection(i, e)}
+          onClick={(e) => handleToggleCellSelection(i, e)}
           className={`
             relative border border-gray-300 text-xs font-mono flex items-center justify-center
             transition-colors hover:border-gray-400
@@ -99,7 +117,7 @@ const CellSelectionGrid = ({
             <input
               type="checkbox"
               checked={enableCellSelection}
-              onChange={(e) => onEnableCellSelection(e.target.checked)}
+              onChange={(e) => handleEnableCellSelection(e.target.checked)}
               className="mr-2 text-blue-600"
             />
             <span className="text-sm text-gray-700 dark:text-gray-300">

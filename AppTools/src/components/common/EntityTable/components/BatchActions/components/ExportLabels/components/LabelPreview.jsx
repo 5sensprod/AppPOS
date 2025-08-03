@@ -1,9 +1,20 @@
-//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\LabelPreview.jsx
+// ===== LabelPreview.jsx (reset positions uniquement) =====
 import React, { useState, useEffect } from 'react';
 import { Eye, Ruler, Move, RotateCcw, Save } from 'lucide-react';
 import FabricLabelCanvas from './FabricLabelCanvas';
+import { useLabelExportStore } from '../stores/useLabelExportStore';
 
-const LabelPreview = ({ labelData, customLayout, labelStyle, onStyleChange }) => {
+const LabelPreview = () => {
+  const {
+    labelStyle,
+    currentLayout,
+    updateStyle,
+    extractLabelData,
+    resetCustomPositionsOnly, // 🎯 Reset spécifique aux positions
+  } = useLabelExportStore();
+
+  const labelData = extractLabelData();
+
   if (!labelData || labelData.length === 0) return null;
 
   const sampleLabel = labelData[0];
@@ -19,12 +30,14 @@ const LabelPreview = ({ labelData, customLayout, labelStyle, onStyleChange }) =>
 
   useEffect(() => {
     setCustomPositions({});
-    if (onStyleChange) {
-      onStyleChange({
-        customPositions: {},
-      });
-    }
-  }, [customLayout.supportType, customLayout.width, customLayout.height, sampleLabel.id]);
+    updateStyle({ customPositions: {} });
+  }, [
+    currentLayout.supportType,
+    currentLayout.width,
+    currentLayout.height,
+    sampleLabel.id,
+    updateStyle,
+  ]);
 
   const handlePositionChange = (positionData) => {
     const newPositions = {
@@ -33,22 +46,13 @@ const LabelPreview = ({ labelData, customLayout, labelStyle, onStyleChange }) =>
     };
 
     setCustomPositions(newPositions);
-
-    if (onStyleChange) {
-      onStyleChange({
-        customPositions: newPositions,
-      });
-    }
+    updateStyle({ customPositions: newPositions });
   };
 
   const handleResetPositions = () => {
     setCustomPositions({});
-
-    if (onStyleChange) {
-      onStyleChange({
-        customPositions: {},
-      });
-    }
+    resetCustomPositionsOnly(); // 🎯 Reset spécifique aux positions
+    console.log('📍 Positions personnalisées réinitialisées');
   };
 
   const customPositionCount = Object.keys(customPositions).length;
@@ -63,7 +67,7 @@ const LabelPreview = ({ labelData, customLayout, labelStyle, onStyleChange }) =>
         <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
           <div className="flex items-center">
             <Ruler className="h-3 w-3 mr-1" />
-            {customLayout.width} × {customLayout.height} mm
+            {currentLayout.width} × {currentLayout.height} mm
           </div>
           {customPositionCount > 0 && (
             <div className="flex items-center">
@@ -86,34 +90,23 @@ const LabelPreview = ({ labelData, customLayout, labelStyle, onStyleChange }) =>
           {customPositionCount > 0 && (
             <button
               type="button"
-              onClick={handleResetPositions}
+              onClick={handleResetPositions} // 🎯 Reset spécifique aux positions
               className="flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
               title="Remettre les positions par défaut"
             >
               <RotateCcw className="h-3 w-3 mr-1" />
-              Réinitialiser
+              Réinitialiser positions
             </button>
           )}
         </div>
       </div>
 
-      {customPositionCount > 0 && (
-        <div className="mb-3 p-2 bg-green-50 dark:bg-green-900/20 rounded text-xs border border-green-200 dark:border-green-800">
-          <div className="flex items-center">
-            <Save className="h-3 w-3 mr-1 text-green-600" />
-            <span className="text-green-700 dark:text-green-300">
-              Astuce : Vous pouvez sauvegarder cette disposition personnalisée en créant un nouveau
-              preset dans "Style des étiquettes"
-            </span>
-          </div>
-        </div>
-      )}
-
+      {/* Reste du composant inchangé... */}
       <div className="flex justify-center">
         <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
           <FabricLabelCanvas
             label={sampleLabel}
-            layout={customLayout}
+            layout={currentLayout}
             style={{
               ...labelStyle,
               customPositions: customPositions,
