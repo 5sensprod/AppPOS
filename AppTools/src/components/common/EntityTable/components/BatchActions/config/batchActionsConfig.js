@@ -1,5 +1,13 @@
-// config/batchActionsConfig.js
-import { Trash2, RefreshCw, FileText, ListFilter, Folder, FileOutput, Package } from 'lucide-react';
+import {
+  Trash2,
+  RefreshCw,
+  FileText,
+  ListFilter,
+  Folder,
+  FileOutput,
+  Package,
+  Tags,
+} from 'lucide-react';
 import SyncButton from '../components/SyncButton';
 
 export const STATUS_OPTIONS = [
@@ -79,15 +87,23 @@ export const createActionsConfig = (callbacks, hierarchicalCategories, syncStats
     icon: Package,
     label: 'Stock',
     buttonClass: 'bg-teal-100 hover:bg-teal-200 text-teal-800',
-    // Pas d'options - utilise une modal au lieu d'un dropdown
     onAction: () => callbacks.onBatchStockChange(callbacks.selectedItems, 'modal'),
   },
+  // ✅ MODIFICATION : Export devient "Tableau" et couleur bleue
   export: {
     available: typeof callbacks.onBatchExport === 'function',
     icon: FileText,
-    label: 'Exporter',
-    buttonClass: 'bg-green-100 hover:bg-green-200 text-green-800',
+    label: 'Tableau',
+    buttonClass: 'bg-blue-100 hover:bg-blue-200 text-blue-800',
     onAction: () => callbacks.onBatchExport(callbacks.selectedItems),
+  },
+  // ✅ NOUVEAU : Bouton Étiquettes en vert
+  labels: {
+    available: typeof callbacks.onBatchLabels === 'function',
+    icon: Tags,
+    label: 'Étiquettes',
+    buttonClass: 'bg-green-100 hover:bg-green-200 text-green-800',
+    onAction: () => callbacks.onBatchLabels(callbacks.selectedItems),
   },
   delete: {
     available: typeof callbacks.onBatchDelete === 'function',
@@ -101,7 +117,6 @@ export const createActionsConfig = (callbacks, hierarchicalCategories, syncStats
     icon: RefreshCw,
     label: 'Synchroniser',
     buttonClass: 'bg-blue-100 hover:bg-blue-200 text-blue-800',
-    // Composant personnalisé au lieu d'un bouton standard
     customComponent: SyncButton,
     customProps: {
       syncStats: syncStats,

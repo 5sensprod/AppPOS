@@ -341,6 +341,7 @@ function ProductTable(props) {
           'category',
           'createSheet',
           'export',
+          'labels',
           ...(syncEnabled ? ['sync'] : []),
           'delete',
           'captureContent',

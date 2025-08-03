@@ -1,4 +1,3 @@
-//AppTools\src\components\common\EntityTable\index.jsx
 import React, { useState, useCallback } from 'react';
 import { SearchBar } from './components/SearchBar';
 import UnifiedFilterBar from './components/UnifiedFilterBar';
@@ -8,7 +7,7 @@ import { TableRow } from './components/TableRow';
 import { Pagination } from './components/Pagination';
 import { LoadingState } from './components/LoadingState';
 import ExportTableModal from './components/BatchActions/components/ExportTable';
-import ExportModal from './components/BatchActions/components/ExportModal';
+import ExportLabelsModal from './components/BatchActions/components/ExportLabels';
 import { useTableSelection } from './hooks/useTableSelection';
 import { useTableSort } from './hooks/useTableSort';
 import { useTableFilter } from './hooks/useTableFilter';
@@ -26,11 +25,10 @@ const EntityTable = ({
   baseRoute = '',
   defaultSort = { field: 'name', direction: 'asc' },
   actions = ['view', 'edit', 'delete', 'sync'],
-  batchActions = ['delete', 'sync', 'export', 'status', 'category', 'createSheet'],
+  batchActions = ['delete', 'sync', 'export', 'labels', 'status', 'category', 'createSheet'],
   showBatchActions = true,
   showActions = true,
 
-  // NOUVELLES PROPS pour UnifiedFilterBar
   enableUnifiedFilters = true,
   unifiedFilterOptions = [],
   selectedFilters = [],
@@ -65,17 +63,15 @@ const EntityTable = ({
   externalActiveFilters = [],
   productsData = [],
 }) => {
-  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportTableModalOpen, setExportTableModalOpen] = useState(false);
+  const [exportLabelsModalOpen, setExportLabelsModalOpen] = useState(false);
   const { confirm, ConfirmModal } = useConfirmModal();
 
-  // États pour UnifiedFilterBar (si pas de gestion externe)
   const [internalSelectedFilters, setInternalSelectedFilters] = useState([]);
 
-  // Déterminer quels filtres utiliser
   const currentSelectedFilters = onFiltersChange ? selectedFilters : internalSelectedFilters;
   const handleFiltersChangeInternal = onFiltersChange || setInternalSelectedFilters;
 
-  // Fonctionnalités disponibles
   const hasSync = typeof onSync === 'function';
   const hasExport = typeof onExport === 'function';
   const hasBatchDelete = typeof onBatchDelete === 'function';
@@ -83,10 +79,8 @@ const EntityTable = ({
   const hasCreateSheet = typeof onCreateSheet === 'function';
   const hasBatchStockChange = typeof onBatchStockChange === 'function';
 
-  // Hooks pour la gestion des données
   const { sort, sortedData, handleSort } = useTableSort(data, defaultSort);
 
-  // MODIFICATION: Utiliser externalActiveFilters si disponible, sinon utiliser currentSelectedFilters
   const filtersToUse =
     externalActiveFilters?.length > 0 ? externalActiveFilters : currentSelectedFilters;
 
@@ -94,10 +88,10 @@ const EntityTable = ({
     useTableFilter(
       sortedData,
       searchFields,
-      enableUnifiedFilters ? [] : filters, // ✅ filters en 3ème position
+      enableUnifiedFilters ? [] : filters,
       onSearch,
       onFilter,
-      searchProcessor, // ✅ searchProcessor en 6ème position
+      searchProcessor,
       paginationEntityId
     );
 
@@ -110,8 +104,8 @@ const EntityTable = ({
     selectionInfo,
   } = useTableSelection(data, filteredData, {
     persist: true,
-    entityName: entityName.toLowerCase(), // 'product', 'category', etc.
-    pageKey: `${paginationEntityId}_${JSON.stringify(currentSelectedFilters)}`, // pour séparer par contexte/filtres
+    entityName: entityName.toLowerCase(),
+    pageKey: `${paginationEntityId}_${JSON.stringify(currentSelectedFilters)}`,
   });
 
   const { toastActions, removeToast } = useActionToasts();
@@ -126,19 +120,15 @@ const EntityTable = ({
     paginationInfo,
   } = useTablePagination(filteredData, pagination, paginationEntityId);
 
-  // Actions par lot avec modal React
   const handleBatchDelete = useCallback(async () => {
     if (selectedItems.length === 0) return;
 
-    // ✅ GARDER - Récupération des objets pour la modal
     const selectedEntities = selectedItems
       .map((id) => filteredData.find((item) => item._id === id))
       .filter(Boolean);
 
-    // ✅ GARDER - Construction du message avec noms
     const entityNames = selectedEntities
       .map((entity) => {
-        // ✅ SPÉCIAL POUR CATÉGORIES - Utiliser _originalName si name est du JSX
         return entity._originalName || entity.name || entity.designation || entity._id;
       })
       .slice(0, 3)
@@ -163,9 +153,7 @@ const EntityTable = ({
       if (hasBatchDelete) {
         await onBatchDelete(selectedItems);
 
-        // ✅ TOAST ENRICHI AVEC NOMS (adapter pour catégories)
         if (selectedEntities.length === 1) {
-          // ✅ UTILISER _originalName pour les catégories
           const entityDisplayName =
             selectedEntities[0]._originalName ||
             selectedEntities[0].name ||
@@ -173,7 +161,6 @@ const EntityTable = ({
             selectedEntities[0]._id;
           toastActions.deletion.success(1, `${entityName} "${entityDisplayName}"`);
         } else {
-          // ✅ UTILISER _originalName pour les catégories
           const toastEntityNames = selectedEntities
             .slice(0, 3)
             .map(
@@ -191,7 +178,6 @@ const EntityTable = ({
 
         setSelectedItems([]);
       } else if (typeof onDelete === 'function') {
-        // ✅ FALLBACK - Suppression individuelle avec toasts enrichis
         let successCount = 0;
         let failedEntities = [];
 
@@ -201,13 +187,11 @@ const EntityTable = ({
             successCount++;
           } catch (error) {
             failedEntities.push(entity);
-            // ✅ CORRECTION - Utiliser _originalName
             const entityName = entity._originalName || entity.name || entity._id;
             console.error(`Erreur suppression ${entityName}:`, error);
           }
         }
 
-        // ✅ TOASTS SELON RÉSULTATS
         if (successCount > 0) {
           if (successCount === 1 && selectedEntities.length === 1) {
             const entityDisplayName =
@@ -238,7 +222,7 @@ const EntityTable = ({
             .slice(0, 2)
             .map(
               (entity) => entity._originalName || entity.name || entity.designation || entity._id
-            ) // ✅ AJOUT _originalName
+            )
             .join(', ');
           const failedMoreText =
             failedEntities.length > 2 ? ` et ${failedEntities.length - 2} autre(s)` : '';
@@ -252,9 +236,7 @@ const EntityTable = ({
         setSelectedItems([]);
       }
     } catch (err) {
-      console.error(`❌ Erreur de suppression par lot:`, err);
-
-      // ✅ TOAST D'ERREUR ENRICHI
+      console.error(`Erreur de suppression par lot:`, err);
       toastActions.deletion.error(`Erreur lors de la suppression : ${err.message}`, entityName);
     }
   }, [
@@ -267,18 +249,16 @@ const EntityTable = ({
     onDelete,
     setSelectedItems,
     confirm,
-    toastActions, // ✅ AJOUT - Dépendance pour les toasts
+    toastActions,
   ]);
 
   const handleBatchSync = useCallback(async () => {
     if (selectedItems.length === 0) return;
 
-    // 1. Récupérer entités pour noms
     const selectedEntities = selectedItems
       .map((id) => filteredData.find((item) => item._id === id))
       .filter(Boolean);
 
-    // 2. Construire noms pour modal
     const entityNames = selectedEntities
       .map((entity) => entity._originalName || entity.name || entity.designation || entity._id)
       .slice(0, 3)
@@ -288,7 +268,6 @@ const EntityTable = ({
     const displayNames = `${entityNames}${moreText}`;
 
     try {
-      // 3. Modal de confirmation
       const confirmed = await confirm({
         title: 'Confirmer la synchronisation',
         message: `Synchroniser ${selectedEntities.length === 1 ? 'cette' : 'ces'} ${
@@ -301,55 +280,42 @@ const EntityTable = ({
 
       if (!confirmed) return;
 
-      // 4. Toast de démarrage
       const toastId = toastActions.sync.start(selectedEntities.length, entityName);
 
       try {
-        // 5. Appel API avec progression
         if (hasBatchSync) {
-          // Sync une par une avec progression même si on a batchSync
           let completed = 0;
           for (const id of selectedItems) {
-            await onSync(id); // Utiliser onSync individuel pour la progression
+            await onSync(id);
             completed++;
             toastActions.sync.updateProgress(toastId, completed, selectedItems.length);
           }
         } else if (hasSync) {
-          // ✅ SYNC UNE PAR UNE AVEC PROGRESSION
           let completed = 0;
 
           for (const id of selectedItems) {
             try {
               await onSync(id);
               completed++;
-
-              // ✅ METTRE À JOUR LA PROGRESSION
               toastActions.sync.updateProgress(toastId, completed, selectedItems.length);
             } catch (syncErr) {
               console.error(`Erreur sync ${id}:`, syncErr);
-              // Continuer même en cas d'erreur individuelle
               completed++;
               toastActions.sync.updateProgress(toastId, completed, selectedItems.length);
             }
           }
         }
 
-        // ✅ SUPPRIMER le toast de progression
         removeToast(toastId);
-
-        // 6. Toast de succès
         toastActions.sync.success(selectedEntities.length, entityName);
-
         setSelectedItems([]);
       } catch (apiErr) {
-        // ✅ SUPPRIMER le toast de progression en cas d'erreur API
         removeToast(toastId);
-
-        console.error('❌ Erreur synchronisation API:', apiErr);
+        console.error('Erreur synchronisation API:', apiErr);
         toastActions.sync.error(apiErr.message, entityName);
       }
     } catch (err) {
-      console.error('❌ Erreur synchronisation générale:', err);
+      console.error('Erreur synchronisation générale:', err);
       toastActions.sync.error(err.message, entityName);
     }
   }, [
@@ -366,15 +332,28 @@ const EntityTable = ({
     toastActions,
     removeToast,
   ]);
-  const handleBatchExport = () => setExportModalOpen(true);
 
-  const handleExportConfirm = async (exportConfig) => {
+  const handleBatchExport = () => setExportTableModalOpen(true);
+  const handleBatchLabels = () => setExportLabelsModalOpen(true);
+
+  const handleTableExportConfirm = async (exportConfig) => {
     if (hasExport) {
       try {
         await onExport(exportConfig);
-        setExportModalOpen(false);
+        setExportTableModalOpen(false);
       } catch (err) {
-        console.error("Erreur lors de l'export:", err);
+        console.error("Erreur lors de l'export tableau:", err);
+      }
+    }
+  };
+
+  const handleLabelsExportConfirm = async (exportConfig) => {
+    if (hasExport) {
+      try {
+        await onExport(exportConfig);
+        setExportLabelsModalOpen(false);
+      } catch (err) {
+        console.error("Erreur lors de l'export étiquettes:", err);
       }
     }
   };
@@ -405,7 +384,6 @@ const EntityTable = ({
     onBatchStockChange(selectedObjects, stockAction);
   };
 
-  // États du composant
   if (isLoading && data.length === 0) return <LoadingState />;
 
   if (error) {
@@ -419,11 +397,11 @@ const EntityTable = ({
     );
   }
 
-  // Filtrer les actions par lot disponibles
   const availableBatchActions = batchActions.filter((action) => {
     if (action === 'sync') return hasSync || hasBatchSync;
     if (action === 'delete') return typeof onDelete === 'function' || hasBatchDelete;
     if (action === 'export') return hasExport;
+    if (action === 'labels') return hasExport;
     if (action === 'status') return typeof onBatchStatusChange === 'function';
     if (action === 'category')
       return typeof onBatchCategoryChange === 'function' && categoryOptions.length > 0;
@@ -434,11 +412,9 @@ const EntityTable = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-      {/* Section des filtres et recherche - VERSION MODERNE COMPACTE */}
       <div className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className="px-4 py-3">
           <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
-            {/* SearchBar à gauche */}
             <div className="flex-shrink-0 w-full lg:w-auto">
               <SearchBar
                 searchTerm={searchTerm}
@@ -448,7 +424,6 @@ const EntityTable = ({
               />
             </div>
 
-            {/* UnifiedFilterBar à droite (si activé) */}
             {enableUnifiedFilters && (
               <div className="flex-1 w-full lg:w-auto">
                 <UnifiedFilterBar
@@ -465,7 +440,6 @@ const EntityTable = ({
         </div>
       </div>
 
-      {/* Actions par lot */}
       {showBatchActions && (
         <BatchActions
           selectedItems={selectedItems}
@@ -475,6 +449,7 @@ const EntityTable = ({
           onBatchDelete={handleBatchDelete}
           onBatchSync={hasSync || hasBatchSync ? handleBatchSync : undefined}
           onBatchExport={hasExport ? handleBatchExport : undefined}
+          onBatchLabels={hasExport ? handleBatchLabels : undefined}
           onBatchStatusChange={handleBatchStatusChange}
           onBatchCategoryChange={handleBatchCategoryChange}
           onBatchStockChange={hasBatchStockChange ? handleBatchStockChange : undefined}
@@ -484,7 +459,6 @@ const EntityTable = ({
         />
       )}
 
-      {/* Tableau */}
       <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <TableHeader
@@ -536,7 +510,6 @@ const EntityTable = ({
         </table>
       </div>
 
-      {/* Pagination */}
       {pagination.enabled && (totalPages > 1 || filteredData.length >= 5) && (
         <Pagination
           currentPage={currentPage}
@@ -551,18 +524,27 @@ const EntityTable = ({
         />
       )}
 
-      {/* Modal d'export */}
       <ExportTableModal
-        isOpen={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-        onExport={handleExportConfirm}
+        isOpen={exportTableModalOpen}
+        onClose={() => setExportTableModalOpen(false)}
+        onExport={handleTableExportConfirm}
         selectedItems={selectedItems}
         entityName={entityName}
         entityNamePlural={entityNamePlural}
         activeFilters={filtersToUse}
       />
 
-      {/* Modal de confirmation pour les suppressions par lot */}
+      <ExportLabelsModal
+        isOpen={exportLabelsModalOpen}
+        onClose={() => setExportLabelsModalOpen(false)}
+        onExport={handleLabelsExportConfirm}
+        selectedItems={selectedItems}
+        entityName={entityName}
+        entityNamePlural={entityNamePlural}
+        activeFilters={filtersToUse}
+        productsData={productsData}
+      />
+
       <ConfirmModal />
     </div>
   );

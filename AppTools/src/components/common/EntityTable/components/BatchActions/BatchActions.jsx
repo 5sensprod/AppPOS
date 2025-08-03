@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useCategoryUtils } from '../../../../hooks/useCategoryUtils'; // ✅ HOOK CENTRALISÉ
+import { useCategoryUtils } from '../../../../hooks/useCategoryUtils';
 import { createActionsConfig } from './config/batchActionsConfig';
 import ActionButton from './components/ActionButton';
 
@@ -7,10 +7,20 @@ export const BatchActions = ({
   selectedItems = [],
   entityName = '',
   entityNamePlural = '',
-  batchActions = ['status', 'stock', 'category', 'delete', 'sync', 'export', 'createSheet'],
+  batchActions = [
+    'status',
+    'stock',
+    'category',
+    'delete',
+    'sync',
+    'export',
+    'labels',
+    'createSheet',
+  ],
   onBatchDelete,
   onBatchSync,
   onBatchExport,
+  onBatchLabels,
   onBatchStatusChange,
   onBatchCategoryChange,
   onBatchStockChange,
@@ -55,6 +65,7 @@ export const BatchActions = ({
     onBatchDelete,
     onBatchSync,
     onBatchExport,
+    onBatchLabels,
     onBatchStatusChange,
     onBatchCategoryChange,
     onBatchStockChange,
