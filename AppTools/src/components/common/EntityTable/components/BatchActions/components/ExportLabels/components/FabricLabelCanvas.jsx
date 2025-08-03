@@ -1,6 +1,6 @@
-// AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\FabricLabelCanvas.jsx
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\FabricLabelCanvas.jsx
 import React, { useEffect, useRef } from 'react';
-import LabelRenderer from '@services/LabelRenderer';
+import fabricExportService from '@services/fabricExportService';
 
 const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
   const canvasRef = useRef();
@@ -18,14 +18,18 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
 
     const renderCanvas = async () => {
       try {
-        const fabricCanvas = await LabelRenderer.renderToCanvas(canvasEl, label, layout, style, {
-          highRes: false,
-        });
-        fabricCanvasRef.current = fabricCanvas;
+        const fabricCanvas = await fabricExportService.renderLabelPreview(
+          canvasEl,
+          label,
+          layout,
+          style,
+          { highRes: false }
+        );
 
+        fabricCanvasRef.current = fabricCanvas;
         makeObjectsMovable(fabricCanvas);
       } catch (error) {
-        // L'erreur est silencieusement ignorée ici — vous pouvez la traiter autrement si nécessaire
+        console.warn('Erreur rendu aperçu étiquette:', error);
       }
     };
 

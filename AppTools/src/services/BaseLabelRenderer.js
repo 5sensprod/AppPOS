@@ -1,13 +1,20 @@
-//services/LabelRenderer.js
+//services/BaseLabelRenderer.js
 import JsBarcode from 'jsbarcode';
 import { formatCurrency } from '../utils/formatters.js';
 
-class LabelRenderer {
+/**
+ * Classe de base pour le rendu d'étiquettes
+ * Contient toutes les méthodes communes aux deux modes (A4 et Rouleau)
+ */
+class BaseLabelRenderer {
   constructor() {
     this.mmToPx = 3.779527559;
     this.pxToMm = 1 / this.mmToPx;
   }
 
+  /**
+   * Rendu d'une étiquette sur canvas Fabric.js
+   */
   async renderToCanvas(canvasElement, label, layout, style, options = {}) {
     const fabric = await import('fabric');
     if (canvasElement.__fabricCanvas__) {
@@ -52,154 +59,9 @@ class LabelRenderer {
     return fabricCanvas;
   }
 
-  async exportLabelsToPDF(exportConfig) {
-    try {
-      const { jsPDF } = await import('jspdf');
-      const { labelData = [], labelLayout = {}, title = 'Etiquettes' } = exportConfig;
-
-      if (!labelData || labelData.length === 0) {
-        throw new Error("Aucune donnée d'étiquette à exporter");
-      }
-
-      const layout = labelLayout.layout || {
-        width: 48.5,
-        height: 25,
-        offsetTop: 22,
-        offsetLeft: 8,
-        spacingV: 0,
-        spacingH: 0,
-        supportType: 'A4',
-      };
-
-      const style = labelLayout.style || {
-        padding: 1,
-        showBorder: false,
-        showName: false,
-        showPrice: true,
-        showBarcode: true,
-        nameSize: 10,
-        priceSize: 14,
-        barcodeHeight: 15,
-      };
-
-      const duplicateCount = style.duplicateCount || 1;
-      const duplicatedLabels = [];
-      for (const label of labelData) {
-        for (let i = 0; i < duplicateCount; i++) {
-          duplicatedLabels.push(label);
-        }
-      }
-
-      const pageConfig = this._calculatePageLayout(layout, duplicatedLabels.length);
-      const isRollMode = layout.supportType === 'rouleau';
-
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: isRollMode ? [pageConfig.pageWidth, pageConfig.pageHeight] : 'a4',
-      });
-
-      let disabledCells = new Set();
-      if (!isRollMode) {
-        const disabledCellsArray =
-          labelLayout.disabledCells ||
-          labelLayout.layout?.disabledCells ||
-          labelLayout.style?.disabledCells ||
-          [];
-        disabledCells = new Set(disabledCellsArray);
-      }
-
-      let labelIndex = 0;
-      let currentPage = 0;
-
-      while (labelIndex < duplicatedLabels.length) {
-        if (currentPage > 0) {
-          doc.addPage();
-        }
-
-        const tempCanvas = document.createElement('canvas');
-
-        if (isRollMode) {
-          const label = duplicatedLabels[labelIndex];
-
-          try {
-            const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
-              highRes: true,
-            });
-
-            const canvasElement = fabricCanvas.toCanvasElement();
-            const imgData = canvasElement.toDataURL('image/png', 1.0);
-
-            const x = (pageConfig.pageWidth - layout.width) / 2;
-            const y = (pageConfig.pageHeight - layout.height) / 2;
-
-            doc.addImage(imgData, 'PNG', x, y, layout.width, layout.height, undefined, 'FAST');
-            fabricCanvas.dispose();
-          } catch (error) {
-            console.error(`Erreur étiquette ${label.name}:`, error);
-          }
-
-          labelIndex++;
-        } else {
-          let cellIndex = 0;
-          let labelsPlacedOnPage = 0;
-
-          while (
-            cellIndex < pageConfig.labelsPerPage &&
-            labelIndex < duplicatedLabels.length &&
-            labelsPlacedOnPage < pageConfig.labelsPerPage
-          ) {
-            if (disabledCells.has(cellIndex)) {
-              cellIndex++;
-              continue;
-            }
-
-            const label = duplicatedLabels[labelIndex];
-
-            try {
-              const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
-                highRes: true,
-              });
-
-              const canvasElement = fabricCanvas.toCanvasElement();
-              const imgData = canvasElement.toDataURL('image/png', 1.0);
-              const position = this._calculateLabelPosition(cellIndex, pageConfig, layout);
-
-              doc.addImage(
-                imgData,
-                'PNG',
-                position.x,
-                position.y,
-                layout.width,
-                layout.height,
-                undefined,
-                'FAST'
-              );
-
-              fabricCanvas.dispose();
-            } catch (error) {
-              console.error(`Erreur étiquette ${label.name}:`, error);
-            }
-
-            labelIndex++;
-            labelsPlacedOnPage++;
-            cellIndex++;
-          }
-        }
-
-        currentPage++;
-      }
-
-      const filename = `${title}_${isRollMode ? 'rouleau' : 'A4'}_${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(filename);
-
-      return { success: true, filename };
-    } catch (error) {
-      console.error('Erreur export PDF:', error);
-      throw error;
-    }
-  }
-
+  /**
+   * Calcul des éléments et leur positionnement
+   */
   _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
     const canvasHeight = layout.height * this.mmToPx * scaleFactor;
@@ -296,6 +158,9 @@ class LabelRenderer {
     return elements;
   }
 
+  /**
+   * Ajout de la bordure
+   */
   async _addBorder(fabricCanvas, width, height, style, fabric, scaleFactor = 1) {
     const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor;
     const halfStroke = borderWidth / 60;
@@ -318,6 +183,9 @@ class LabelRenderer {
     fabricCanvas.add(border);
   }
 
+  /**
+   * Ajout du nom/titre
+   */
   async _addName(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const nameText = new fabric.Text(label.name, {
       left: element.centerX,
@@ -333,6 +201,9 @@ class LabelRenderer {
     fabricCanvas.add(nameText);
   }
 
+  /**
+   * Ajout du prix
+   */
   async _addPrice(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const priceText = formatCurrency(label.price);
     const price = new fabric.Text(priceText, {
@@ -349,6 +220,9 @@ class LabelRenderer {
     fabricCanvas.add(price);
   }
 
+  /**
+   * Ajout du code-barres
+   */
   async _addBarcode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     try {
       const barcodeCanvas = document.createElement('canvas');
@@ -403,51 +277,9 @@ class LabelRenderer {
     }
   }
 
-  _calculatePageLayout(layout, totalLabels = 1) {
-    const isRollMode = layout.supportType === 'rouleau';
-
-    if (isRollMode) {
-      return {
-        isRollMode: true,
-        pageWidth: layout.rouleau?.width || layout.width,
-        pageHeight: layout.height,
-        labelsPerPage: 1,
-      };
-    } else {
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const usableWidth = pageWidth - (layout.offsetLeft || 8) * 2;
-      const usableHeight = pageHeight - (layout.offsetTop || 22) * 2;
-      const columns = Math.floor(usableWidth / (layout.width + (layout.spacingH || 0)));
-      const rows = Math.floor(usableHeight / (layout.height + (layout.spacingV || 0)));
-
-      return {
-        isRollMode: false,
-        pageWidth,
-        pageHeight,
-        columns,
-        rows,
-        labelsPerPage: columns * rows,
-      };
-    }
-  }
-
-  _calculateLabelPosition(cellIndex, pageConfig, layout) {
-    if (pageConfig.isRollMode) {
-      return {
-        x: (pageConfig.pageWidth - layout.width) / 2,
-        y: (layout.offsetTop ?? 5) + cellIndex * (layout.height + (layout.spacingV ?? 2)),
-      };
-    } else {
-      const col = cellIndex % pageConfig.columns;
-      const row = Math.floor(cellIndex / pageConfig.columns);
-      return {
-        x: (layout.offsetLeft || 8) + col * (layout.width + (layout.spacingH || 0)),
-        y: (layout.offsetTop || 22) + row * (layout.height + (layout.spacingV || 0)),
-      };
-    }
-  }
-
+  /**
+   * Formatage du texte EAN13
+   */
   formatEAN13Text(barcode) {
     const clean = barcode.replace(/[\s-]/g, '');
     if (/^\d{13}$/.test(clean)) return `${clean[0]} ${clean.slice(1, 7)} ${clean.slice(7)}`;
@@ -455,6 +287,38 @@ class LabelRenderer {
     if (/^\d{12}$/.test(clean)) return `0 ${clean.slice(0, 6)} ${clean.slice(6)}`;
     return clean;
   }
+
+  /**
+   * Préparation des données d'étiquettes dupliquées
+   */
+  _prepareDuplicatedLabels(labelData, duplicateCount) {
+    const duplicatedLabels = [];
+    for (const label of labelData) {
+      for (let i = 0; i < duplicateCount; i++) {
+        duplicatedLabels.push(label);
+      }
+    }
+    return duplicatedLabels;
+  }
+
+  /**
+   * Rendu d'une étiquette unique sur canvas temporaire
+   */
+  async _renderSingleLabelToCanvas(label, layout, style) {
+    const tempCanvas = document.createElement('canvas');
+    try {
+      const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
+        highRes: true,
+      });
+      const canvasElement = fabricCanvas.toCanvasElement();
+      const imgData = canvasElement.toDataURL('image/png', 1.0);
+      fabricCanvas.dispose();
+      return imgData;
+    } catch (error) {
+      console.error(`Erreur étiquette ${label.name}:`, error);
+      throw error;
+    }
+  }
 }
 
-export default new LabelRenderer();
+export default BaseLabelRenderer;
