@@ -22,7 +22,7 @@ const DEFAULT_STYLE = {
   priceSize: 14,
   showName: false,
   nameSize: 10,
-  duplicateCount: 1, // ❌ JAMAIS persisté
+  duplicateCount: 1,
 };
 
 const DEFAULT_LAYOUT = {
@@ -251,7 +251,7 @@ export const useLabelExportStore = create(
         }
       },
 
-      // Layout presets (inchangé)
+      // Layout presets
       loadLayoutPresets: async () => {
         try {
           const presets = await userPresetService.refreshPresets(PRINT_LAYOUT_CATEGORY);
@@ -370,14 +370,14 @@ export const useLabelExportStore = create(
           productsData,
           activeFilters,
           entityNamePlural,
-          // ✅ RESET explicite des états non-persistés à chaque montage
+          // ✅ RESET explicite des états non-persistés
           loading: false,
           enableCellSelection: false,
           disabledCells: new Set(),
           // ✅ RESET du duplicateCount à 1 à chaque montage
           labelStyle: {
             ...state.labelStyle,
-            duplicateCount: 1, // 🎯 TOUJOURS 1 au montage
+            duplicateCount: 1,
           },
         }));
 
@@ -404,7 +404,6 @@ export const useLabelExportStore = create(
         return {
           labelStyle: styleWithoutCount, // ❌ SANS duplicateCount
           currentLayout: state.currentLayout, // ✅ Layout persisté
-          // ❌ Tout le reste n'est PAS persisté
         };
       },
     }
