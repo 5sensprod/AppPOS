@@ -325,8 +325,6 @@ export const useLabelExportStore = create(
         }
       },
 
-      // ===== NOUVELLES ACTIONS POUR IMPRESSION DIRECTE =====
-
       /**
        * Charger les imprimantes disponibles
        */
@@ -464,11 +462,14 @@ export const useLabelExportStore = create(
 
       // ===== INITIALISATION SIMPLIFIÉE =====
       initializeForModal: (selectedItems, productsData, activeFilters, entityNamePlural) => {
+        const newTitle = generateExportTitle(activeFilters, entityNamePlural);
+
         set((state) => ({
           selectedItems,
           productsData,
           activeFilters,
           entityNamePlural,
+          exportTitle: newTitle,
           // ✅ RESET explicite des états non-persistés
           loading: false,
           enableCellSelection: false,
@@ -482,7 +483,6 @@ export const useLabelExportStore = create(
 
         get().loadStylePresets();
         get().loadLayoutPresets();
-        get().generateExportTitle();
       },
 
       resetTemporaryState: () =>
