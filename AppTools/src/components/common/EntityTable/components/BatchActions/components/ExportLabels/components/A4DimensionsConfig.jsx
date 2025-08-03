@@ -79,24 +79,6 @@ const A4DimensionsConfig = ({
         </div>
       </div>
 
-      {/* Sélecteur de type de support */}
-      <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded">
-        <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Type de support
-        </h5>
-        <select
-          value={customLayout.supportType || 'A4'}
-          onChange={(e) => handleSupportTypeChange(e.target.value)}
-          className="w-full px-2 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
-        >
-          {supportTypes.map((type) => (
-            <option key={type.id} value={type.id}>
-              {type.name} - {type.description}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Configuration dimensions étiquettes */}
       <div className="mb-4">
         <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
