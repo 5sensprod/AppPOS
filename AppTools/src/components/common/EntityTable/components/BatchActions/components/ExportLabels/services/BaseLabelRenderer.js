@@ -12,9 +12,7 @@ class BaseLabelRenderer {
     this.pxToMm = 1 / this.mmToPx;
   }
 
-  /**
-   * Rendu d'une étiquette sur canvas Fabric.js
-   */
+  //Rendu d'une étiquette sur canvas Fabric.js
   async renderToCanvas(canvasElement, label, layout, style, options = {}) {
     const fabric = await import('fabric');
     if (canvasElement.__fabricCanvas__) {
@@ -59,9 +57,7 @@ class BaseLabelRenderer {
     return fabricCanvas;
   }
 
-  /**
-   * Calcul des éléments et leur positionnement
-   */
+  //Calcul des éléments et leur positionnement
   _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
     const canvasHeight = layout.height * this.mmToPx * scaleFactor;
@@ -158,9 +154,7 @@ class BaseLabelRenderer {
     return elements;
   }
 
-  /**
-   * Ajout de la bordure
-   */
+  //Ajout de la bordure
   async _addBorder(fabricCanvas, width, height, style, fabric, scaleFactor = 1) {
     const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor;
     const halfStroke = borderWidth / 60;
@@ -183,9 +177,7 @@ class BaseLabelRenderer {
     fabricCanvas.add(border);
   }
 
-  /**
-   * Ajout du nom/titre
-   */
+  //Ajout du nom/titre
   async _addName(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const nameText = new fabric.Text(label.name, {
       left: element.centerX,
@@ -201,9 +193,7 @@ class BaseLabelRenderer {
     fabricCanvas.add(nameText);
   }
 
-  /**
-   * Ajout du prix
-   */
+  //Ajout du prix
   async _addPrice(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const priceText = formatCurrency(label.price);
     const price = new fabric.Text(priceText, {
@@ -220,9 +210,7 @@ class BaseLabelRenderer {
     fabricCanvas.add(price);
   }
 
-  /**
-   * Ajout du code-barres
-   */
+  //Ajout du code-barres
   async _addBarcode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     try {
       const barcodeCanvas = document.createElement('canvas');
@@ -277,9 +265,7 @@ class BaseLabelRenderer {
     }
   }
 
-  /**
-   * Formatage du texte EAN13
-   */
+  //Formatage du texte EAN13
   formatEAN13Text(barcode) {
     const clean = barcode.replace(/[\s-]/g, '');
     if (/^\d{13}$/.test(clean)) return `${clean[0]} ${clean.slice(1, 7)} ${clean.slice(7)}`;
@@ -288,9 +274,8 @@ class BaseLabelRenderer {
     return clean;
   }
 
-  /**
-   * Préparation des données d'étiquettes dupliquées
-   */
+  //Préparation des données d'étiquettes dupliquées
+
   _prepareDuplicatedLabels(labelData, duplicateCount) {
     const duplicatedLabels = [];
     for (const label of labelData) {
@@ -301,9 +286,7 @@ class BaseLabelRenderer {
     return duplicatedLabels;
   }
 
-  /**
-   * Rendu d'une étiquette unique sur canvas temporaire
-   */
+  //Rendu d'une étiquette unique sur canvas temporaire
   async _renderSingleLabelToCanvas(label, layout, style) {
     const tempCanvas = document.createElement('canvas');
     try {

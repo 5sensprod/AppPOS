@@ -6,9 +6,7 @@ import BaseLabelRenderer from './BaseLabelRenderer.js';
  * Gère la logique de grille, pagination et cellules désactivées
  */
 class A4LabelRenderer extends BaseLabelRenderer {
-  /**
-   * Export des étiquettes en PDF sur format A4
-   */
+  //  Export des étiquettes en PDF sur format A4
   async exportLabelsToPDF(exportConfig) {
     try {
       const { jsPDF } = await import('jspdf');
@@ -70,9 +68,7 @@ class A4LabelRenderer extends BaseLabelRenderer {
     }
   }
 
-  /**
-   * Rendu d'une page A4 complète
-   */
+  // Rendu d'une page A4 complète
   async _renderA4Page(doc, duplicatedLabels, startIndex, layout, style, pageConfig, disabledCells) {
     let cellIndex = 0;
     let labelIndex = startIndex;
@@ -112,9 +108,7 @@ class A4LabelRenderer extends BaseLabelRenderer {
     return labelIndex;
   }
 
-  /**
-   * Calcul de la configuration de page A4
-   */
+  // Calcul de la configuration de page A4
   _calculateA4PageLayout(layout) {
     const pageWidth = 210;
     const pageHeight = 297;
@@ -134,9 +128,7 @@ class A4LabelRenderer extends BaseLabelRenderer {
     };
   }
 
-  /**
-   * Calcul de la position d'une étiquette sur la page A4
-   */
+  // Calcul de la position d'une étiquette sur la page A4
   _calculateA4LabelPosition(cellIndex, pageConfig, layout) {
     const col = cellIndex % pageConfig.columns;
     const row = Math.floor(cellIndex / pageConfig.columns);
@@ -147,9 +139,7 @@ class A4LabelRenderer extends BaseLabelRenderer {
     };
   }
 
-  /**
-   * Configuration par défaut pour A4
-   */
+  //Configuration par défaut pour A4
   _getDefaultA4Layout() {
     return {
       width: 48.5,
@@ -162,9 +152,7 @@ class A4LabelRenderer extends BaseLabelRenderer {
     };
   }
 
-  /**
-   * Style par défaut
-   */
+  // Style par défaut
   _getDefaultStyle() {
     return {
       padding: 1,

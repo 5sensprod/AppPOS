@@ -27,33 +27,6 @@ class FabricExportService {
     }
   }
 
-  async printLabelsDirectly(printConfig) {
-    try {
-      this._validateExportConfig(printConfig);
-
-      const { labelLayout } = printConfig;
-      const supportType = labelLayout?.layout?.supportType || 'rouleau';
-
-      if (supportType !== 'rouleau') {
-        throw new Error("L'impression directe n'est supportée que pour les rouleaux d'étiquettes");
-      }
-
-      return await RollLabelRenderer.printLabelsDirectly(printConfig);
-    } catch (error) {
-      console.error('Erreur dans fabricExportService.printLabelsDirectly:', error);
-      throw error;
-    }
-  }
-
-  async getAvailablePrinters() {
-    try {
-      return await RollLabelRenderer.getAvailablePrinters();
-    } catch (error) {
-      console.error('Erreur dans fabricExportService.getAvailablePrinters:', error);
-      throw error;
-    }
-  }
-
   async renderLabelPreview(canvasElement, label, layout, style, options = {}) {
     try {
       const supportType = layout?.supportType || 'A4';
@@ -97,40 +70,6 @@ class FabricExportService {
     if (!config.title || typeof config.title !== 'string') {
       throw new Error('Titre du document manquant');
     }
-  }
-
-  getSupportedFeatures() {
-    return {
-      A4: {
-        exportPDF: true,
-        directPrint: false,
-        gridLayout: true,
-        disabledCells: true,
-        pagination: true,
-        description: "Planches d'étiquettes sur format A4 standard",
-      },
-      custom: {
-        exportPDF: true,
-        directPrint: false,
-        gridLayout: true,
-        disabledCells: true,
-        pagination: true,
-        description: 'Format personnalisé avec disposition en grille',
-      },
-      rouleau: {
-        exportPDF: true,
-        directPrint: true,
-        gridLayout: false,
-        disabledCells: false,
-        pagination: false,
-        description: "Rouleau d'étiquettes avec impression séquentielle",
-      },
-    };
-  }
-
-  isFeatureSupported(supportType, feature) {
-    const features = this.getSupportedFeatures();
-    return features[supportType]?.[feature] || false;
   }
 }
 
