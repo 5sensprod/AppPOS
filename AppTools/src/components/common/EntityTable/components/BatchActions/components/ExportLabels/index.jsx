@@ -63,13 +63,15 @@ const ExportLabelsModal = ({
     deleteLayoutPreset,
   } = hookResult;
 
-  // 🔧 MODIFIÉ: Ne plus appeler resetForm lors de la fermeture/ouverture
+  // 🔧 MODIFIÉ: Reset des états non-persistés à la fermeture
   useEffect(() => {
     if (!isOpen) {
-      // ❌ NE PAS appeler resetForm ici car ça efface localStorage
-      setLoading(false); // Juste arrêter le loading si nécessaire
+      setLoading(false); // Arrêter le loading
+      // 🔄 Reset des états temporaires (non-persistés)
+      setDisabledCells(new Set()); // Cases vides remises à zéro
+      setEnableCellSelection(false); // Mode sélection désactivé
     }
-  }, [isOpen, setLoading]);
+  }, [isOpen, setLoading, setDisabledCells, setEnableCellSelection]);
 
   // 🔧 MODIFIÉ: handleClose ne fait plus de reset
   const handleClose = () => {

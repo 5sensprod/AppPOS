@@ -76,6 +76,13 @@ export const useLabelExport = ({
   const [disabledCells, setDisabledCells] = useState(new Set());
   const [currentLayout, setCurrentLayout] = useState(DEFAULT_LAYOUT);
   const [savedLayoutPresets, setSavedLayoutPresets] = useState([]);
+
+  // 🆕 NOUVEAU: Fonction setter pour duplicateCount (comme setDisabledCells)
+  const setDuplicateCount = useCallback((count) => {
+    setLabelStyle((prev) => ({ ...prev, duplicateCount: count }));
+    console.log('🔄 duplicateCount mis à jour:', count);
+  }, []);
+
   const [supportTypes] = useState([
     {
       id: 'A4',
@@ -108,7 +115,7 @@ export const useLabelExport = ({
           const restoredStyle = {
             ...DEFAULT_STYLE,
             ...savedData.style,
-            duplicateCount: 1, // Toujours réinitialiser le count
+            duplicateCount: 1, // 🔄 TOUJOURS réinitialiser le count à 1
           };
           setLabelStyle(restoredStyle);
           console.log('✅ Style restauré:', restoredStyle);
@@ -140,7 +147,6 @@ export const useLabelExport = ({
       loadData();
     }
   }, [isOpen]);
-
   const generateExportTitle = useCallback(() => {
     let title = `Étiquettes ${entityNamePlural}`;
     if (activeFilters.length) {
@@ -182,18 +188,27 @@ export const useLabelExport = ({
     };
   }, [currentLayout, labelStyle, disabledCells]);
 
-  // 🔧 MODIFIÉ: handleStyleChange avec persistance complète
+  // 🔧 MODIFIÉ: handleStyleChange avec persistance sélective
   const handleStyleChange = useCallback(
     (newStyle) => {
       const updatedStyle = { ...labelStyle, ...newStyle };
       setLabelStyle(updatedStyle);
 
-      // 💾 Sauvegarde immédiate dans localStorage (SANS duplicateCount)
+      // 💾 Sauvegarde sélective dans localStorage
+      // ❌ EXCLUSIONS: duplicateCount (toujours = 1 au redémarrage)
       const styleToSave = { ...updatedStyle };
       delete styleToSave.duplicateCount; // Ne pas persister le count
-      saveToLocalStorage('style', styleToSave);
 
-      console.log('🎨 Style mis à jour et sauvegardé:', updatedStyle);
+      // 🚫 CONDITION: Ne sauvegarder QUE si ce n'est pas uniquement duplicateCount qui change
+      const isOnlyDuplicateCount =
+        Object.keys(newStyle).length === 1 && 'duplicateCount' in newStyle;
+
+      if (!isOnlyDuplicateCount) {
+        saveToLocalStorage('style', styleToSave);
+        console.log('🎨 Style mis à jour et sauvegardé (duplicateCount exclus):', styleToSave);
+      } else {
+        console.log('🚫 duplicateCount modifié - pas de sauvegarde localStorage');
+      }
     },
     [labelStyle]
   );
@@ -379,14 +394,17 @@ export const useLabelExport = ({
     }
   }, []);
 
-  // 🔧 MODIFIÉ: resetForm SANS nettoyer localStorage automatiquement
+  // 🔧 MODIFIÉ: resetForm SANS nettoyer localStorage + reset des états non-persistés
   const resetForm = useCallback(() => {
     setLoading(false);
     setLabelStyle(DEFAULT_STYLE);
     setCurrentLayout(DEFAULT_LAYOUT);
-    setDisabledCells(new Set());
-    // ❌ NE PAS nettoyer localStorage ici car resetForm est appelé à l'ouverture
-    console.log('🔄 Formulaire réinitialisé (localStorage préservé)');
+
+    // 🔄 TOUJOURS remettre à zéro les états non-persistés
+    setDisabledCells(new Set()); // ❌ Cases vides = pas de persistance
+    setEnableCellSelection(false); // ❌ Mode sélection = pas de persistance
+
+    console.log('🔄 Formulaire réinitialisé (localStorage préservé, états temporaires reset)');
   }, []);
 
   // 🗑️ NOUVEAU: Fonction pour nettoyer localStorage manuellement
@@ -431,8 +449,9 @@ export const useLabelExport = ({
     setEnableCellSelection,
     disabledCells,
     setDisabledCells,
+    setDuplicateCount, // 🆕 Exposer la fonction comme setDisabledCells
     resetForm,
-    clearLocalStorage, // 🆕 Fonction pour nettoyer manuellement
+    clearLocalStorage,
     generateExportTitle,
   };
 };
