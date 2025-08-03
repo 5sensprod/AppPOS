@@ -1,9 +1,10 @@
-// 📁 hooks/usePrintLayoutConfiguration.js - Version nettoyée
+// 📁 hooks/usePrintLayoutConfiguration.js - Version POS simplifiée
 import { useState, useEffect, useCallback } from 'react';
 import userPresetService from '../../../../../../../../services/userPresetService';
 
 const CATEGORY = 'print_layout';
 
+// ✅ DEFAULT_LAYOUT simplifié pour POS
 const DEFAULT_LAYOUT = {
   width: 48.5,
   height: 25,
@@ -13,8 +14,6 @@ const DEFAULT_LAYOUT = {
   spacingH: 0,
   supportType: 'A4',
   rouleau: { width: 58 },
-  cutPerLabel: false,
-  labelsPerGroup: 3,
 };
 
 export const usePrintLayoutConfiguration = (onLayoutChange) => {
@@ -31,7 +30,7 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     {
       id: 'rouleau',
       name: "Rouleau d'étiquettes",
-      description: 'Support rouleau continu',
+      description: 'Support rouleau (coupe automatique)',
       defaults: { width: 50, height: 30, offsetTop: 5, offsetLeft: 5, spacingV: 2, spacingH: 0 },
     },
     {
@@ -97,26 +96,13 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     [currentLayout, onLayoutChange, supportTypes]
   );
 
-  // Changement de layout
+  // ✅ Changement de layout SIMPLIFIÉ pour POS
   const handleLayoutChange = useCallback(
     (field, value) => {
       let updatedLayout = { ...currentLayout };
 
-      // ✅ Gestion spéciale pour les nouvelles options
-      if (field === 'cutMode') {
-        // Quand on change le mode via le composant EnhancedCutOptions
-        updatedLayout = { ...currentLayout, ...value };
-      }
-      // ✅ Gestion des booléens
-      else if (field === 'cutPerLabel') {
-        updatedLayout.cutPerLabel = !!value;
-      }
-      // ✅ Gestion des entiers
-      else if (field === 'labelsPerGroup') {
-        updatedLayout.labelsPerGroup = parseInt(value) || 3;
-      }
       // 🧩 Gérer rouleau.{...}
-      else if (field === 'rouleau') {
+      if (field === 'rouleau') {
         updatedLayout.rouleau = {
           ...currentLayout.rouleau,
           ...value,
@@ -244,7 +230,7 @@ export const usePrintLayoutConfiguration = (onLayoutChange) => {
     }
   }, [onLayoutChange]);
 
-  // Calculer les dimensions de grille
+  // Calculer les dimensions de grille (A4 uniquement)
   const calculateGridDimensions = useCallback(() => {
     const pageWidth = 210;
     const pageHeight = 297;

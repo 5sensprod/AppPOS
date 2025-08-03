@@ -8,7 +8,6 @@ import PrintOptionsConfig from './PrintOptionsConfig';
 import LabelStyleConfig from './LabelStyleConfig';
 import LabelPreview from './LabelPreview';
 import CellSelectionGrid from './CellSelectionGrid';
-import EnhancedCutOptions from './EnhancedCutOptions';
 const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, labelData = [] }) => {
   const {
     labelStyle,
@@ -123,10 +122,6 @@ const LabelsLayoutConfigurator = ({ orientation = 'portrait', onLayoutChange, la
           labelStyle={labelStyle}
           onStyleChange={handleStyleChange}
         />
-      )}
-
-      {currentLayout?.supportType === 'rouleau' && (
-        <EnhancedCutOptions currentLayout={currentLayout} onLayoutChange={handleLayoutChange} />
       )}
 
       <PrintOptionsConfig

@@ -629,30 +629,16 @@ class LabelRenderer {
     const isRollMode = layout.supportType === 'rouleau';
 
     if (isRollMode) {
-      // ✅ CORRECTION pour Brother QL-600 29mm
-      const offsetTop = layout.rouleau?.width === 29 ? 2 : layout.offsetTop || 5;
-      const offsetBottom = 2;
-      const spacing = layout.spacingV || 1;
-
-      if (layout.cutPerLabel) {
-        return {
-          isRollMode: true,
-          pageWidth: 29, // Force la largeur exacte
-          pageHeight: layout.height + offsetTop + offsetBottom,
-          labelsPerPage: 1,
-        };
-      }
-
-      const dynamicHeight =
-        offsetTop + totalLabels * layout.height + (totalLabels - 1) * spacing + offsetBottom;
-
+      // ✅ POS = TOUJOURS coupe par étiquette
+      // Plus de complexité inutile avec les modes continus
       return {
         isRollMode: true,
-        pageWidth: 29, // Largeur exacte du rouleau
-        pageHeight: Math.max(dynamicHeight, layout.height + 4),
-        labelsPerPage: totalLabels,
+        pageWidth: layout.rouleau?.width || layout.width,
+        pageHeight: layout.height,
+        labelsPerPage: 1, // Toujours 1 étiquette = 1 page
       };
     } else {
+      // ✅ Mode A4 reste inchangé (pour les planches d'étiquettes)
       const pageWidth = 210;
       const pageHeight = 297;
       const usableWidth = pageWidth - (layout.offsetLeft || 8) * 2;
