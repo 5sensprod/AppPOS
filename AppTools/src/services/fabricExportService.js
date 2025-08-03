@@ -1,6 +1,6 @@
 //services/fabricExportService.js
-import A4LabelRenderer from './A4LabelRenderer.js';
-import RollLabelRenderer from './RollLabelRenderer.js';
+import A4LabelRenderer from '../components/common/EntityTable/components/BatchActions/components/ExportLabels/services/A4LabelRenderer.js';
+import RollLabelRenderer from '../components/common/EntityTable/components/BatchActions/components/ExportLabels/services/RollLabelRenderer.js';
 
 class FabricExportService {
   async exportLabelsToPDF(exportConfig) {

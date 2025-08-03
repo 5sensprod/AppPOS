@@ -1,6 +1,6 @@
 //services/BaseLabelRenderer.js
 import JsBarcode from 'jsbarcode';
-import { formatCurrency } from '../utils/formatters.js';
+import { formatCurrency } from '../../../../../../../../utils/formatters.js';
 
 /**
  * Classe de base pour le rendu d'étiquettes
