@@ -1,3 +1,4 @@
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\LabelsLayoutConfigurator.jsx
 import React from 'react';
 import { Grid } from 'lucide-react';
 import LabelDimensionsConfig from './LabelDimensionsConfig';
