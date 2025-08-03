@@ -40,17 +40,12 @@ export const useLabelExport = ({
   selectedItems = [],
   productsData = [],
 }) => {
-  // ✅ États de base export
   const [exportTitle, setExportTitle] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // ✅ États style étiquettes (fusionné de useLabelConfiguration)
   const [labelStyle, setLabelStyle] = useState(DEFAULT_STYLE);
   const [savedStylePresets, setSavedStylePresets] = useState([]);
   const [enableCellSelection, setEnableCellSelection] = useState(false);
   const [disabledCells, setDisabledCells] = useState(new Set());
-
-  // ✅ États layout impression (fusionné de usePrintLayoutConfiguration)
   const [currentLayout, setCurrentLayout] = useState(DEFAULT_LAYOUT);
   const [savedLayoutPresets, setSavedLayoutPresets] = useState([]);
   const [supportTypes] = useState([
@@ -64,7 +59,7 @@ export const useLabelExport = ({
       id: 'rouleau',
       name: "Rouleau d'étiquettes",
       description: 'Support rouleau (coupe automatique)',
-      defaults: { width: 50, height: 30, offsetTop: 5, offsetLeft: 5, spacingV: 2, spacingH: 0 },
+      defaults: { width: 50, height: 29, offsetTop: 2, offsetLeft: 5, spacingV: 0, spacingH: 0 },
     },
     {
       id: 'custom',
@@ -74,37 +69,16 @@ export const useLabelExport = ({
     },
   ]);
 
-  // ✅ CHARGEMENT INITIAL
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Charger style depuis localStorage
-        const savedStyle = localStorage.getItem('labelStyleSettings');
-        if (savedStyle) {
-          setLabelStyle({ ...DEFAULT_STYLE, ...JSON.parse(savedStyle) });
-        }
-
-        // Charger layout depuis localStorage
-        const savedLayout = localStorage.getItem('printLayoutSettings');
-        if (savedLayout) {
-          const parsed = JSON.parse(savedLayout);
-          const completeLayout = {
-            ...DEFAULT_LAYOUT,
-            ...parsed,
-            rouleau: { ...DEFAULT_LAYOUT.rouleau, ...parsed.rouleau },
-          };
-          setCurrentLayout(completeLayout);
-        }
-
-        // Charger presets style
         const stylePresets = await userPresetService.refreshPresets(LABEL_STYLE_CATEGORY);
         setSavedStylePresets(stylePresets);
 
-        // Charger presets layout
         const layoutPresets = await userPresetService.refreshPresets(PRINT_LAYOUT_CATEGORY);
         setSavedLayoutPresets(layoutPresets);
       } catch (error) {
-        console.warn('Erreur chargement configurations étiquettes:', error);
+        console.warn('Erreur chargement presets:', error);
       }
     };
 
@@ -113,7 +87,6 @@ export const useLabelExport = ({
     }
   }, [isOpen]);
 
-  // ✅ GÉNÉRATION TITRE
   const generateExportTitle = useCallback(() => {
     let title = `Étiquettes ${entityNamePlural}`;
     if (activeFilters.length) {
@@ -126,34 +99,27 @@ export const useLabelExport = ({
       const parts = Object.values(byType).map((vals) => vals.join(', '));
       if (parts.length) title += ` - ${parts.join(' - ')}`;
     }
-
     setExportTitle(title.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_'));
   }, [activeFilters, entityNamePlural]);
 
-  // ✅ EXTRACTION DONNÉES ÉTIQUETTES
   const extractLabelData = useCallback(() => {
     const selectedProducts = selectedItems
       .map((id) => productsData.find((product) => product._id === id))
       .filter(Boolean);
 
-    const labelData = selectedProducts.map((product) => {
+    return selectedProducts.map((product) => {
       const barcodeMetaData = product.meta_data?.find((meta) => meta.key === 'barcode');
-      const barcode = barcodeMetaData?.value || '';
-
       return {
         id: product._id,
         name: product.name || product.designation || product.sku,
         price: product.price || 0,
-        barcode: barcode,
+        barcode: barcodeMetaData?.value || '',
         sku: product.sku || '',
         designation: product.designation || '',
       };
     });
-
-    return labelData;
   }, [selectedItems, productsData]);
 
-  // ✅ CONSTRUCTION LAYOUT FINAL
   const buildLabelLayout = useCallback(() => {
     return {
       layout: currentLayout,
@@ -162,31 +128,20 @@ export const useLabelExport = ({
     };
   }, [currentLayout, labelStyle, disabledCells]);
 
-  // ✅ GESTION STYLE
   const handleStyleChange = useCallback(
     (newStyle) => {
       const updatedStyle = { ...labelStyle, ...newStyle };
       setLabelStyle(updatedStyle);
-
-      try {
-        localStorage.setItem('labelStyleSettings', JSON.stringify(updatedStyle));
-      } catch (error) {
-        console.warn('Erreur sauvegarde style local:', error);
-      }
     },
     [labelStyle]
   );
 
-  // ✅ GESTION LAYOUT
   const handleLayoutChange = useCallback(
     (field, value) => {
       let updatedLayout = { ...currentLayout };
 
       if (field === 'rouleau') {
-        updatedLayout.rouleau = {
-          ...currentLayout.rouleau,
-          ...value,
-        };
+        updatedLayout.rouleau = { ...currentLayout.rouleau, ...value };
       } else if (field.startsWith('rouleau.')) {
         const rouleauField = field.split('.')[1];
         updatedLayout.rouleau = {
@@ -198,40 +153,21 @@ export const useLabelExport = ({
       }
 
       setCurrentLayout(updatedLayout);
-
-      try {
-        localStorage.setItem('printLayoutSettings', JSON.stringify(updatedLayout));
-      } catch (error) {
-        console.warn('Erreur sauvegarde layout local:', error);
-      }
     },
     [currentLayout]
   );
 
-  // ✅ CHANGEMENT TYPE SUPPORT
   const handleSupportTypeChange = useCallback(
     (newType) => {
       const supportType = supportTypes.find((t) => t.id === newType);
       if (!supportType) return;
 
-      const newLayout = {
-        ...currentLayout,
-        supportType: newType,
-        ...supportType.defaults,
-      };
-
+      const newLayout = { ...currentLayout, supportType: newType, ...supportType.defaults };
       setCurrentLayout(newLayout);
-
-      try {
-        localStorage.setItem('printLayoutSettings', JSON.stringify(newLayout));
-      } catch (error) {
-        console.warn('Erreur sauvegarde layout local:', error);
-      }
     },
     [currentLayout, supportTypes]
   );
 
-  // ✅ CALCUL DIMENSIONS GRILLE
   const calculateGridDimensions = useCallback(() => {
     const pageWidth = 210;
     const pageHeight = 297;
@@ -242,11 +178,9 @@ export const useLabelExport = ({
     return { columns, rows, total: columns * rows };
   }, [currentLayout]);
 
-  // ✅ PRESETS STYLE
   const saveStylePreset = useCallback(
     async (presetName, isPublic = false) => {
       if (!presetName.trim()) return false;
-
       try {
         const configData = { style: { ...labelStyle } };
         const newPreset = await userPresetService.savePreset(
@@ -255,12 +189,10 @@ export const useLabelExport = ({
           configData,
           isPublic
         );
-
         const updatedPresets = await userPresetService.refreshPresets(LABEL_STYLE_CATEGORY);
         setSavedStylePresets(updatedPresets);
         return newPreset;
       } catch (error) {
-        console.error('Erreur sauvegarde preset style:', error);
         return false;
       }
     },
@@ -276,22 +208,18 @@ export const useLabelExport = ({
           savedStylePresets
         );
         if (!preset) return false;
-
         const { style } = preset.preset_data;
         if (style) {
           setLabelStyle({ ...DEFAULT_STYLE, ...style });
-          localStorage.setItem('labelStyleSettings', JSON.stringify(style));
         }
         return true;
       } catch (error) {
-        console.error('Erreur chargement preset style:', error);
         return false;
       }
     },
     [savedStylePresets]
   );
 
-  // ✅ SUPPRESSION PRESET STYLE
   const deleteStylePreset = useCallback(async (presetId) => {
     try {
       await userPresetService.deletePreset(LABEL_STYLE_CATEGORY, presetId);
@@ -299,20 +227,16 @@ export const useLabelExport = ({
       setSavedStylePresets(updatedPresets);
       return true;
     } catch (error) {
-      console.error('Erreur suppression preset style:', error);
       return false;
     }
   }, []);
 
-  // ✅ PRESETS LAYOUT
   const saveLayoutPreset = useCallback(
     async (presetName, isPublic = false) => {
       if (!presetName.trim()) return false;
-
       try {
         const layoutData = { ...currentLayout };
         const metadata = { support_type: currentLayout.supportType || 'A4' };
-
         const newPreset = await userPresetService.savePreset(
           PRINT_LAYOUT_CATEGORY,
           presetName,
@@ -320,12 +244,10 @@ export const useLabelExport = ({
           isPublic,
           metadata
         );
-
         const updatedPresets = await userPresetService.refreshPresets(PRINT_LAYOUT_CATEGORY);
         setSavedLayoutPresets(updatedPresets);
         return newPreset;
       } catch (error) {
-        console.error('Erreur sauvegarde preset layout:', error);
         return false;
       }
     },
@@ -341,7 +263,6 @@ export const useLabelExport = ({
           savedLayoutPresets
         );
         if (!preset) return false;
-
         const layoutData = preset.preset_data;
         if (layoutData) {
           const newLayout = {
@@ -349,20 +270,16 @@ export const useLabelExport = ({
             ...layoutData,
             rouleau: { ...DEFAULT_LAYOUT.rouleau, ...layoutData.rouleau },
           };
-
           setCurrentLayout(newLayout);
-          localStorage.setItem('printLayoutSettings', JSON.stringify(newLayout));
         }
         return true;
       } catch (error) {
-        console.error('Erreur chargement preset layout:', error);
         return false;
       }
     },
     [savedLayoutPresets]
   );
 
-  // ✅ SUPPRESSION PRESET LAYOUT
   const deleteLayoutPreset = useCallback(async (presetId) => {
     try {
       await userPresetService.deletePreset(PRINT_LAYOUT_CATEGORY, presetId);
@@ -370,23 +287,15 @@ export const useLabelExport = ({
       setSavedLayoutPresets(updatedPresets);
       return true;
     } catch (error) {
-      console.error('Erreur suppression preset layout:', error);
       return false;
     }
   }, []);
 
-  // ✅ RÉINITIALISATION
   const resetForm = useCallback(() => {
     setLoading(false);
     setLabelStyle(DEFAULT_STYLE);
     setCurrentLayout(DEFAULT_LAYOUT);
     setDisabledCells(new Set());
-    try {
-      localStorage.removeItem('labelStyleSettings');
-      localStorage.removeItem('printLayoutSettings');
-    } catch (error) {
-      console.warn('Erreur réinitialisation:', error);
-    }
   }, []);
 
   useEffect(() => {
@@ -396,25 +305,18 @@ export const useLabelExport = ({
   }, [isOpen, generateExportTitle]);
 
   return {
-    // États de base
     exportTitle,
     setExportTitle,
     loading,
     setLoading,
-
-    // Données étiquettes
     extractLabelData,
     buildLabelLayout,
-
-    // Style étiquettes
     labelStyle,
     handleStyleChange,
     savedStylePresets,
     saveStylePreset,
     loadStylePreset,
     deleteStylePreset,
-
-    // Layout impression
     currentLayout,
     handleLayoutChange,
     handleSupportTypeChange,
@@ -424,14 +326,10 @@ export const useLabelExport = ({
     loadLayoutPreset,
     deleteLayoutPreset,
     calculateGridDimensions,
-
-    // Cases désactivées
     enableCellSelection,
     setEnableCellSelection,
     disabledCells,
     setDisabledCells,
-
-    // Actions
     resetForm,
     generateExportTitle,
   };

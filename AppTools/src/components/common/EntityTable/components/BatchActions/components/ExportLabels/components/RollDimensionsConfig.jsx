@@ -1,6 +1,6 @@
 //AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\RollDimensionsConfig.jsx
 import React from 'react';
-import { Printer, RotateCcw, AlertCircle } from 'lucide-react';
+import { Printer, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
 
 const RollDimensionsConfig = ({
@@ -174,32 +174,6 @@ const RollDimensionsConfig = ({
             />
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Découpe automatique par l'étiqueteuse
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Configuration marge de début uniquement */}
-      <div className="mb-4">
-        <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Marges d'impression
-        </h5>
-        <div className="grid grid-cols-1 gap-3">
-          <div>
-            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Marge de début (mm)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              max="20"
-              value={customLayout.offsetTop || 2}
-              onChange={(e) => handleChange('offsetTop', e.target.value)}
-              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
-            />
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Espace avant la première étiquette (optionnel)
             </div>
           </div>
         </div>

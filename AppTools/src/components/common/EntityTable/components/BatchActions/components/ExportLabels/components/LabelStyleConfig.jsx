@@ -1,6 +1,6 @@
-//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportModal\components\LabelStyleConfig.jsx
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\LabelStyleConfig.jsx
 import React from 'react';
-import { Palette, RotateCcw, Save } from 'lucide-react';
+import { Palette, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
 
 const LabelStyleConfig = ({
@@ -118,13 +118,6 @@ const LabelStyleConfig = ({
             />
           </div>
         )}
-      </div>
-
-      <div className="flex items-center justify-center pt-2 border-t border-gray-200 dark:border-gray-600">
-        <div className="flex items-center text-xs text-green-600 dark:text-green-400">
-          <Save className="h-3 w-3 mr-1" />
-          Paramètres sauvegardés automatiquement
-        </div>
       </div>
 
       {onSavePreset && (
