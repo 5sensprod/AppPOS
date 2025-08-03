@@ -183,6 +183,9 @@ app.get('/', (req, res) => {
   res.json({ message: "Bienvenue sur l'API POS" });
 });
 
+const labelPrintingRoutes = require('./routes/labelPrintingRoutes');
+app.use('/api/label-printing', authMiddleware, labelPrintingRoutes);
+
 // Initialiser WebSocket avec le serveur HTTP
 websocketManager.initialize(server);
 initializeWebSocketEventBridge();

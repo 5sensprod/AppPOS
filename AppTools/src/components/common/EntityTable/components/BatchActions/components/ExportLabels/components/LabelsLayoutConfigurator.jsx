@@ -1,4 +1,5 @@
-// components/LabelsLayoutConfigurator.jsx - VERSION SIMPLIFIÉE
+// AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\LabelsLayoutConfigurator.jsx
+
 import React from 'react';
 import { Grid } from 'lucide-react';
 import LabelDimensionsConfig from './LabelDimensionsConfig';
@@ -6,6 +7,7 @@ import PrintOptionsConfig from './PrintOptionsConfig';
 import LabelStyleConfig from './LabelStyleConfig';
 import LabelPreview from './LabelPreview';
 import CellSelectionGrid from './CellSelectionGrid';
+import PrinterSelector from './PrinterSelector';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const LabelsLayoutConfigurator = () => {
@@ -81,6 +83,9 @@ const LabelsLayoutConfigurator = () => {
 
       {/* Options d'impression (quantité, etc.) */}
       <PrintOptionsConfig />
+
+      {/* 🆕 NOUVEAU: Sélection d'imprimante (mode rouleau uniquement) */}
+      {currentLayout?.supportType === 'rouleau' && <PrinterSelector />}
 
       {/* Gestion de la sélection de cellules (seulement pour A4) */}
       {currentLayout?.supportType !== 'rouleau' && (

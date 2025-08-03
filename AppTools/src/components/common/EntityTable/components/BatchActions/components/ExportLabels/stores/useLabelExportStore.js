@@ -89,6 +89,13 @@ export const useLabelExportStore = create(
       activeFilters: [],
       entityNamePlural: '',
 
+      // ===== NOUVEAUX ÉTATS POUR IMPRESSION DIRECTE =====
+      availablePrinters: [],
+      selectedPrinter: null,
+      loadingPrinters: false,
+      printing: false,
+      printError: null,
+
       // ===== ACTIONS STYLE =====
       updateStyle: (newStyle) =>
         set((state) => ({
@@ -318,6 +325,98 @@ export const useLabelExportStore = create(
         }
       },
 
+      // ===== NOUVELLES ACTIONS POUR IMPRESSION DIRECTE =====
+
+      /**
+       * Charger les imprimantes disponibles
+       */
+      loadAvailablePrinters: async () => {
+        set({ loadingPrinters: true, printError: null });
+        try {
+          const RollLabelRenderer = (await import('../services/RollLabelRenderer')).default;
+          const printers = await RollLabelRenderer.getAvailablePrinters();
+
+          set({
+            availablePrinters: printers,
+            // Sélectionner automatiquement l'imprimante par défaut
+            selectedPrinter: printers.find((p) => p.Default) || printers[0] || null,
+          });
+
+          console.log(`🖨️ [STORE] ${printers.length} imprimante(s) chargée(s)`);
+        } catch (error) {
+          console.error('❌ [STORE] Erreur chargement imprimantes:', error);
+          set({ printError: error.message });
+        } finally {
+          set({ loadingPrinters: false });
+        }
+      },
+
+      /**
+       * Sélectionner une imprimante
+       */
+      selectPrinter: (printer) => {
+        set({ selectedPrinter: printer });
+        console.log('🖨️ [STORE] Imprimante sélectionnée:', printer?.Name);
+      },
+
+      /**
+       * Impression directe des étiquettes
+       */
+      printLabelsDirectly: async () => {
+        const {
+          selectedItems,
+          currentLayout,
+          labelStyle,
+          selectedPrinter,
+          extractLabelData,
+          buildLabelLayout,
+        } = get();
+
+        if (!selectedItems.length) {
+          throw new Error('Aucune étiquette sélectionnée');
+        }
+
+        if (currentLayout.supportType !== 'rouleau') {
+          throw new Error("L'impression directe n'est disponible qu'en mode rouleau");
+        }
+
+        set({ printing: true, printError: null });
+
+        try {
+          const RollLabelRenderer = (await import('../services/RollLabelRenderer')).default;
+
+          const printConfig = {
+            labelData: extractLabelData(),
+            labelLayout: buildLabelLayout(),
+            printerName: selectedPrinter?.Name,
+            copies: 1,
+          };
+
+          console.log('🖨️ [STORE] Début impression directe...', printConfig);
+
+          const result = await RollLabelRenderer.printLabelsDirectly(printConfig);
+
+          console.log('✅ [STORE] Impression terminée:', result);
+
+          return result;
+        } catch (error) {
+          console.error('❌ [STORE] Erreur impression:', error);
+          set({ printError: error.message });
+          throw error;
+        } finally {
+          set({ printing: false });
+        }
+      },
+
+      /**
+       * Reset des états d'impression
+       */
+      resetPrintState: () =>
+        set({
+          printError: null,
+          printing: false,
+        }),
+
       // ===== UTILITAIRES =====
       setExportTitle: (title) => set({ exportTitle: title }),
 
@@ -402,8 +501,10 @@ export const useLabelExportStore = create(
         const { duplicateCount, ...styleWithoutCount } = state.labelStyle;
 
         return {
-          labelStyle: styleWithoutCount, // ❌ SANS duplicateCount
-          currentLayout: state.currentLayout, // ✅ Layout persisté
+          labelStyle: styleWithoutCount,
+          currentLayout: state.currentLayout,
+          selectedPrinter: state.selectedPrinter, // Persister le choix d'imprimante
+          // Ne PAS persister: availablePrinters, printing, printError, etc.
         };
       },
     }

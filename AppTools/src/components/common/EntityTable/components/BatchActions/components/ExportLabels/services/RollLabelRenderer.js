@@ -146,19 +146,65 @@ class RollLabelRenderer extends BaseLabelRenderer {
    * @param {Array} labelData - Données des étiquettes
    * @param {Object} printerSettings - Paramètres imprimante
    */
-  async printLabelsDirectly(printConfig) {
-    // TODO: Implémentation future
-    console.log('🚀 Impression directe - À implémenter', printConfig);
-    throw new Error("Fonctionnalité d'impression directe pas encore implémentée");
+  async getAvailablePrinters() {
+    try {
+      // ✅ CORRECTION: Import dynamique au lieu de require
+      const apiService = await import('../../../../../../../../services/api');
+      const response = await apiService.default.get('/api/label-printing/printers');
+      return response.data.printers;
+    } catch (error) {
+      console.error('❌ [ROLL] Erreur récupération imprimantes:', error);
+      throw error;
+    }
   }
 
   /**
-   * Détection des imprimantes d'étiquettes disponibles (Phase 2)
+   * Impression directe des étiquettes (implémentation complète)
    */
-  async getAvailablePrinters() {
-    // TODO: Implémentation future (Web Serial API, etc.)
-    console.log('🚀 Détection imprimantes - À implémenter');
-    return [];
+  async printLabelsDirectly(printConfig) {
+    try {
+      const { labelData = [], labelLayout = {}, printerName, copies = 1 } = printConfig;
+
+      if (!labelData || labelData.length === 0) {
+        throw new Error("Aucune donnée d'étiquette à imprimer");
+      }
+
+      const layout = labelLayout.layout || this._getDefaultRollLayout();
+      const style = labelLayout.style || this._getDefaultStyle();
+
+      // Validation que c'est bien du rouleau
+      if (layout.supportType !== 'rouleau') {
+        throw new Error('L\'impression directe ne supporte que le type "rouleau"');
+      }
+
+      const duplicateCount = style.duplicateCount || 1;
+      const duplicatedLabels = this._prepareDuplicatedLabels(labelData, duplicateCount);
+
+      console.log(
+        `🖨️ [ROLL] Génération ${duplicatedLabels.length} étiquettes pour impression directe`
+      );
+
+      // Générer les images depuis Fabric.js (même qualité que preview)
+      const images = [];
+      for (const label of duplicatedLabels) {
+        const imageData = await this._renderSingleLabelToCanvas(label, layout, style);
+        images.push(imageData);
+      }
+
+      // ✅ CORRECTION: Import dynamique au lieu de require
+      const apiService = await import('../../../../../../../../services/api');
+      const response = await apiService.default.post('/api/label-printing/print-labels', {
+        images,
+        printerName,
+        layout,
+        copies,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('❌ [ROLL] Erreur impression directe:', error);
+      throw error;
+    }
   }
 
   /**

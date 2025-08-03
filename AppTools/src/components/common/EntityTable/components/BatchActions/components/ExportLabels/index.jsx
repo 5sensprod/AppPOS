@@ -1,9 +1,11 @@
-// components/ExportLabels/index.jsx
+// AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\index.jsx
+
 import React, { useEffect } from 'react';
 import { Tags } from 'lucide-react';
 import BaseModal from '../../../../../ui/BaseModal';
 import LabelsLayoutConfigurator from './components/LabelsLayoutConfigurator';
 import LabelExportSummary from './components/LabelExportSummary';
+import DirectPrintButton from './components/DirectPrintButton';
 import { useLabelExportStore } from './stores/useLabelExportStore';
 
 const ExportLabelsModal = ({
@@ -17,18 +19,18 @@ const ExportLabelsModal = ({
   productsData = [],
 }) => {
   const {
-    // État
+    // État principal
     exportTitle,
     loading,
+    currentLayout,
 
-    // Actions
+    // Actions principales
     setExportTitle,
     setLoading,
     initializeForModal,
     resetTemporaryState,
     extractLabelData,
     buildLabelLayout,
-    resetAll,
   } = useLabelExportStore();
 
   // Initialisation à l'ouverture
@@ -77,11 +79,6 @@ const ExportLabelsModal = ({
     }
   };
 
-  const handleReset = () => {
-    resetAll();
-    console.log('🔄 Reset complet effectué');
-  };
-
   const selectedCount = selectedItems.length;
   const itemLabel = selectedCount === 1 ? entityName : entityNamePlural;
 
@@ -95,6 +92,10 @@ const ExportLabelsModal = ({
         Annuler
       </button>
 
+      {/* 🆕 NOUVEAU: Impression directe (mode rouleau uniquement) */}
+      {currentLayout?.supportType === 'rouleau' && <DirectPrintButton />}
+
+      {/* Export PDF (tous modes) */}
       <button
         type="submit"
         disabled={loading || selectedItems.length === 0}
@@ -104,12 +105,12 @@ const ExportLabelsModal = ({
         {loading ? (
           <>
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            Génération...
+            Génération PDF...
           </>
         ) : (
           <>
             <Tags className="h-4 w-4 mr-2" />
-            Générer Étiquettes PDF
+            Générer PDF
           </>
         )}
       </button>
@@ -153,9 +154,10 @@ const ExportLabelsModal = ({
           />
         </div>
 
-        {/* Plus besoin de passer autant de props ! */}
-        <LabelsLayoutConfigurator onResetForm={handleReset} />
+        {/* Configuration des étiquettes avec impression directe intégrée */}
+        <LabelsLayoutConfigurator />
 
+        {/* Résumé de l'export */}
         <LabelExportSummary
           selectedCount={selectedCount}
           itemLabel={itemLabel}
