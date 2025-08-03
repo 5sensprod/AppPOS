@@ -59,7 +59,7 @@ export const useLabelExport = ({
       id: 'rouleau',
       name: "Rouleau d'étiquettes",
       description: 'Support rouleau (coupe automatique)',
-      defaults: { width: 50, height: 29, offsetTop: 2, offsetLeft: 5, spacingV: 0, spacingH: 0 },
+      defaults: { width: 50, height: 30, offsetTop: 5, offsetLeft: 5, spacingV: 2, spacingH: 0 },
     },
     {
       id: 'custom',
@@ -72,13 +72,20 @@ export const useLabelExport = ({
   useEffect(() => {
     const loadData = async () => {
       try {
+        const lastChoices = localStorage.getItem('lastLabelChoices');
+        if (lastChoices) {
+          const { style, layout } = JSON.parse(lastChoices);
+          if (style) setLabelStyle({ ...DEFAULT_STYLE, ...style, duplicateCount: 1 });
+          if (layout) setCurrentLayout({ ...DEFAULT_LAYOUT, ...layout });
+        }
+
         const stylePresets = await userPresetService.refreshPresets(LABEL_STYLE_CATEGORY);
         setSavedStylePresets(stylePresets);
 
         const layoutPresets = await userPresetService.refreshPresets(PRINT_LAYOUT_CATEGORY);
         setSavedLayoutPresets(layoutPresets);
       } catch (error) {
-        console.warn('Erreur chargement presets:', error);
+        console.warn('Erreur chargement:', error);
       }
     };
 
@@ -132,6 +139,17 @@ export const useLabelExport = ({
     (newStyle) => {
       const updatedStyle = { ...labelStyle, ...newStyle };
       setLabelStyle(updatedStyle);
+
+      try {
+        const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
+        localStorage.setItem(
+          'lastLabelChoices',
+          JSON.stringify({
+            ...current,
+            style: { ...updatedStyle, duplicateCount: 1 },
+          })
+        );
+      } catch (error) {}
     },
     [labelStyle]
   );
@@ -153,6 +171,17 @@ export const useLabelExport = ({
       }
 
       setCurrentLayout(updatedLayout);
+
+      try {
+        const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
+        localStorage.setItem(
+          'lastLabelChoices',
+          JSON.stringify({
+            ...current,
+            layout: updatedLayout,
+          })
+        );
+      } catch (error) {}
     },
     [currentLayout]
   );
@@ -164,6 +193,17 @@ export const useLabelExport = ({
 
       const newLayout = { ...currentLayout, supportType: newType, ...supportType.defaults };
       setCurrentLayout(newLayout);
+
+      try {
+        const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
+        localStorage.setItem(
+          'lastLabelChoices',
+          JSON.stringify({
+            ...current,
+            layout: newLayout,
+          })
+        );
+      } catch (error) {}
     },
     [currentLayout, supportTypes]
   );
@@ -211,6 +251,14 @@ export const useLabelExport = ({
         const { style } = preset.preset_data;
         if (style) {
           setLabelStyle({ ...DEFAULT_STYLE, ...style });
+          const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
+          localStorage.setItem(
+            'lastLabelChoices',
+            JSON.stringify({
+              ...current,
+              style: { ...style, duplicateCount: 1 },
+            })
+          );
         }
         return true;
       } catch (error) {
@@ -271,6 +319,14 @@ export const useLabelExport = ({
             rouleau: { ...DEFAULT_LAYOUT.rouleau, ...layoutData.rouleau },
           };
           setCurrentLayout(newLayout);
+          const current = JSON.parse(localStorage.getItem('lastLabelChoices') || '{}');
+          localStorage.setItem(
+            'lastLabelChoices',
+            JSON.stringify({
+              ...current,
+              layout: newLayout,
+            })
+          );
         }
         return true;
       } catch (error) {
