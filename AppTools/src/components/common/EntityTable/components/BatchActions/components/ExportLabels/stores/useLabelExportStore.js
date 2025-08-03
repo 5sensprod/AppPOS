@@ -1,4 +1,5 @@
-// stores/useLabelExportStore.js - VERSION NETTOYÉE
+// stores/useLabelExportStore.js - LOGIQUE LOCALSTORAGE SIMPLIFIÉE
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import userPresetService from '../../../../../../../../services/userPresetService';
@@ -21,7 +22,7 @@ const DEFAULT_STYLE = {
   priceSize: 14,
   showName: false,
   nameSize: 10,
-  duplicateCount: 1,
+  duplicateCount: 1, // ❌ JAMAIS persisté
 };
 
 const DEFAULT_LAYOUT = {
@@ -75,16 +76,14 @@ export const useLabelExportStore = create(
       currentLayout: DEFAULT_LAYOUT,
       exportTitle: '',
 
-      // États non-persistés (reset à chaque ouverture)
+      // ❌ États JAMAIS persistés (toujours reset au montage)
       loading: false,
-      enableCellSelection: false,
-      disabledCells: new Set(),
+      enableCellSelection: false, // ❌ Toujours false au démarrage
+      disabledCells: new Set(), // ❌ Toujours vide au démarrage
 
-      // Presets (chargés depuis l'API)
+      // Les presets et données contextuelles ne sont pas persistés non plus
       savedStylePresets: [],
       savedLayoutPresets: [],
-
-      // Données contextuelles
       selectedItems: [],
       productsData: [],
       activeFilters: [],
@@ -96,12 +95,11 @@ export const useLabelExportStore = create(
           labelStyle: { ...state.labelStyle, ...newStyle },
         })),
 
-      // 🎯 Reset uniquement le style (préserve duplicateCount)
       resetStyleOnly: () =>
         set((state) => ({
           labelStyle: {
             ...DEFAULT_STYLE,
-            duplicateCount: state.labelStyle.duplicateCount,
+            duplicateCount: state.labelStyle.duplicateCount, // Préservé en session seulement
           },
         })),
 
@@ -144,7 +142,6 @@ export const useLabelExportStore = create(
           };
         }),
 
-      // 🎯 Reset layout A4 spécifiquement
       resetA4LayoutOnly: () =>
         set({
           currentLayout: {
@@ -153,13 +150,11 @@ export const useLabelExportStore = create(
           },
         }),
 
-      // 🎯 Reset layout Rouleau spécifiquement
       resetRollLayoutOnly: () =>
         set({
           currentLayout: DEFAULT_ROLL_LAYOUT,
         }),
 
-      // 🎯 Reset uniquement les positions personnalisées
       resetCustomPositionsOnly: () =>
         set((state) => ({
           labelStyle: {
@@ -201,7 +196,9 @@ export const useLabelExportStore = create(
       saveStylePreset: async (presetName, isPublic = false) => {
         try {
           const { labelStyle } = get();
-          const configData = { style: { ...labelStyle } };
+          // ❌ Ne pas inclure duplicateCount dans les presets
+          const { duplicateCount, ...styleToSave } = labelStyle;
+          const configData = { style: styleToSave };
 
           await userPresetService.savePreset(
             LABEL_STYLE_CATEGORY,
@@ -220,7 +217,7 @@ export const useLabelExportStore = create(
 
       loadStylePreset: async (presetId) => {
         try {
-          const { savedStylePresets } = get();
+          const { savedStylePresets, labelStyle } = get();
           const preset = await userPresetService.loadPreset(
             LABEL_STYLE_CATEGORY,
             presetId,
@@ -228,7 +225,11 @@ export const useLabelExportStore = create(
           );
 
           if (preset?.preset_data?.style) {
-            const loadedStyle = { ...DEFAULT_STYLE, ...preset.preset_data.style };
+            const loadedStyle = {
+              ...DEFAULT_STYLE,
+              ...preset.preset_data.style,
+              duplicateCount: labelStyle.duplicateCount, // Préserver le count actuel
+            };
             set({ labelStyle: loadedStyle });
             return true;
           }
@@ -250,7 +251,7 @@ export const useLabelExportStore = create(
         }
       },
 
-      // Presets Layout
+      // Layout presets (inchangé)
       loadLayoutPresets: async () => {
         try {
           const presets = await userPresetService.refreshPresets(PRINT_LAYOUT_CATEGORY);
@@ -362,17 +363,23 @@ export const useLabelExportStore = create(
 
       getSupportTypes: () => SUPPORT_TYPES,
 
-      // ===== INITIALISATION =====
+      // ===== INITIALISATION SIMPLIFIÉE =====
       initializeForModal: (selectedItems, productsData, activeFilters, entityNamePlural) => {
-        set({
+        set((state) => ({
           selectedItems,
           productsData,
           activeFilters,
           entityNamePlural,
+          // ✅ RESET explicite des états non-persistés à chaque montage
           loading: false,
           enableCellSelection: false,
           disabledCells: new Set(),
-        });
+          // ✅ RESET du duplicateCount à 1 à chaque montage
+          labelStyle: {
+            ...state.labelStyle,
+            duplicateCount: 1, // 🎯 TOUJOURS 1 au montage
+          },
+        }));
 
         get().loadStylePresets();
         get().loadLayoutPresets();
@@ -390,13 +397,16 @@ export const useLabelExportStore = create(
     }),
     {
       name: 'label-export-config',
-      partialize: (state) => ({
-        labelStyle: {
-          ...state.labelStyle,
-          duplicateCount: 1, // Toujours reset à 1
-        },
-        currentLayout: state.currentLayout,
-      }),
+      // 🎯 CONFIGURATION SIMPLIFIÉE : Persister seulement ce qui doit l'être
+      partialize: (state) => {
+        const { duplicateCount, ...styleWithoutCount } = state.labelStyle;
+
+        return {
+          labelStyle: styleWithoutCount, // ❌ SANS duplicateCount
+          currentLayout: state.currentLayout, // ✅ Layout persisté
+          // ❌ Tout le reste n'est PAS persisté
+        };
+      },
     }
   )
 );
