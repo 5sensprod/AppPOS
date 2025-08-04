@@ -4,15 +4,42 @@ import { formatCurrency } from '../../../../../../../../utils/formatters.js';
 
 /**
  * Classe de base pour le rendu d'étiquettes
- * Contient toutes les méthodes communes aux deux modes (A4 et Rouleau)
+ * CORRIGÉ : Canvas 200 DPI, éléments taille normale
  */
 class BaseLabelRenderer {
   constructor() {
+    // ✅ GARDER la logique 96 DPI existante
     this.mmToPx = 3.779527559;
     this.pxToMm = 1 / this.mmToPx;
+
+    // 🎯 FACTEURS D'ÉCHELLE
+    this.DISPLAY_SCALE = 1; // 96 DPI pour affichage
+    this.PRINT_SCALE = 200 / 96; // 2.083 pour impression (200 DPI)
+    this.EXPORT_SCALE = 200 / 96; // 2.083 pour PDF (200 DPI)
+
+    console.log("🎯 Facteurs d'échelle initialisés:", {
+      Display: this.DISPLAY_SCALE,
+      Print: this.PRINT_SCALE.toFixed(3),
+      Export: this.EXPORT_SCALE.toFixed(3),
+    });
   }
 
-  //Rendu d'une étiquette sur canvas Fabric.js
+  // Déterminer le facteur d'échelle selon le contexte
+  getScaleFactorForContext(context = 'display') {
+    switch (context) {
+      case 'print':
+        return this.PRINT_SCALE;
+      case 'export':
+      case 'pdf':
+        return this.EXPORT_SCALE;
+      case 'display':
+      case 'preview':
+      default:
+        return this.DISPLAY_SCALE;
+    }
+  }
+
+  //Rendu d'une étiquette sur canvas Fabric.js - CORRIGÉ
   async renderToCanvas(canvasElement, label, layout, style, options = {}) {
     const fabric = await import('fabric');
     if (canvasElement.__fabricCanvas__) {
@@ -20,45 +47,99 @@ class BaseLabelRenderer {
       canvasElement.__fabricCanvas__ = null;
     }
 
-    const scaleFactor = options.highRes ? 4 : 1;
-    const canvasWidth = layout.width * this.mmToPx * scaleFactor;
-    const canvasHeight = layout.height * this.mmToPx * scaleFactor;
+    const baseScaleFactor = options.highRes ? 4 : 1;
+    const context = options.context || 'display';
+    const contextScaleFactor = this.getScaleFactorForContext(context);
+
+    // 🔧 CORRECTION PRINCIPALE : Séparer facteur canvas et facteur éléments
+    const canvasScaleFactor = baseScaleFactor * contextScaleFactor; // Pour taille canvas (200 DPI)
+    const elementScaleFactor = baseScaleFactor; // Pour éléments (taille normale)
+
+    console.log(`🎯 Rendu corrigé ${context}:`, {
+      base: baseScaleFactor,
+      contexte: contextScaleFactor.toFixed(3),
+      canvas: canvasScaleFactor.toFixed(3),
+      éléments: elementScaleFactor.toFixed(3),
+      'DPI équivalent': (96 * contextScaleFactor).toFixed(0),
+    });
+
+    // Canvas avec facteur complet (200 DPI)
+    const canvasWidth = layout.width * this.mmToPx * canvasScaleFactor;
+    const canvasHeight = layout.height * this.mmToPx * canvasScaleFactor;
+
+    console.log(`📐 Canvas: ${canvasWidth.toFixed(0)}×${canvasHeight.toFixed(0)}px`);
 
     const fabricCanvas = new fabric.Canvas(canvasElement, {
       width: canvasWidth,
       height: canvasHeight,
       backgroundColor: '#ffffff',
       selection: false,
-      enableRetinaScaling: true,
-      imageSmoothingEnabled: false,
+      enableRetinaScaling: false,
+      imageSmoothingEnabled: contextScaleFactor > 1,
     });
     canvasElement.__fabricCanvas__ = fabricCanvas;
 
+    // 🔧 ÉLÉMENTS : Calculés avec facteur normal (pas agrandi)
     const customPositions = style.customPositions || {};
-    const elements = this._calculateElements(layout, style, scaleFactor, customPositions);
+    const elements = this._calculateElements(layout, style, elementScaleFactor, customPositions);
 
+    // 🎯 TRANSFORMATION : Si 200 DPI, appliquer mise à l'échelle globale
+    if (contextScaleFactor > 1) {
+      // Centrer et agrandir le contenu
+      const centerX = canvasWidth / 2;
+      const centerY = canvasHeight / 2;
+      const normalWidth = layout.width * this.mmToPx * elementScaleFactor;
+      const normalHeight = layout.height * this.mmToPx * elementScaleFactor;
+
+      // Calculer le décalage pour centrer
+      const offsetX = (canvasWidth - normalWidth * contextScaleFactor) / 2;
+      const offsetY = (canvasHeight - normalHeight * contextScaleFactor) / 2;
+
+      console.log(
+        `📍 Transformation 200 DPI: échelle ${contextScaleFactor.toFixed(2)}, décalage (${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`
+      );
+
+      // Appliquer transformation globale au canvas
+      fabricCanvas.viewportTransform = [
+        contextScaleFactor,
+        0,
+        0,
+        contextScaleFactor,
+        offsetX,
+        offsetY,
+      ];
+    }
+
+    // Rendu des éléments avec taille normale
     if (style.showBorder) {
       await this._addBorder(
         fabricCanvas,
-        canvasWidth,
-        canvasHeight,
+        layout.width * this.mmToPx * elementScaleFactor,
+        layout.height * this.mmToPx * elementScaleFactor,
         style,
         fabric,
-        scaleFactor,
+        elementScaleFactor,
         layout
       );
     }
 
     if (style.showName && label.name) {
-      await this._addName(fabricCanvas, label, elements.name, style, fabric, scaleFactor);
+      await this._addName(fabricCanvas, label, elements.name, style, fabric, elementScaleFactor);
     }
 
     if (style.showPrice && label.price !== undefined) {
-      await this._addPrice(fabricCanvas, label, elements.price, style, fabric, scaleFactor);
+      await this._addPrice(fabricCanvas, label, elements.price, style, fabric, elementScaleFactor);
     }
 
     if (style.showBarcode && label.barcode?.trim()) {
-      await this._addBarcode(fabricCanvas, label, elements.barcode, style, fabric, scaleFactor);
+      await this._addBarcode(
+        fabricCanvas,
+        label,
+        elements.barcode,
+        style,
+        fabric,
+        elementScaleFactor
+      );
     }
 
     fabricCanvas.renderAll();
@@ -69,7 +150,7 @@ class BaseLabelRenderer {
   _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
     const canvasHeight = layout.height * this.mmToPx * scaleFactor;
-    const padding = layout.padding * this.mmToPx * scaleFactor;
+    const padding = (layout.padding || 2) * this.mmToPx * scaleFactor;
     const contentWidth = canvasWidth - padding * 2;
 
     const elements = {};
@@ -165,8 +246,6 @@ class BaseLabelRenderer {
   //Ajout de la bordure
   async _addBorder(fabricCanvas, width, height, style, fabric, scaleFactor = 1, layout) {
     const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor;
-
-    // 🎯 NOUVEAU : Utiliser la marge du layout (pas du style)
     const margeInterieure = (layout.padding || style.padding || 1) * this.mmToPx * scaleFactor;
     const halfStroke = borderWidth / 2;
 
@@ -184,6 +263,7 @@ class BaseLabelRenderer {
 
     fabricCanvas.add(border);
   }
+
   //Ajout du nom/titre
   async _addName(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const nameText = new fabric.Text(label.name, {
@@ -282,7 +362,6 @@ class BaseLabelRenderer {
   }
 
   //Préparation des données d'étiquettes dupliquées
-
   _prepareDuplicatedLabels(labelData, duplicateCount) {
     const duplicatedLabels = [];
     for (const label of labelData) {
@@ -293,19 +372,29 @@ class BaseLabelRenderer {
     return duplicatedLabels;
   }
 
-  //Rendu d'une étiquette unique sur canvas temporaire
-  async _renderSingleLabelToCanvas(label, layout, style) {
+  // Rendu d'une étiquette unique sur canvas temporaire avec contexte
+  async _renderSingleLabelToCanvas(label, layout, style, context = 'print') {
     const tempCanvas = document.createElement('canvas');
     try {
+      console.log(`🖼️ Génération image pour: ${context}`);
+
       const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
         highRes: true,
+        context: context,
       });
+
       const canvasElement = fabricCanvas.toCanvasElement();
       const imgData = canvasElement.toDataURL('image/png', 1.0);
+
+      console.log(`✅ Image ${context} générée:`, {
+        taille: `${canvasElement.width}×${canvasElement.height}px`,
+        'DPI estimé': ((canvasElement.width / layout.width) * 25.4).toFixed(0),
+      });
+
       fabricCanvas.dispose();
       return imgData;
     } catch (error) {
-      console.error(`Erreur étiquette ${label.name}:`, error);
+      console.error(`❌ Erreur génération ${context}:`, error);
       throw error;
     }
   }
