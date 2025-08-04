@@ -6,6 +6,7 @@ const os = require('os');
 const Product = require('../models/Product');
 const ResponseHandler = require('../handlers/ResponseHandler');
 const iconv = require('iconv-lite');
+const { createBarcodeImage } = require('../utils/barcodeGenerator');
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('fr-FR', {
@@ -251,10 +252,27 @@ class ProductExportController {
       // Hauteur minimale de ligne
       let rowHeight = 20;
 
-      // Vérifier chaque colonne
+      // NOUVEAU : Vérifier si on a une colonne barcode avec une valeur
+      const hasBarcodeColumn = columnsConfig.some((col) => {
+        if (col.key === 'barcode') {
+          const barcodeItem = product.meta_data?.find((item) => item.key === 'barcode');
+          return barcodeItem?.value; // Retourne true si le produit a un code-barres
+        }
+        return false;
+      });
+
+      // Si on a un code-barres, augmenter la hauteur pour laisser la place
+      if (hasBarcodeColumn) {
+        rowHeight = Math.max(rowHeight, 45); // 45px pour le code-barres + chiffres
+      }
+
+      // Vérifier chaque colonne pour le texte
       for (const col of columnsConfig) {
         // Pour la colonne personnalisée, utiliser une hauteur standard
         if (col.isCustom) continue;
+
+        // Pour la colonne barcode, on a déjà défini la hauteur ci-dessus
+        if (col.key === 'barcode') continue;
 
         const value = this.formatCellValue(product, col.key);
         const width = columnWidths[col.key] - 10; // Moins les marges intérieures
@@ -422,42 +440,92 @@ class ProductExportController {
             .rect(x + 5, y + 3, columnWidths[col.key] - 10, rowHeight - 6)
             .stroke();
         } else {
-          // Pour les colonnes normales, afficher la valeur
-          const value = this.formatCellValue(product, col.key);
+          // NOUVEAU : Traitement spécial pour la colonne barcode avec génération d'image
+          if (col.key === 'barcode') {
+            const barcodeItem = product.meta_data?.find((item) => item.key === 'barcode');
+            if (barcodeItem?.value) {
+              try {
+                // Générer l'image du code-barres côté serveur
+                const imageBuffer = createBarcodeImage(barcodeItem.value, {
+                  width: 1.5, // Un peu plus fin
+                  height: 35, // Plus haut pour les chiffres
+                  fontSize: 8, // Police plus petite pour les chiffres
+                  margin: 3, // Marge réduite
+                });
 
-          // Traitement spécial pour la colonne catégorie qui peut contenir des sauts de ligne
-          if (col.key === 'category' && value.includes('\n')) {
-            const lines = value.split('\n');
+                // Calculer les dimensions pour que le code-barres s'adapte à la cellule
+                const maxWidth = columnWidths[col.key] - 10;
+                const maxHeight = rowHeight - 10;
 
-            // Première ligne (catégorie principale) en taille normale
-            doc
-              .font('Helvetica')
-              .fontSize(10)
-              .text(lines[0], x + 5, y + 5, { width: columnWidths[col.key] - 10, align: 'left' });
+                // Ajouter l'image du code-barres au PDF
+                doc.image(imageBuffer, x + 5, y + 5, {
+                  width: Math.min(maxWidth, 120), // Largeur max 120px
+                  height: Math.min(maxHeight, 30), // Hauteur max 30px
+                });
 
-            // Lignes suivantes (chemin et autres catégories) en plus petit et gris
-            doc
-              .font('Helvetica')
-              .fontSize(8)
-              .fillColor('#6B7280') // Équivalent de text-gray-500
-              .text(lines.slice(1).join('\n'), x + 5, doc.y, {
-                width: columnWidths[col.key] - 10,
-                align: 'left',
-              })
-              .fillColor('#000000'); // Remettre la couleur par défaut
+                console.log(`✅ Code-barres PDF ajouté pour produit ${product.sku}`);
+              } catch (error) {
+                console.error(`❌ Erreur affichage code-barres pour ${product.sku}:`, error);
+                // Fallback : afficher le texte du code-barres
+                const value = this.formatCellValue(product, col.key);
+                doc
+                  .fillColor('#000000')
+                  .font('Helvetica')
+                  .fontSize(10)
+                  .text(value, x + 5, y + 5, {
+                    width: columnWidths[col.key] - 10,
+                    align: 'left',
+                  });
+              }
+            } else {
+              // Pas de code-barres, afficher un tiret
+              doc
+                .fillColor('#000000')
+                .font('Helvetica')
+                .fontSize(10)
+                .text('-', x + 5, y + 5, {
+                  width: columnWidths[col.key] - 10,
+                  align: 'left',
+                });
+            }
           } else {
-            // Dessiner la valeur de la cellule pour les autres colonnes
-            doc
-              .fillColor('#000000')
-              .font('Helvetica')
-              .fontSize(10)
-              .text(value, x + 5, y + 5, {
-                width: columnWidths[col.key] - 10,
-                align:
-                  col.key === 'stock' || col.key === 'price' || col.key === 'purchase_price'
-                    ? 'right'
-                    : 'left',
-              });
+            // Pour les colonnes normales, afficher la valeur
+            const value = this.formatCellValue(product, col.key);
+
+            // Traitement spécial pour la colonne catégorie qui peut contenir des sauts de ligne
+            if (col.key === 'category' && value.includes('\n')) {
+              const lines = value.split('\n');
+
+              // Première ligne (catégorie principale) en taille normale
+              doc
+                .font('Helvetica')
+                .fontSize(10)
+                .text(lines[0], x + 5, y + 5, { width: columnWidths[col.key] - 10, align: 'left' });
+
+              // Lignes suivantes (chemin et autres catégories) en plus petit et gris
+              doc
+                .font('Helvetica')
+                .fontSize(8)
+                .fillColor('#6B7280') // Équivalent de text-gray-500
+                .text(lines.slice(1).join('\n'), x + 5, doc.y, {
+                  width: columnWidths[col.key] - 10,
+                  align: 'left',
+                })
+                .fillColor('#000000'); // Remettre la couleur par défaut
+            } else {
+              // Dessiner la valeur de la cellule pour les autres colonnes
+              doc
+                .fillColor('#000000')
+                .font('Helvetica')
+                .fontSize(10)
+                .text(value, x + 5, y + 5, {
+                  width: columnWidths[col.key] - 10,
+                  align:
+                    col.key === 'stock' || col.key === 'price' || col.key === 'purchase_price'
+                      ? 'right'
+                      : 'left',
+                });
+            }
           }
         }
 
