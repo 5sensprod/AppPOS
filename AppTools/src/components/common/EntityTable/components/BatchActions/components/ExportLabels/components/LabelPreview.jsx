@@ -52,15 +52,9 @@ const LabelPreview = () => {
 
   const customPositionCount = Object.keys(customPositions).length;
 
-  // 🎯 CALCUL DES VRAIES DIMENSIONS PHYSIQUES
-  const isRollMode = currentLayout.supportType === 'rouleau';
-  let physicalWidth = currentLayout.width;
-
-  if (isRollMode) {
-    // En mode rouleau : largeur physique = zone imprimable + (2 × marges)
-    const marges = currentLayout.offsetLeft || 5;
-    physicalWidth = currentLayout.width + marges * 2;
-  }
+  // 🎯 SIMPLIFIÉ : currentLayout.width contient déjà la largeur physique
+  const physicalWidth = currentLayout.width;
+  const physicalHeight = currentLayout.height;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-md p-4 border border-gray-200 dark:border-gray-600">
@@ -72,7 +66,7 @@ const LabelPreview = () => {
         <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
           <div className="flex items-center">
             <Ruler className="h-3 w-3 mr-1" />
-            {physicalWidth} × {currentLayout.height} mm
+            {physicalWidth} × {physicalHeight} mm
           </div>
           {customPositionCount > 0 && (
             <div className="flex items-center">

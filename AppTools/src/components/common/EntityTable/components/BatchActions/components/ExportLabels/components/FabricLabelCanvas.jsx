@@ -1,4 +1,3 @@
-//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\FabricLabelCanvas.jsx
 import React, { useEffect, useRef } from 'react';
 import fabricExportService from '@services/fabricExportService';
 
@@ -13,7 +12,11 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     }
 
     if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.dispose();
+      try {
+        fabricCanvasRef.current.dispose();
+      } catch (error) {
+        console.warn('Erreur dispose canvas:', error);
+      }
     }
 
     const renderCanvas = async () => {
@@ -100,7 +103,11 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
 
     return () => {
       if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
+        try {
+          fabricCanvasRef.current.dispose();
+        } catch (error) {
+          console.warn('Erreur nettoyage canvas:', error);
+        }
         fabricCanvasRef.current = null;
       }
     };
@@ -108,32 +115,26 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
 
   const mmToPx = 3.779527559;
 
-  // 🎯 CALCUL DE LA LARGEUR PHYSIQUE RÉELLE
-  const isRollMode = layout.supportType === 'rouleau';
-  let physicalWidth = layout.width;
+  // 🎯 SIMPLIFIÉ : currentLayout.width = largeur physique directement
+  const physicalWidth = layout.width;
+  const physicalHeight = layout.height;
 
-  if (isRollMode) {
-    // En mode rouleau : largeur physique = zone imprimable + (2 × marges)
-    const marges = layout.offsetLeft || 5;
-    physicalWidth = layout.width + marges * 2;
-  }
-
-  const displayWidth = physicalWidth;
-  const displayHeight = layout.height;
+  const canvasWidth = physicalWidth;
+  const canvasHeight = physicalHeight;
 
   return (
     <div>
       <canvas
         ref={canvasRef}
         style={{
-          width: `${displayWidth * mmToPx}px`,
-          height: `${layout.height * mmToPx}px`,
+          width: `${canvasWidth * mmToPx}px`,
+          height: `${canvasHeight * mmToPx}px`,
           border: '1px solid #ccc',
           cursor: 'move',
         }}
       />
       <div style={{ fontSize: '10px', color: '#666', marginTop: '5px' }}>
-        {label?.name || 'Pas de label'} - {displayWidth}×{displayHeight}mm
+        {label?.name || 'Pas de label'} - {physicalWidth}×{physicalHeight}mm
         <br />
         <span style={{ color: '#0084ff' }}>💡 Cliquez et déplacez les éléments</span>
       </div>
