@@ -11,46 +11,61 @@ class RollLabelRenderer extends BaseLabelRenderer {
     try {
       const { jsPDF } = await import('jspdf');
       const { labelData = [], labelLayout = {}, title = 'Etiquettes' } = exportConfig;
-
       if (!labelData || labelData.length === 0) {
         throw new Error("Aucune donnée d'étiquette à exporter");
       }
-
       const layout = labelLayout.layout || this._getDefaultRollLayout();
       const style = labelLayout.style || this._getDefaultStyle();
-
       // Validation que c'est bien du rouleau
       if (layout.supportType !== 'rouleau') {
         throw new Error('RollLabelRenderer ne supporte que le type "rouleau"');
       }
-
       const duplicateCount = style.duplicateCount || 1;
       const duplicatedLabels = this._prepareDuplicatedLabels(labelData, duplicateCount);
-
       const pageConfig = this._calculateRollPageLayout(layout, duplicatedLabels.length);
 
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: [pageConfig.pageWidth, pageConfig.pageHeight],
-      });
+      // SOLUTION 1: Méthode directe - forcer les dimensions sans auto-détection
+      const doc = new jsPDF('p', 'mm', 'a4'); // Créer avec un format standard d'abord
+
+      // Redéfinir manuellement les dimensions de page pour contourner l'auto-détection
+      doc.internal.pageSize.width = pageConfig.pageWidth;
+      doc.internal.pageSize.height = pageConfig.pageHeight;
+      doc.internal.pageSize.getWidth = () => pageConfig.pageWidth;
+      doc.internal.pageSize.getHeight = () => pageConfig.pageHeight;
+
+      // Alternative (SOLUTION 2): Si la solution 1 ne fonctionne pas, décommentez celle-ci
+      /*
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [pageConfig.pageWidth, pageConfig.pageHeight],
+      compress: true,
+      userUnit: 1.0 // Forcer l'unité utilisateur
+    });
+    
+    // Ajouter des métadonnées pour indiquer l'orientation souhaitée
+    doc.setProperties({
+      title: title,
+      creator: 'Label Printer',
+      orientation: 'portrait'
+    });
+    */
 
       let labelIndex = 0;
-
       // Rendu séquentiel des étiquettes
       while (labelIndex < duplicatedLabels.length) {
         if (labelIndex > 0) {
           doc.addPage();
+          // Redéfinir les dimensions pour chaque nouvelle page aussi
+          doc.internal.pageSize.width = pageConfig.pageWidth;
+          doc.internal.pageSize.height = pageConfig.pageHeight;
         }
-
         const label = duplicatedLabels[labelIndex];
         await this._renderRollLabel(doc, label, layout, style, pageConfig);
         labelIndex++;
       }
-
       const filename = `${title}_rouleau_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
-
       return { success: true, filename };
     } catch (error) {
       console.error('Erreur export PDF rouleau:', error);
