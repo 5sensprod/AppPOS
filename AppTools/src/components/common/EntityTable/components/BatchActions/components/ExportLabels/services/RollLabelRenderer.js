@@ -57,9 +57,46 @@ class RollLabelRenderer extends BaseLabelRenderer {
 
   // Rendu d'une étiquette sur rouleau
   async _renderRollLabel(doc, label, layout, style, pageConfig) {
+    console.log('🔍 AVANT renderSingleLabel:', {
+      'label.name': label.name,
+      'layout.width': layout.width,
+      'layout.height': layout.height,
+      'layout.padding': layout.padding,
+    });
+
     const imgData = await this._renderSingleLabelToCanvas(label, layout, style);
 
+    console.log('🔍 APRÈS renderSingleLabel:', {
+      'imgData length': imgData.length,
+      'imgData type': typeof imgData,
+    });
+
+    // 🔍 Vérifier la taille réelle de l'image générée
+    const img = new Image();
+    await new Promise((resolve) => {
+      img.onload = function () {
+        console.log('🔍 Image réelle générée:', {
+          'img.width (px)': img.width,
+          'img.height (px)': img.height,
+          ratio: (img.width / img.height).toFixed(2),
+          'width en mm': (img.width / 3.779527559).toFixed(1),
+          'height en mm': (img.height / 3.779527559).toFixed(1),
+        });
+        resolve();
+      };
+      img.src = imgData;
+    });
+
     const position = this._calculateRollLabelPosition(pageConfig, layout);
+    const realWidthMm = img.width / 3.779527559;
+    const realHeightMm = img.height / 3.779527559;
+    console.log('🔍 AVANT addImage:', {
+      'position.x': position.x,
+      'position.y': position.y,
+      'layout.width': layout.width,
+      'layout.height': layout.height,
+      pageConfig: pageConfig,
+    });
 
     doc.addImage(
       imgData,
@@ -97,8 +134,7 @@ class RollLabelRenderer extends BaseLabelRenderer {
     return {
       width: 50,
       height: 30,
-      offsetTop: 5,
-      offsetLeft: 5,
+
       spacingV: 2,
       spacingH: 0,
       supportType: 'rouleau',
@@ -109,7 +145,6 @@ class RollLabelRenderer extends BaseLabelRenderer {
   //Style par défaut
   _getDefaultStyle() {
     return {
-      padding: 1,
       showBorder: false,
       showName: false,
       showPrice: true,
@@ -152,30 +187,37 @@ class RollLabelRenderer extends BaseLabelRenderer {
       const layout = labelLayout.layout || this._getDefaultRollLayout();
       const style = labelLayout.style || this._getDefaultStyle();
 
+      // Validation que c'est bien du rouleau
       if (layout.supportType !== 'rouleau') {
-        throw new Error("L'impression directe ne supporte que le type 'rouleau'");
+        throw new Error('L\'impression directe ne supporte que le type "rouleau"');
       }
 
       const duplicateCount = style.duplicateCount || 1;
       const duplicatedLabels = this._prepareDuplicatedLabels(labelData, duplicateCount);
 
       console.log(
-        `🖨️ [PRINT] Simulation de ${duplicatedLabels.length} étiquettes à télécharger (aucune impression)`
+        `🖨️ [ROLL] Génération ${duplicatedLabels.length} étiquettes pour impression directe`
       );
 
-      // === Mode test : téléchargement local ===
-      for (let i = 0; i < duplicatedLabels.length; i++) {
-        const label = duplicatedLabels[i];
-
+      // Générer les images depuis Fabric.js (même qualité que preview)
+      const images = [];
+      for (const label of duplicatedLabels) {
         const imageData = await this._renderSingleLabelToCanvas(label, layout, style);
-        const filename = `etiquette_${i + 1}_${label.name || 'label'}.png`;
-
-        this._downloadDataURL(imageData, filename); // ⬅️ Téléchargement
+        images.push(imageData);
       }
 
-      return { success: true, message: 'Images téléchargées localement (impression désactivée)' };
+      // ✅ CORRECTION: Import dynamique au lieu de require
+      const apiService = await import('../../../../../../../../services/api');
+      const response = await apiService.default.post('/api/label-printing/print-labels', {
+        images,
+        printerName,
+        layout,
+        copies,
+      });
+
+      return response.data;
     } catch (error) {
-      console.error('❌ [ROLL] Erreur dans printLabelsDirectly (mode test):', error);
+      console.error('❌ [ROLL] Erreur impression directe:', error);
       throw error;
     }
   }

@@ -14,7 +14,6 @@ const DEFAULT_STYLE = {
   showBorder: false,
   borderWidth: 0.1,
   borderColor: '#000000',
-  padding: 3,
   alignment: 'center',
   showBarcode: true,
   barcodeHeight: 15,

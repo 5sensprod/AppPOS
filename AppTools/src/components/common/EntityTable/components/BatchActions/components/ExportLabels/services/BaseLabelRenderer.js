@@ -38,7 +38,15 @@ class BaseLabelRenderer {
     const elements = this._calculateElements(layout, style, scaleFactor, customPositions);
 
     if (style.showBorder) {
-      await this._addBorder(fabricCanvas, canvasWidth, canvasHeight, style, fabric, scaleFactor);
+      await this._addBorder(
+        fabricCanvas,
+        canvasWidth,
+        canvasHeight,
+        style,
+        fabric,
+        scaleFactor,
+        layout
+      );
     }
 
     if (style.showName && label.name) {
@@ -61,7 +69,7 @@ class BaseLabelRenderer {
   _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
     const canvasHeight = layout.height * this.mmToPx * scaleFactor;
-    const padding = (style.padding || 1) * this.mmToPx * scaleFactor;
+    const padding = layout.padding * this.mmToPx * scaleFactor;
     const contentWidth = canvasWidth - padding * 2;
 
     const elements = {};
@@ -155,16 +163,18 @@ class BaseLabelRenderer {
   }
 
   //Ajout de la bordure
-  async _addBorder(fabricCanvas, width, height, style, fabric, scaleFactor = 1) {
+  async _addBorder(fabricCanvas, width, height, style, fabric, scaleFactor = 1, layout) {
     const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor;
-    const padding = (style.padding || 1) * this.mmToPx * scaleFactor;
+
+    // 🎯 NOUVEAU : Utiliser la marge du layout (pas du style)
+    const margeInterieure = (layout.padding || style.padding || 1) * this.mmToPx * scaleFactor;
     const halfStroke = borderWidth / 2;
 
     const border = new fabric.Rect({
-      left: padding + halfStroke,
-      top: padding + halfStroke,
-      width: width - padding * 2 - borderWidth,
-      height: height - padding * 2 - borderWidth,
+      left: margeInterieure + halfStroke,
+      top: margeInterieure + halfStroke,
+      width: width - margeInterieure * 2 - borderWidth,
+      height: height - margeInterieure * 2 - borderWidth,
       fill: 'transparent',
       stroke: style.borderColor || '#000000',
       strokeWidth: borderWidth,
@@ -174,7 +184,6 @@ class BaseLabelRenderer {
 
     fabricCanvas.add(border);
   }
-
   //Ajout du nom/titre
   async _addName(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const nameText = new fabric.Text(label.name, {
