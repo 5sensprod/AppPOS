@@ -146,7 +146,7 @@ class LabelPrintingService {
     const { printerName, layout, copies = 1 } = options;
 
     // Conversion des dimensions mm vers pixels (approximation pour 203 DPI étiqueteuse)
-    const dpi = 92;
+    const dpi = 96;
     const mmToPixels = (mm) => Math.round((mm * dpi) / 25.4);
 
     let widthPixels = 384; // Largeur par défaut étiqueteuse Brother
