@@ -1,4 +1,4 @@
-// components/RollDimensionsConfig.jsx - CORRIGÉ avec reset spécifique
+// components/RollDimensionsConfig.jsx - CORRIGÉ avec logique de positionnement
 import React from 'react';
 import { Printer, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
@@ -11,35 +11,32 @@ const RollDimensionsConfig = ({
   onLoadPreset,
   onDeletePreset,
 }) => {
-  const {
-    currentLayout,
-    updateLayout,
-    resetRollLayoutOnly, // 🎯 Reset ciblé pour le layout rouleau
-  } = useLabelExportStore();
+  const { currentLayout, updateLayout, resetRollLayoutOnly } = useLabelExportStore();
 
   const handleChange = (field, value) => {
     updateLayout(field, value);
   };
 
-  // 🆕 NOUVEAU: Reset spécifique au rouleau
   const handleResetRollLayout = () => {
     resetRollLayoutOnly();
     console.log('🎞️ Layout Rouleau réinitialisé aux valeurs par défaut');
   };
 
-  // Calculs automatiques
+  // 🎯 NOUVELLE LOGIQUE : Zone imprimable calculée automatiquement
   const rouleauWidth = currentLayout.rouleau?.width || 58;
-  const offsetLeft = Math.max(currentLayout.offsetLeft || 5, 3); // Minimum 3mm
-  const calculatedLabelWidth = rouleauWidth - offsetLeft * 2;
+  const margeSecurite = parseFloat(currentLayout.offsetLeft) || 5; // Marge de sécurité définie par l'utilisateur
+  const labelHeight = parseFloat(currentLayout.height) || 29;
 
-  // Mettre à jour automatiquement la largeur d'étiquette calculée
+  // Calcul automatique de la zone imprimable
+  const zoneImprimable = rouleauWidth - margeSecurite * 2;
+  const isValidConfig = zoneImprimable > 10 && margeSecurite >= 3; // Zone min 10mm, marge min 3mm
+
+  // 🆕 Mettre à jour automatiquement la largeur (zone imprimable) dans le store
   React.useEffect(() => {
-    if (calculatedLabelWidth > 0) {
-      handleChange('width', calculatedLabelWidth.toFixed(1));
+    if (isValidConfig && zoneImprimable !== parseFloat(currentLayout.width)) {
+      handleChange('width', zoneImprimable.toFixed(1));
     }
-  }, [rouleauWidth, offsetLeft, calculatedLabelWidth]);
-
-  const isValidConfig = calculatedLabelWidth > 10; // Au moins 10mm d'étiquette utile
+  }, [rouleauWidth, margeSecurite, zoneImprimable, isValidConfig]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-600">
@@ -49,7 +46,6 @@ const RollDimensionsConfig = ({
           Configuration Rouleau - Impression continue
         </h4>
 
-        {/* 🎯 BOUTON RESET SPÉCIFIQUE AU ROULEAU */}
         <button
           type="button"
           onClick={handleResetRollLayout}
@@ -61,7 +57,7 @@ const RollDimensionsConfig = ({
         </button>
       </div>
 
-      {/* Status impression */}
+      {/* Status impression avec nouvelle logique */}
       <div
         className={`mb-3 p-3 rounded border ${
           isValidConfig
@@ -86,7 +82,7 @@ const RollDimensionsConfig = ({
                 : 'text-red-600 dark:text-red-400'
             }`}
           >
-            Étiquette : {calculatedLabelWidth.toFixed(1)}mm
+            Étiquette : {zoneImprimable.toFixed(1)}×{labelHeight}mm (zone imprimable)
           </span>
         </div>
         <div
@@ -94,8 +90,9 @@ const RollDimensionsConfig = ({
             isValidConfig ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'
           }`}
         >
-          🎯 Mode rouleau • Découpe automatique • Largeur calculée automatiquement
-          {!isValidConfig && ' • Augmentez la largeur du rouleau ou réduisez les marges'}
+          🎯 Mode rouleau • Découpe automatique • Zone imprimable : {zoneImprimable.toFixed(1)}mm
+          (marges {margeSecurite}mm)
+          {!isValidConfig && ' • Réduisez les marges ou augmentez la largeur du rouleau'}
         </div>
       </div>
 
@@ -127,14 +124,14 @@ const RollDimensionsConfig = ({
 
           <div>
             <label className="block text-xs text-blue-600 dark:text-blue-300 mb-1">
-              Marge intérieure (mm)
+              Marge de sécurité (mm)
             </label>
             <input
               type="number"
               step="0.1"
               min="3"
               max="20"
-              value={offsetLeft}
+              value={margeSecurite}
               onChange={(e) =>
                 handleChange('offsetLeft', Math.max(3, parseFloat(e.target.value) || 3))
               }
@@ -142,13 +139,13 @@ const RollDimensionsConfig = ({
               placeholder="5"
             />
             <div className="text-xs text-blue-500 dark:text-blue-400 mt-1">
-              Minimum 3mm (sécurité)
+              Minimum 3mm (espacement des bords)
             </div>
           </div>
         </div>
       </div>
 
-      {/* Configuration étiquettes - Largeur calculée automatiquement */}
+      {/* Configuration étiquettes - Seule la hauteur est modifiable */}
       <div className="mb-4">
         <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
           Dimensions des étiquettes
@@ -156,13 +153,13 @@ const RollDimensionsConfig = ({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Largeur étiquette (calculée)
+              Zone imprimable (calculée)
             </label>
             <div className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-600 text-gray-700 dark:text-gray-300">
-              {calculatedLabelWidth.toFixed(1)} mm
+              {zoneImprimable.toFixed(1)} mm
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              = {rouleauWidth}mm - (2 × {offsetLeft}mm)
+              = {rouleauWidth}mm - (2 × {margeSecurite}mm)
             </div>
           </div>
 
@@ -175,12 +172,12 @@ const RollDimensionsConfig = ({
               step="0.1"
               min="15"
               max="200"
-              value={currentLayout.height || 29}
+              value={labelHeight}
               onChange={(e) => handleChange('height', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Découpe automatique par l'étiqueteuse
+              Découpe automatique par l'imprimante
             </div>
           </div>
         </div>
@@ -189,11 +186,11 @@ const RollDimensionsConfig = ({
       {/* Information sur la preview */}
       <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
         <div className="text-xs text-gray-600 dark:text-gray-400">
-          📋 L'aperçu reflète l'impression réelle : étiquette de{' '}
+          📋 L'aperçu reflète l'impression réelle : zone imprimable de{' '}
           <strong>
-            {calculatedLabelWidth.toFixed(1)}×{currentLayout.height || 29}mm
+            {zoneImprimable.toFixed(1)}×{labelHeight}mm
           </strong>
-          centrée dans un rouleau de <strong>{rouleauWidth}mm</strong>
+          dans un rouleau de <strong>{rouleauWidth}mm</strong>
         </div>
       </div>
 

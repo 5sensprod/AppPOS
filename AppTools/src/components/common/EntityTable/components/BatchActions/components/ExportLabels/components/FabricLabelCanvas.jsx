@@ -108,19 +108,24 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
 
   const mmToPx = 3.779527559;
 
+  // 🎯 LARGEUR PHYSIQUE = toujours layout.width (29mm)
+  // Les marges servent juste au positionnement interne des éléments
+  const displayWidth = layout.width;
+  const displayHeight = layout.height;
+
   return (
     <div>
       <canvas
         ref={canvasRef}
         style={{
-          width: `${layout.width * mmToPx}px`,
+          width: `${displayWidth * mmToPx}px`,
           height: `${layout.height * mmToPx}px`,
           border: '1px solid #ccc',
           cursor: 'move',
         }}
       />
       <div style={{ fontSize: '10px', color: '#666', marginTop: '5px' }}>
-        {label?.name || 'Pas de label'} - {layout.width}×{layout.height}mm
+        {label?.name || 'Pas de label'} - {displayWidth}×{displayHeight}mm
         <br />
         <span style={{ color: '#0084ff' }}>💡 Cliquez et déplacez les éléments</span>
       </div>

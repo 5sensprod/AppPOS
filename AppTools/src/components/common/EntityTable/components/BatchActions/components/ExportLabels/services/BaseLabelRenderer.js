@@ -157,16 +157,14 @@ class BaseLabelRenderer {
   //Ajout de la bordure
   async _addBorder(fabricCanvas, width, height, style, fabric, scaleFactor = 1) {
     const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor;
-    const halfStroke = borderWidth / 60;
-
-    width = Math.floor(fabricCanvas.getWidth());
-    height = Math.floor(fabricCanvas.getHeight());
+    const padding = (style.padding || 1) * this.mmToPx * scaleFactor;
+    const halfStroke = borderWidth / 2;
 
     const border = new fabric.Rect({
-      left: halfStroke - 1,
-      top: halfStroke,
-      width: width - borderWidth,
-      height: height - borderWidth,
+      left: padding + halfStroke,
+      top: padding + halfStroke,
+      width: width - padding * 2 - borderWidth,
+      height: height - padding * 2 - borderWidth,
       fill: 'transparent',
       stroke: style.borderColor || '#000000',
       strokeWidth: borderWidth,
