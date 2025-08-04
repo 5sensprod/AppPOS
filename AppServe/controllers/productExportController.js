@@ -5,6 +5,7 @@ const path = require('path');
 const os = require('os');
 const Product = require('../models/Product');
 const ResponseHandler = require('../handlers/ResponseHandler');
+const iconv = require('iconv-lite');
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('fr-FR', {
@@ -135,11 +136,12 @@ class ProductExportController {
       // Générer le contenu CSV
       const csvContent = this.generateCsv(productsToExport, selectedColumns, customColumn);
 
-      // Écrire dans un fichier temporaire
-      fs.writeFileSync(tempFilePath, csvContent, 'utf8');
+      // Encoder avec Windows-1252 pour P-touch
+      const csvBuffer = iconv.encode(csvContent, 'win1252');
+      fs.writeFileSync(tempFilePath, csvBuffer);
 
-      // Envoyer le fichier en réponse
-      res.setHeader('Content-Type', 'text/csv');
+      // Envoyer le fichier en réponse avec le bon charset
+      res.setHeader('Content-Type', 'text/csv; charset=Windows-1252');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
       const fileStream = fs.createReadStream(tempFilePath);
@@ -596,6 +598,7 @@ class ProductExportController {
       { key: 'sku', label: 'Référence', weight: 2 },
       { key: 'designation', label: 'Désignation', weight: 3 },
       { key: 'name', label: 'Nom', weight: 3 },
+      { key: 'barcode', label: 'Code-barres', weight: 2 },
       { key: 'purchase_price', label: "Prix d'achat", weight: 1.5 },
       { key: 'price', label: 'Prix de vente', weight: 1.5 },
       { key: 'stock', label: 'Stock', weight: 1 },
@@ -631,6 +634,10 @@ class ProductExportController {
 
       case 'stock':
         return product[key]?.toString() || '0';
+
+      case 'barcode':
+        const barcodeItem = product.meta_data?.find((item) => item.key === 'barcode');
+        return barcodeItem?.value || '';
 
       case 'category':
         if (product.category_info && product.category_info.primary) {

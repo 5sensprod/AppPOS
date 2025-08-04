@@ -63,6 +63,17 @@ export const ENTITY_CONFIG = {
       sortable: true,
     },
     {
+      key: 'barcode',
+      label: 'Code-barres',
+      render: (product) => {
+        const barcodeItem = product.meta_data?.find((item) => item.key === 'barcode');
+        const barcode = barcodeItem?.value || '-';
+        return <span className="font-mono text-sm">{barcode}</span>;
+      },
+      sortable: false,
+      exportable: true, // ← Disponible pour l'export
+    },
+    {
       key: 'stock',
       label: 'Stock',
       render: (product) => (
