@@ -1,17 +1,12 @@
-// ===== LabelPreview.jsx (reset positions uniquement) =====
+// ===== LabelPreview.jsx (fix dimensions affichées) =====
 import React, { useState, useEffect } from 'react';
-import { Eye, Ruler, Move, RotateCcw, Save } from 'lucide-react';
+import { Eye, Ruler, Move, RotateCcw } from 'lucide-react';
 import FabricLabelCanvas from './FabricLabelCanvas';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const LabelPreview = () => {
-  const {
-    labelStyle,
-    currentLayout,
-    updateStyle,
-    extractLabelData,
-    resetCustomPositionsOnly, // 🎯 Reset spécifique aux positions
-  } = useLabelExportStore();
+  const { labelStyle, currentLayout, updateStyle, extractLabelData, resetCustomPositionsOnly } =
+    useLabelExportStore();
 
   const labelData = extractLabelData();
 
@@ -51,11 +46,21 @@ const LabelPreview = () => {
 
   const handleResetPositions = () => {
     setCustomPositions({});
-    resetCustomPositionsOnly(); // 🎯 Reset spécifique aux positions
+    resetCustomPositionsOnly();
     console.log('📍 Positions personnalisées réinitialisées');
   };
 
   const customPositionCount = Object.keys(customPositions).length;
+
+  // 🎯 CALCUL DES VRAIES DIMENSIONS PHYSIQUES
+  const isRollMode = currentLayout.supportType === 'rouleau';
+  let physicalWidth = currentLayout.width;
+
+  if (isRollMode) {
+    // En mode rouleau : largeur physique = zone imprimable + (2 × marges)
+    const marges = currentLayout.offsetLeft || 5;
+    physicalWidth = currentLayout.width + marges * 2;
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-md p-4 border border-gray-200 dark:border-gray-600">
@@ -67,7 +72,7 @@ const LabelPreview = () => {
         <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
           <div className="flex items-center">
             <Ruler className="h-3 w-3 mr-1" />
-            {currentLayout.width} × {currentLayout.height} mm
+            {physicalWidth} × {currentLayout.height} mm
           </div>
           {customPositionCount > 0 && (
             <div className="flex items-center">
@@ -90,7 +95,7 @@ const LabelPreview = () => {
           {customPositionCount > 0 && (
             <button
               type="button"
-              onClick={handleResetPositions} // 🎯 Reset spécifique aux positions
+              onClick={handleResetPositions}
               className="flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
               title="Remettre les positions par défaut"
             >
@@ -101,7 +106,6 @@ const LabelPreview = () => {
         </div>
       </div>
 
-      {/* Reste du composant inchangé... */}
       <div className="flex justify-center">
         <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
           <FabricLabelCanvas

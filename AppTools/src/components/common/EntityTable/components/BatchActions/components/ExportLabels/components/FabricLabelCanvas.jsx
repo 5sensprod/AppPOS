@@ -108,9 +108,17 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
 
   const mmToPx = 3.779527559;
 
-  // 🎯 LARGEUR PHYSIQUE = toujours layout.width (29mm)
-  // Les marges servent juste au positionnement interne des éléments
-  const displayWidth = layout.width;
+  // 🎯 CALCUL DE LA LARGEUR PHYSIQUE RÉELLE
+  const isRollMode = layout.supportType === 'rouleau';
+  let physicalWidth = layout.width;
+
+  if (isRollMode) {
+    // En mode rouleau : largeur physique = zone imprimable + (2 × marges)
+    const marges = layout.offsetLeft || 5;
+    physicalWidth = layout.width + marges * 2;
+  }
+
+  const displayWidth = physicalWidth;
   const displayHeight = layout.height;
 
   return (
