@@ -33,24 +33,6 @@ class RollLabelRenderer extends BaseLabelRenderer {
       doc.internal.pageSize.getWidth = () => pageConfig.pageWidth;
       doc.internal.pageSize.getHeight = () => pageConfig.pageHeight;
 
-      // Alternative (SOLUTION 2): Si la solution 1 ne fonctionne pas, décommentez celle-ci
-      /*
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: [pageConfig.pageWidth, pageConfig.pageHeight],
-      compress: true,
-      userUnit: 1.0 // Forcer l'unité utilisateur
-    });
-    
-    // Ajouter des métadonnées pour indiquer l'orientation souhaitée
-    doc.setProperties({
-      title: title,
-      creator: 'Label Printer',
-      orientation: 'portrait'
-    });
-    */
-
       let labelIndex = 0;
       // Rendu séquentiel des étiquettes
       while (labelIndex < duplicatedLabels.length) {
