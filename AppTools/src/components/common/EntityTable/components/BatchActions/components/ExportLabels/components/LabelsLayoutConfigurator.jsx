@@ -16,7 +16,7 @@ const LabelsLayoutConfigurator = () => {
   const labelData = extractLabelData();
 
   // 🔧 Tous les accordéons fermés par défaut
-  const { toggle, isOpen } = useAccordion([]); // Array vide = tout fermé
+  const { toggle, isOpen } = useAccordion(['dimensions']); // Array vide = tout fermé
 
   // 🆕 Fonction pour générer les infos du header selon le type de support
   const getDimensionsHeaderInfo = () => {
