@@ -11,12 +11,52 @@ import PrinterSelector from './PrinterSelector';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const LabelsLayoutConfigurator = () => {
-  const { currentLayout, extractLabelData } = useLabelExportStore();
+  const { currentLayout, extractLabelData, getGridDimensions } = useLabelExportStore();
 
   const labelData = extractLabelData();
 
   // 🔧 Tous les accordéons fermés par défaut
   const { toggle, isOpen } = useAccordion([]); // Array vide = tout fermé
+
+  // 🆕 Fonction pour générer les infos du header selon le type de support
+  const getDimensionsHeaderInfo = () => {
+    if (!currentLayout) return '';
+
+    const isRoll = currentLayout.supportType === 'rouleau';
+
+    if (isRoll) {
+      // Mode rouleau : largeur calculée × hauteur + largeur physique
+      const rouleauWidth = currentLayout.rouleau?.width || 58;
+      const margeInterieure = parseFloat(currentLayout.padding) || 3;
+      const etiquettePhysique = rouleauWidth - margeInterieure * 2;
+      const hauteur = currentLayout.height || 29;
+
+      return `${etiquettePhysique.toFixed(1)}×${hauteur}mm • Rouleau: ${rouleauWidth}mm • Marge: ${margeInterieure}mm`;
+    } else {
+      // Mode A4 : largeur × hauteur + grille
+      const gridDims = getGridDimensions();
+      const largeur = currentLayout.width || 48.5;
+      const hauteur = currentLayout.height || 25;
+
+      return `${largeur}×${hauteur}mm • Grille: ${gridDims.columns}×${gridDims.rows} (${gridDims.total} étiq.)`;
+    }
+  };
+
+  // 🆕 Fonction pour les infos de style
+  const getStyleHeaderInfo = () => {
+    // On pourrait accéder au labelStyle depuis le store ici si besoin
+    return ''; // Pour l'instant vide, à implémenter selon vos besoins
+  };
+
+  // 🆕 Fonction pour les infos d'impression
+  const getPrintHeaderInfo = () => {
+    // Exemple : afficher le nombre de copies si disponible
+    return ''; // À implémenter selon vos besoins
+  };
+
+  const dimensionsInfo = getDimensionsHeaderInfo();
+  const styleInfo = getStyleHeaderInfo();
+  const printInfo = getPrintHeaderInfo();
 
   return (
     <div className="space-y-3 bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
@@ -28,10 +68,10 @@ const LabelsLayoutConfigurator = () => {
         </h3>
       </div>
 
-      {/* Panel Dimensions */}
+      {/* Panel Dimensions avec infos dans le header */}
       <AccordionPanel
         id="dimensions"
-        title="Configuration des dimensions"
+        title={`Configuration des dimensions${!isOpen('dimensions') && dimensionsInfo ? ` • ${dimensionsInfo}` : ''}`}
         icon={Ruler}
         isOpen={isOpen('dimensions')}
         onToggle={toggle}

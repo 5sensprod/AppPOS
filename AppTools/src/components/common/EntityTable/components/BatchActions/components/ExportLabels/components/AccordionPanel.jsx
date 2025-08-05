@@ -27,15 +27,23 @@ export const AccordionPanel = ({
         onClick={handleToggle}
         className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-t-md"
       >
-        <div className="flex items-center">
-          {Icon && <Icon className="h-4 w-4 mr-2" />}
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</span>
+        <div className="flex items-center min-w-0 flex-1">
+          {' '}
+          {/* 🔧 Ajouté flex-1 et min-w-0 pour la troncature */}
+          {Icon && <Icon className="h-4 w-4 mr-2 flex-shrink-0" />}
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+            {title}
+          </span>
         </div>
-        {isOpen ? (
-          <ChevronDown className="h-4 w-4 text-gray-500 transition-transform duration-200" />
-        ) : (
-          <ChevronRight className="h-4 w-4 text-gray-500 transition-transform duration-200" />
-        )}
+        <div className="flex-shrink-0 ml-2">
+          {' '}
+          {/* 🔧 Container pour le chevron */}
+          {isOpen ? (
+            <ChevronDown className="h-4 w-4 text-gray-500 transition-transform duration-200" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-gray-500 transition-transform duration-200" />
+          )}
+        </div>
       </button>
 
       {/* Contenu - avec div qui empêche la propagation */}
