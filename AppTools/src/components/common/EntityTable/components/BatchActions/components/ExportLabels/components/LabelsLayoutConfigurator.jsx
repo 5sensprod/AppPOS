@@ -1,5 +1,7 @@
 import React from 'react';
-import { Grid } from 'lucide-react';
+import { Grid, Ruler, Palette, Eye, Printer, Settings } from 'lucide-react';
+import { useAccordion } from '../hooks/useAccordion'; // 🔧 Import du hook créé
+import { AccordionPanel } from './AccordionPanel';
 import LabelDimensionsConfig from './LabelDimensionsConfig';
 import PrintOptionsConfig from './PrintOptionsConfig';
 import LabelStyleConfig from './LabelStyleConfig';
@@ -9,16 +11,18 @@ import PrinterSelector from './PrinterSelector';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const LabelsLayoutConfigurator = () => {
-  const {
-    // État depuis le store
-    currentLayout,
-    extractLabelData,
-  } = useLabelExportStore();
+  const { currentLayout, extractLabelData } = useLabelExportStore();
 
   const labelData = extractLabelData();
 
+  // Accordéon avec panels ouverts par défaut selon le contexte
+  const defaultOpenPanels =
+    labelData.length > 0 ? ['dimensions', 'style', 'preview'] : ['dimensions', 'style'];
+
+  const { toggle, isOpen } = useAccordion(defaultOpenPanels);
+
   return (
-    <div className="space-y-4 bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+    <div className="space-y-3 bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
       {/* En-tête simple */}
       <div className="flex items-center space-x-2 mb-3">
         <Grid className="h-5 w-5 text-blue-600" />
@@ -27,23 +31,77 @@ const LabelsLayoutConfigurator = () => {
         </h3>
       </div>
 
-      {/* 🎯 Configuration des dimensions - Plus besoin de props ! */}
-      <LabelDimensionsConfig />
+      {/* Panel Dimensions */}
+      <AccordionPanel
+        id="dimensions"
+        title="Configuration des dimensions"
+        icon={Ruler}
+        isOpen={isOpen('dimensions')}
+        onToggle={toggle}
+      >
+        <LabelDimensionsConfig />
+      </AccordionPanel>
 
-      {/* 🎯 Configuration du style - Plus besoin de props ! */}
-      <LabelStyleConfig />
+      {/* Panel Style */}
+      <AccordionPanel
+        id="style"
+        title="Style des étiquettes"
+        icon={Palette}
+        isOpen={isOpen('style')}
+        onToggle={toggle}
+      >
+        <LabelStyleConfig />
+      </AccordionPanel>
 
-      {/* Aperçu avec preview interactive (si données disponibles) */}
-      {labelData.length > 0 && <LabelPreview />}
+      {/* Panel Aperçu (seulement si données disponibles) */}
+      {labelData.length > 0 && (
+        <AccordionPanel
+          id="preview"
+          title="Aperçu"
+          icon={Eye}
+          isOpen={isOpen('preview')}
+          onToggle={toggle}
+        >
+          <LabelPreview />
+        </AccordionPanel>
+      )}
 
-      {/* Options d'impression (quantité, etc.) */}
-      <PrintOptionsConfig />
+      {/* Panel Options d'impression */}
+      <AccordionPanel
+        id="print"
+        title="Options d'impression"
+        icon={Settings}
+        isOpen={isOpen('print')}
+        onToggle={toggle}
+      >
+        <PrintOptionsConfig />
+      </AccordionPanel>
 
-      {/* Sélection d'imprimante (mode rouleau uniquement) */}
-      {currentLayout?.supportType === 'rouleau' && <PrinterSelector />}
+      {/* Panel Sélection d'imprimante (mode rouleau uniquement) */}
+      {currentLayout?.supportType === 'rouleau' && (
+        <AccordionPanel
+          id="printer"
+          title="Sélection d'imprimante"
+          icon={Printer}
+          isOpen={isOpen('printer')}
+          onToggle={toggle}
+        >
+          <PrinterSelector />
+        </AccordionPanel>
+      )}
 
-      {/* Gestion de la sélection de cellules (seulement pour A4) */}
-      {currentLayout?.supportType !== 'rouleau' && <CellSelectionGrid />}
+      {/* Panel Gestion des cellules (seulement pour A4) */}
+      {currentLayout?.supportType !== 'rouleau' && (
+        <AccordionPanel
+          id="cells"
+          title="Gestion des cellules"
+          icon={Grid}
+          isOpen={isOpen('cells')}
+          onToggle={toggle}
+        >
+          <CellSelectionGrid />
+        </AccordionPanel>
+      )}
     </div>
   );
 };
