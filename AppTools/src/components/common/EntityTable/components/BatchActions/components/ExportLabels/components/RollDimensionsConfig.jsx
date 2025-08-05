@@ -137,7 +137,7 @@ const RollDimensionsConfig = () => {
                 handleChange('padding', Math.max(1, parseFloat(e.target.value) || 1))
               }
               className="w-full px-2 py-1 text-sm border border-blue-300 dark:border-blue-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
-              placeholder="3"
+              placeholder="1"
             />
           </div>
 
