@@ -1,4 +1,3 @@
-// ===== 3. SERVICE PRINCIPAL - services/labelPrintingService.js =====
 const path = require('path');
 const fs = require('fs').promises;
 const { spawn } = require('child_process');
@@ -6,421 +5,196 @@ const os = require('os');
 
 class LabelPrintingService {
   constructor() {
-    this.tempDir = path.join(os.tmpdir(), 'label-printing');
-    this.ensureTempDirectory();
+    this.tempDir = path.join(os.tmpdir(), 'labels');
+    this.#ensureTempDirectory();
   }
 
-  /**
-   * Créer le dossier temporaire si nécessaire
-   */
-  async ensureTempDirectory() {
-    try {
-      await fs.mkdir(this.tempDir, { recursive: true });
-      console.log(`📁 [PRINT] Dossier temporaire: ${this.tempDir}`);
-    } catch (error) {
-      console.error('❌ [PRINT] Erreur création dossier temp:', error);
-    }
+  async #ensureTempDirectory() {
+    await fs.mkdir(this.tempDir, { recursive: true }).catch(() => {});
   }
 
-  /**
-   * Impression principale des étiquettes
-   */
+  // Méthode principale - conserve la logique de qualité
   async printLabels({ images, printerName, layout, copies = 1 }) {
-    console.log(`🖨️ [PRINT] Début impression ${images.length} étiquettes`);
-
     const results = [];
 
     for (let i = 0; i < images.length; i++) {
       try {
-        const imageData = images[i];
-        const tempFilePath = await this.saveImageToTemp(imageData, `label_${i}`);
+        const tempFile = await this.#saveImage(images[i], `label_${Date.now()}_${i}`);
+        await this.#printImage(tempFile, { printerName, layout, copies });
 
-        const printResult = await this.printImageFile(tempFilePath, {
-          printerName,
-          layout,
-          copies,
-        });
+        results.push({ index: i, success: true });
 
-        results.push({
-          labelIndex: i,
-          success: true,
-          filePath: tempFilePath,
-          printResult,
-        });
-
-        // Nettoyer le fichier temporaire après impression
-        await this.cleanupTempFile(tempFilePath);
+        // Nettoyage après impression
+        fs.unlink(tempFile).catch(() => {});
       } catch (error) {
-        console.error(`❌ [PRINT] Erreur étiquette ${i}:`, error);
-        results.push({
-          labelIndex: i,
-          success: false,
-          error: error.message,
-        });
+        results.push({ index: i, success: false, error: error.message });
       }
     }
 
     const successCount = results.filter((r) => r.success).length;
-    console.log(`✅ [PRINT] ${successCount}/${images.length} étiquettes imprimées`);
-
-    return {
-      totalLabels: images.length,
-      successCount,
-      results,
-    };
+    return { total: images.length, printed: successCount, details: results };
   }
 
-  /**
-   * Sauvegarder l'image base64 en fichier temporaire
-   */
-  async saveImageToTemp(base64Data, filename) {
-    const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Content, 'base64');
-    const tempFilePath = path.join(this.tempDir, `${filename}.png`);
-
-    await fs.writeFile(tempFilePath, buffer);
-    console.log(`💾 [PRINT] Image sauvée: ${tempFilePath}`);
-
-    return tempFilePath;
+  // Sauvegarde optimisée
+  async #saveImage(base64Data, filename) {
+    const buffer = Buffer.from(base64Data.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const filePath = path.join(this.tempDir, `${filename}.png`);
+    await fs.writeFile(filePath, buffer);
+    return filePath;
   }
 
-  /**
-   * Imprimer un fichier image via PowerShell
-   */
-  async printImageFile(filePath, options = {}) {
-    const { printerName, layout, copies = 1 } = options;
-
-    // Script PowerShell pour impression d'étiquettes
-    const powershellScript = this.generatePrintScript(filePath, {
-      printerName,
-      layout,
-      copies,
-    });
+  // Impression HAUTE QUALITÉ mais script simplifié
+  async #printImage(filePath, { printerName, layout, copies = 1 }) {
+    const script = this.#generateQualityPrintScript(filePath, { printerName, layout, copies });
 
     return new Promise((resolve, reject) => {
-      const powershell = spawn(
-        'powershell',
-        ['-ExecutionPolicy', 'Bypass', '-Command', powershellScript],
-        {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          windowsHide: true,
-        }
-      );
+      const ps = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-Command', script], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
 
-      let stdout = '';
       let stderr = '';
+      ps.stderr.on('data', (data) => (stderr += data));
 
-      powershell.stdout.on('data', (data) => {
-        stdout += data.toString();
+      ps.on('close', (code) => {
+        code === 0 ? resolve() : reject(new Error(`Impression échouée: ${stderr}`));
       });
 
-      powershell.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      powershell.on('close', (code) => {
-        if (code === 0) {
-          console.log(`✅ [PRINT] Impression réussie: ${filePath}`);
-          resolve({
-            success: true,
-            output: stdout,
-            exitCode: code,
-          });
-        } else {
-          console.error(`❌ [PRINT] Échec impression (code ${code}):`, stderr);
-          reject(new Error(`Impression échouée (code ${code}): ${stderr}`));
-        }
-      });
-
-      powershell.on('error', (error) => {
-        console.error('❌ [PRINT] Erreur PowerShell:', error);
-        reject(error);
-      });
+      ps.on('error', reject);
     });
   }
 
-  /**
-   * Générer le script PowerShell pour impression
-   */
-  generatePrintScript(filePath, options = {}) {
-    const { printerName, layout, copies = 1 } = options;
-
-    // Conversion des dimensions mm vers pixels (approximation pour 203 DPI étiqueteuse)
-    const dpi = 96;
-    const mmToPixels = (mm) => Math.round((mm * dpi) / 25.4);
-
-    let widthPixels = 384; // Largeur par défaut étiqueteuse Brother
-    let heightPixels = 240; // Hauteur par défaut
+  // Script PowerShell OPTIMISÉ mais qualité préservée
+  #generateQualityPrintScript(filePath, { printerName, layout, copies = 1 }) {
+    // Calcul dimensions étiquette (conservé de l'original)
+    let widthPixels = 384; // Brother par défaut
+    let heightPixels = 240;
 
     if (layout) {
+      const dpi = 96;
+      const mmToPixels = (mm) => Math.round((mm * dpi) / 25.4);
       widthPixels = mmToPixels(layout.width);
       heightPixels = mmToPixels(layout.height);
     }
 
-    const script = `
-# Script d'impression étiquettes optimisé
+    return `
 try {
-    Write-Host "🖨️ Début impression: ${path.basename(filePath)}"
-    
-    # Chargement des assemblies .NET
     Add-Type -AssemblyName System.Drawing
     Add-Type -AssemblyName System.Windows.Forms
     
-    # Charger l'image
     $image = [System.Drawing.Image]::FromFile("${filePath.replace(/\\/g, '\\\\')}")
-    Write-Host "📷 Image chargée: $($image.Width)x$($image.Height)px"
+    $printDoc = New-Object System.Drawing.Printing.PrintDocument
     
-    # Configuration de l'impression
-    $printDocument = New-Object System.Drawing.Printing.PrintDocument
+    ${printerName ? `$printDoc.PrinterSettings.PrinterName = "${printerName}"` : ''}
     
-    ${printerName ? `$printDocument.PrinterSettings.PrinterName = "${printerName}"` : '# Imprimante par défaut'}
-    
-    # Vérifier que l'imprimante est disponible
-    if (-not $printDocument.PrinterSettings.IsValid) {
-        throw "Imprimante non disponible: $($printDocument.PrinterSettings.PrinterName)"
+    if (-not $printDoc.PrinterSettings.IsValid) {
+        throw "Imprimante non disponible: $($printDoc.PrinterSettings.PrinterName)"
     }
     
-    # Configuration page étiquette
-    $printDocument.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Label", ${widthPixels}, ${heightPixels})
-    $printDocument.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+    # Configuration étiquette (dimensions précises conservées)
+    $printDoc.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Label", ${widthPixels}, ${heightPixels})
+    $printDoc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
     
-    # Event handler pour le rendu
-    $printDocument.add_PrintPage({
+    # QUALITÉ MAXIMALE (partie cruciale conservée)
+    $printDoc.add_PrintPage({
         param($sender, $e)
         
-        # Calculer les dimensions pour ajustement optimal
         $pageWidth = $e.PageBounds.Width
         $pageHeight = $e.PageBounds.Height
         
-        # Ajuster l'image aux dimensions de l'étiquette
+        # Calcul mise à l'échelle optimale (conservé)
         $scaleFactor = [Math]::Min($pageWidth / $image.Width, $pageHeight / $image.Height)
         $newWidth = $image.Width * $scaleFactor
         $newHeight = $image.Height * $scaleFactor
         
-        # Centrer l'image
+        # Centrage précis
         $x = ($pageWidth - $newWidth) / 2
         $y = ($pageHeight - $newHeight) / 2
         
-        # Rendu haute qualité
+        # RENDU HAUTE QUALITÉ (essentiel pour étiquettes)
         $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
         $e.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
         $e.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
         
-        # Dessiner l'image
+        # Rendu final
         $destRect = New-Object System.Drawing.Rectangle($x, $y, $newWidth, $newHeight)
         $e.Graphics.DrawImage($image, $destRect)
-        
-        Write-Host "✅ Rendu étiquette: $($newWidth)x$($newHeight)px à position ($x, $y)"
     })
     
-    # Imprimer le nombre de copies demandé
+    # Impression des copies
     for ($i = 1; $i -le ${copies}; $i++) {
-        Write-Host "🖨️ Impression copie $i/${copies}"
-        $printDocument.Print()
-        Start-Sleep -Milliseconds 100  # Délai entre copies
+        $printDoc.Print()
+        if ($i -lt ${copies}) { Start-Sleep -Milliseconds 100 }
     }
     
-    Write-Host "🎉 Impression terminée avec succès!"
-    
 } catch {
-    Write-Error "❌ Erreur impression: $($_.Exception.Message)"
+    Write-Error $_.Exception.Message
     exit 1
 } finally {
-    # Nettoyage
     if ($image) { $image.Dispose() }
-    if ($printDocument) { $printDocument.Dispose() }
-}
-`;
-
-    return script;
+    if ($printDoc) { $printDoc.Dispose() }
+}`;
   }
 
-  /**
-   * Obtenir les imprimantes disponibles
-   */
+  // Imprimantes - version allégée
   async getAvailablePrinters() {
-    const script = `
-Get-WmiObject -Class Win32_Printer | Select-Object Name, DriverName, PortName, Default | ConvertTo-Json
-`;
+    const script = `Get-WmiObject Win32_Printer | Select Name, DriverName, Default | ConvertTo-Json`;
 
     return new Promise((resolve, reject) => {
-      const powershell = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-Command', script], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      const ps = spawn('powershell', ['-Command', script]);
 
       let stdout = '';
-      let stderr = '';
+      ps.stdout.on('data', (data) => (stdout += data));
+      ps.on('error', reject);
 
-      powershell.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
+      ps.on('close', (code) => {
+        if (code !== 0) return reject(new Error('Erreur récupération imprimantes'));
 
-      powershell.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      powershell.on('close', (code) => {
-        if (code === 0) {
-          try {
-            const printers = JSON.parse(stdout);
-            const formattedPrinters = Array.isArray(printers) ? printers : [printers];
-
-            console.log(`📋 [PRINT] ${formattedPrinters.length} imprimante(s) trouvée(s)`);
-            resolve(formattedPrinters);
-          } catch (error) {
-            reject(new Error('Erreur parsing liste imprimantes'));
-          }
-        } else {
-          reject(new Error(`Erreur récupération imprimantes: ${stderr}`));
+        try {
+          const printers = JSON.parse(stdout);
+          resolve(Array.isArray(printers) ? printers : [printers]);
+        } catch {
+          reject(new Error('Erreur parsing imprimantes'));
         }
       });
     });
   }
 
-  /**
-   * Tester une imprimante
-   */
+  // Test simplifié mais fiable
   async testPrinter(printerName) {
-    const testScript = `
-try {
-    Write-Host "🔍 Test imprimante: ${printerName || 'par défaut'}"
-    
-    # ÉTAPE 1: Chargement des assemblies en premier
-    Write-Host "📦 Chargement des assemblies..."
-    Add-Type -AssemblyName System.Drawing
-    Add-Type -AssemblyName System.Windows.Forms
-    Write-Host "✅ Assemblies chargées"
-    
-    # ÉTAPE 2: Vérifier si l'imprimante existe dans WMI
-    Write-Host "🔍 Recherche de l'imprimante..."
-    $allPrinters = Get-WmiObject -Class Win32_Printer
-    
-    ${
-      printerName
-        ? `
-    $targetPrinter = $allPrinters | Where-Object {$_.Name -eq "${printerName}"}
-    if (-not $targetPrinter) {
-        Write-Error "❌ Imprimante '${printerName}' non trouvée"
-        exit 1
-    }
-    Write-Host "✅ Imprimante trouvée dans WMI:"
-    Write-Host "   Nom: $($targetPrinter.Name)"
-    Write-Host "   État: $($targetPrinter.PrinterState)"
-    Write-Host "   Status: $($targetPrinter.PrinterStatus)"
-    `
-        : ''
-    }
-    
-    # ÉTAPE 3: Test PrintDocument
-    Write-Host "🖨️ Test de connexion PrintDocument..."
-    $printDocument = New-Object System.Drawing.Printing.PrintDocument
-    
-    ${printerName ? `$printDocument.PrinterSettings.PrinterName = "${printerName}"` : '# Imprimante par défaut'}
-    
-    Write-Host "📋 Résultats PrintDocument:"
-    Write-Host "   Nom configuré: $($printDocument.PrinterSettings.PrinterName)"
-    Write-Host "   Est valide: $($printDocument.PrinterSettings.IsValid)"
-    
-    if ($printDocument.PrinterSettings.IsValid) {
-        Write-Host "✅ SUCCESS: Imprimante accessible via PrintDocument"
-    } else {
-        Write-Error "❌ FAIL: PrintDocument ne peut pas accéder à cette imprimante"
-        exit 1
-    }
-    
-} catch {
-    Write-Error "❌ Exception: $($_.Exception.Message)"
-    exit 1
-} finally {
-    if ($printDocument) { 
-        $printDocument.Dispose() 
-    }
+    const script = `
+Add-Type -AssemblyName System.Drawing
+$printDoc = New-Object System.Drawing.Printing.PrintDocument
+${printerName ? `$printDoc.PrinterSettings.PrinterName = "${printerName}"` : ''}
+
+if ($printDoc.PrinterSettings.IsValid) { 
+    Write-Host "SUCCESS" 
+} else { 
+    throw "Imprimante inaccessible" 
 }
-`;
+$printDoc.Dispose()`;
 
     return new Promise((resolve, reject) => {
-      const powershell = spawn(
-        'powershell',
-        ['-ExecutionPolicy', 'Bypass', '-NoProfile', '-Command', testScript],
-        {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          windowsHide: true,
-        }
-      );
-
-      let stdout = '';
-      let stderr = '';
-
-      powershell.stdout.on('data', (data) => {
-        const output = data.toString();
-        stdout += output;
-        console.log(`[PS-OUT] ${output.trim()}`);
-      });
-
-      powershell.stderr.on('data', (data) => {
-        const error = data.toString();
-        stderr += error;
-        console.error(`[PS-ERR] ${error.trim()}`);
-      });
-
-      powershell.on('close', (code) => {
-        console.log(`[PS] Processus terminé avec code: ${code}`);
-
-        if (code === 0) {
-          resolve({
-            success: true,
-            available: true,
-            output: stdout,
-            diagnostics: {
-              printerFound: stdout.includes('Imprimante trouvée'),
-              printDocumentValid: stdout.includes('Test réussi'),
-              fullOutput: stdout,
-            },
-          });
-        } else {
-          reject(new Error(`Test échoué (code ${code}): ${stderr || stdout}`));
-        }
-      });
-
-      powershell.on('error', (error) => {
-        console.error('❌ [PS] Erreur spawn PowerShell:', error);
-        reject(error);
+      const ps = spawn('powershell', ['-Command', script]);
+      ps.on('close', (code) => {
+        code === 0 ? resolve({ available: true }) : reject(new Error('Test échoué'));
       });
     });
   }
-  /**
-   * Obtenir les paramètres d'impression par défaut
-   */
-  async getPrintSettings() {
+
+  // Paramètres qualité étiquettes
+  getPrintSettings() {
     return {
-      defaultDPI: 203,
-      supportedFormats: ['PNG', 'JPEG', 'BMP'],
-      defaultLabelSize: {
-        width: 50,
-        height: 30,
-      },
-      maxLabelSize: {
-        width: 100,
-        height: 200,
-      },
-      recommendedSettings: {
-        imageFormat: 'PNG',
-        quality: 'high',
-        colorMode: 'monochrome',
+      defaultDPI: 203, // DPI étiqueteuse standard
+      formats: ['PNG', 'JPEG'],
+      defaultSize: { width: 50, height: 30 },
+      maxSize: { width: 100, height: 200 },
+      quality: {
+        interpolation: 'HighQualityBicubic',
+        smoothing: 'HighQuality',
+        pixelOffset: 'HighQuality',
       },
     };
-  }
-
-  /**
-   * Nettoyer un fichier temporaire
-   */
-  async cleanupTempFile(filePath) {
-    try {
-      await fs.unlink(filePath);
-      console.log(`🗑️ [PRINT] Fichier temp nettoyé: ${filePath}`);
-    } catch (error) {
-      console.warn(`⚠️ [PRINT] Impossible de nettoyer: ${filePath}`, error.message);
-    }
   }
 }
 

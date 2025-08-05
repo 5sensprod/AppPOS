@@ -1,30 +1,20 @@
-// ===== 2. CONTRÔLEUR - controllers/labelPrintingController.js =====
 const labelPrintingService = require('../services/labelPrintingService');
 
 class LabelPrintingController {
-  /**
-   * Impression directe des étiquettes
-   */
+  // Gestionnaire d'erreur générique
+  #handleError(res, error, message = "Erreur d'impression") {
+    res.status(500).json({ error: message, details: error.message });
+  }
+
+  // Impression principale
   async printLabels(req, res) {
     try {
-      const {
-        images, // Array d'images base64 générées par Fabric.js
-        printerName, // Nom de l'imprimante (optionnel)
-        layout, // Configuration layout (width, height, etc.)
-        copies = 1, // Nombre de copies
-      } = req.body;
+      const { images, printerName, layout, copies = 1 } = req.body;
 
-      console.log(`🖨️ [PRINT] Demande d'impression de ${images.length} étiquettes`);
-
-      // Validation
-      if (!images || !Array.isArray(images) || images.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Aucune image d'étiquette fournie",
-        });
+      if (!images?.length) {
+        return res.status(400).json({ error: 'Aucune image fournie' });
       }
 
-      // Lancer l'impression
       const result = await labelPrintingService.printLabels({
         images,
         printerName,
@@ -32,85 +22,37 @@ class LabelPrintingController {
         copies,
       });
 
-      res.json({
-        success: true,
-        message: `${images.length} étiquette(s) envoyée(s) à l'impression`,
-        details: result,
-      });
+      res.json(result);
     } catch (error) {
-      console.error('❌ [PRINT] Erreur impression:', error);
-      res.status(500).json({
-        success: false,
-        error: "Erreur lors de l'impression",
-        details: error.message,
-      });
+      this.#handleError(res, error, 'Erreur impression');
     }
   }
 
-  /**
-   * Obtenir les imprimantes disponibles
-   */
+  // Liste des imprimantes
   async getAvailablePrinters(req, res) {
     try {
       const printers = await labelPrintingService.getAvailablePrinters();
-
-      res.json({
-        success: true,
-        printers,
-      });
+      res.json({ printers });
     } catch (error) {
-      console.error('❌ [PRINT] Erreur récupération imprimantes:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Erreur lors de la récupération des imprimantes',
-        details: error.message,
-      });
+      this.#handleError(res, error, 'Erreur récupération imprimantes');
     }
   }
 
-  /**
-   * Tester une imprimante avec une page de test
-   */
+  // Test imprimante (optionnel - peut être supprimé si inutilisé)
   async testPrinter(req, res) {
     try {
       const { printerName } = req.body;
-
       const result = await labelPrintingService.testPrinter(printerName);
-
-      res.json({
-        success: true,
-        message: "Test d'impression envoyé",
-        details: result,
-      });
+      res.json(result);
     } catch (error) {
-      console.error('❌ [PRINT] Erreur test imprimante:', error);
-      res.status(500).json({
-        success: false,
-        error: "Erreur lors du test d'impression",
-        details: error.message,
-      });
+      this.#handleError(res, error, 'Erreur test imprimante');
     }
   }
 
-  /**
-   * Obtenir les paramètres d'impression
-   */
-  async getPrintSettings(req, res) {
-    try {
-      const settings = await labelPrintingService.getPrintSettings();
-
-      res.json({
-        success: true,
-        settings,
-      });
-    } catch (error) {
-      console.error('❌ [PRINT] Erreur paramètres:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Erreur lors de la récupération des paramètres',
-        details: error.message,
-      });
-    }
+  // Paramètres statiques (peut être supprimé si non utilisé)
+  getPrintSettings(req, res) {
+    const settings = labelPrintingService.getPrintSettings();
+    res.json({ settings });
   }
 }
 
