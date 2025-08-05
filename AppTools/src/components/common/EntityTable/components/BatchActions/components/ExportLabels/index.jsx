@@ -133,18 +133,6 @@ const ExportLabelsModal = ({
     >
       <form id="export-labels-form" onSubmit={handleSubmit}>
         <div className="mb-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            <span className="font-semibold">{selectedCount}</span> {itemLabel} sélectionné
-            {selectedCount > 1 ? 's' : ''}
-            {activeFilters.length > 0 && (
-              <span className="block mt-1">
-                <span className="font-semibold">{activeFilters.length}</span> filtre
-                {activeFilters.length > 1 ? 's' : ''} appliqué
-                {activeFilters.length > 1 ? 's' : ''}
-              </span>
-            )}
-          </p>
-
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Titre du document
           </label>
