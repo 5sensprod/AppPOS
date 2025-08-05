@@ -106,11 +106,17 @@ class BaseLabelRenderer {
   _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
     const canvasHeight = layout.height * this.mmToPx * scaleFactor;
-    const padding = (layout.padding || 2) * this.mmToPx * scaleFactor;
-    const contentWidth = canvasWidth - padding * 2;
+
+    // NOUVELLE LOGIQUE : marge latérale uniquement pour les rouleaux
+    const isRouleau = layout.supportType === 'rouleau';
+    const lateralMargin = isRouleau ? layout.padding || 2 : layout.padding || 2;
+    const paddingH = lateralMargin * this.mmToPx * scaleFactor;
+    const paddingV = isRouleau ? 0 : lateralMargin * this.mmToPx * scaleFactor;
+
+    const contentWidth = canvasWidth - paddingH * 2;
 
     const elements = {};
-    let currentY = padding;
+    let currentY = paddingV;
     const spacing = 8 * scaleFactor;
 
     // Helper pour créer un élément
@@ -126,18 +132,18 @@ class BaseLabelRenderer {
       }
 
       const element = {
-        x: padding,
+        x: paddingH,
         y: currentY,
         width: contentWidth,
         height,
-        centerX: padding + contentWidth / 2,
+        centerX: paddingH + contentWidth / 2,
       };
 
       currentY += height + spacing;
       return element;
     };
 
-    // Calcul des éléments
+    // Reste du code identique...
     if (style.showName) {
       const height = Math.max(15, (style.nameSize || 10) * 1.2) * scaleFactor;
       elements.name = {
@@ -162,11 +168,11 @@ class BaseLabelRenderer {
       elements.barcode = customPositions.barcode
         ? createElement('barcode', totalHeight, customPositions.barcode)
         : {
-            x: padding,
-            y: canvasHeight - padding - totalHeight,
+            x: paddingH,
+            y: canvasHeight - paddingV - totalHeight,
             width: contentWidth,
             height: totalHeight,
-            centerX: padding + contentWidth / 2,
+            centerX: paddingH + contentWidth / 2,
           };
 
       elements.barcode.barcodeHeight = barcodeHeight;
@@ -197,15 +203,14 @@ class BaseLabelRenderer {
   async _addBorder(fabricCanvas, layout, style, fabric, scaleFactor = 1) {
     const width = layout.width * this.mmToPx * scaleFactor;
     const height = layout.height * this.mmToPx * scaleFactor;
-    const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor;
-    const margin = (layout.padding || style.padding || 1) * this.mmToPx * scaleFactor;
-    const halfStroke = borderWidth / 2;
+    const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor * 2; // x2 plus épais
+    const offset = borderWidth; // Décalage complet au lieu de halfStroke
 
     const border = new fabric.Rect({
-      left: margin + halfStroke,
-      top: margin + halfStroke,
-      width: width - margin * 2 - borderWidth,
-      height: height - margin * 2 - borderWidth,
+      left: offset,
+      top: offset,
+      width: width - offset * 2,
+      height: height - offset * 2,
       fill: 'transparent',
       stroke: style.borderColor || '#000000',
       strokeWidth: borderWidth,
