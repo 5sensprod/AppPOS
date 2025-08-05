@@ -103,7 +103,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
         console.error('Erreur rendu aperçu étiquette:', err);
         setError(`Erreur de rendu: ${err.message}`);
       }
-    }, 50); // 🎯 Timeout original de 50ms
+    }, 50);
 
     return () => {
       clearTimeout(timeoutId);
@@ -123,8 +123,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     style.nameSize,
     style.priceSize,
     style.barcodeHeight,
-    JSON.stringify(style.customPositions), // Simple stringify pour éviter les re-renders d'objet
-    // duplicateCount volontairement exclu
+    JSON.stringify(style.customPositions),
   ]);
 
   // Cleanup au démontage
@@ -134,8 +133,6 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
 
   // Calculs dimensions
   const mmToPx = 3.779527559;
-
-  // 🎯 NOUVELLES DIMENSIONS POUR LE FOND ROULEAU
   const isRollMode = layout.supportType === 'rouleau';
   const physicalRollWidth = isRollMode ? layout.rouleau?.width || 58 : layout.width;
   const physicalRollHeight = layout.height;
@@ -176,74 +173,80 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
   }
 
   return (
-    <div className="relative inline-block">
-      {/* 🎯 FOND DU ROULEAU PHYSIQUE (visible uniquement en mode rouleau) */}
-      {isRollMode && (
-        <div
-          className="absolute bg-gray-200 dark:bg-gray-600 rounded-sm border border-gray-300 dark:border-gray-500 z-0"
-          style={{
-            width: `${rollBgWidth}px`,
-            height: `${rollBgHeight}px`,
-            top: 0,
-            left: 0,
-          }}
-        >
-          {/* Indication des marges */}
-          <div className="absolute inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400 text-[10px] font-medium pointer-events-none">
-            <div className="text-center">
-              <div>Rouleau {physicalRollWidth}mm</div>
-              <div className="mt-1 opacity-75">Marge {margeInterieure}mm</div>
+    <div className="relative">
+      {/* 🎯 CONTENEUR AVEC HAUTEUR FIXE pour éviter les sauts d'interface */}
+      <div
+        className="relative mx-auto"
+        style={{
+          width: `${isRollMode ? rollBgWidth : printableWidth}px`,
+          height: `${isRollMode ? rollBgHeight : printableHeight}px`,
+          minHeight: '120px',
+        }}
+      >
+        {/* 🎯 FOND DU ROULEAU PHYSIQUE (visible uniquement en mode rouleau) */}
+        {isRollMode && (
+          <div
+            className="absolute bg-gray-200 dark:bg-gray-600 rounded-sm border border-gray-300 dark:border-gray-500"
+            style={{
+              width: `${rollBgWidth}px`,
+              height: `${rollBgHeight}px`,
+              top: 0,
+              left: 0,
+            }}
+          >
+            {/* Indication des marges */}
+            <div className="absolute inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400 text-[10px] font-medium pointer-events-none">
+              <div className="text-center">
+                <div>Rouleau {physicalRollWidth}mm</div>
+                <div className="mt-1 opacity-75">Marge {margeInterieure}mm</div>
+              </div>
             </div>
+
+            {/* Lignes de marge */}
+            <div
+              className="absolute top-0 bottom-0 border-l border-dashed border-gray-400 dark:border-gray-500 opacity-50"
+              style={{ left: `${margeInterieure * mmToPx}px` }}
+            />
+            <div
+              className="absolute top-0 bottom-0 border-r border-dashed border-gray-400 dark:border-gray-500 opacity-50"
+              style={{ right: `${margeInterieure * mmToPx}px` }}
+            />
           </div>
+        )}
 
-          {/* Lignes de marge (optionnel, pour plus de clarté) */}
+        {/* 🎯 FOND BLANC POUR LA ZONE IMPRIMABLE (seulement en mode rouleau) */}
+        {isRollMode && (
           <div
-            className="absolute top-0 bottom-0 border-l border-dashed border-gray-400 dark:border-gray-500 opacity-50"
-            style={{ left: `${margeInterieure * mmToPx}px` }}
+            className="absolute bg-white border border-gray-300"
+            style={{
+              width: `${printableWidth}px`,
+              height: `${printableHeight}px`,
+              top: 0,
+              left: `${offsetX}px`,
+              zIndex: 5,
+            }}
           />
-          <div
-            className="absolute top-0 bottom-0 border-r border-dashed border-gray-400 dark:border-gray-500 opacity-50"
-            style={{ right: `${margeInterieure * mmToPx}px` }}
-          />
-        </div>
-      )}
+        )}
 
-      {/* 🎯 FOND BLANC POUR LA ZONE IMPRIMABLE (seulement en mode rouleau) */}
-      {isRollMode && (
-        <div
-          className="absolute bg-white border border-gray-300 z-5"
+        {/* 🎯 CANVAS DE LA ZONE IMPRIMABLE */}
+        <canvas
+          ref={canvasRef}
+          className="absolute"
           style={{
             width: `${printableWidth}px`,
             height: `${printableHeight}px`,
+            border: isRollMode ? 'none' : '1px solid #ccc',
+            borderRadius: '0px',
+            boxShadow: isRollMode ? 'none' : '0 2px 4px rgba(0,0,0,0.1)',
+            backgroundColor: isRollMode ? 'transparent' : '#ffffff',
             top: 0,
-            left: `${offsetX}px`,
+            left: isRollMode ? `${offsetX}px` : 0,
+            zIndex: 10,
           }}
         />
-      )}
+      </div>
 
-      {/* 🎯 CANVAS DE LA ZONE IMPRIMABLE (transparent pour voir le fond) */}
-      <canvas
-        ref={canvasRef}
-        style={{
-          width: `${printableWidth}px`,
-          height: `${printableHeight}px`,
-          border: isRollMode ? 'none' : '1px solid #ccc', // Pas de bordure en mode rouleau
-          borderRadius: '0px',
-          boxShadow: isRollMode ? 'none' : '0 2px 4px rgba(0,0,0,0.1)', // Pas d'ombre en mode rouleau
-          backgroundColor: isRollMode ? 'transparent' : '#ffffff',
-          position: 'relative',
-          zIndex: 10,
-          // Position absolue pour un centrage parfait en mode rouleau
-          ...(isRollMode && {
-            position: 'absolute',
-            left: `${offsetX}px`,
-            top: 0,
-            marginLeft: 0,
-          }),
-        }}
-      />
-
-      {/* 🎯 INFORMATIONS MISE À JOUR */}
+      {/* 🎯 INFORMATIONS EN BAS */}
       <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 text-center">
         <span className="font-medium">{label?.name || 'Aperçu étiquette'}</span>
         <span className="mx-2">•</span>
