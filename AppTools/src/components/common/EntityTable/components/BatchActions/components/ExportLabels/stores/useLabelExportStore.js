@@ -43,7 +43,7 @@ const DEFAULT_ROLL_LAYOUT = {
   spacingV: 2,
   spacingH: 0,
   supportType: 'rouleau',
-  rouleau: { width: 58 },
+  rouleau: { width: 29 },
 };
 
 const SUPPORT_TYPES = [

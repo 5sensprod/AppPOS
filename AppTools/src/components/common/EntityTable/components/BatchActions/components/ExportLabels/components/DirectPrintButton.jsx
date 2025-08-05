@@ -3,6 +3,7 @@
 import React from 'react';
 import { Printer, Loader2 } from 'lucide-react';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
+import { useActionToasts } from '../../../hooks/useActionToasts';
 
 const DirectPrintButton = () => {
   const {
@@ -15,6 +16,8 @@ const DirectPrintButton = () => {
     resetPrintState,
   } = useLabelExportStore();
 
+  const { toastActions } = useActionToasts();
+
   const canPrint =
     currentLayout?.supportType === 'rouleau' &&
     selectedItems.length > 0 &&
@@ -24,15 +27,29 @@ const DirectPrintButton = () => {
   const handlePrint = async () => {
     try {
       resetPrintState();
+
+      // Toast de démarrage
+      const progressToastId = toastActions.export.start(
+        selectedItems.length,
+        'impression',
+        'étiquette'
+      );
+
       const result = await printLabelsDirectly();
 
-      // Succès - afficher notification
-      alert(
-        `✅ Impression réussie !\n${result.successCount}/${result.totalLabels} étiquette(s) imprimée(s)`
+      // Toast de succès
+      toastActions.generic.success(
+        `${result.successCount}/${result.totalLabels} étiquette(s) imprimée(s)`,
+        'Impression réussie'
       );
     } catch (error) {
       console.error('❌ Erreur impression:', error);
-      alert(`❌ Erreur impression: ${error.message}`);
+
+      // Toast d'erreur
+      toastActions.generic.error(
+        error.message || "Une erreur est survenue lors de l'impression",
+        "Erreur d'impression"
+      );
     }
   };
 

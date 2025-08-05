@@ -138,7 +138,7 @@ class RollLabelRenderer extends BaseLabelRenderer {
       spacingV: 2,
       spacingH: 0,
       supportType: 'rouleau',
-      rouleau: { width: 58 },
+      rouleau: { width: 29 },
     };
   }
 
