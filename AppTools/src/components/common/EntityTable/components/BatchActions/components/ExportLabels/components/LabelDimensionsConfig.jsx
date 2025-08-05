@@ -1,17 +1,14 @@
-// ===== LabelDimensionsConfig.jsx REFACTORISÉ =====
 import React from 'react';
 import A4DimensionsConfig from './A4DimensionsConfig';
 import RollDimensionsConfig from './RollDimensionsConfig';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
-const LabelDimensionsConfig = ({
-  onReset,
-  savedPresets = [],
-  onSavePreset,
-  onLoadPreset,
-  onDeletePreset,
-}) => {
-  const { currentLayout, changeSupportType, getSupportTypes } = useLabelExportStore();
+const LabelDimensionsConfig = () => {
+  const {
+    currentLayout,
+    changeSupportType,
+    getSupportTypes, // 🆕 Accès direct aux types de support
+  } = useLabelExportStore();
 
   const supportTypes = getSupportTypes();
   const currentSupportType = currentLayout?.supportType || 'A4';
@@ -36,26 +33,40 @@ const LabelDimensionsConfig = ({
             ))}
           </select>
         </div>
+
+        {/* 🆕 Info contextuelle selon le type sélectionné */}
+        <div className="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 rounded p-2">
+          {currentSupportType === 'rouleau' && (
+            <div className="flex items-center">
+              <span className="mr-2">🎞️</span>
+              <span>
+                Mode rouleau - Impression continue avec découpe automatique. Idéal pour les
+                imprimantes d'étiquettes Brother, Zebra, etc.
+              </span>
+            </div>
+          )}
+          {currentSupportType === 'A4' && (
+            <div className="flex items-center">
+              <span className="mr-2">📄</span>
+              <span>
+                Mode A4 - Impression sur planches d'étiquettes standard. Gestion des cellules vides
+                possible.
+              </span>
+            </div>
+          )}
+          {currentSupportType === 'custom' && (
+            <div className="flex items-center">
+              <span className="mr-2">🎨</span>
+              <span>
+                Mode personnalisé - Définissez vos propres dimensions pour des supports spécifiques.
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Délégation vers le composant spécialisé selon le type de support */}
-      {currentSupportType === 'rouleau' ? (
-        <RollDimensionsConfig
-          onReset={onReset}
-          savedPresets={savedPresets}
-          onSavePreset={onSavePreset}
-          onLoadPreset={onLoadPreset}
-          onDeletePreset={onDeletePreset}
-        />
-      ) : (
-        <A4DimensionsConfig
-          onReset={onReset}
-          savedPresets={savedPresets}
-          onSavePreset={onSavePreset}
-          onLoadPreset={onLoadPreset}
-          onDeletePreset={onDeletePreset}
-        />
-      )}
+      {/* 🎯 Délégation vers le composant spécialisé - Composants autonomes ! */}
+      {currentSupportType === 'rouleau' ? <RollDimensionsConfig /> : <A4DimensionsConfig />}
     </div>
   );
 };

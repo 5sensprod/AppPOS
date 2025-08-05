@@ -1,12 +1,16 @@
-// ===== LabelPreview.jsx (fix dimensions affichées) =====
 import React, { useState, useEffect } from 'react';
 import { Eye, Ruler, Move, RotateCcw } from 'lucide-react';
 import FabricLabelCanvas from './FabricLabelCanvas';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const LabelPreview = () => {
-  const { labelStyle, currentLayout, updateStyle, extractLabelData, resetCustomPositionsOnly } =
-    useLabelExportStore();
+  const {
+    labelStyle,
+    currentLayout,
+    updateStyle,
+    extractLabelData,
+    reset, // 🆕 API unifiée
+  } = useLabelExportStore();
 
   const labelData = extractLabelData();
 
@@ -15,6 +19,7 @@ const LabelPreview = () => {
   const sampleLabel = labelData[0];
   const [customPositions, setCustomPositions] = useState({});
 
+  // Initialiser les positions depuis le store
   useEffect(() => {
     if (labelStyle.customPositions && Object.keys(labelStyle.customPositions).length > 0) {
       setCustomPositions(labelStyle.customPositions);
@@ -23,17 +28,17 @@ const LabelPreview = () => {
     }
   }, [labelStyle.customPositions]);
 
+  // Reset des positions lors de changements MAJEURS seulement (pas les dimensions)
   useEffect(() => {
     setCustomPositions({});
     updateStyle({ customPositions: {} });
   }, [
-    currentLayout.supportType,
-    currentLayout.width,
-    currentLayout.height,
-    sampleLabel.id,
+    currentLayout.supportType, // Seul le type de support reset les positions
+    sampleLabel.id, // Changement de produit
     updateStyle,
   ]);
 
+  // 🆕 Handler pour changement de position
   const handlePositionChange = (positionData) => {
     const newPositions = {
       ...customPositions,
@@ -44,15 +49,14 @@ const LabelPreview = () => {
     updateStyle({ customPositions: newPositions });
   };
 
+  // 🆕 Handler reset simplifié avec nouvelle API
   const handleResetPositions = () => {
     setCustomPositions({});
-    resetCustomPositionsOnly();
+    reset('positions'); // 🎯 Au lieu de resetCustomPositionsOnly()
     console.log('📍 Positions personnalisées réinitialisées');
   };
 
   const customPositionCount = Object.keys(customPositions).length;
-
-  // 🎯 SIMPLIFIÉ : currentLayout.width contient déjà la largeur physique
   const physicalWidth = currentLayout.width;
   const physicalHeight = currentLayout.height;
 
@@ -78,6 +82,7 @@ const LabelPreview = () => {
         </div>
       </div>
 
+      {/* 🆕 Bannière d'aide interactive améliorée */}
       <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs border border-blue-200 dark:border-blue-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
@@ -98,8 +103,16 @@ const LabelPreview = () => {
             </button>
           )}
         </div>
+
+        {/* 🆕 Aide contextuelle selon le mode */}
+        <div className="mt-1 text-blue-600 dark:text-blue-300">
+          {currentLayout.supportType === 'rouleau'
+            ? "🎞️ Mode rouleau - Les positions seront conservées pour l'impression directe"
+            : '📄 Mode A4 - Les positions seront appliquées à toutes les étiquettes du PDF'}
+        </div>
       </div>
 
+      {/* Canvas d'aperçu */}
       <div className="flex justify-center">
         <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
           <FabricLabelCanvas
@@ -113,6 +126,35 @@ const LabelPreview = () => {
           />
         </div>
       </div>
+
+      {/* 🆕 Statistiques de positionnement */}
+      {customPositionCount > 0 && (
+        <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+          <div className="text-xs text-green-700 dark:text-green-300">
+            <div className="font-medium mb-1">📍 Positions personnalisées actives :</div>
+            <div className="space-y-1">
+              {Object.entries(customPositions).map(([type, position]) => (
+                <div key={type} className="flex justify-between">
+                  <span className="capitalize">{type} :</span>
+                  <span>
+                    x:{position.x?.toFixed(1)}mm, y:{position.y?.toFixed(1)}mm
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Aide pour les utilisateurs sans positions custom */}
+      {customPositionCount === 0 && (
+        <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            💡 <strong>Astuce :</strong> Les éléments sont positionnés automatiquement. Vous pouvez
+            les déplacer en cliquant et glissant sur l'aperçu ci-dessus.
+          </div>
+        </div>
+      )}
     </div>
   );
 };

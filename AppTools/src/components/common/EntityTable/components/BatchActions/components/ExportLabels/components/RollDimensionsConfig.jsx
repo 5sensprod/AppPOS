@@ -1,37 +1,53 @@
-// components/RollDimensionsConfig.jsx - CORRIGÉ avec logique de positionnement
 import React from 'react';
 import { Printer, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
-const RollDimensionsConfig = ({
-  savedPresets = [],
-  loading = false,
-  onSavePreset,
-  onLoadPreset,
-  onDeletePreset,
-}) => {
-  const { currentLayout, updateLayout, resetRollLayoutOnly } = useLabelExportStore();
+const RollDimensionsConfig = () => {
+  const {
+    currentLayout,
+    updateLayout,
+    reset, // 🆕 API unifiée
+    managePresets, // 🆕 API unifiée pour presets
+    savedPresets, // 🆕 Accès direct aux presets
+  } = useLabelExportStore();
 
   const handleChange = (field, value) => {
     updateLayout(field, value);
   };
 
+  // 🆕 Handler reset simplifié avec nouvelle API
   const handleResetRollLayout = () => {
-    resetRollLayoutOnly();
+    reset('layout'); // 🎯 Au lieu de resetRollLayoutOnly()
     console.log('🎞️ Layout Rouleau réinitialisé aux valeurs par défaut');
   };
 
-  // 🎯 NOUVELLE LOGIQUE : Une seule marge intérieure tout autour
+  // 🆕 Handlers presets avec API unifiée
+  const handleSavePreset = async (name, isPublic = false) => {
+    return await managePresets('save', 'layout', { name, isPublic });
+  };
+
+  const handleLoadPreset = async (presetId) => {
+    return await managePresets('apply', 'layout', { id: presetId });
+  };
+
+  const handleDeletePreset = async (presetId) => {
+    return await managePresets('delete', 'layout', { id: presetId });
+  };
+
+  // 🆕 Accès direct aux presets depuis le store
+  const layoutPresets = savedPresets.layout || [];
+
+  // Logique de calcul automatique des dimensions
   const rouleauWidth = currentLayout.rouleau?.width || 58;
-  const margeInterieure = parseFloat(currentLayout.padding) || 3; // Marge globale
+  const margeInterieure = parseFloat(currentLayout.padding) || 3;
   const labelHeight = parseFloat(currentLayout.height) || 29;
 
   // Calcul automatique de l'étiquette physique
   const etiquettePhysique = rouleauWidth - margeInterieure * 2;
-  const isValidConfig = etiquettePhysique > 10 && margeInterieure >= 1; // Étiquette min 10mm, marge min 1mm
+  const isValidConfig = etiquettePhysique > 10 && margeInterieure >= 1;
 
-  // 🆕 Mettre à jour automatiquement la largeur physique dans le store
+  // 🆕 Mettre à jour automatiquement la largeur physique
   React.useEffect(() => {
     if (isValidConfig && etiquettePhysique !== parseFloat(currentLayout.width)) {
       handleChange('width', etiquettePhysique.toFixed(1));
@@ -57,7 +73,7 @@ const RollDimensionsConfig = ({
         </button>
       </div>
 
-      {/* Status impression avec nouvelle logique */}
+      {/* Status impression avec validation intelligente */}
       <div
         className={`mb-3 p-3 rounded border ${
           isValidConfig
@@ -76,7 +92,7 @@ const RollDimensionsConfig = ({
             {isValidConfig ? '✅ Configuration valide' : '❌ Configuration invalide'}
           </span>
           <span
-            className={`text-sm ${
+            className={`text-sm font-semibold ${
               isValidConfig
                 ? 'text-green-600 dark:text-green-400'
                 : 'text-red-600 dark:text-red-400'
@@ -144,7 +160,7 @@ const RollDimensionsConfig = ({
         </div>
       </div>
 
-      {/* Configuration étiquettes - Seule la hauteur est modifiable */}
+      {/* Configuration étiquettes - Largeur calculée automatiquement */}
       <div className="mb-4">
         <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
           Dimensions des étiquettes
@@ -152,9 +168,9 @@ const RollDimensionsConfig = ({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Largeur étiquette (calculée)
+              Largeur étiquette (calculée automatiquement)
             </label>
-            <div className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-600 text-gray-700 dark:text-gray-300">
+            <div className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-600 text-gray-700 dark:text-gray-300 font-mono">
               {etiquettePhysique.toFixed(1)} mm
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -182,28 +198,27 @@ const RollDimensionsConfig = ({
         </div>
       </div>
 
+      {/* 🆕 Récapitulatif visuel amélioré */}
       <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
         <div className="text-xs text-gray-600 dark:text-gray-400">
           📋 L'aperçu reflète l'étiquette physique de{' '}
-          <strong>
+          <strong className={isValidConfig ? 'text-green-600' : 'text-red-600'}>
             {etiquettePhysique.toFixed(1)}×{labelHeight}mm
           </strong>{' '}
           avec une marge intérieure de <strong>{margeInterieure}mm</strong>
+          {isValidConfig && ' ✅'}
         </div>
       </div>
 
-      {/* Gestion des presets */}
-      {onSavePreset && (
-        <PresetManager
-          savedPresets={savedPresets}
-          loading={loading}
-          onSavePreset={onSavePreset}
-          onLoadPreset={onLoadPreset}
-          onDeletePreset={onDeletePreset}
-          title="Presets Rouleau sauvegardés"
-          emptyMessage="Aucun preset rouleau sauvegardé"
-        />
-      )}
+      {/* 🆕 Gestion des presets avec API unifiée */}
+      <PresetManager
+        savedPresets={layoutPresets}
+        onSavePreset={handleSavePreset}
+        onLoadPreset={handleLoadPreset}
+        onDeletePreset={handleDeletePreset}
+        title="Presets Rouleau sauvegardés"
+        emptyMessage="Aucun preset rouleau sauvegardé"
+      />
     </div>
   );
 };

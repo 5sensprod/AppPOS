@@ -144,62 +144,53 @@ function ProductTable(props) {
   const handleProductExport = useCallback(
     async (exportConfig) => {
       console.log('📤 Configuration export reçue:', exportConfig);
-
       const toastId = toastActions.export.start(
         exportConfig.selectedItems.length,
         exportConfig.format,
         'produit'
       );
 
+      // 🎯 Déclarer les variables avant le try pour qu'elles soient accessibles partout
+      let withoutPrice = [];
+      let withoutBarcode = [];
+
       try {
         let result;
 
-        // ✅ GESTION DIFFÉRENCIÉE SELON LE TYPE D'EXPORT
         if (exportConfig.exportType === 'labels') {
           console.log("🏷️ Export d'étiquettes via Fabric.js");
           console.log('📋 Données étiquettes avant filtrage:', exportConfig.labelData);
 
-          // ✅ FILTRAGE PRÉALABLE DES PRODUITS VALIDES (même logique)
-          const validLabels = exportConfig.labelData.filter((label) => {
-            const hasPrice = label.price && label.price > 0;
-            const hasBarcode = label.barcode && label.barcode.trim() !== '';
+          // ✅ APPROCHE TOLÉRANTE : On garde tous les produits
+          const allLabels = exportConfig.labelData;
 
-            if (!hasPrice) {
-              console.warn(
-                `⚠️ Produit rejeté (pas de prix valide): ${label.name} - Prix: ${label.price}`
-              );
-            }
-            if (!hasBarcode) {
-              console.warn(
-                `⚠️ Produit rejeté (pas de code-barres): ${label.name} - Code: "${label.barcode}"`
-              );
-            }
+          // 🔍 Analyse pour logs informatifs (sans rejet)
+          withoutPrice = allLabels.filter((label) => !label.price || label.price <= 0);
+          withoutBarcode = allLabels.filter((label) => !label.barcode?.trim());
 
-            return hasPrice && hasBarcode;
-          });
-
-          console.log(
-            `✅ Produits valides: ${validLabels.length}/${exportConfig.labelData.length}`
-          );
-
-          // ✅ VÉRIFICATION QU'IL RESTE DES PRODUITS VALIDES
-          if (validLabels.length === 0) {
-            throw new Error(
-              'Aucun produit valide à exporter.\n\nLes produits doivent avoir :\n• Un prix supérieur à 0\n• Un code-barres non vide'
+          if (withoutPrice.length > 0) {
+            console.warn(
+              `⚠️ ${withoutPrice.length} produit(s) sans prix - seront affichés sans prix`
             );
           }
 
-          // ✅ MISE À JOUR DE LA CONFIGURATION AVEC PRODUITS VALIDES
-          const filteredConfig = {
-            ...exportConfig,
-            labelData: validLabels,
-          };
+          if (withoutBarcode.length > 0) {
+            console.warn(
+              `⚠️ ${withoutBarcode.length} produit(s) sans code-barres - seront affichés sans code-barres`
+            );
+          }
 
-          console.log('🎨 Configuration layout Fabric:', filteredConfig.labelLayout);
+          console.log(`✅ Tous les produits seront exportés: ${allLabels.length}`);
 
-          // ✅ APPEL DU NOUVEAU SERVICE FABRIC POUR LES ÉTIQUETTES
-          result = await fabricExportService.exportLabelsToPDF(filteredConfig);
+          // ✅ VÉRIFICATION MINIMALE : Au moins 1 produit sélectionné
+          if (allLabels.length === 0) {
+            throw new Error("Aucun produit sélectionné pour l'export d'étiquettes");
+          }
 
+          console.log('🎨 Configuration layout Fabric:', exportConfig.labelLayout);
+
+          // ✅ APPEL DU SERVICE FABRIC POUR TOUTES LES ÉTIQUETTES
+          result = await fabricExportService.exportLabelsToPDF(exportConfig);
           console.log('✅ Export étiquettes Fabric terminé:', result);
         } else {
           // ✅ Export tableau classique (service original)
@@ -212,9 +203,13 @@ function ProductTable(props) {
 
         // ✅ TOAST DE SUCCÈS DIFFÉRENCIÉ
         if (exportConfig.exportType === 'labels') {
-          toastActions.export.success(
-            `Étiquettes ${exportConfig.format.toUpperCase()} (Fabric.js)`
-          );
+          // 🆕 Message informatif selon le contenu
+          let successMessage = `Étiquettes ${exportConfig.format.toUpperCase()} générées`;
+          const missingInfoCount = withoutPrice.length + withoutBarcode.length;
+          if (missingInfoCount > 0) {
+            successMessage += ` (${missingInfoCount} produit(s) avec infos manquantes)`;
+          }
+          toastActions.export.success(successMessage);
         } else {
           toastActions.export.success(exportConfig.format);
         }
@@ -222,16 +217,13 @@ function ProductTable(props) {
         return result;
       } catch (error) {
         console.error('❌ Erreur export:', error);
-
         removeToast(toastId);
 
-        // ✅ MESSAGE D'ERREUR SPÉCIFIQUE AUX ÉTIQUETTES
         if (exportConfig.exportType === 'labels') {
-          toastActions.export.error(`Erreur export étiquettes Fabric: ${error.message}`);
+          toastActions.export.error(`Erreur export étiquettes: ${error.message}`);
         } else {
           toastActions.export.error(error.message);
         }
-
         return false;
       }
     },

@@ -1,5 +1,3 @@
-// components/PrinterSelector.jsx
-
 import React, { useEffect } from 'react';
 import { Printer, RefreshCw, Wifi } from 'lucide-react';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
@@ -8,21 +6,41 @@ const PrinterSelector = () => {
   const {
     availablePrinters,
     selectedPrinter,
-    loadingPrinters,
     printError,
-    loadAvailablePrinters,
-    selectPrinter,
-    resetPrintState,
+    print, // 🆕 API unifiée pour impression
+    reset, // 🆕 API unifiée pour reset
   } = useLabelExportStore();
 
-  // Charger les imprimantes au montage
-  useEffect(() => {
-    loadAvailablePrinters();
-  }, [loadAvailablePrinters]);
+  // 🆕 État de chargement local (plus dans le store global)
+  const [loadingPrinters, setLoadingPrinters] = React.useState(false);
 
+  // 🆕 Charger les imprimantes au montage avec nouvelle API
+  useEffect(() => {
+    handleLoadPrinters();
+  }, []);
+
+  // 🆕 Handler simplifié avec nouvelle API
+  const handleLoadPrinters = async () => {
+    setLoadingPrinters(true);
+    try {
+      await print('loadPrinters');
+    } catch (error) {
+      console.error('Erreur chargement imprimantes:', error);
+    } finally {
+      setLoadingPrinters(false);
+    }
+  };
+
+  // 🆕 Handler refresh avec reset des erreurs
   const handleRefreshPrinters = () => {
-    resetPrintState();
-    loadAvailablePrinters();
+    reset('print'); // 🎯 Reset erreurs d'impression
+    handleLoadPrinters();
+  };
+
+  // 🆕 Handler sélection avec nouvelle API
+  const handleSelectPrinter = (printerName) => {
+    const printer = availablePrinters.find((p) => p.Name === printerName);
+    print('selectPrinter', { printer });
   };
 
   return (
@@ -71,10 +89,7 @@ const PrinterSelector = () => {
 
           <select
             value={selectedPrinter?.Name || ''}
-            onChange={(e) => {
-              const printer = availablePrinters.find((p) => p.Name === e.target.value);
-              selectPrinter(printer);
-            }}
+            onChange={(e) => handleSelectPrinter(e.target.value)}
             className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
           >
             <option value="">Sélectionner une imprimante...</option>
@@ -113,6 +128,14 @@ const PrinterSelector = () => {
           </div>
         </div>
       )}
+
+      {/* 🆕 Aide contextuelle */}
+      <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+        <div className="text-xs text-gray-600 dark:text-gray-400">
+          💡 <strong>Astuce :</strong> L'impression directe nécessite une imprimante d'étiquettes
+          compatible (Brother, Zebra, etc.) configurée sur votre système.
+        </div>
+      </div>
     </div>
   );
 };

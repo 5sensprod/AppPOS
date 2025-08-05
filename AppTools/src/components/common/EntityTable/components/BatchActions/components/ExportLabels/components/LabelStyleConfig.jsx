@@ -1,20 +1,38 @@
-// components/LabelStyleConfig.jsx (reset style uniquement)
 import React from 'react';
 import { Palette, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
-const LabelStyleConfig = ({ savedPresets = [], onSavePreset, onLoadPreset, onDeletePreset }) => {
+const LabelStyleConfig = () => {
   const {
     labelStyle,
     updateStyle,
-    resetStyleOnly, // 🎯 Reset ciblé pour le style seulement
+    reset, // 🆕 API unifiée
+    managePresets, // 🆕 API unifiée pour presets
+    savedPresets, // 🆕 Accès direct aux presets
   } = useLabelExportStore();
 
+  // 🆕 Handler simplifié avec nouvelle API
   const handleResetStyle = () => {
-    resetStyleOnly();
+    reset('style'); // 🎯 Au lieu de resetStyleOnly()
     console.log('🎨 Style réinitialisé (duplicateCount préservé)');
   };
+
+  // 🆕 Handlers presets avec nouvelle API
+  const handleSavePreset = async (name, isPublic = false) => {
+    return await managePresets('save', 'style', { name, isPublic });
+  };
+
+  const handleLoadPreset = async (presetId) => {
+    return await managePresets('apply', 'style', { id: presetId });
+  };
+
+  const handleDeletePreset = async (presetId) => {
+    return await managePresets('delete', 'style', { id: presetId });
+  };
+
+  // 🆕 Accès direct aux presets depuis le store
+  const stylePresets = savedPresets.style || [];
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-600">
@@ -26,7 +44,7 @@ const LabelStyleConfig = ({ savedPresets = [], onSavePreset, onLoadPreset, onDel
 
         <button
           type="button"
-          onClick={handleResetStyle} // 🎯 Reset spécifique au style
+          onClick={handleResetStyle}
           className="flex items-center text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Réinitialiser le style aux valeurs par défaut"
         >
@@ -123,14 +141,15 @@ const LabelStyleConfig = ({ savedPresets = [], onSavePreset, onLoadPreset, onDel
           )}
         </div>
 
-        {onSavePreset && (
-          <PresetManager
-            savedPresets={savedPresets}
-            onSavePreset={onSavePreset}
-            onLoadPreset={onLoadPreset}
-            onDeletePreset={onDeletePreset}
-          />
-        )}
+        {/* 🆕 PresetManager avec nouveaux handlers */}
+        <PresetManager
+          savedPresets={stylePresets}
+          onSavePreset={handleSavePreset}
+          onLoadPreset={handleLoadPreset}
+          onDeletePreset={handleDeletePreset}
+          title="Presets de style"
+          emptyMessage="Aucun preset de style sauvegardé"
+        />
       </div>
     </div>
   );

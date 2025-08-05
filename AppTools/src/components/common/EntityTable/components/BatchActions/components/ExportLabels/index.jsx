@@ -1,5 +1,3 @@
-// AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\index.jsx
-
 import React, { useEffect } from 'react';
 import { Tags } from 'lucide-react';
 import BaseModal from '../../../../../ui/BaseModal';
@@ -24,39 +22,38 @@ const ExportLabelsModal = ({
     loading,
     currentLayout,
 
-    // Actions principales
+    // 🆕 API unifiée
+    initialize, // Au lieu de initializeForModal
+    reset, // Au lieu de resetTemporaryState
     setExportTitle,
     setLoading,
-    initializeForModal,
-    resetTemporaryState,
     extractLabelData,
     buildLabelLayout,
   } = useLabelExportStore();
 
-  // Initialisation à l'ouverture
+  // 🆕 Initialisation simplifiée à l'ouverture
   useEffect(() => {
     if (isOpen) {
-      initializeForModal(selectedItems, productsData, activeFilters, entityNamePlural);
+      initialize(selectedItems, productsData, activeFilters, entityNamePlural);
     }
-  }, [isOpen, selectedItems, productsData, activeFilters, entityNamePlural, initializeForModal]);
+  }, [isOpen, selectedItems, productsData, activeFilters, entityNamePlural, initialize]);
 
-  // Reset des états temporaires à la fermeture
+  // 🆕 Reset des états temporaires à la fermeture
   useEffect(() => {
     if (!isOpen) {
-      resetTemporaryState();
+      reset('all'); // 🎯 Reset complet au lieu de resetTemporaryState()
     }
-  }, [isOpen, resetTemporaryState]);
+  }, [isOpen, reset]);
 
   const handleClose = () => {
     console.log('🔍 handleClose appelé dans ExportLabelsModal');
-    console.log('🔍 onClose original:', typeof onClose, onClose);
     setLoading(false);
 
     try {
       onClose();
-      console.log('✅ onClose() appelé avec succès depuis handleClose');
+      console.log('✅ onClose() appelé avec succès');
     } catch (error) {
-      console.error("❌ Erreur lors de l'appel onClose depuis handleClose:", error);
+      console.error("❌ Erreur lors de l'appel onClose:", error);
     }
   };
 
@@ -100,7 +97,7 @@ const ExportLabelsModal = ({
         Annuler
       </button>
 
-      {/* 🆕 NOUVEAU: Impression directe (mode rouleau uniquement) */}
+      {/* Impression directe (mode rouleau uniquement) */}
       {currentLayout?.supportType === 'rouleau' && <DirectPrintButton onClose={handleClose} />}
 
       {/* Export PDF (tous modes) */}

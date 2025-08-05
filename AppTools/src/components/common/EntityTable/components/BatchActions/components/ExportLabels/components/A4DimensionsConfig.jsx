@@ -1,21 +1,16 @@
-// components/A4DimensionsConfig.jsx - VERSION CORRIGÉE
 import React from 'react';
 import { Grid, RotateCcw } from 'lucide-react';
 import PresetManager from './PresetManager';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
-const A4DimensionsConfig = ({
-  savedPresets = [],
-  loading = false,
-  onSavePreset,
-  onLoadPreset,
-  onDeletePreset,
-}) => {
+const A4DimensionsConfig = () => {
   const {
     currentLayout,
     updateLayout,
     getGridDimensions,
-    resetA4LayoutOnly, // 🎯 Reset ciblé pour le layout A4 spécifiquement
+    reset, // 🆕 API unifiée
+    managePresets, // 🆕 API unifiée pour presets
+    savedPresets, // 🆕 Accès direct aux presets
   } = useLabelExportStore();
 
   const gridDimensions = getGridDimensions();
@@ -24,10 +19,27 @@ const A4DimensionsConfig = ({
     updateLayout(field, value);
   };
 
+  // 🆕 Handler simplifié avec nouvelle API
   const handleResetA4Layout = () => {
-    resetA4LayoutOnly();
+    reset('layout'); // 🎯 Au lieu de resetA4LayoutOnly()
     console.log('📐 Layout A4 réinitialisé aux valeurs par défaut');
   };
+
+  // 🆕 Handlers presets - utilisation directe de l'API store
+  const handleSavePreset = async (name, isPublic = false) => {
+    return await managePresets('save', 'layout', { name, isPublic });
+  };
+
+  const handleLoadPreset = async (presetId) => {
+    return await managePresets('apply', 'layout', { id: presetId });
+  };
+
+  const handleDeletePreset = async (presetId) => {
+    return await managePresets('delete', 'layout', { id: presetId });
+  };
+
+  // 🆕 Accès direct aux presets depuis le store
+  const layoutPresets = savedPresets.layout || [];
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-600">
@@ -39,7 +51,7 @@ const A4DimensionsConfig = ({
 
         <button
           type="button"
-          onClick={handleResetA4Layout} // 🎯 Reset spécifique au layout A4
+          onClick={handleResetA4Layout}
           className="flex items-center text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Réinitialiser les dimensions A4 aux valeurs par défaut"
         >
@@ -180,18 +192,15 @@ const A4DimensionsConfig = ({
         </div>
       )}
 
-      {/* Gestion des presets */}
-      {onSavePreset && (
-        <PresetManager
-          savedPresets={savedPresets}
-          loading={loading}
-          onSavePreset={onSavePreset}
-          onLoadPreset={onLoadPreset}
-          onDeletePreset={onDeletePreset}
-          title="Presets A4 sauvegardés"
-          emptyMessage="Aucun preset A4 sauvegardé"
-        />
-      )}
+      {/* 🆕 Gestion des presets avec API unifiée */}
+      <PresetManager
+        savedPresets={layoutPresets}
+        onSavePreset={handleSavePreset}
+        onLoadPreset={handleLoadPreset}
+        onDeletePreset={handleDeletePreset}
+        title="Presets A4 sauvegardés"
+        emptyMessage="Aucun preset A4 sauvegardé"
+      />
     </div>
   );
 };

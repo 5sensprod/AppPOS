@@ -1,75 +1,73 @@
-//services/fabricExportService.js
+// services/fabricExportService.js - VERSION OPTIMISÉE
 import A4LabelRenderer from '../components/common/EntityTable/components/BatchActions/components/ExportLabels/services/A4LabelRenderer.js';
 import RollLabelRenderer from '../components/common/EntityTable/components/BatchActions/components/ExportLabels/services/RollLabelRenderer.js';
 
 class FabricExportService {
+  // 🎯 Sélecteur de renderer unifié
+  #getRenderer(supportType) {
+    switch (supportType) {
+      case 'rouleau':
+        return RollLabelRenderer;
+      case 'A4':
+      case 'custom':
+      default:
+        return A4LabelRenderer;
+    }
+  }
+
+  // 🚀 Export PDF simplifié
   async exportLabelsToPDF(exportConfig) {
     try {
-      this._validateExportConfig(exportConfig);
+      this.#validateExportConfig(exportConfig);
 
-      const { labelLayout } = exportConfig;
-      const supportType = labelLayout?.layout?.supportType || 'A4';
+      const supportType = exportConfig.labelLayout?.layout?.supportType || 'A4';
+      const renderer = this.#getRenderer(supportType);
 
-      switch (supportType) {
-        case 'A4':
-        case 'custom':
-          return await A4LabelRenderer.exportLabelsToPDF(exportConfig);
+      console.log(`📄 Export PDF ${supportType} avec ${exportConfig.labelData.length} étiquettes`);
 
-        case 'rouleau':
-          return await RollLabelRenderer.exportLabelsToPDF(exportConfig);
-
-        default:
-          throw new Error(`Type de support non supporté: ${supportType}`);
-      }
+      return await renderer.exportLabelsToPDF(exportConfig);
     } catch (error) {
-      console.error('Erreur dans fabricExportService.exportLabelsToPDF:', error);
+      console.error('❌ Erreur export PDF:', error);
       throw error;
     }
   }
 
+  // 🎨 Aperçu canvas simplifié
   async renderLabelPreview(canvasElement, label, layout, style, options = {}) {
     try {
       const supportType = layout?.supportType || 'A4';
+      const renderer = this.#getRenderer(supportType);
 
-      switch (supportType) {
-        case 'A4':
-        case 'custom':
-          return await A4LabelRenderer.renderToCanvas(canvasElement, label, layout, style, options);
-
-        case 'rouleau':
-          return await RollLabelRenderer.renderToCanvas(
-            canvasElement,
-            label,
-            layout,
-            style,
-            options
-          );
-
-        default:
-          throw new Error(`Type de support non supporté pour l'aperçu: ${supportType}`);
-      }
+      return await renderer.renderToCanvas(canvasElement, label, layout, style, options);
     } catch (error) {
-      console.error('Erreur dans fabricExportService.renderLabelPreview:', error);
+      console.error('❌ Erreur aperçu canvas:', error);
       throw error;
     }
   }
 
-  _validateExportConfig(config) {
-    if (!config) {
-      throw new Error("Configuration d'export manquante");
+  // 🔍 Validation allégée et tolérante
+  #validateExportConfig(config) {
+    if (!config?.labelData?.length) {
+      throw new Error("Aucune donnée d'étiquette à exporter");
     }
 
-    if (!config.labelData || !Array.isArray(config.labelData) || config.labelData.length === 0) {
-      throw new Error("Données d'étiquettes manquantes ou vides");
-    }
-
-    if (!config.labelLayout) {
+    if (!config.labelLayout?.layout) {
       throw new Error('Configuration de layout manquante');
     }
 
-    if (!config.title || typeof config.title !== 'string') {
-      throw new Error('Titre du document manquant');
+    if (!config.title?.trim()) {
+      throw new Error('Titre du document requis');
     }
+  }
+
+  // 🆕 Méthode utilitaire pour obtenir les infos du renderer
+  getRendererInfo(supportType) {
+    const renderer = this.#getRenderer(supportType);
+    return {
+      type: supportType,
+      renderer: renderer.constructor.name,
+      isRoll: supportType === 'rouleau',
+    };
   }
 }
 

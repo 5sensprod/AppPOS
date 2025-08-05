@@ -1,51 +1,43 @@
-//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\services\A4LabelRenderer.js
 import BaseLabelRenderer from './BaseLabelRenderer.js';
 
 /**
- * Renderer spécialisé pour l'export PDF sur planches A4
- * Gère la logique de grille, pagination et cellules désactivées
+ * Renderer optimisé pour l'export PDF sur planches A4
  */
 class A4LabelRenderer extends BaseLabelRenderer {
-  //  Export des étiquettes en PDF sur format A4
+  // 🚀 Export PDF A4 simplifié
   async exportLabelsToPDF(exportConfig) {
     try {
       const { jsPDF } = await import('jspdf');
       const { labelData = [], labelLayout = {}, title = 'Etiquettes' } = exportConfig;
 
-      if (!labelData || labelData.length === 0) {
+      if (!labelData.length) {
         throw new Error("Aucune donnée d'étiquette à exporter");
       }
 
-      const layout = labelLayout.layout || this._getDefaultA4Layout();
+      const layout = labelLayout.layout || this._getDefaultLayout();
       const style = labelLayout.style || this._getDefaultStyle();
 
-      // Validation que c'est bien du A4
-      if (layout.supportType !== 'A4' && layout.supportType !== 'custom') {
+      // Validation du type de support
+      if (!['A4', 'custom'].includes(layout.supportType)) {
         throw new Error('A4LabelRenderer ne supporte que les formats A4 et custom');
       }
 
-      const duplicateCount = style.duplicateCount || 1;
-      const duplicatedLabels = this._prepareDuplicatedLabels(labelData, duplicateCount);
-
-      const pageConfig = this._calculateA4PageLayout(layout);
+      // Préparation des données
+      const duplicatedLabels = this._prepareDuplicatedLabels(labelData, style.duplicateCount || 1);
+      const pageConfig = this._calculatePageLayout(layout);
       const disabledCells = new Set(labelLayout.disabledCells || []);
 
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
+      // Initialisation PDF
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
+      // 🎯 Génération page par page
       let labelIndex = 0;
       let currentPage = 0;
 
-      // Génération page par page
       while (labelIndex < duplicatedLabels.length) {
-        if (currentPage > 0) {
-          doc.addPage();
-        }
+        if (currentPage > 0) doc.addPage();
 
-        labelIndex = await this._renderA4Page(
+        labelIndex = await this._renderPage(
           doc,
           duplicatedLabels,
           labelIndex,
@@ -58,78 +50,90 @@ class A4LabelRenderer extends BaseLabelRenderer {
         currentPage++;
       }
 
+      // Sauvegarde
       const filename = `${title}_A4_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
 
-      return { success: true, filename };
+      return { success: true, filename, pages: currentPage, labels: duplicatedLabels.length };
     } catch (error) {
-      console.error('Erreur export PDF A4:', error);
+      console.error('❌ Erreur export PDF A4:', error);
       throw error;
     }
   }
 
-  // Rendu d'une page A4 complète
-  async _renderA4Page(doc, duplicatedLabels, startIndex, layout, style, pageConfig, disabledCells) {
+  // 🎯 Rendu d'une page A4 optimisé
+  async _renderPage(doc, labels, startIndex, layout, style, pageConfig, disabledCells) {
     let cellIndex = 0;
     let labelIndex = startIndex;
-    let labelsPlacedOnPage = 0;
+    let labelsOnPage = 0;
 
     while (
       cellIndex < pageConfig.labelsPerPage &&
-      labelIndex < duplicatedLabels.length &&
-      labelsPlacedOnPage < pageConfig.labelsPerPage
+      labelIndex < labels.length &&
+      labelsOnPage < pageConfig.labelsPerPage
     ) {
-      // Ignorer les cellules désactivées
+      // Skip cellules désactivées
       if (disabledCells.has(cellIndex)) {
         cellIndex++;
         continue;
       }
 
-      const label = duplicatedLabels[labelIndex];
-      const imgData = await this._renderSingleLabelToCanvas(label, layout, style);
-      const position = this._calculateA4LabelPosition(cellIndex, pageConfig, layout);
+      const label = labels[labelIndex];
+      const position = this._calculateLabelPosition(cellIndex, pageConfig, layout);
 
-      doc.addImage(
-        imgData,
-        'PNG',
-        position.x,
-        position.y,
-        layout.width,
-        layout.height,
-        undefined,
-        'FAST'
-      );
+      try {
+        // Génération image étiquette
+        const imgData = await this._renderSingleLabelToCanvas(label, layout, style, 'export');
 
-      labelIndex++;
-      labelsPlacedOnPage++;
+        // Ajout au PDF
+        doc.addImage(
+          imgData,
+          'PNG',
+          position.x,
+          position.y,
+          layout.width,
+          layout.height,
+          undefined,
+          'FAST'
+        );
+
+        labelIndex++;
+        labelsOnPage++;
+      } catch (error) {
+        console.warn(`⚠️ Erreur rendu étiquette ${labelIndex}:`, error);
+        labelIndex++; // Skip cette étiquette et continue
+      }
+
       cellIndex++;
     }
 
     return labelIndex;
   }
 
-  // Calcul de la configuration de page A4
-  _calculateA4PageLayout(layout) {
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const usableWidth = pageWidth - (layout.offsetLeft || 8) * 2;
-    const usableHeight = pageHeight - (layout.offsetTop || 22) * 2;
+  // 🎯 Calcul layout page unifié
+  _calculatePageLayout(layout) {
+    const PAGE_WIDTH = 210;
+    const PAGE_HEIGHT = 297;
 
-    const columns = Math.floor(usableWidth / (layout.width + (layout.spacingH || 0)));
-    const rows = Math.floor(usableHeight / (layout.height + (layout.spacingV || 0)));
+    const usableWidth = PAGE_WIDTH - (layout.offsetLeft || 8) * 2;
+    const usableHeight = PAGE_HEIGHT - (layout.offsetTop || 22) * 2;
+
+    const columns = Math.max(1, Math.floor(usableWidth / (layout.width + (layout.spacingH || 0))));
+    const rows = Math.max(1, Math.floor(usableHeight / (layout.height + (layout.spacingV || 0))));
 
     return {
-      isRollMode: false,
-      pageWidth,
-      pageHeight,
+      pageWidth: PAGE_WIDTH,
+      pageHeight: PAGE_HEIGHT,
       columns,
       rows,
       labelsPerPage: columns * rows,
+      usableWidth,
+      usableHeight,
     };
   }
 
-  // Calcul de la position d'une étiquette sur la page A4
-  _calculateA4LabelPosition(cellIndex, pageConfig, layout) {
+  // 🎯 Calcul position étiquette unifié
+  _calculateLabelPosition(cellIndex, pageConfig, layout) {
     const col = cellIndex % pageConfig.columns;
     const row = Math.floor(cellIndex / pageConfig.columns);
 
@@ -139,8 +143,8 @@ class A4LabelRenderer extends BaseLabelRenderer {
     };
   }
 
-  //Configuration par défaut pour A4
-  _getDefaultA4Layout() {
+  // 🎯 Configurations par défaut
+  _getDefaultLayout() {
     return {
       width: 48.5,
       height: 25,
@@ -152,7 +156,6 @@ class A4LabelRenderer extends BaseLabelRenderer {
     };
   }
 
-  // Style par défaut
   _getDefaultStyle() {
     return {
       padding: 1,
