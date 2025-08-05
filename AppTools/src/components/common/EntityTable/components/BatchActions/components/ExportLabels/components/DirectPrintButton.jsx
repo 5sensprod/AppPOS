@@ -1,11 +1,10 @@
-// components/DirectPrintButton.jsx
-
+// AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\DirectPrintButton.jsx
 import React from 'react';
 import { Printer, Loader2 } from 'lucide-react';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 import { useActionToasts } from '../../../hooks/useActionToasts';
 
-const DirectPrintButton = () => {
+const DirectPrintButton = ({ onClose }) => {
   const {
     currentLayout,
     selectedItems,
@@ -25,36 +24,48 @@ const DirectPrintButton = () => {
     !printing;
 
   const handlePrint = async () => {
+    resetPrintState();
+
     try {
-      resetPrintState();
-
-      // Toast de démarrage
-      const progressToastId = toastActions.export.start(
-        selectedItems.length,
-        'impression',
-        'étiquette'
-      );
-
       const result = await printLabelsDirectly();
+      resetPrintState();
+      onClose();
 
-      // Toast de succès
-      toastActions.generic.success(
-        `${result.successCount}/${result.totalLabels} étiquette(s) imprimée(s)`,
-        'Impression réussie'
-      );
+      // Afficher le toast de succès
+      setTimeout(() => {
+        const totalLabels = selectedItems.length;
+        const successCount = result?.successCount || result?.printed || totalLabels;
+
+        if (successCount === totalLabels) {
+          toastActions.generic.success(
+            `${successCount} étiquette(s) imprimée(s) avec succès`,
+            'Impression réussie'
+          );
+        } else {
+          toastActions.generic.warning(
+            `${successCount}/${totalLabels} étiquette(s) imprimée(s)`,
+            'Impression partielle'
+          );
+        }
+      }, 300);
     } catch (error) {
-      console.error('❌ Erreur impression:', error);
+      console.error('Erreur impression:', error);
+      resetPrintState();
+      onClose();
 
-      // Toast d'erreur
-      toastActions.generic.error(
-        error.message || "Une erreur est survenue lors de l'impression",
-        "Erreur d'impression"
-      );
+      // Afficher le toast d'erreur
+      setTimeout(() => {
+        toastActions.generic.error(
+          error.message || "Erreur lors de l'impression",
+          "Erreur d'impression"
+        );
+      }, 300);
     }
   };
 
+  // Ne pas afficher le bouton si ce n'est pas un mode rouleau
   if (currentLayout?.supportType !== 'rouleau') {
-    return null; // Pas d'impression directe en mode A4
+    return null;
   }
 
   return (
@@ -76,7 +87,9 @@ const DirectPrintButton = () => {
             ? 'Sélectionnez une imprimante'
             : selectedItems.length === 0
               ? 'Sélectionnez des étiquettes'
-              : "Imprimer directement sur l'imprimante"
+              : printError
+                ? "Problème avec l'imprimante - cliquez pour réessayer"
+                : "Imprimer directement sur l'imprimante"
         }
       >
         {printing ? (
@@ -86,8 +99,6 @@ const DirectPrintButton = () => {
         )}
         {printing ? 'Impression...' : 'Imprimer directement'}
       </button>
-
-      {printError && <div className="text-xs text-red-600">❌ {printError}</div>}
     </div>
   );
 };

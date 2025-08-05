@@ -48,8 +48,16 @@ const ExportLabelsModal = ({
   }, [isOpen, resetTemporaryState]);
 
   const handleClose = () => {
+    console.log('🔍 handleClose appelé dans ExportLabelsModal');
+    console.log('🔍 onClose original:', typeof onClose, onClose);
     setLoading(false);
-    onClose();
+
+    try {
+      onClose();
+      console.log('✅ onClose() appelé avec succès depuis handleClose');
+    } catch (error) {
+      console.error("❌ Erreur lors de l'appel onClose depuis handleClose:", error);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -93,7 +101,7 @@ const ExportLabelsModal = ({
       </button>
 
       {/* 🆕 NOUVEAU: Impression directe (mode rouleau uniquement) */}
-      {currentLayout?.supportType === 'rouleau' && <DirectPrintButton />}
+      {currentLayout?.supportType === 'rouleau' && <DirectPrintButton onClose={handleClose} />}
 
       {/* Export PDF (tous modes) */}
       <button
