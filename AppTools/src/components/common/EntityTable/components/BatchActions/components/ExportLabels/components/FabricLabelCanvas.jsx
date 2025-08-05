@@ -174,7 +174,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
 
   return (
     <div className="relative">
-      {/* 🎯 CONTENEUR AVEC HAUTEUR FIXE pour éviter les sauts d'interface */}
+      {/* CONTENEUR AVEC HAUTEUR FIXE pour éviter les sauts d'interface */}
       <div
         className="relative mx-auto"
         style={{
@@ -183,62 +183,14 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
           minHeight: '120px',
         }}
       >
-        {/* 🎯 FOND DU ROULEAU PHYSIQUE (visible uniquement en mode rouleau) */}
-        {isRollMode && (
-          <div
-            className="absolute bg-gray-200 dark:bg-gray-600 rounded-sm border border-gray-300 dark:border-gray-500"
-            style={{
-              width: `${rollBgWidth}px`,
-              height: `${rollBgHeight}px`,
-              top: 0,
-              left: 0,
-            }}
-          >
-            {/* Indication des marges */}
-            <div className="absolute inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400 text-[10px] font-medium pointer-events-none">
-              <div className="text-center">
-                <div>Rouleau {physicalRollWidth}mm</div>
-                <div className="mt-1 opacity-75">Marge {margeInterieure}mm</div>
-              </div>
-            </div>
-
-            {/* Lignes de marge */}
-            <div
-              className="absolute top-0 bottom-0 border-l border-dashed border-gray-400 dark:border-gray-500 opacity-50"
-              style={{ left: `${margeInterieure * mmToPx}px` }}
-            />
-            <div
-              className="absolute top-0 bottom-0 border-r border-dashed border-gray-400 dark:border-gray-500 opacity-50"
-              style={{ right: `${margeInterieure * mmToPx}px` }}
-            />
-          </div>
-        )}
-
-        {/* 🎯 FOND BLANC POUR LA ZONE IMPRIMABLE (seulement en mode rouleau) */}
-        {isRollMode && (
-          <div
-            className="absolute bg-white border border-gray-300"
-            style={{
-              width: `${printableWidth}px`,
-              height: `${printableHeight}px`,
-              top: 0,
-              left: `${offsetX}px`,
-              zIndex: 5,
-            }}
-          />
-        )}
-
-        {/* 🎯 CANVAS DE LA ZONE IMPRIMABLE */}
+        {/* CANVAS DE LA ZONE IMPRIMABLE */}
         <canvas
           ref={canvasRef}
           className="absolute"
           style={{
             width: `${printableWidth}px`,
             height: `${printableHeight}px`,
-            border: isRollMode ? 'none' : '1px solid #ccc',
-            borderRadius: '0px',
-            boxShadow: isRollMode ? 'none' : '0 2px 4px rgba(0,0,0,0.1)',
-            backgroundColor: isRollMode ? 'transparent' : '#ffffff',
+            backgroundColor: 'transparent',
             top: 0,
             left: isRollMode ? `${offsetX}px` : 0,
             zIndex: 10,
@@ -246,7 +198,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
         />
       </div>
 
-      {/* 🎯 INFORMATIONS EN BAS */}
+      {/* INFORMATIONS EN BAS */}
       <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 text-center">
         <span className="font-medium">{label?.name || 'Aperçu étiquette'}</span>
         <span className="mx-2">•</span>
