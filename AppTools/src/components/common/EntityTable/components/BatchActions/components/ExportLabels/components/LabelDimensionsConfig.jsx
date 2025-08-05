@@ -33,36 +33,6 @@ const LabelDimensionsConfig = () => {
             ))}
           </select>
         </div>
-
-        {/* 🆕 Info contextuelle selon le type sélectionné */}
-        <div className="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 rounded p-2">
-          {currentSupportType === 'rouleau' && (
-            <div className="flex items-center">
-              <span className="mr-2">🎞️</span>
-              <span>
-                Mode rouleau - Impression continue avec découpe automatique. Idéal pour les
-                imprimantes d'étiquettes Brother, Zebra, etc.
-              </span>
-            </div>
-          )}
-          {currentSupportType === 'A4' && (
-            <div className="flex items-center">
-              <span className="mr-2">📄</span>
-              <span>
-                Mode A4 - Impression sur planches d'étiquettes standard. Gestion des cellules vides
-                possible.
-              </span>
-            </div>
-          )}
-          {currentSupportType === 'custom' && (
-            <div className="flex items-center">
-              <span className="mr-2">🎨</span>
-              <span>
-                Mode personnalisé - Définissez vos propres dimensions pour des supports spécifiques.
-              </span>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* 🎯 Délégation vers le composant spécialisé - Composants autonomes ! */}

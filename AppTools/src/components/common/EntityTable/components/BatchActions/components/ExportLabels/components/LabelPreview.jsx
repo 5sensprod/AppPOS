@@ -103,13 +103,6 @@ const LabelPreview = () => {
             </button>
           )}
         </div>
-
-        {/* 🆕 Aide contextuelle selon le mode */}
-        <div className="mt-1 text-blue-600 dark:text-blue-300">
-          {currentLayout.supportType === 'rouleau'
-            ? "🎞️ Mode rouleau - Les positions seront conservées pour l'impression directe"
-            : '📄 Mode A4 - Les positions seront appliquées à toutes les étiquettes du PDF'}
-        </div>
       </div>
 
       {/* Canvas d'aperçu */}

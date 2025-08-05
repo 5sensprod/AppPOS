@@ -15,11 +15,8 @@ const LabelsLayoutConfigurator = () => {
 
   const labelData = extractLabelData();
 
-  // Accordéon avec panels ouverts par défaut selon le contexte
-  const defaultOpenPanels =
-    labelData.length > 0 ? ['dimensions', 'style', 'preview'] : ['dimensions', 'style'];
-
-  const { toggle, isOpen } = useAccordion(defaultOpenPanels);
+  // 🔧 Tous les accordéons fermés par défaut
+  const { toggle, isOpen } = useAccordion([]); // Array vide = tout fermé
 
   return (
     <div className="space-y-3 bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
