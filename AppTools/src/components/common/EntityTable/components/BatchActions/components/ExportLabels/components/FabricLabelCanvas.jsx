@@ -19,7 +19,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     }
   };
 
-  // useEffect simple avec les bonnes dépendances
+  // useEffect simple avec les bonnes dépendances (comme l'original)
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
       const canvasEl = canvasRef.current;
@@ -103,7 +103,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
         console.error('Erreur rendu aperçu étiquette:', err);
         setError(`Erreur de rendu: ${err.message}`);
       }
-    }, 50);
+    }, 50); // 🎯 Timeout original de 50ms
 
     return () => {
       clearTimeout(timeoutId);
@@ -134,19 +134,35 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
 
   // Calculs dimensions
   const mmToPx = 3.779527559;
-  const physicalWidth = layout.width;
-  const physicalHeight = layout.height;
-  const canvasWidth = physicalWidth * mmToPx;
-  const canvasHeight = physicalHeight * mmToPx;
+
+  // 🎯 NOUVELLES DIMENSIONS POUR LE FOND ROULEAU
+  const isRollMode = layout.supportType === 'rouleau';
+  const physicalRollWidth = isRollMode ? layout.rouleau?.width || 58 : layout.width;
+  const physicalRollHeight = layout.height;
+  const margeInterieure = isRollMode ? layout.padding || 3 : 0;
+
+  // Dimensions du fond physique du rouleau
+  const rollBgWidth = physicalRollWidth * mmToPx;
+  const rollBgHeight = physicalRollHeight * mmToPx;
+
+  // Dimensions de la zone imprimable (canvas actuel)
+  const printableWidth = layout.width * mmToPx;
+  const printableHeight = layout.height * mmToPx;
+
+  // Calcul de l'offset pour centrer la zone imprimable
+  const offsetX = isRollMode ? (rollBgWidth - printableWidth) / 2 : 0;
 
   // Affichage d'erreur
   if (error) {
+    const errorWidth = isRollMode ? rollBgWidth : printableWidth;
+    const errorHeight = isRollMode ? rollBgHeight : printableHeight;
+
     return (
       <div
         className="flex items-center justify-center bg-red-50 border border-red-200 rounded"
         style={{
-          width: `${canvasWidth}px`,
-          height: `${canvasHeight}px`,
+          width: `${errorWidth}px`,
+          height: `${errorHeight}px`,
           minWidth: '200px',
           minHeight: '100px',
         }}
@@ -160,23 +176,87 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
   }
 
   return (
-    <div className="relative">
+    <div className="relative inline-block">
+      {/* 🎯 FOND DU ROULEAU PHYSIQUE (visible uniquement en mode rouleau) */}
+      {isRollMode && (
+        <div
+          className="absolute bg-gray-200 dark:bg-gray-600 rounded-sm border border-gray-300 dark:border-gray-500 z-0"
+          style={{
+            width: `${rollBgWidth}px`,
+            height: `${rollBgHeight}px`,
+            top: 0,
+            left: 0,
+          }}
+        >
+          {/* Indication des marges */}
+          <div className="absolute inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400 text-[10px] font-medium pointer-events-none">
+            <div className="text-center">
+              <div>Rouleau {physicalRollWidth}mm</div>
+              <div className="mt-1 opacity-75">Marge {margeInterieure}mm</div>
+            </div>
+          </div>
+
+          {/* Lignes de marge (optionnel, pour plus de clarté) */}
+          <div
+            className="absolute top-0 bottom-0 border-l border-dashed border-gray-400 dark:border-gray-500 opacity-50"
+            style={{ left: `${margeInterieure * mmToPx}px` }}
+          />
+          <div
+            className="absolute top-0 bottom-0 border-r border-dashed border-gray-400 dark:border-gray-500 opacity-50"
+            style={{ right: `${margeInterieure * mmToPx}px` }}
+          />
+        </div>
+      )}
+
+      {/* 🎯 FOND BLANC POUR LA ZONE IMPRIMABLE (seulement en mode rouleau) */}
+      {isRollMode && (
+        <div
+          className="absolute bg-white border border-gray-300 z-5"
+          style={{
+            width: `${printableWidth}px`,
+            height: `${printableHeight}px`,
+            top: 0,
+            left: `${offsetX}px`,
+          }}
+        />
+      )}
+
+      {/* 🎯 CANVAS DE LA ZONE IMPRIMABLE (transparent pour voir le fond) */}
       <canvas
         ref={canvasRef}
         style={{
-          width: `${canvasWidth}px`,
-          height: `${canvasHeight}px`,
-          border: '1px solid #ccc',
+          width: `${printableWidth}px`,
+          height: `${printableHeight}px`,
+          border: isRollMode ? 'none' : '1px solid #ccc', // Pas de bordure en mode rouleau
           borderRadius: '0px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          boxShadow: isRollMode ? 'none' : '0 2px 4px rgba(0,0,0,0.1)', // Pas d'ombre en mode rouleau
+          backgroundColor: isRollMode ? 'transparent' : '#ffffff',
+          position: 'relative',
+          zIndex: 10,
+          // Position absolue pour un centrage parfait en mode rouleau
+          ...(isRollMode && {
+            position: 'absolute',
+            left: `${offsetX}px`,
+            top: 0,
+            marginLeft: 0,
+          }),
         }}
       />
 
-      <div className="mt-2 text-xs text-gray-600 text-center">
+      {/* 🎯 INFORMATIONS MISE À JOUR */}
+      <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 text-center">
         <span className="font-medium">{label?.name || 'Aperçu étiquette'}</span>
         <span className="mx-2">•</span>
         <span>
-          {physicalWidth}×{physicalHeight}mm
+          {isRollMode ? (
+            <>
+              Imprimable: {layout.width}×{layout.height}mm
+              <span className="mx-1 opacity-50">|</span>
+              Rouleau: {physicalRollWidth}mm
+            </>
+          ) : (
+            `${layout.width}×{layout.height}mm`
+          )}
         </span>
       </div>
     </div>
