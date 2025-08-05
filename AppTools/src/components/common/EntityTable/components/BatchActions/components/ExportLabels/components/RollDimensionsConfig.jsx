@@ -33,17 +33,18 @@ const RollDimensionsConfig = () => {
   const layoutPresets = savedPresets.layout || [];
 
   const rouleauWidth = currentLayout.rouleau?.width || 29;
-  const margeInterieure = parseFloat(currentLayout.padding) || 1;
+  const margeInterieure = 1; // 🎯 MARGE FIXE À 1MM - définie dans le store
   const labelHeight = parseFloat(currentLayout.height) || 15;
 
   const etiquettePhysique = rouleauWidth - margeInterieure * 2;
-  const isValidConfig = etiquettePhysique > 10 && margeInterieure >= 1;
+  const isValidConfig = etiquettePhysique > 10; // Simplifié car marge = 1mm toujours
 
+  // Recalcul automatique de la largeur imprimable
   React.useEffect(() => {
     if (isValidConfig && etiquettePhysique !== parseFloat(currentLayout.width)) {
       handleChange('width', etiquettePhysique.toFixed(1));
     }
-  }, [rouleauWidth, margeInterieure, etiquettePhysique, isValidConfig]);
+  }, [rouleauWidth, etiquettePhysique, isValidConfig]);
 
   return (
     <div className="space-y-4">
@@ -97,7 +98,8 @@ const RollDimensionsConfig = () => {
           }`}
         >
           🎯 Mode rouleau • Découpe automatique • Marge intérieure : {margeInterieure}mm tout autour
-          {!isValidConfig && ' • Réduisez la marge ou augmentez la largeur du rouleau'}
+          (optimisée)
+          {!isValidConfig && ' • Augmentez la largeur du rouleau'}
         </div>
       </div>
 
@@ -106,7 +108,8 @@ const RollDimensionsConfig = () => {
           <Printer className="h-3 w-3 mr-1" />
           Paramètres du rouleau et de l'étiquette
         </h5>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          {/* 🎯 Suppression du champ marge - maintenant fixe */}
           <div>
             <label className="block text-xs text-blue-600 dark:text-blue-300 mb-1">
               Largeur rouleau (mm)
@@ -120,24 +123,6 @@ const RollDimensionsConfig = () => {
               onChange={(e) => handleChange('rouleau.width', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-blue-300 dark:border-blue-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
               placeholder="29"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-blue-600 dark:text-blue-300 mb-1">
-              Marge intérieure (mm)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              min="1"
-              max="10"
-              value={margeInterieure}
-              onChange={(e) =>
-                handleChange('padding', Math.max(1, parseFloat(e.target.value) || 1))
-              }
-              className="w-full px-2 py-1 text-sm border border-blue-300 dark:border-blue-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
-              placeholder="1"
             />
           </div>
 

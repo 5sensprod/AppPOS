@@ -38,6 +38,7 @@ const DEFAULT_LAYOUTS = {
     spacingH: 0,
     supportType: 'rouleau',
     rouleau: { width: 29 },
+    padding: 1,
   },
   custom: {
     width: 50,
