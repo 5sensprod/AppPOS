@@ -17,44 +17,33 @@ const ExportLabelsModal = ({
   productsData = [],
 }) => {
   const {
-    // État principal
     exportTitle,
     loading,
     currentLayout,
-
-    // 🆕 API unifiée
-    initialize, // Au lieu de initializeForModal
-    reset, // Au lieu de resetTemporaryState
+    initialize,
+    reset,
     setExportTitle,
     setLoading,
     extractLabelData,
     buildLabelLayout,
   } = useLabelExportStore();
 
-  // 🆕 Initialisation simplifiée à l'ouverture
   useEffect(() => {
     if (isOpen) {
       initialize(selectedItems, productsData, activeFilters, entityNamePlural);
     }
   }, [isOpen, selectedItems, productsData, activeFilters, entityNamePlural, initialize]);
 
-  // 🆕 Reset des états temporaires à la fermeture
   useEffect(() => {
     if (!isOpen) {
-      reset('all'); // 🎯 Reset complet au lieu de resetTemporaryState()
+      reset('cells');
+      reset('print');
     }
   }, [isOpen, reset]);
 
   const handleClose = () => {
-    console.log('🔍 handleClose appelé dans ExportLabelsModal');
     setLoading(false);
-
-    try {
-      onClose();
-      console.log('✅ onClose() appelé avec succès');
-    } catch (error) {
-      console.error("❌ Erreur lors de l'appel onClose:", error);
-    }
+    onClose();
   };
 
   const handleSubmit = async (e) => {
@@ -97,10 +86,8 @@ const ExportLabelsModal = ({
         Annuler
       </button>
 
-      {/* Impression directe (mode rouleau uniquement) */}
       {currentLayout?.supportType === 'rouleau' && <DirectPrintButton onClose={handleClose} />}
 
-      {/* Export PDF (tous modes) */}
       <button
         type="submit"
         disabled={loading || selectedItems.length === 0}
@@ -147,10 +134,8 @@ const ExportLabelsModal = ({
           />
         </div>
 
-        {/* Configuration des étiquettes avec impression directe intégrée */}
         <LabelsLayoutConfigurator />
 
-        {/* Résumé de l'export */}
         <LabelExportSummary
           selectedCount={selectedCount}
           itemLabel={itemLabel}
