@@ -47,16 +47,7 @@ const LabelStyleConfig = () => {
   };
 
   const handleResetStyle = (e) => {
-    e.stopPropagation();
     reset('style');
-    console.log('🎨 Style réinitialisé');
-  };
-
-  const handleResetPositions = (e) => {
-    e.stopPropagation();
-    setCustomPositions({});
-    reset('positions');
-    console.log('📍 Positions réinitialisées');
   };
 
   // Handlers presets
@@ -108,16 +99,14 @@ const LabelStyleConfig = () => {
       </div>
 
       {/* Checkboxes pour les éléments à afficher */}
-      <div className="flex flex-wrap gap-4" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap gap-4">
         <label className="flex items-center">
           <input
             type="checkbox"
             checked={labelStyle.showName}
             onChange={(e) => {
-              e.stopPropagation();
               updateStyle({ showName: e.target.checked });
             }}
-            onClick={(e) => e.stopPropagation()}
             className="mr-2 text-blue-600"
           />
           <span className="text-sm text-gray-700 dark:text-gray-300">Nom produit</span>
@@ -127,10 +116,8 @@ const LabelStyleConfig = () => {
             type="checkbox"
             checked={labelStyle.showPrice}
             onChange={(e) => {
-              e.stopPropagation();
               updateStyle({ showPrice: e.target.checked });
             }}
-            onClick={(e) => e.stopPropagation()}
             className="mr-2 text-blue-600"
           />
           <span className="text-sm text-gray-700 dark:text-gray-300">Prix</span>
@@ -140,10 +127,8 @@ const LabelStyleConfig = () => {
             type="checkbox"
             checked={labelStyle.showBarcode}
             onChange={(e) => {
-              e.stopPropagation();
               updateStyle({ showBarcode: e.target.checked });
             }}
-            onClick={(e) => e.stopPropagation()}
             className="mr-2 text-blue-600"
           />
           <span className="text-sm text-gray-700 dark:text-gray-300">Code-barres</span>
@@ -153,10 +138,8 @@ const LabelStyleConfig = () => {
             type="checkbox"
             checked={labelStyle.showBorder}
             onChange={(e) => {
-              e.stopPropagation();
               updateStyle({ showBorder: e.target.checked });
             }}
-            onClick={(e) => e.stopPropagation()}
             className="mr-2 text-blue-600"
           />
           <span className="text-sm text-gray-700 dark:text-gray-300">Bordure</span>
@@ -164,7 +147,7 @@ const LabelStyleConfig = () => {
       </div>
 
       {/* Tailles conditionnelles */}
-      <div className="grid grid-cols-3 gap-3" onClick={(e) => e.stopPropagation()}>
+      <div className="grid grid-cols-3 gap-3">
         {labelStyle.showName && (
           <div>
             <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
@@ -176,10 +159,8 @@ const LabelStyleConfig = () => {
               max="20"
               value={labelStyle.nameSize}
               onChange={(e) => {
-                e.stopPropagation();
                 updateStyle({ nameSize: parseInt(e.target.value) });
               }}
-              onClick={(e) => e.stopPropagation()}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
           </div>
@@ -195,10 +176,8 @@ const LabelStyleConfig = () => {
               max="24"
               value={labelStyle.priceSize}
               onChange={(e) => {
-                e.stopPropagation();
                 updateStyle({ priceSize: parseInt(e.target.value) });
               }}
-              onClick={(e) => e.stopPropagation()}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
           </div>
@@ -214,10 +193,8 @@ const LabelStyleConfig = () => {
               max="30"
               value={labelStyle.barcodeHeight}
               onChange={(e) => {
-                e.stopPropagation();
                 updateStyle({ barcodeHeight: parseInt(e.target.value) });
               }}
-              onClick={(e) => e.stopPropagation()}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
           </div>
@@ -229,7 +206,6 @@ const LabelStyleConfig = () => {
         <button
           type="button"
           onClick={(e) => {
-            e.stopPropagation();
             toggle('presets');
           }}
           className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-t"
@@ -253,10 +229,7 @@ const LabelStyleConfig = () => {
         </button>
 
         {isOpen('presets') && (
-          <div
-            className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600">
             <PresetManager
               savedPresets={stylePresets}
               onSavePreset={handleSavePreset}

@@ -8,8 +8,7 @@ const A4DimensionsConfig = () => {
   const { currentLayout, updateLayout, getGridDimensions, reset, managePresets, savedPresets } =
     useLabelExportStore();
 
-  // 🔧 Utiliser le hook useAccordion pour les presets
-  const { toggle, isOpen } = useAccordion([]); // Fermé par défaut
+  const { toggle, isOpen } = useAccordion([]);
 
   const gridDimensions = getGridDimensions();
 
@@ -17,13 +16,11 @@ const A4DimensionsConfig = () => {
     updateLayout(field, value);
   };
 
-  const handleResetA4Layout = (e) => {
-    e.stopPropagation();
+  const handleResetA4Layout = () => {
     reset('layout');
     console.log('📐 Layout A4 réinitialisé aux valeurs par défaut');
   };
 
-  // Handlers presets
   const handleSavePreset = async (name, isPublic = false) => {
     return await managePresets('save', 'layout', { name, isPublic });
   };
@@ -40,7 +37,6 @@ const A4DimensionsConfig = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header avec bouton reset */}
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center">
           <Grid className="h-4 w-4 mr-2" />
@@ -58,7 +54,6 @@ const A4DimensionsConfig = () => {
         </button>
       </div>
 
-      {/* Informations grille A4 */}
       <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
         <div className="flex items-center justify-between mb-2">
           <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">
@@ -73,12 +68,11 @@ const A4DimensionsConfig = () => {
         </div>
       </div>
 
-      {/* Configuration dimensions étiquettes */}
       <div>
         <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
           Dimensions des étiquettes
         </h5>
-        <div className="grid grid-cols-2 gap-3" onClick={(e) => e.stopPropagation()}>
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
               Largeur étiquette (mm)
@@ -89,11 +83,7 @@ const A4DimensionsConfig = () => {
               min="10"
               max="200"
               value={currentLayout.width || 48.5}
-              onChange={(e) => {
-                e.stopPropagation();
-                handleChange('width', e.target.value);
-              }}
-              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleChange('width', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
           </div>
@@ -108,23 +98,18 @@ const A4DimensionsConfig = () => {
               min="10"
               max="200"
               value={currentLayout.height || 25}
-              onChange={(e) => {
-                e.stopPropagation();
-                handleChange('height', e.target.value);
-              }}
-              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleChange('height', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
           </div>
         </div>
       </div>
 
-      {/* Configuration marges et espacements */}
       <div>
         <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
           Marges et espacements
         </h5>
-        <div className="grid grid-cols-2 gap-3" onClick={(e) => e.stopPropagation()}>
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
               Marge haute (mm)
@@ -135,11 +120,7 @@ const A4DimensionsConfig = () => {
               min="0"
               max="50"
               value={currentLayout.offsetTop || 22}
-              onChange={(e) => {
-                e.stopPropagation();
-                handleChange('offsetTop', e.target.value);
-              }}
-              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleChange('offsetTop', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
           </div>
@@ -154,11 +135,7 @@ const A4DimensionsConfig = () => {
               min="0"
               max="50"
               value={currentLayout.offsetLeft || 8}
-              onChange={(e) => {
-                e.stopPropagation();
-                handleChange('offsetLeft', e.target.value);
-              }}
-              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleChange('offsetLeft', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
           </div>
@@ -173,11 +150,7 @@ const A4DimensionsConfig = () => {
               min="0"
               max="10"
               value={currentLayout.spacingV || 0}
-              onChange={(e) => {
-                e.stopPropagation();
-                handleChange('spacingV', e.target.value);
-              }}
-              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleChange('spacingV', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
           </div>
@@ -192,18 +165,13 @@ const A4DimensionsConfig = () => {
               min="0"
               max="10"
               value={currentLayout.spacingH || 0}
-              onChange={(e) => {
-                e.stopPropagation();
-                handleChange('spacingH', e.target.value);
-              }}
-              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleChange('spacingH', e.target.value)}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             />
           </div>
         </div>
       </div>
 
-      {/* Alerte si trop peu d'étiquettes par page */}
       {gridDimensions.total < 4 && (
         <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-700">
           <div className="text-xs text-orange-700 dark:text-orange-300">
@@ -214,15 +182,10 @@ const A4DimensionsConfig = () => {
         </div>
       )}
 
-      {/* PresetManager dépliable */}
       <div className="border border-gray-200 dark:border-gray-600 rounded">
-        {/* Header cliquable pour les presets */}
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            toggle('presets');
-          }}
+          onClick={() => toggle('presets')}
           className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-t"
         >
           <div className="flex items-center">
@@ -241,12 +204,8 @@ const A4DimensionsConfig = () => {
           )}
         </button>
 
-        {/* Contenu PresetManager */}
         {isOpen('presets') && (
-          <div
-            className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600">
             <PresetManager
               savedPresets={layoutPresets}
               onSavePreset={handleSavePreset}
