@@ -1,19 +1,62 @@
-import React from 'react';
-import { Palette, RotateCcw, ChevronDown, ChevronRight, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { RotateCcw, ChevronDown, ChevronRight, Save, Move } from 'lucide-react';
 import { useAccordion } from '../hooks/useAccordion';
+import FabricLabelCanvas from './FabricLabelCanvas';
 import PresetManager from './PresetManager';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const LabelStyleConfig = () => {
-  const { labelStyle, updateStyle, reset, managePresets, savedPresets } = useLabelExportStore();
+  const {
+    labelStyle,
+    currentLayout,
+    updateStyle,
+    extractLabelData,
+    reset,
+    managePresets,
+    savedPresets,
+  } = useLabelExportStore();
 
-  // 🔧 Utiliser le hook useAccordion pour les presets
-  const { toggle, isOpen } = useAccordion([]); // Fermé par défaut
+  const { toggle, isOpen } = useAccordion([]);
+  const labelData = extractLabelData();
+  const sampleLabel = labelData.length > 0 ? labelData[0] : null;
+  const [customPositions, setCustomPositions] = useState({});
+
+  // Initialiser les positions depuis le store
+  useEffect(() => {
+    if (labelStyle.customPositions && Object.keys(labelStyle.customPositions).length > 0) {
+      setCustomPositions(labelStyle.customPositions);
+    } else {
+      setCustomPositions({});
+    }
+  }, [labelStyle.customPositions]);
+
+  // Reset des positions lors de changements MAJEURS
+  useEffect(() => {
+    setCustomPositions({});
+    updateStyle({ customPositions: {} });
+  }, [currentLayout.supportType, sampleLabel?.id, updateStyle]);
+
+  const handlePositionChange = (positionData) => {
+    const newPositions = {
+      ...customPositions,
+      [positionData.objectType]: positionData.position,
+    };
+
+    setCustomPositions(newPositions);
+    updateStyle({ customPositions: newPositions });
+  };
 
   const handleResetStyle = (e) => {
     e.stopPropagation();
     reset('style');
-    console.log('🎨 Style réinitialisé (duplicateCount préservé)');
+    console.log('🎨 Style réinitialisé');
+  };
+
+  const handleResetPositions = (e) => {
+    e.stopPropagation();
+    setCustomPositions({});
+    reset('positions');
+    console.log('📍 Positions réinitialisées');
   };
 
   // Handlers presets
@@ -30,10 +73,28 @@ const LabelStyleConfig = () => {
   };
 
   const stylePresets = savedPresets.style || [];
+  const customPositionCount = Object.keys(customPositions).length;
 
   return (
     <div className="space-y-4">
-      {/* Bouton reset en haut à droite, sans titre redondant */}
+      {/* 🔧 Aperçu en haut - Canvas principal */}
+      {sampleLabel && (
+        <div className="flex justify-center">
+          <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
+            <FabricLabelCanvas
+              label={sampleLabel}
+              layout={currentLayout}
+              style={{
+                ...labelStyle,
+                customPositions: customPositions,
+              }}
+              onPositionChange={handlePositionChange}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 🔧 Contrôles de style en dessous */}
       <div className="flex justify-end">
         <button
           type="button"
@@ -165,7 +226,6 @@ const LabelStyleConfig = () => {
 
       {/* PresetManager dépliable */}
       <div className="border border-gray-200 dark:border-gray-600 rounded">
-        {/* Header cliquable pour les presets */}
         <button
           type="button"
           onClick={(e) => {
@@ -192,7 +252,6 @@ const LabelStyleConfig = () => {
           )}
         </button>
 
-        {/* Contenu PresetManager */}
         {isOpen('presets') && (
           <div
             className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600"

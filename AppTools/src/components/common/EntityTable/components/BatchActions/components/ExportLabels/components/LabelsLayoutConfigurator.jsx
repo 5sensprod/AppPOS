@@ -79,7 +79,7 @@ const LabelsLayoutConfigurator = () => {
         <LabelDimensionsConfig />
       </AccordionPanel>
 
-      {/* Panel Style */}
+      {/* Panel Style avec aperçu intégré */}
       <AccordionPanel
         id="style"
         title="Style des étiquettes"
@@ -89,19 +89,6 @@ const LabelsLayoutConfigurator = () => {
       >
         <LabelStyleConfig />
       </AccordionPanel>
-
-      {/* Panel Aperçu (seulement si données disponibles) */}
-      {labelData.length > 0 && (
-        <AccordionPanel
-          id="preview"
-          title="Aperçu"
-          icon={Eye}
-          isOpen={isOpen('preview')}
-          onToggle={toggle}
-        >
-          <LabelPreview />
-        </AccordionPanel>
-      )}
 
       {/* Panel Options d'impression */}
       <AccordionPanel
