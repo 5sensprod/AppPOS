@@ -198,18 +198,6 @@ const RollDimensionsConfig = () => {
         </div>
       </div>
 
-      {/* 🆕 Récapitulatif visuel amélioré */}
-      <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
-        <div className="text-xs text-gray-600 dark:text-gray-400">
-          📋 L'aperçu reflète l'étiquette physique de{' '}
-          <strong className={isValidConfig ? 'text-green-600' : 'text-red-600'}>
-            {etiquettePhysique.toFixed(1)}×{labelHeight}mm
-          </strong>{' '}
-          avec une marge intérieure de <strong>{margeInterieure}mm</strong>
-          {isValidConfig && ' ✅'}
-        </div>
-      </div>
-
       {/* 🆕 Gestion des presets avec API unifiée */}
       <PresetManager
         savedPresets={layoutPresets}
