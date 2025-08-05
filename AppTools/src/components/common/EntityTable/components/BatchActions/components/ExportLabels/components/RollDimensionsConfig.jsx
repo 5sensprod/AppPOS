@@ -36,9 +36,9 @@ const RollDimensionsConfig = () => {
   const layoutPresets = savedPresets.layout || [];
 
   // Logique de calcul automatique des dimensions
-  const rouleauWidth = currentLayout.rouleau?.width || 58;
-  const margeInterieure = parseFloat(currentLayout.padding) || 3;
-  const labelHeight = parseFloat(currentLayout.height) || 29;
+  const rouleauWidth = currentLayout.rouleau?.width || 29;
+  const margeInterieure = parseFloat(currentLayout.padding) || 1;
+  const labelHeight = parseFloat(currentLayout.height) || 15;
 
   // Calcul automatique de l'étiquette physique
   const etiquettePhysique = rouleauWidth - margeInterieure * 2;
@@ -136,7 +136,7 @@ const RollDimensionsConfig = () => {
               }}
               onClick={(e) => e.stopPropagation()}
               className="w-full px-2 py-1 text-sm border border-blue-300 dark:border-blue-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
-              placeholder="58"
+              placeholder="29"
             />
           </div>
 

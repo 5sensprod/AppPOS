@@ -31,7 +31,7 @@ const DEFAULT_LAYOUTS = {
   },
   rouleau: {
     width: 29,
-    height: 30,
+    height: 15,
     offsetTop: 0,
     offsetLeft: 0,
     spacingV: 0,
