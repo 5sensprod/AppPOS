@@ -221,8 +221,6 @@ class BaseLabelRenderer {
     fabricCanvas.add(border);
   }
 
-  // 🎯 Code-barres avec gestion d'erreur tolérante
-  // 🎯 Code-barres avec taille réduite et optimisée
   // 🎯 Code-barres avec réduction proportionnelle de la largeur
   async _addBarcode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     try {

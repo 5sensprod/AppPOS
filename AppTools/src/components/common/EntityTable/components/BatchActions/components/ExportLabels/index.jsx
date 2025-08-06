@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Tags, FileText, Printer } from 'lucide-react';
 import BaseModal from '../../../../../ui/BaseModal';
 import LabelsLayoutConfigurator from './components/LabelsLayoutConfigurator';
-import LabelExportSummary from './components/LabelExportSummary';
 import DirectPrintButton from './components/DirectPrintButton';
 import { useLabelExportStore } from './stores/useLabelExportStore';
 
@@ -187,12 +186,6 @@ const ExportLabelsModal = ({
         )}
 
         <LabelsLayoutConfigurator exportMode={exportMode} />
-
-        <LabelExportSummary
-          selectedCount={selectedCount}
-          itemLabel={itemLabel}
-          activeFilters={activeFilters}
-        />
       </form>
     </BaseModal>
   );
