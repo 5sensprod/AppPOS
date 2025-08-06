@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import fabricExportService from '@services/fabricExportService';
 
 const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
   const canvasRef = useRef();
   const fabricCanvasRef = useRef();
   const [error, setError] = useState(null);
+  const [zoomLevel, setZoomLevel] = useState(100); // Zoom de 100% à 200%
 
   // Cleanup
   const cleanupCanvas = () => {
@@ -19,7 +21,49 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     }
   };
 
-  // useEffect simple avec les bonnes dépendances (comme l'original)
+  // Handlers de zoom avec Fabric.js natif + redimensionnement canvas
+  const handleZoomChange = (newZoom) => {
+    const clampedZoom = Math.max(100, Math.min(200, newZoom));
+    setZoomLevel(clampedZoom);
+
+    if (fabricCanvasRef.current) {
+      const zoomFactor = clampedZoom / 100;
+
+      // Appliquer le zoom aux éléments
+      fabricCanvasRef.current.setZoom(zoomFactor);
+
+      // Redimensionner le canvas HTML pour qu'il grandisse visuellement
+      const baseWidth = window.basePrintableWidth || layout.width * mmToPx;
+      const baseHeight = window.basePrintableHeight || layout.height * mmToPx;
+      const newWidth = baseWidth * zoomFactor;
+      const newHeight = baseHeight * zoomFactor;
+
+      fabricCanvasRef.current.setWidth(newWidth);
+      fabricCanvasRef.current.setHeight(newHeight);
+
+      fabricCanvasRef.current.renderAll();
+    }
+  };
+
+  const handleZoomIn = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleZoomChange(zoomLevel + 10);
+  };
+
+  const handleZoomOut = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleZoomChange(zoomLevel - 10);
+  };
+
+  const handleZoomReset = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleZoomChange(100);
+  };
+
+  // useEffect principal pour le rendu
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
       const canvasEl = canvasRef.current;
@@ -45,6 +89,10 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
         );
 
         fabricCanvasRef.current = fabricCanvas;
+
+        // Stocker les dimensions de base pour le zoom
+        window.basePrintableWidth = layout.width * mmToPx;
+        window.basePrintableHeight = layout.height * mmToPx;
 
         // Configuration objets mobiles
         fabricCanvas.getObjects().forEach((obj) => {
@@ -75,6 +123,18 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
           obj.objectType = objectType;
         });
 
+        // Appliquer le zoom actuel au nouveau canvas
+        if (zoomLevel !== 100) {
+          const zoomFactor = zoomLevel / 100;
+          fabricCanvas.setZoom(zoomFactor);
+
+          // Ajuster les dimensions du canvas HTML pour correspondre au zoom
+          const newWidth = window.basePrintableWidth * zoomFactor;
+          const newHeight = window.basePrintableHeight * zoomFactor;
+          fabricCanvas.setWidth(newWidth);
+          fabricCanvas.setHeight(newHeight);
+        }
+
         // Gestion modifications
         let modificationTimeout;
         fabricCanvas.on('object:modified', (e) => {
@@ -82,6 +142,8 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
           modificationTimeout = setTimeout(() => {
             const obj = e.target;
             if (obj && obj.objectType && onPositionChange) {
+              // Les coordonnées sont automatiquement corrigées par Fabric.js
+              // même avec le zoom appliqué
               const mmToPx = 3.779527559;
               const leftMm = obj.left / mmToPx;
               const topMm = obj.top / mmToPx;
@@ -99,6 +161,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
         });
 
         fabricCanvas.selection = true;
+        fabricCanvas.renderAll();
       } catch (err) {
         console.error('Erreur rendu aperçu étiquette:', err);
         setError(`Erreur de rendu: ${err.message}`);
@@ -131,20 +194,26 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     return cleanupCanvas;
   }, []);
 
-  // Calculs dimensions
+  // Calculs dimensions avec zoom
   const mmToPx = 3.779527559;
   const isRollMode = layout.supportType === 'rouleau';
   const physicalRollWidth = isRollMode ? layout.rouleau?.width || 58 : layout.width;
   const physicalRollHeight = layout.height;
-  const margeInterieure = isRollMode ? layout.padding || 3 : 0;
 
-  // Dimensions du fond physique du rouleau
-  const rollBgWidth = physicalRollWidth * mmToPx;
-  const rollBgHeight = physicalRollHeight * mmToPx;
+  // Facteur de zoom
+  const zoomFactor = zoomLevel / 100;
 
-  // Dimensions de la zone imprimable (canvas actuel)
-  const printableWidth = layout.width * mmToPx;
-  const printableHeight = layout.height * mmToPx;
+  // Dimensions de base
+  const baseRollBgWidth = physicalRollWidth * mmToPx;
+  const baseRollBgHeight = physicalRollHeight * mmToPx;
+  const basePrintableWidth = layout.width * mmToPx;
+  const basePrintableHeight = layout.height * mmToPx;
+
+  // Dimensions avec zoom appliqué
+  const rollBgWidth = baseRollBgWidth * zoomFactor;
+  const rollBgHeight = baseRollBgHeight * zoomFactor;
+  const printableWidth = basePrintableWidth * zoomFactor;
+  const printableHeight = basePrintableHeight * zoomFactor;
 
   // Calcul de l'offset pour centrer la zone imprimable
   const offsetX = isRollMode ? (rollBgWidth - printableWidth) / 2 : 0;
@@ -155,47 +224,125 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     const errorHeight = isRollMode ? rollBgHeight : printableHeight;
 
     return (
-      <div
-        className="flex items-center justify-center bg-red-50 border border-red-200 rounded"
-        style={{
-          width: `${errorWidth}px`,
-          height: `${errorHeight}px`,
-          minWidth: '200px',
-          minHeight: '100px',
-        }}
-      >
-        <div className="text-red-600 text-xs text-center p-2">
-          <div className="font-medium">❌ Erreur d'aperçu</div>
-          <div className="mt-1">{error}</div>
+      <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
+        {/* Contrôles de zoom même en cas d'erreur */}
+        <div className="mb-3 flex items-center justify-center gap-1 bg-gray-200 dark:bg-gray-600 p-2 rounded">
+          <button
+            onClick={handleZoomOut}
+            onMouseDown={(e) => e.stopPropagation()}
+            disabled={zoomLevel <= 100}
+            className="p-1.5 rounded hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Réduire"
+          >
+            <ZoomOut className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+          </button>
+
+          <div className="text-xs font-mono text-gray-700 dark:text-gray-300 min-w-[35px] text-center px-1">
+            {zoomLevel}%
+          </div>
+
+          <button
+            onClick={handleZoomIn}
+            onMouseDown={(e) => e.stopPropagation()}
+            disabled={zoomLevel >= 200}
+            className="p-1.5 rounded hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Agrandir"
+          >
+            <ZoomIn className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+          </button>
+
+          <button
+            onClick={handleZoomReset}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="p-1.5 rounded hover:bg-gray-300 dark:hover:bg-gray-500 ml-1"
+            title="Taille réelle"
+          >
+            <RotateCcw className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+          </button>
+        </div>
+
+        <div
+          className="flex items-center justify-center bg-red-50 border border-red-200 rounded"
+          style={{
+            width: `${errorWidth}px`,
+            height: `${errorHeight}px`,
+            minWidth: '200px',
+            minHeight: '100px',
+          }}
+        >
+          <div className="text-red-600 text-xs text-center p-2">
+            <div className="font-medium">❌ Erreur d'aperçu</div>
+            <div className="mt-1">{error}</div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative">
-      {/* CONTENEUR AVEC HAUTEUR FIXE pour éviter les sauts d'interface */}
-      <div
-        className="relative mx-auto"
-        style={{
-          width: `${isRollMode ? rollBgWidth : printableWidth}px`,
-          height: `${isRollMode ? rollBgHeight : printableHeight}px`,
-          minHeight: '120px',
-        }}
-      >
-        {/* CANVAS DE LA ZONE IMPRIMABLE */}
-        <canvas
-          ref={canvasRef}
-          className="absolute"
+    <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
+      {/* CONTRÔLES DE ZOOM compacts dans la zone grisée */}
+      <div className="mb-3 flex items-center justify-center gap-1 bg-gray-200 dark:bg-gray-600 p-2 rounded">
+        <button
+          onClick={handleZoomOut}
+          onMouseDown={(e) => e.stopPropagation()}
+          disabled={zoomLevel <= 100}
+          className="p-1.5 rounded hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Réduire (Ctrl + -)"
+        >
+          <ZoomOut className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+        </button>
+
+        <div className="text-xs font-mono text-gray-700 dark:text-gray-300 min-w-[35px] text-center px-1">
+          {zoomLevel}%
+        </div>
+
+        <button
+          onClick={handleZoomIn}
+          onMouseDown={(e) => e.stopPropagation()}
+          disabled={zoomLevel >= 200}
+          className="p-1.5 rounded hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Agrandir (Ctrl + +)"
+        >
+          <ZoomIn className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+        </button>
+
+        <button
+          onClick={handleZoomReset}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="p-1.5 rounded hover:bg-gray-300 dark:hover:bg-gray-500 ml-1 transition-colors"
+          title="Taille réelle (100%)"
+        >
+          <RotateCcw className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+        </button>
+      </div>
+
+      {/* CONTENEUR avec dimensions adaptatives au zoom */}
+      <div className="relative overflow-visible">
+        <div
+          className="relative mx-auto"
           style={{
-            width: `${printableWidth}px`,
-            height: `${printableHeight}px`,
-            backgroundColor: 'transparent',
-            top: 0,
-            left: isRollMode ? `${offsetX}px` : 0,
-            zIndex: 10,
+            width: `${isRollMode ? rollBgWidth : printableWidth}px`,
+            height: `${isRollMode ? rollBgHeight : printableHeight}px`,
+            // Suppression de minHeight qui créait l'espace gris inutile
+            border: isRollMode ? '1px solid #e5e7eb' : 'none',
+            borderRadius: isRollMode ? '4px' : '0',
+            backgroundColor: isRollMode ? '#f9fafb' : 'transparent',
           }}
-        />
+        >
+          {/* CANVAS Fabric.js avec zoom natif */}
+          <canvas
+            ref={canvasRef}
+            className="absolute"
+            style={{
+              // Le canvas va maintenant prendre ses vraies dimensions zoomées
+              backgroundColor: 'transparent',
+              top: 0,
+              left: isRollMode ? `${offsetX}px` : 0,
+              zIndex: 10,
+            }}
+          />
+        </div>
       </div>
 
       {/* INFORMATIONS EN BAS */}
@@ -213,6 +360,12 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
             `${layout.width}×{layout.height}mm`
           )}
         </span>
+        {zoomLevel !== 100 && (
+          <>
+            <span className="mx-2">•</span>
+            <span className="text-blue-600 dark:text-blue-400 font-medium">Zoom: {zoomLevel}%</span>
+          </>
+        )}
       </div>
     </div>
   );

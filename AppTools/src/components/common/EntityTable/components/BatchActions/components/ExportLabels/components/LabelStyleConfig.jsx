@@ -67,11 +67,11 @@ const LabelStyleConfig = () => {
   const customPositionCount = Object.keys(customPositions).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* 🔧 Aperçu en haut - Canvas principal */}
       {sampleLabel && (
         <div className="flex justify-center">
-          <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
+          <div className="bg-gray-100 dark:bg-gray-700 p-0 rounded-lg shadow-sm">
             <FabricLabelCanvas
               label={sampleLabel}
               layout={currentLayout}
