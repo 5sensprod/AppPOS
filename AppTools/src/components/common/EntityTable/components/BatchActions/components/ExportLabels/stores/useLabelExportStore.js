@@ -13,11 +13,14 @@ const DEFAULT_STYLE = {
   showBarcode: true,
   barcodeHeight: 15,
   barcodeWidth: 60,
+  showBarcodeText: true,
+  barcodeTextSize: 8,
   showPrice: true,
-
   priceSize: 14,
+  priceWeight: 'bold',
   showName: false,
   nameSize: 10,
+  nameWeight: 'bold', // ⭐ NOUVEAU (pour cohérence)
   duplicateCount: 1,
 };
 

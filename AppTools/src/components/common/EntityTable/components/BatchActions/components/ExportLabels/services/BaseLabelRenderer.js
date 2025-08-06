@@ -184,14 +184,23 @@ class BaseLabelRenderer {
 
   // 🎨 Ajout de texte unifié
   async _addText(fabricCanvas, text, element, style, fabric, type) {
+    // Déterminer les propriétés selon le type
+    let fontWeight = 'normal';
+
+    if (type === 'price') {
+      fontWeight = style.priceWeight || 'bold';
+    } else if (type === 'name') {
+      fontWeight = style.nameWeight || 'bold';
+    }
+
     const textObj = new fabric.Text(text, {
       left: element.centerX,
       top: element.y,
       originX: 'center',
       fontSize: element.fontSize,
       fontFamily: style.fontFamily || 'Arial',
-      fontWeight: type === 'price' ? 'bold' : type === 'name' ? 'bold' : 'normal',
-      fill: '#000000',
+      fontWeight: fontWeight,
+      fill: '#000000', // Toujours noir pour étiqueteuse thermique
       selectable: false,
       paintFirst: 'fill',
     });
@@ -226,20 +235,29 @@ class BaseLabelRenderer {
     try {
       const barcodeCanvas = document.createElement('canvas');
 
-      // 🎯 LARGEUR CONFIGURABLE : utilise style.barcodeWidth (pourcentage)
-      const proportionFactor = (style.barcodeWidth || 60) / 100; // Convertit % en facteur
+      // 🎯 LARGEUR PROPORTIONNELLE CONTINUE
+      const widthPercentage = (style.barcodeWidth || 60) / 100;
       const availableWidth = element.width - 10 * scaleFactor;
-      const barcodeWidth = availableWidth * proportionFactor;
+      const barcodeWidth = availableWidth * widthPercentage;
 
       barcodeCanvas.width = barcodeWidth;
       barcodeCanvas.height = element.barcodeHeight;
 
-      // 🎯 Largeur des barres adaptative selon la taille
-      const barWidth = proportionFactor < 0.7 ? 0.9 : 1.2; // Plus fin si très réduit
+      // 🎯 LARGEUR DES BARRES PROPORTIONNELLE ET CONTINUE
+      let barWidth;
+      if (widthPercentage <= 0.5) {
+        barWidth = 0.6 + (widthPercentage - 0.4) * 2;
+      } else if (widthPercentage <= 0.7) {
+        barWidth = 0.8 + (widthPercentage - 0.5) * 1;
+      } else {
+        barWidth = 1.0 + (widthPercentage - 0.7) * 0.67;
+      }
+
+      barWidth *= scaleFactor;
 
       JsBarcode(barcodeCanvas, label.barcode, {
         format: 'EAN13',
-        width: barWidth * scaleFactor,
+        width: barWidth,
         height: element.barcodeHeight * 0.85,
         displayValue: false,
         background: '#ffffff',
@@ -258,18 +276,21 @@ class BaseLabelRenderer {
       });
       fabricCanvas.add(barcodeImg);
 
-      // Texte du code-barres
-      const barcodeText = new fabric.Text(this._formatBarcodeText(label.barcode), {
-        left: element.centerX,
-        top: element.y + element.barcodeHeight + 1 * scaleFactor,
-        originX: 'center',
-        fontSize: 8 * scaleFactor,
-        fontFamily: 'Arial',
-        fill: '#000000',
-        selectable: false,
-        paintFirst: 'fill',
-      });
-      fabricCanvas.add(barcodeText);
+      // ⭐ LOGIQUE CONDITIONNELLE : Texte du code-barres seulement si activé
+      if (style.showBarcodeText !== false) {
+        const fontSize = (style.barcodeTextSize || 8) * scaleFactor;
+        const barcodeText = new fabric.Text(this._formatBarcodeText(label.barcode), {
+          left: element.centerX,
+          top: element.y + element.barcodeHeight + 1 * scaleFactor,
+          originX: 'center',
+          fontSize: fontSize,
+          fontFamily: 'Arial',
+          fill: '#000000',
+          selectable: false,
+          paintFirst: 'fill',
+        });
+        fabricCanvas.add(barcodeText);
+      }
     } catch (error) {
       console.warn(`Code-barres invalide pour ${label.name}:`, error.message);
 
@@ -285,6 +306,7 @@ class BaseLabelRenderer {
       fabricCanvas.add(fallbackText);
     }
   }
+
   // 🎯 Formatage code-barres simplifié
   _formatBarcodeText(barcode) {
     const clean = barcode.replace(/[\s-]/g, '');
@@ -308,7 +330,6 @@ class BaseLabelRenderer {
         context: context,
       });
 
-      // 🎯 SOLUTION : Utiliser toDataURL directement sur le canvas HTML au lieu de toCanvasElement
       // Cela évite les marges automatiques ajoutées par Fabric.js
       const imgData = fabricCanvas.toDataURL({
         format: 'png',

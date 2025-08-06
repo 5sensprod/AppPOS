@@ -185,7 +185,11 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     style.showBorder,
     style.nameSize,
     style.priceSize,
+    style.priceWeight,
     style.barcodeHeight,
+    style.barcodeWidth,
+    style.showBarcodeText,
+    style.barcodeTextSize,
     JSON.stringify(style.customPositions),
   ]);
 
