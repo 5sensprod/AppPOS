@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Tags } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Tags, FileText, Printer } from 'lucide-react';
 import BaseModal from '../../../../../ui/BaseModal';
 import LabelsLayoutConfigurator from './components/LabelsLayoutConfigurator';
 import LabelExportSummary from './components/LabelExportSummary';
@@ -28,6 +28,9 @@ const ExportLabelsModal = ({
     buildLabelLayout,
   } = useLabelExportStore();
 
+  // État pour gérer le mode PDF/Impression
+  const [exportMode, setExportMode] = useState('print'); // 'pdf' ou 'print'
+
   useEffect(() => {
     if (isOpen) {
       initialize(selectedItems, productsData, activeFilters, entityNamePlural);
@@ -38,6 +41,7 @@ const ExportLabelsModal = ({
     if (!isOpen) {
       reset('cells');
       reset('print');
+      setExportMode('print'); // Reset au mode Print par défaut
     }
   }, [isOpen, reset]);
 
@@ -59,8 +63,11 @@ const ExportLabelsModal = ({
       const exportConfig = {
         selectedItems,
         exportType: 'labels',
-        title: exportTitle.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_'),
-        format: 'pdf',
+        title:
+          exportMode === 'pdf'
+            ? exportTitle.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_')
+            : undefined,
+        format: exportMode, // 'pdf' ou 'print'
         labelData: extractLabelData(),
         labelLayout: buildLabelLayout(),
       };
@@ -78,6 +85,36 @@ const ExportLabelsModal = ({
 
   const footer = (
     <>
+      {/* Toggle PDF/Impression */}
+      <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+        <button
+          type="button"
+          onClick={() => setExportMode('pdf')}
+          className={`px-3 py-2 text-sm font-medium rounded-md flex items-center transition-colors ${
+            exportMode === 'pdf'
+              ? 'bg-white dark:bg-gray-600 text-green-600 shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+          }`}
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          PDF
+        </button>
+        <button
+          type="button"
+          onClick={() => setExportMode('print')}
+          className={`px-3 py-2 text-sm font-medium rounded-md flex items-center transition-colors ${
+            exportMode === 'print'
+              ? 'bg-white dark:bg-gray-600 text-green-600 shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+          }`}
+        >
+          <Printer className="h-4 w-4 mr-2" />
+          Impression
+        </button>
+      </div>
+
+      <div className="flex-1"></div>
+
       <button
         type="button"
         onClick={handleClose}
@@ -86,26 +123,38 @@ const ExportLabelsModal = ({
         Annuler
       </button>
 
-      {currentLayout?.supportType === 'rouleau' && <DirectPrintButton onClose={handleClose} />}
-
-      <button
-        type="submit"
-        disabled={loading || selectedItems.length === 0}
-        className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center"
-        form="export-labels-form"
-      >
-        {loading ? (
-          <>
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            Génération PDF...
-          </>
-        ) : (
-          <>
-            <Tags className="h-4 w-4 mr-2" />
-            Générer PDF
-          </>
-        )}
-      </button>
+      {/* Bouton d'impression directe seulement en mode impression pour les rouleaux */}
+      {exportMode === 'print' && currentLayout?.supportType === 'rouleau' ? (
+        <DirectPrintButton onClose={handleClose} />
+      ) : (
+        <button
+          type="submit"
+          disabled={loading || selectedItems.length === 0}
+          className="flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          form="export-labels-form"
+        >
+          {loading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              {exportMode === 'pdf' ? 'Génération PDF...' : 'Impression...'}
+            </>
+          ) : (
+            <>
+              {exportMode === 'pdf' ? (
+                <>
+                  <Tags className="h-4 w-4 mr-2" />
+                  Générer PDF
+                </>
+              ) : (
+                <>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimer
+                </>
+              )}
+            </>
+          )}
+        </button>
+      )}
     </>
   );
 
@@ -119,22 +168,25 @@ const ExportLabelsModal = ({
       maxWidth="max-w-4xl"
     >
       <form id="export-labels-form" onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Titre du document
-          </label>
-          <input
-            type="text"
-            value={exportTitle}
-            onChange={(e) => setExportTitle(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            placeholder="Nom du fichier à exporter"
-            required
-            autoFocus
-          />
-        </div>
+        {/* Champ titre seulement en mode PDF */}
+        {exportMode === 'pdf' && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Titre du document
+            </label>
+            <input
+              type="text"
+              value={exportTitle}
+              onChange={(e) => setExportTitle(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              placeholder="Nom du fichier à exporter"
+              required
+              autoFocus
+            />
+          </div>
+        )}
 
-        <LabelsLayoutConfigurator />
+        <LabelsLayoutConfigurator exportMode={exportMode} />
 
         <LabelExportSummary
           selectedCount={selectedCount}

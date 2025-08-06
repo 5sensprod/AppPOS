@@ -79,7 +79,7 @@ const DirectPrintButton = ({ onClose }) => {
   const getButtonText = () => {
     if (printing) return 'Impression...';
     if (printError) return 'Réessayer impression';
-    return 'Imprimer directement';
+    return 'Imprimer';
   };
 
   const getButtonClass = () => {

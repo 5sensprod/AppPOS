@@ -1,6 +1,6 @@
 import React from 'react';
 import { Grid, Ruler, Palette, Eye, Printer, Settings } from 'lucide-react';
-import { useAccordion } from '../hooks/useAccordion'; // 🔧 Import du hook créé
+import { useAccordion } from '../hooks/useAccordion';
 import { AccordionPanel } from './AccordionPanel';
 import LabelDimensionsConfig from './LabelDimensionsConfig';
 import PrintOptionsConfig from './PrintOptionsConfig';
@@ -9,15 +9,17 @@ import CellSelectionGrid from './CellSelectionGrid';
 import PrinterSelector from './PrinterSelector';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
-const LabelsLayoutConfigurator = () => {
+const LabelsLayoutConfigurator = ({ exportMode }) => {
   const { currentLayout, extractLabelData, getGridDimensions } = useLabelExportStore();
 
   const labelData = extractLabelData();
 
-  // 🔧 Tous les accordéons fermés par défaut
-  const { toggle, isOpen } = useAccordion(['dimensions']); // Array vide = tout fermé
+  // Accordéons fermés par défaut, avec panels différents selon le mode
+  const defaultPanels =
+    exportMode === 'print' ? ['style', 'print', 'printer'] : ['dimensions', 'style'];
+  const { toggle, isOpen } = useAccordion(defaultPanels);
 
-  // 🆕 Fonction pour générer les infos du header selon le type de support
+  // Fonction pour générer les infos du header selon le type de support
   const getDimensionsHeaderInfo = () => {
     if (!currentLayout) return '';
 
@@ -41,13 +43,13 @@ const LabelsLayoutConfigurator = () => {
     }
   };
 
-  // 🆕 Fonction pour les infos de style
+  // Fonction pour les infos de style
   const getStyleHeaderInfo = () => {
     // On pourrait accéder au labelStyle depuis le store ici si besoin
     return ''; // Pour l'instant vide, à implémenter selon vos besoins
   };
 
-  // 🆕 Fonction pour les infos d'impression
+  // Fonction pour les infos d'impression
   const getPrintHeaderInfo = () => {
     // Exemple : afficher le nombre de copies si disponible
     return ''; // À implémenter selon vos besoins
@@ -59,15 +61,19 @@ const LabelsLayoutConfigurator = () => {
 
   return (
     <div className="space-y-3 bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-      {/* En-tête simple */}
-      <div className="flex items-center space-x-2 mb-3">
-        <Grid className="h-5 w-5 text-blue-600" />
-        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          Configuration des étiquettes
-        </h3>
+      {/* En-tête avec indication du mode */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-2">
+          <Grid className="h-5 w-5 text-blue-600" />
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            Configuration des étiquettes
+          </h3>
+        </div>
+        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+          Mode: {exportMode === 'pdf' ? 'PDF' : 'Impression'}
+        </span>
       </div>
-
-      {/* Panel Dimensions avec infos dans le header */}
+      {/* Panel Dimensions - toujours visible */}
       <AccordionPanel
         id="dimensions"
         title={`Configuration des dimensions${!isOpen('dimensions') && dimensionsInfo ? ` • ${dimensionsInfo}` : ''}`}
@@ -77,8 +83,7 @@ const LabelsLayoutConfigurator = () => {
       >
         <LabelDimensionsConfig />
       </AccordionPanel>
-
-      {/* Panel Style avec aperçu intégré */}
+      {/* Panel Style - toujours visible */}
       <AccordionPanel
         id="style"
         title="Style des étiquettes"
@@ -88,33 +93,13 @@ const LabelsLayoutConfigurator = () => {
       >
         <LabelStyleConfig />
       </AccordionPanel>
-
-      {/* Panel Options d'impression */}
-      <AccordionPanel
-        id="print"
-        title="Options d'impression"
-        icon={Settings}
-        isOpen={isOpen('print')}
-        onToggle={toggle}
-      >
-        <PrintOptionsConfig />
-      </AccordionPanel>
-
-      {/* Panel Sélection d'imprimante (mode rouleau uniquement) */}
-      {currentLayout?.supportType === 'rouleau' && (
-        <AccordionPanel
-          id="printer"
-          title="Sélection d'imprimante"
-          icon={Printer}
-          isOpen={isOpen('printer')}
-          onToggle={toggle}
-        >
-          <PrinterSelector />
-        </AccordionPanel>
-      )}
-
-      {/* Panel Gestion des cellules (seulement pour A4) */}
-      {currentLayout?.supportType !== 'rouleau' && (
+      {/* Panels mode impression */}
+      <div className="grid grid-cols-2 gap-4">
+        {exportMode === 'print' && <PrintOptionsConfig />}
+        {exportMode === 'print' && currentLayout?.supportType === 'rouleau' && <PrinterSelector />}
+      </div>
+      {/* Panel Gestion des cellules - seulement pour A4 en mode PDF */}
+      {exportMode === 'pdf' && currentLayout?.supportType !== 'rouleau' && (
         <AccordionPanel
           id="cells"
           title="Gestion des cellules"

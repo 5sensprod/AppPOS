@@ -99,23 +99,6 @@ const PrinterSelector = () => {
               </option>
             ))}
           </select>
-
-          {/* Info imprimante sélectionnée */}
-          {selectedPrinter && (
-            <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
-              <div className="text-xs text-green-700 dark:text-green-300">
-                <div className="flex items-center font-medium">
-                  <Wifi className="h-3 w-3 mr-1" />
-                  {selectedPrinter.Name}
-                </div>
-                <div className="mt-1 space-y-1">
-                  <div>Driver: {selectedPrinter.DriverName}</div>
-                  <div>Port: {selectedPrinter.PortName}</div>
-                  {selectedPrinter.Default && <div>🎯 Imprimante par défaut</div>}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -128,14 +111,6 @@ const PrinterSelector = () => {
           </div>
         </div>
       )}
-
-      {/* 🆕 Aide contextuelle */}
-      <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
-        <div className="text-xs text-gray-600 dark:text-gray-400">
-          💡 <strong>Astuce :</strong> L'impression directe nécessite une imprimante d'étiquettes
-          compatible (Brother, Zebra, etc.) configurée sur votre système.
-        </div>
-      </div>
     </div>
   );
 };
