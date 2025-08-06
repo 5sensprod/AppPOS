@@ -15,13 +15,13 @@ class LabelPrintingService {
   }
 
   // Méthode principale - conserve la logique de qualité
-  async printLabels({ images, printerName, layout, copies = 1 }) {
+  async printLabels({ images, printerName, layout, copies = 1, preserveOriginalSize = false }) {
     const results = [];
 
     for (let i = 0; i < images.length; i++) {
       try {
         const tempFile = await this.#saveImage(images[i], `label_${Date.now()}_${i}`);
-        await this.#printImage(tempFile, { printerName, layout, copies });
+        await this.#printImage(tempFile, { printerName, layout, copies, preserveOriginalSize });
 
         results.push({ index: i, success: true });
 
@@ -45,8 +45,13 @@ class LabelPrintingService {
   }
 
   // Impression HAUTE QUALITÉ mais script simplifié
-  async #printImage(filePath, { printerName, layout, copies = 1 }) {
-    const script = this.#generateQualityPrintScript(filePath, { printerName, layout, copies });
+  async #printImage(filePath, { printerName, layout, copies = 1, preserveOriginalSize = false }) {
+    const script = this.#generateQualityPrintScript(filePath, {
+      printerName,
+      layout,
+      copies,
+      preserveOriginalSize,
+    });
 
     return new Promise((resolve, reject) => {
       const ps = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-Command', script], {
@@ -65,14 +70,17 @@ class LabelPrintingService {
     });
   }
 
-  // Script PowerShell OPTIMISÉ mais qualité préservée
-  #generateQualityPrintScript(filePath, { printerName, layout, copies = 1 }) {
+  // Script PowerShell OPTIMISÉ avec option de taille originale
+  #generateQualityPrintScript(
+    filePath,
+    { printerName, layout, copies = 1, preserveOriginalSize = false }
+  ) {
     // Calcul dimensions étiquette (conservé de l'original)
     let widthPixels = 384; // Brother par défaut
     let heightPixels = 240;
 
     if (layout) {
-      const dpi = 120;
+      const dpi = 96;
       const mmToPixels = (mm) => Math.round((mm * dpi) / 25.4);
       widthPixels = mmToPixels(layout.width);
       heightPixels = mmToPixels(layout.height);
@@ -92,14 +100,38 @@ try {
         throw "Imprimante non disponible: $($printDoc.PrinterSettings.PrinterName)"
     }
     
-    # Configuration étiquette (dimensions précises conservées)
+    # Configuration étiquette
+    ${
+      preserveOriginalSize
+        ? `
+    # Utiliser les dimensions de l'image originale
+    $printDoc.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Label", $image.Width, $image.Height)
+    `
+        : `
+    # Utiliser les dimensions spécifiées
     $printDoc.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Label", ${widthPixels}, ${heightPixels})
+    `
+    }
     $printDoc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
     
-    # QUALITÉ MAXIMALE (partie cruciale conservée)
+    # IMPRESSION SANS MODIFICATION
     $printDoc.add_PrintPage({
         param($sender, $e)
         
+        ${
+          preserveOriginalSize
+            ? `
+        # Imprimer l'image à sa taille originale sans redimensionnement
+        $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+        $e.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::None
+        $e.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::None
+        
+        # Dessiner l'image sans modification de taille
+        $destRect = New-Object System.Drawing.Rectangle(0, 0, $image.Width, $image.Height)
+        $e.Graphics.DrawImage($image, $destRect, 0, 0, $image.Width, $image.Height, [System.Drawing.GraphicsUnit]::Pixel)
+        `
+            : `
+        # Mode original avec redimensionnement
         $pageWidth = $e.PageBounds.Width
         $pageHeight = $e.PageBounds.Height
         
@@ -109,7 +141,7 @@ try {
         $newHeight = $image.Height * $scaleFactor
         
         # Centrage précis
-        $x = ($pageWidth - $newWidth) / 2 - 12
+        $x = ($pageWidth - $newWidth) / 2 
         $y = ($pageHeight - $newHeight) / 2
         
         # RENDU HAUTE QUALITÉ (essentiel pour étiquettes)
@@ -120,6 +152,8 @@ try {
         # Rendu final
         $destRect = New-Object System.Drawing.Rectangle($x, $y, $newWidth, $newHeight)
         $e.Graphics.DrawImage($image, $destRect)
+        `
+        }
     })
     
     # Impression des copies
