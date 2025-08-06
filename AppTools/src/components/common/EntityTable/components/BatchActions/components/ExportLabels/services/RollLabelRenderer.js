@@ -145,16 +145,13 @@ class RollLabelRenderer extends BaseLabelRenderer {
       }
       const layout = labelLayout.layout || this._getDefaultLayout();
       const style = labelLayout.style || this._getDefaultStyle();
-
       // Validation mode rouleau
       if (layout.supportType !== 'rouleau') {
         throw new Error('L\'impression directe ne supporte que le type "rouleau"');
       }
-
       // Préparation des données
       const duplicatedLabels = this._prepareDuplicatedLabels(labelData, style.duplicateCount || 1);
       console.log(`🖨️ Génération ${duplicatedLabels.length} étiquettes pour impression directe`);
-
       // 🎯 Génération des images en parallèle (plus rapide)
       const images = await Promise.all(
         duplicatedLabels.map(async (label, index) => {
@@ -166,22 +163,11 @@ class RollLabelRenderer extends BaseLabelRenderer {
           }
         })
       );
-
       // Filtrer les images valides
       const validImages = images.filter(Boolean);
       if (!validImages.length) {
         throw new Error('Aucune étiquette valide générée');
       }
-
-      // 💾 Téléchargement simple des images générées
-      validImages.forEach((dataUrl, index) => {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `etiquette_${index + 1}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      });
 
       // 🖨️ Envoi vers l'imprimante SANS MODIFICATION
       const apiService = await import('../../../../../../../../services/api');
@@ -192,7 +178,6 @@ class RollLabelRenderer extends BaseLabelRenderer {
         copies,
         preserveOriginalSize: true, // 🎯 NOUVEAU PARAMÈTRE pour conserver la taille originale
       });
-
       return {
         ...response.data,
         generated: duplicatedLabels.length,
