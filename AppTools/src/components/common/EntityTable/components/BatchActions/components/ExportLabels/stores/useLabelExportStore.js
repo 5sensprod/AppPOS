@@ -12,7 +12,9 @@ const DEFAULT_STYLE = {
   alignment: 'center',
   showBarcode: true,
   barcodeHeight: 15,
+  barcodeWidth: 60,
   showPrice: true,
+
   priceSize: 14,
   showName: false,
   nameSize: 10,

@@ -222,19 +222,27 @@ class BaseLabelRenderer {
   }
 
   // 🎯 Code-barres avec gestion d'erreur tolérante
+  // 🎯 Code-barres avec taille réduite et optimisée
+  // 🎯 Code-barres avec réduction proportionnelle de la largeur
   async _addBarcode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     try {
       const barcodeCanvas = document.createElement('canvas');
-      const barcodeWidth = Math.min(element.width - 10 * scaleFactor, 150 * scaleFactor);
+
+      // 🎯 LARGEUR CONFIGURABLE : utilise style.barcodeWidth (pourcentage)
+      const proportionFactor = (style.barcodeWidth || 60) / 100; // Convertit % en facteur
+      const availableWidth = element.width - 10 * scaleFactor;
+      const barcodeWidth = availableWidth * proportionFactor;
 
       barcodeCanvas.width = barcodeWidth;
       barcodeCanvas.height = element.barcodeHeight;
 
-      // 🎯 Tentative de génération code-barres
+      // 🎯 Largeur des barres adaptative selon la taille
+      const barWidth = proportionFactor < 0.7 ? 0.9 : 1.2; // Plus fin si très réduit
+
       JsBarcode(barcodeCanvas, label.barcode, {
         format: 'EAN13',
-        width: 1.5 * scaleFactor,
-        height: element.barcodeHeight * 0.9,
+        width: barWidth * scaleFactor,
+        height: element.barcodeHeight * 0.85,
         displayValue: false,
         background: '#ffffff',
         lineColor: '#000000',
@@ -242,7 +250,7 @@ class BaseLabelRenderer {
         flat: true,
       });
 
-      // Image du code-barres
+      // Image du code-barres (centrée)
       const barcodeImg = new fabric.Image(barcodeCanvas, {
         left: element.centerX,
         top: element.y,
@@ -255,9 +263,9 @@ class BaseLabelRenderer {
       // Texte du code-barres
       const barcodeText = new fabric.Text(this._formatBarcodeText(label.barcode), {
         left: element.centerX,
-        top: element.y + element.barcodeHeight + 2 * scaleFactor,
+        top: element.y + element.barcodeHeight + 1 * scaleFactor,
         originX: 'center',
-        fontSize: 9 * scaleFactor,
+        fontSize: 8 * scaleFactor,
         fontFamily: 'Arial',
         fill: '#000000',
         selectable: false,
@@ -265,14 +273,13 @@ class BaseLabelRenderer {
       });
       fabricCanvas.add(barcodeText);
     } catch (error) {
-      // 🎯 Fallback silencieux - affichage texte simple
       console.warn(`Code-barres invalide pour ${label.name}:`, error.message);
 
       const fallbackText = new fabric.Text(label.barcode, {
         left: element.centerX,
         top: element.y,
         originX: 'center',
-        fontSize: 10 * scaleFactor,
+        fontSize: 9 * scaleFactor,
         fontFamily: 'Arial',
         fill: '#666666',
         selectable: false,
@@ -280,7 +287,6 @@ class BaseLabelRenderer {
       fabricCanvas.add(fallbackText);
     }
   }
-
   // 🎯 Formatage code-barres simplifié
   _formatBarcodeText(barcode) {
     const clean = barcode.replace(/[\s-]/g, '');
@@ -304,8 +310,17 @@ class BaseLabelRenderer {
         context: context,
       });
 
-      const canvasElement = fabricCanvas.toCanvasElement();
-      const imgData = canvasElement.toDataURL('image/png', 1.0);
+      // 🎯 SOLUTION : Utiliser toDataURL directement sur le canvas HTML au lieu de toCanvasElement
+      // Cela évite les marges automatiques ajoutées par Fabric.js
+      const imgData = fabricCanvas.toDataURL({
+        format: 'png',
+        quality: 1.0,
+        multiplier: 1, // Pas de sur-échantillonnage
+        left: 0, // Départ exact à 0
+        top: 0, // Départ exact à 0
+        width: fabricCanvas.width, // Largeur exacte du canvas
+        height: fabricCanvas.height, // Hauteur exacte du canvas
+      });
 
       fabricCanvas.dispose();
       return imgData;

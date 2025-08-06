@@ -183,21 +183,40 @@ const LabelStyleConfig = () => {
           </div>
         )}
         {labelStyle.showBarcode && (
-          <div>
-            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Hauteur code-barres
-            </label>
-            <input
-              type="number"
-              min="10"
-              max="30"
-              value={labelStyle.barcodeHeight}
-              onChange={(e) => {
-                updateStyle({ barcodeHeight: parseInt(e.target.value) });
-              }}
-              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                Hauteur code-barres
+              </label>
+              <input
+                type="number"
+                min="10"
+                max="30"
+                value={labelStyle.barcodeHeight}
+                onChange={(e) => {
+                  updateStyle({ barcodeHeight: parseInt(e.target.value) });
+                }}
+                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                Largeur code-barres (%)
+              </label>
+              <input
+                type="number"
+                min="40"
+                max="100"
+                step="5"
+                value={labelStyle.barcodeWidth || 60}
+                onChange={(e) => {
+                  updateStyle({ barcodeWidth: parseInt(e.target.value) });
+                }}
+                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
+                title="Pourcentage de la largeur de l'étiquette"
+              />
+            </div>
+          </>
         )}
       </div>
 
