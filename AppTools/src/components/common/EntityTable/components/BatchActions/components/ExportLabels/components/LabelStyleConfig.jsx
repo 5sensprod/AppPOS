@@ -303,10 +303,10 @@ const LabelStyleConfig = () => {
   }, [labelStyle.customPositions]);
 
   // Reset des positions lors de changements MAJEURS
-  useEffect(() => {
-    setCustomPositions({});
-    updateStyle({ customPositions: {} });
-  }, [currentLayout.supportType, sampleLabel?.id]); // ⭐ SUPPRESSION de updateStyle
+  // useEffect(() => {
+  //   setCustomPositions({});
+  //   updateStyle({ customPositions: {} });
+  // }, [currentLayout.supportType, sampleLabel?.id]);
 
   // Sélectionner automatiquement le premier onglet activé
   useEffect(() => {

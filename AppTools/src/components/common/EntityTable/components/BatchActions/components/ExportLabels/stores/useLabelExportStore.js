@@ -22,6 +22,7 @@ const DEFAULT_STYLE = {
   nameSize: 10,
   nameWeight: 'bold', // ⭐ NOUVEAU (pour cohérence)
   duplicateCount: 1,
+  customPositions: {},
 };
 
 const DEFAULT_LAYOUTS = {
@@ -132,7 +133,11 @@ export const useLabelExportStore = create(
           const updates = {};
 
           if (scope === 'all' || scope === 'style') {
-            updates.labelStyle = { ...DEFAULT_STYLE, duplicateCount: 1 };
+            updates.labelStyle = {
+              ...DEFAULT_STYLE,
+              duplicateCount: 1,
+              customPositions: state.labelStyle.customPositions || {},
+            };
           }
           if (scope === 'all' || scope === 'layout') {
             updates.currentLayout =

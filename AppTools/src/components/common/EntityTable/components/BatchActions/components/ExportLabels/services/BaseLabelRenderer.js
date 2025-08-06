@@ -184,7 +184,6 @@ class BaseLabelRenderer {
 
   // 🎨 Ajout de texte unifié
   async _addText(fabricCanvas, text, element, style, fabric, type) {
-    // Déterminer les propriétés selon le type
     let fontWeight = 'normal';
 
     if (type === 'price') {
@@ -200,7 +199,7 @@ class BaseLabelRenderer {
       fontSize: element.fontSize,
       fontFamily: style.fontFamily || 'Arial',
       fontWeight: fontWeight,
-      fill: '#000000', // Toujours noir pour étiqueteuse thermique
+      fill: '#000000',
       selectable: false,
       paintFirst: 'fill',
     });
