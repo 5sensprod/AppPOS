@@ -5,7 +5,6 @@ import { AccordionPanel } from './AccordionPanel';
 import LabelDimensionsConfig from './LabelDimensionsConfig';
 import PrintOptionsConfig from './PrintOptionsConfig';
 import LabelStyleConfig from './LabelStyleConfig';
-import LabelPreview from './LabelPreview';
 import CellSelectionGrid from './CellSelectionGrid';
 import PrinterSelector from './PrinterSelector';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
