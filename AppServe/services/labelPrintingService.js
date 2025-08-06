@@ -72,7 +72,7 @@ class LabelPrintingService {
     let heightPixels = 240;
 
     if (layout) {
-      const dpi = 96;
+      const dpi = 120;
       const mmToPixels = (mm) => Math.round((mm * dpi) / 25.4);
       widthPixels = mmToPixels(layout.width);
       heightPixels = mmToPixels(layout.height);
@@ -109,7 +109,7 @@ try {
         $newHeight = $image.Height * $scaleFactor
         
         # Centrage précis
-        $x = ($pageWidth - $newWidth) / 2
+        $x = ($pageWidth - $newWidth) / 2 - 12
         $y = ($pageHeight - $newHeight) / 2
         
         # RENDU HAUTE QUALITÉ (essentiel pour étiquettes)
