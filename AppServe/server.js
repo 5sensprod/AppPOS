@@ -127,7 +127,6 @@ const productTitleRoutes = require('./routes/productTitleRoutes');
 const saleRoutes = require('./routes/saleRoutes');
 const timeRoutes = require('./routes/timeRoutes');
 const backupRoutes = require('./routes/backupRoutes');
-const brotherRoutes = require('./routes/brotherRoutes');
 
 const userPresetRoutes = require('./routes/userPresetRoutes');
 
@@ -152,7 +151,6 @@ app.use('/api/wordpress/menu', authMiddleware, wordpressMenuRoutes);
 
 const dataCopyRoutes = require('./routes/dataCopyRoutes');
 app.use('/api/data-copy', authMiddleware, dataCopyRoutes);
-app.use('/api/brother', authMiddleware, brotherRoutes);
 
 // ✅ ROUTE D'INFO SERVEUR AVEC ID D'AUTH ET STATUS BACKUP
 app.get('/api/server-info', (req, res) => {
