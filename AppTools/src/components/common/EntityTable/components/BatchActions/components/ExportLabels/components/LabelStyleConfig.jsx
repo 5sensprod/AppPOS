@@ -292,7 +292,7 @@ const LabelStyleConfig = () => {
     savedPresets,
   } = useLabelExportStore();
 
-  const { toggle, isOpen } = useAccordion(['presets']);
+  const { toggle, isOpen } = useAccordion(['']);
   const labelData = extractLabelData();
   const sampleLabel = labelData.length > 0 ? labelData[0] : null;
   const [customPositions, setCustomPositions] = useState({});
@@ -409,6 +409,47 @@ const LabelStyleConfig = () => {
 
   return (
     <div className="space-y-4">
+      {/* 💾 Presets Manager */}
+      <div className="border border-gray-200 dark:border-gray-600 rounded-lg">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            toggle('presets');
+          }}
+          className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-t-lg"
+        >
+          <div className="flex items-center">
+            <Save className="h-4 w-4 mr-2 text-gray-600 dark:text-gray-400" />
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Presets de style
+            </span>
+            {stylePresets.length > 0 && (
+              <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
+                {stylePresets.length}
+              </span>
+            )}
+          </div>
+          {isOpen('presets') ? (
+            <ChevronDown className="h-4 w-4 text-gray-500" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-gray-500" />
+          )}
+        </button>
+
+        {isOpen('presets') && (
+          <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600">
+            <PresetManager
+              savedPresets={allPresets}
+              onSavePreset={handleSavePreset}
+              onLoadPreset={handleLoadPreset}
+              onDeletePreset={handleDeletePreset}
+              title="Presets d'étiquettes"
+              emptyMessage="Aucun preset sauvegardé"
+            />
+          </div>
+        )}
+      </div>
       {/* 🎨 Aperçu en haut */}
       {sampleLabel && (
         <div className="flex justify-center">
@@ -472,48 +513,6 @@ const LabelStyleConfig = () => {
             </div>
           )}
         </div>
-      </div>
-
-      {/* 💾 Presets Manager */}
-      <div className="border border-gray-200 dark:border-gray-600 rounded-lg">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            toggle('presets');
-          }}
-          className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-t-lg"
-        >
-          <div className="flex items-center">
-            <Save className="h-4 w-4 mr-2 text-gray-600 dark:text-gray-400" />
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              Presets de style
-            </span>
-            {stylePresets.length > 0 && (
-              <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
-                {stylePresets.length}
-              </span>
-            )}
-          </div>
-          {isOpen('presets') ? (
-            <ChevronDown className="h-4 w-4 text-gray-500" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-gray-500" />
-          )}
-        </button>
-
-        {isOpen('presets') && (
-          <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600">
-            <PresetManager
-              savedPresets={allPresets}
-              onSavePreset={handleSavePreset}
-              onLoadPreset={handleLoadPreset}
-              onDeletePreset={handleDeletePreset}
-              title="Presets d'étiquettes"
-              emptyMessage="Aucun preset sauvegardé"
-            />
-          </div>
-        )}
       </div>
     </div>
   );
