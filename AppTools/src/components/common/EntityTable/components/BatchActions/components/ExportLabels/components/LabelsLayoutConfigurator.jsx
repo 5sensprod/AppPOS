@@ -74,7 +74,7 @@ const LabelsLayoutConfigurator = ({ exportMode }) => {
       {/* Panel Dimensions - toujours visible */}
       <AccordionPanel
         id="dimensions"
-        title={`Configuration des dimensions${!isOpen('dimensions') && dimensionsInfo ? ` • ${dimensionsInfo}` : ''}`}
+        title={`Configuration du support${!isOpen('dimensions') && dimensionsInfo ? ` • ${dimensionsInfo}` : ''}`}
         icon={Ruler}
         isOpen={isOpen('dimensions')}
         onToggle={toggle}
