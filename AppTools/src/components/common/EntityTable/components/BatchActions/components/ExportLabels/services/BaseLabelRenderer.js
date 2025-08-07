@@ -1,9 +1,7 @@
 import JsBarcode from 'jsbarcode';
 import { formatCurrency } from '../../../../../../../../utils/formatters.js';
+import { QRCodeSVG } from 'qrcode.react';
 
-/**
- * Classe de base optimisée pour le rendu d'étiquettes
- */
 class BaseLabelRenderer {
   constructor() {
     this.mmToPx = 3.779527559;
@@ -108,7 +106,6 @@ class BaseLabelRenderer {
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
     const canvasHeight = layout.height * this.mmToPx * scaleFactor;
 
-    // NOUVELLE LOGIQUE : marge latérale uniquement pour les rouleaux
     const isRouleau = layout.supportType === 'rouleau';
     const lateralMargin = isRouleau ? layout.padding || 2 : layout.padding || 2;
     const paddingH = lateralMargin * this.mmToPx * scaleFactor;
@@ -144,7 +141,7 @@ class BaseLabelRenderer {
       return element;
     };
 
-    // Reste du code identique...
+    // Name
     if (style.showName) {
       const height = Math.max(15, (style.nameSize || 10) * 1.2) * scaleFactor;
       elements.name = {
@@ -153,6 +150,7 @@ class BaseLabelRenderer {
       };
     }
 
+    // Price
     if (style.showPrice) {
       const height = Math.max(20, (style.priceSize || 14) * 1.4) * scaleFactor;
       elements.price = {
@@ -161,23 +159,47 @@ class BaseLabelRenderer {
       };
     }
 
+    // ⭐ Barcode/QR Code avec calcul adaptatif
     if (style.showBarcode) {
-      const barcodeHeight = (style.barcodeHeight || 15) * this.mmToPx * 0.4 * scaleFactor;
-      const textHeight = 12 * scaleFactor;
-      const totalHeight = barcodeHeight + textHeight + 4 * scaleFactor;
+      let totalHeight;
 
-      elements.barcode = customPositions.barcode
-        ? createElement('barcode', totalHeight, customPositions.barcode)
-        : {
-            x: paddingH,
-            y: canvasHeight - paddingV - totalHeight,
-            width: contentWidth,
-            height: totalHeight,
-            centerX: paddingH + contentWidth / 2,
-          };
+      if (style.barcodeType === 'qrcode') {
+        // QR Code : dimension carrée
+        const qrSize = (style.qrCodeSize || 20) * this.mmToPx * scaleFactor;
+        const textHeight = style.showBarcodeText !== false ? 12 * scaleFactor : 0;
+        totalHeight = qrSize + textHeight + (textHeight > 0 ? 4 * scaleFactor : 0);
 
-      elements.barcode.barcodeHeight = barcodeHeight;
-      elements.barcode.textHeight = textHeight;
+        elements.barcode = customPositions.barcode
+          ? createElement('barcode', totalHeight, customPositions.barcode)
+          : {
+              x: paddingH,
+              y: canvasHeight - paddingV - totalHeight,
+              width: contentWidth,
+              height: totalHeight,
+              centerX: paddingH + contentWidth / 2,
+            };
+
+        elements.barcode.barcodeHeight = qrSize;
+      } else {
+        // Code-barres classique
+        const barcodeHeight = (style.barcodeHeight || 15) * this.mmToPx * 0.4 * scaleFactor;
+        const textHeight = style.showBarcodeText !== false ? 12 * scaleFactor : 0;
+        totalHeight = barcodeHeight + textHeight + (textHeight > 0 ? 4 * scaleFactor : 0);
+
+        elements.barcode = customPositions.barcode
+          ? createElement('barcode', totalHeight, customPositions.barcode)
+          : {
+              x: paddingH,
+              y: canvasHeight - paddingV - totalHeight,
+              width: contentWidth,
+              height: totalHeight,
+              centerX: paddingH + contentWidth / 2,
+            };
+
+        elements.barcode.barcodeHeight = barcodeHeight;
+      }
+
+      elements.barcode.textHeight = style.showBarcodeText !== false ? 12 * scaleFactor : 0;
     }
 
     return elements;
@@ -255,53 +277,59 @@ class BaseLabelRenderer {
   // 🎯 Code-barres avec réduction proportionnelle de la largeur
   async _addBarcode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     try {
-      const barcodeCanvas = document.createElement('canvas');
-
-      // 🎯 LARGEUR PROPORTIONNELLE CONTINUE
-      const widthPercentage = (style.barcodeWidth || 60) / 100;
-      const availableWidth = element.width - 10 * scaleFactor;
-      const barcodeWidth = availableWidth * widthPercentage;
-
-      barcodeCanvas.width = barcodeWidth;
-      barcodeCanvas.height = element.barcodeHeight;
-
-      // 🎯 LARGEUR DES BARRES PROPORTIONNELLE ET CONTINUE
-      let barWidth;
-      if (widthPercentage <= 0.5) {
-        barWidth = 0.6 + (widthPercentage - 0.4) * 2;
-      } else if (widthPercentage <= 0.7) {
-        barWidth = 0.8 + (widthPercentage - 0.5) * 1;
+      if (style.barcodeType === 'qrcode') {
+        // ⭐ NOUVEAU: Rendu QR Code avec qrcode.react
+        await this._addQRCode(fabricCanvas, label, element, style, fabric, scaleFactor);
       } else {
-        barWidth = 1.0 + (widthPercentage - 0.7) * 0.67;
+        // Rendu code-barres existant (inchangé)
+        const barcodeCanvas = document.createElement('canvas');
+
+        const widthPercentage = (style.barcodeWidth || 60) / 100;
+        const availableWidth = element.width - 10 * scaleFactor;
+        const barcodeWidth = availableWidth * widthPercentage;
+
+        barcodeCanvas.width = barcodeWidth;
+        barcodeCanvas.height = element.barcodeHeight;
+
+        let barWidth;
+        if (widthPercentage <= 0.5) {
+          barWidth = 0.6 + (widthPercentage - 0.4) * 2;
+        } else if (widthPercentage <= 0.7) {
+          barWidth = 0.8 + (widthPercentage - 0.5) * 1;
+        } else {
+          barWidth = 1.0 + (widthPercentage - 0.7) * 0.67;
+        }
+
+        barWidth *= scaleFactor;
+
+        JsBarcode(barcodeCanvas, label.barcode, {
+          format: 'EAN13',
+          width: barWidth,
+          height: element.barcodeHeight * 0.85,
+          displayValue: false,
+          background: '#ffffff',
+          lineColor: '#000000',
+          margin: 0,
+          flat: true,
+        });
+
+        const barcodeImg = new fabric.Image(barcodeCanvas, {
+          left: element.centerX,
+          top: element.y,
+          originX: 'center',
+          selectable: false,
+          imageSmoothing: false,
+        });
+        fabricCanvas.add(barcodeImg);
       }
 
-      barWidth *= scaleFactor;
-
-      JsBarcode(barcodeCanvas, label.barcode, {
-        format: 'EAN13',
-        width: barWidth,
-        height: element.barcodeHeight * 0.85,
-        displayValue: false,
-        background: '#ffffff',
-        lineColor: '#000000',
-        margin: 0,
-        flat: true,
-      });
-
-      // Image du code-barres (centrée)
-      const barcodeImg = new fabric.Image(barcodeCanvas, {
-        left: element.centerX,
-        top: element.y,
-        originX: 'center',
-        selectable: false,
-        imageSmoothing: false,
-      });
-      fabricCanvas.add(barcodeImg);
-
-      // ⭐ LOGIQUE CONDITIONNELLE : Texte du code-barres seulement si activé
+      // ⭐ Texte sous le code (commun aux deux types)
       if (style.showBarcodeText !== false) {
         const fontSize = (style.barcodeTextSize || 8) * scaleFactor;
-        const barcodeText = new fabric.Text(this._formatBarcodeText(label.barcode), {
+        const displayText =
+          style.barcodeType === 'qrcode' ? label.barcode : this._formatBarcodeText(label.barcode);
+
+        const barcodeText = new fabric.Text(displayText, {
           left: element.centerX,
           top: element.y + element.barcodeHeight + 1 * scaleFactor,
           originX: 'center',
@@ -314,7 +342,7 @@ class BaseLabelRenderer {
         fabricCanvas.add(barcodeText);
       }
     } catch (error) {
-      console.warn(`Code-barres invalide pour ${label.name}:`, error.message);
+      console.warn(`Code invalide pour ${label.name}:`, error.message);
 
       const fallbackText = new fabric.Text(label.barcode, {
         left: element.centerX,
@@ -327,6 +355,185 @@ class BaseLabelRenderer {
       });
       fabricCanvas.add(fallbackText);
     }
+  }
+
+  async _addQRCode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
+    const qrSize = (style.qrCodeSize || 20) * this.mmToPx * scaleFactor;
+
+    console.log('🔶 Génération QR Code:', label.barcode, 'taille:', qrSize);
+
+    try {
+      // Créer un conteneur temporaire invisible pour rendre le QRCode React
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '-9999px';
+      tempContainer.style.pointerEvents = 'none';
+      document.body.appendChild(tempContainer);
+
+      // Créer un élément pour recevoir le QR Code
+      const qrContainer = document.createElement('div');
+      tempContainer.appendChild(qrContainer);
+
+      // ⭐ REACT 18 : Utiliser createRoot au lieu de ReactDOM.render
+      const React = await import('react');
+      const { createRoot } = await import('react-dom/client');
+
+      // Rendre le QRCodeSVG
+      const qrElement = React.createElement(QRCodeSVG, {
+        value: label.barcode,
+        size: Math.round(qrSize),
+        level: 'M', // Niveau de correction d'erreur Medium
+        includeMargin: false,
+        bgColor: '#ffffff',
+        fgColor: '#000000',
+      });
+
+      // Rendu avec une Promise pour attendre le résultat
+      await new Promise((resolve, reject) => {
+        try {
+          // ⭐ Créer le root React 18
+          const root = createRoot(qrContainer);
+
+          // ⭐ Rendre le composant
+          root.render(qrElement);
+
+          // Attendre le rendu
+          setTimeout(() => {
+            try {
+              const svgElement = qrContainer.querySelector('svg');
+              if (svgElement) {
+                // Récupérer le SVG généré
+                const svgString = new XMLSerializer().serializeToString(svgElement);
+
+                // Créer une image pour Fabric.js
+                const img = new Image();
+                img.onload = () => {
+                  const qrImage = new fabric.Image(img, {
+                    left: element.centerX,
+                    top: element.y,
+                    originX: 'center',
+                    originY: 'top',
+                    selectable: false,
+                  });
+
+                  fabricCanvas.add(qrImage);
+
+                  // ⭐ REACT 18 : Nettoyer avec unmount()
+                  root.unmount();
+                  document.body.removeChild(tempContainer);
+
+                  console.log('✅ QR Code ajouté au canvas (React 18)');
+                  resolve();
+                };
+
+                img.onerror = () => {
+                  console.error('❌ Erreur chargement image QR Code');
+                  root.unmount();
+                  document.body.removeChild(tempContainer);
+                  this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
+                  reject(new Error('Erreur chargement QR Code'));
+                };
+
+                // Encoder le SVG en base64 pour l'image
+                img.src =
+                  'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+              } else {
+                console.error('❌ SVG QR Code non trouvé');
+                root.unmount();
+                document.body.removeChild(tempContainer);
+                this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
+                reject(new Error('SVG non généré'));
+              }
+            } catch (err) {
+              console.error('❌ Erreur traitement QR Code:', err);
+              root.unmount();
+              document.body.removeChild(tempContainer);
+              this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
+              reject(err);
+            }
+          }, 100); // Délai pour React 18
+        } catch (err) {
+          console.error('❌ Erreur createRoot:', err);
+          this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
+          reject(err);
+        }
+      });
+    } catch (error) {
+      console.error('❌ Erreur génération QR Code:', error);
+      this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
+    }
+  }
+
+  // ⭐ QR Code de secours en cas d'erreur
+  _addFallbackQR(fabricCanvas, element, barcodeText, fabric) {
+    console.log('🔄 Utilisation QR Code de secours');
+
+    // QR Code très basique avec bordure
+    const qrSize = element.barcodeHeight || 60;
+    const border = qrSize * 0.1;
+
+    // Fond blanc
+    const background = new fabric.Rect({
+      left: element.centerX,
+      top: element.y,
+      originX: 'center',
+      originY: 'top',
+      width: qrSize,
+      height: qrSize,
+      fill: '#ffffff',
+      stroke: '#cccccc',
+      strokeWidth: 1,
+      selectable: false,
+    });
+    fabricCanvas.add(background);
+
+    // Patterns de coins (simulation QR Code)
+    const cornerSize = qrSize * 0.2;
+    const positions = [
+      { x: element.centerX - qrSize / 2 + cornerSize / 2, y: element.y + cornerSize / 2 }, // Top-left
+      { x: element.centerX + qrSize / 2 - cornerSize / 2, y: element.y + cornerSize / 2 }, // Top-right
+      { x: element.centerX - qrSize / 2 + cornerSize / 2, y: element.y + qrSize - cornerSize / 2 }, // Bottom-left
+    ];
+
+    positions.forEach((pos) => {
+      const corner = new fabric.Rect({
+        left: pos.x,
+        top: pos.y,
+        originX: 'center',
+        originY: 'center',
+        width: cornerSize,
+        height: cornerSize,
+        fill: '#000000',
+        selectable: false,
+      });
+      fabricCanvas.add(corner);
+
+      const innerCorner = new fabric.Rect({
+        left: pos.x,
+        top: pos.y,
+        originX: 'center',
+        originY: 'center',
+        width: cornerSize * 0.4,
+        height: cornerSize * 0.4,
+        fill: '#ffffff',
+        selectable: false,
+      });
+      fabricCanvas.add(innerCorner);
+    });
+
+    // Texte central
+    const centerText = new fabric.Text('QR', {
+      left: element.centerX,
+      top: element.y + qrSize / 2,
+      originX: 'center',
+      originY: 'center',
+      fontSize: qrSize * 0.15,
+      fontFamily: 'Arial',
+      fill: '#666666',
+      selectable: false,
+    });
+    fabricCanvas.add(centerText);
   }
 
   // 🎯 Formatage code-barres simplifié

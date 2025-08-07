@@ -194,52 +194,127 @@ const PriceStylePanel = ({ style, onUpdate }) => (
 );
 
 const BarcodeStylePanel = ({ style, onUpdate }) => (
-  <ControlGroup title="Configuration du code-barres">
-    <div className="grid grid-cols-2 gap-4">
-      <NumberInput
-        label="Hauteur"
-        value={style.barcodeHeight}
-        onChange={(value) => onUpdate({ barcodeHeight: value })}
-        min={10}
-        max={30}
-        unit="mm"
-      />
-      <NumberInput
-        label="Largeur"
-        value={style.barcodeWidth || 60}
-        onChange={(value) => onUpdate({ barcodeWidth: value })}
-        min={40}
-        max={100}
-        step={5}
-        unit="%"
-      />
+  <ControlGroup title="Configuration du code">
+    {/* ⭐ NOUVEAU Toggle Code-barres/QR Code */}
+    <div className="mb-4">
+      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-2">Type de code</label>
+      <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+        <button
+          type="button"
+          onClick={() => onUpdate({ barcodeType: 'barcode' })}
+          className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+            style.barcodeType === 'barcode'
+              ? 'bg-blue-500 text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+          }`}
+        >
+          <Barcode className="h-4 w-4" />
+          Code-barres
+        </button>
+        <button
+          type="button"
+          onClick={() => onUpdate({ barcodeType: 'qrcode' })}
+          className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+            style.barcodeType === 'qrcode'
+              ? 'bg-blue-500 text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+          }`}
+        >
+          <Square className="h-4 w-4" />
+          QR Code
+        </button>
+      </div>
     </div>
-    <div className="mt-4 space-y-3">
-      <label className="flex items-center">
-        <input
-          type="checkbox"
-          checked={style.showBarcodeText !== false}
-          onChange={(e) => onUpdate({ showBarcodeText: e.target.checked })}
-          className="mr-3 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-        />
-        <span className="text-sm text-gray-700 dark:text-gray-300">
-          Afficher les numéros sous le code-barres
-        </span>
-      </label>
 
-      {style.showBarcodeText !== false && (
-        <div className="ml-6 pl-4 border-l-2 border-gray-200 dark:border-gray-600">
+    {/* Configuration conditionnelle selon le type */}
+    {style.barcodeType === 'barcode' ? (
+      <>
+        <div className="grid grid-cols-2 gap-4">
           <NumberInput
-            label="Taille des numéros"
-            value={style.barcodeTextSize || 8}
-            onChange={(value) => onUpdate({ barcodeTextSize: value })}
-            min={6}
-            max={12}
-            unit="pt"
+            label="Hauteur"
+            value={style.barcodeHeight}
+            onChange={(value) => onUpdate({ barcodeHeight: value })}
+            min={10}
+            max={30}
+            unit="mm"
+          />
+          <NumberInput
+            label="Largeur"
+            value={style.barcodeWidth || 60}
+            onChange={(value) => onUpdate({ barcodeWidth: value })}
+            min={40}
+            max={100}
+            step={5}
+            unit="%"
           />
         </div>
-      )}
-    </div>
+        <div className="mt-4 space-y-3">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={style.showBarcodeText !== false}
+              onChange={(e) => onUpdate({ showBarcodeText: e.target.checked })}
+              className="mr-3 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Afficher les numéros sous le code-barres
+            </span>
+          </label>
+
+          {style.showBarcodeText !== false && (
+            <div className="ml-6 pl-4 border-l-2 border-gray-200 dark:border-gray-600">
+              <NumberInput
+                label="Taille des numéros"
+                value={style.barcodeTextSize || 8}
+                onChange={(value) => onUpdate({ barcodeTextSize: value })}
+                min={6}
+                max={12}
+                unit="pt"
+              />
+            </div>
+          )}
+        </div>
+      </>
+    ) : (
+      <>
+        <div className="grid grid-cols-1 gap-4">
+          <NumberInput
+            label="Taille du QR Code"
+            value={style.qrCodeSize || 5}
+            onChange={(value) => onUpdate({ qrCodeSize: value })}
+            min={5}
+            max={30}
+            unit="mm"
+          />
+        </div>
+        <div className="mt-4 space-y-3">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={style.showBarcodeText !== false}
+              onChange={(e) => onUpdate({ showBarcodeText: e.target.checked })}
+              className="mr-3 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Afficher le texte sous le QR Code
+            </span>
+          </label>
+
+          {style.showBarcodeText !== false && (
+            <div className="ml-6 pl-4 border-l-2 border-gray-200 dark:border-gray-600">
+              <NumberInput
+                label="Taille du texte"
+                value={style.barcodeTextSize || 8}
+                onChange={(value) => onUpdate({ barcodeTextSize: value })}
+                min={6}
+                max={12}
+                unit="pt"
+              />
+            </div>
+          )}
+        </div>
+      </>
+    )}
   </ControlGroup>
 );
 

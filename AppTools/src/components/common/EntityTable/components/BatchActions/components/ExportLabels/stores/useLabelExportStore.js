@@ -12,6 +12,8 @@ const DEFAULT_STYLE = {
   alignment: 'center',
   showBarcode: true,
   barcodeHeight: 15,
+  barcodeType: 'barcode',
+  qrCodeSize: 8,
   barcodeWidth: 60,
   showBarcodeText: true,
   barcodeTextSize: 8,
