@@ -1,14 +1,10 @@
 import React from 'react';
-import { Grid, RotateCcw, ChevronDown, ChevronRight, Save } from 'lucide-react';
-import { useAccordion } from '../hooks/useAccordion';
-import PresetManager from './PresetManager';
+import { Grid, RotateCcw } from 'lucide-react';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const A4DimensionsConfig = () => {
   const { currentLayout, updateLayout, getGridDimensions, reset, managePresets, savedPresets } =
     useLabelExportStore();
-
-  const { toggle, isOpen } = useAccordion([]);
 
   const gridDimensions = getGridDimensions();
 
@@ -20,20 +16,6 @@ const A4DimensionsConfig = () => {
     reset('layout');
     console.log('📐 Layout A4 réinitialisé aux valeurs par défaut');
   };
-
-  const handleSavePreset = async (name, isPublic = false) => {
-    return await managePresets('save', 'layout', { name, isPublic });
-  };
-
-  const handleLoadPreset = async (presetId) => {
-    return await managePresets('apply', 'layout', { id: presetId });
-  };
-
-  const handleDeletePreset = async (presetId) => {
-    return await managePresets('delete', 'layout', { id: presetId });
-  };
-
-  const layoutPresets = savedPresets.layout || [];
 
   return (
     <div className="space-y-4">
@@ -181,42 +163,6 @@ const A4DimensionsConfig = () => {
           </div>
         </div>
       )}
-
-      <div className="border border-gray-200 dark:border-gray-600 rounded">
-        <button
-          type="button"
-          onClick={() => toggle('presets')}
-          className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-t"
-        >
-          <div className="flex items-center">
-            <Save className="h-4 w-4 mr-2 text-gray-600 dark:text-gray-400" />
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Presets A4</span>
-            {layoutPresets.length > 0 && (
-              <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
-                {layoutPresets.length}
-              </span>
-            )}
-          </div>
-          {isOpen('presets') ? (
-            <ChevronDown className="h-4 w-4 text-gray-500" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-gray-500" />
-          )}
-        </button>
-
-        {isOpen('presets') && (
-          <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600">
-            <PresetManager
-              savedPresets={layoutPresets}
-              onSavePreset={handleSavePreset}
-              onLoadPreset={handleLoadPreset}
-              onDeletePreset={handleDeletePreset}
-              title="Presets A4 sauvegardés"
-              emptyMessage="Aucun preset A4 sauvegardé"
-            />
-          </div>
-        )}
-      </div>
     </div>
   );
 };

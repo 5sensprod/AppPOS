@@ -52,6 +52,38 @@ class UserPresetService {
     }
   }
 
+  async getFactoryPresets() {
+    try {
+      const response = await apiService.get(`${this.baseUrl}/factory`);
+      const data = response.data?.data || response.data || [];
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  // 🔄 MODIFIÉ : Récupérer tous les presets (usine + utilisateur)
+  async getAllPresets(category = 'label_preset', filters = {}) {
+    try {
+      const [factoryPresets, userPresets] = await Promise.all([
+        this.getFactoryPresets(),
+        this.getMyPresets(category, filters),
+      ]);
+
+      // Fusionner : presets d'usine en premier
+      const allPresets = [...factoryPresets];
+      userPresets.forEach((preset) => {
+        if (!allPresets.find((p) => p._id === preset._id)) {
+          allPresets.push(preset);
+        }
+      });
+
+      return allPresets;
+    } catch (error) {
+      return [];
+    }
+  }
+
   // 💾 SAUVEGARDER un preset
   async savePreset(category, name, presetData, isPublic = false, metadata = {}) {
     try {

@@ -57,8 +57,8 @@ class UserPresetController extends BaseController {
         return ResponseHandler.badRequest(res, 'Nom et données requis');
       }
 
-      // Validation des catégories autorisées
-      if (!['label_style', 'print_layout'].includes(category)) {
+      // Seule catégorie autorisée maintenant
+      if (category !== 'label_preset') {
         return ResponseHandler.badRequest(res, 'Catégorie non autorisée');
       }
 
@@ -69,6 +69,7 @@ class UserPresetController extends BaseController {
         is_public,
         user_id: req.user?.id || null,
         metadata,
+        is_factory: false,
       };
 
       const preset = await this.model.upsert(presetData);
@@ -105,15 +106,9 @@ class UserPresetController extends BaseController {
     try {
       const categories = [
         {
-          id: 'label_style',
-          name: 'Style des étiquettes',
-          description: 'Apparence et contenu des étiquettes',
-        },
-        {
-          id: 'print_layout',
-          name: "Supports d'impression",
-          description: 'Formats et dimensions des supports',
-          filters: ['support_type'], // Types de filtres disponibles
+          id: 'label_preset', // ← Unifié !
+          name: "Presets d'étiquettes",
+          description: 'Configuration complète (style + layout)',
         },
       ];
 

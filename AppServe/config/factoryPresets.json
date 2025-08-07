@@ -1,0 +1,82 @@
+[
+  {
+    "id": "factory_basic_a4",
+    "name": "A4 Basique",
+    "description": "21 étiquettes A4 avec style simple",
+    "preset_data": {
+      "layout": {
+        "width": 48.5,
+        "height": 25,
+        "offsetTop": 22,
+        "offsetLeft": 8,
+        "spacingV": 0,
+        "spacingH": 0,
+        "supportType": "A4"
+      },
+      "style": {
+        "fontSize": 12,
+        "fontFamily": "Arial",
+        "showBorder": false,
+        "showBarcode": true,
+        "barcodeHeight": 15,
+        "showPrice": true,
+        "priceSize": 14,
+        "showName": false
+      }
+    }
+  },
+  {
+    "id": "factory_premium_a4",
+    "name": "A4 Premium",
+    "description": "21 étiquettes A4 avec bordure et nom",
+    "preset_data": {
+      "layout": {
+        "width": 48.5,
+        "height": 25,
+        "offsetTop": 22,
+        "offsetLeft": 8,
+        "spacingV": 0,
+        "spacingH": 0,
+        "supportType": "A4"
+      },
+      "style": {
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "showBorder": true,
+        "borderWidth": 0.2,
+        "showBarcode": true,
+        "barcodeHeight": 12,
+        "showPrice": true,
+        "priceSize": 16,
+        "showName": true,
+        "nameSize": 10
+      }
+    }
+  },
+  {
+    "id": "factory_roll_basic",
+    "name": "Rouleau Standard",
+    "description": "Étiquettes rouleau 29mm",
+    "preset_data": {
+      "layout": {
+        "width": 29,
+        "height": 15,
+        "offsetTop": 0,
+        "offsetLeft": 0,
+        "supportType": "rouleau",
+        "rouleau": { "width": 29 },
+        "padding": 1
+      },
+      "style": {
+        "fontSize": 10,
+        "fontFamily": "Arial",
+        "showBorder": false,
+        "showBarcode": true,
+        "barcodeHeight": 8,
+        "showPrice": true,
+        "priceSize": 12,
+        "showName": false
+      }
+    }
+  }
+]

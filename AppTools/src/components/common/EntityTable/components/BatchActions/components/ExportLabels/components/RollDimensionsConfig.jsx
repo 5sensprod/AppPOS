@@ -1,13 +1,10 @@
 import React from 'react';
-import { Printer, RotateCcw, ChevronDown, ChevronRight, Save } from 'lucide-react';
-import { useAccordion } from '../hooks/useAccordion';
-import PresetManager from './PresetManager';
+import { useEffect } from 'react';
+import { Printer, RotateCcw } from 'lucide-react';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const RollDimensionsConfig = () => {
-  const { currentLayout, updateLayout, reset, managePresets, savedPresets } = useLabelExportStore();
-
-  const { toggle, isOpen } = useAccordion([]);
+  const { currentLayout, updateLayout, reset } = useLabelExportStore();
 
   const handleChange = (field, value) => {
     updateLayout(field, value);
@@ -15,32 +12,16 @@ const RollDimensionsConfig = () => {
 
   const handleResetRollLayout = () => {
     reset('layout');
-    console.log('🎞️ Layout Rouleau réinitialisé aux valeurs par défaut');
   };
-
-  const handleSavePreset = async (name, isPublic = false) => {
-    return await managePresets('save', 'layout', { name, isPublic });
-  };
-
-  const handleLoadPreset = async (presetId) => {
-    return await managePresets('apply', 'layout', { id: presetId });
-  };
-
-  const handleDeletePreset = async (presetId) => {
-    return await managePresets('delete', 'layout', { id: presetId });
-  };
-
-  const layoutPresets = savedPresets.layout || [];
 
   const rouleauWidth = currentLayout.rouleau?.width || 29;
-  const margeInterieure = 1; // 🎯 MARGE FIXE À 1MM - définie dans le store
+  const margeInterieure = 1;
   const labelHeight = parseFloat(currentLayout.height) || 15;
 
   const etiquettePhysique = rouleauWidth - margeInterieure * 2;
-  const isValidConfig = etiquettePhysique > 10; // Simplifié car marge = 1mm toujours
+  const isValidConfig = etiquettePhysique > 10;
 
-  // Recalcul automatique de la largeur imprimable
-  React.useEffect(() => {
+  useEffect(() => {
     if (isValidConfig && etiquettePhysique !== parseFloat(currentLayout.width)) {
       handleChange('width', etiquettePhysique.toFixed(1));
     }
@@ -109,7 +90,6 @@ const RollDimensionsConfig = () => {
           Paramètres du rouleau et de l'étiquette
         </h5>
         <div className="grid grid-cols-2 gap-3">
-          {/* 🎯 Suppression du champ marge - maintenant fixe */}
           <div>
             <label className="block text-xs text-blue-600 dark:text-blue-300 mb-1">
               Largeur rouleau (mm)
@@ -141,44 +121,6 @@ const RollDimensionsConfig = () => {
             />
           </div>
         </div>
-      </div>
-
-      <div className="border border-gray-200 dark:border-gray-600 rounded">
-        <button
-          type="button"
-          onClick={() => toggle('presets')}
-          className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-t"
-        >
-          <div className="flex items-center">
-            <Save className="h-4 w-4 mr-2 text-gray-600 dark:text-gray-400" />
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              Presets Rouleau
-            </span>
-            {layoutPresets.length > 0 && (
-              <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
-                {layoutPresets.length}
-              </span>
-            )}
-          </div>
-          {isOpen('presets') ? (
-            <ChevronDown className="h-4 w-4 text-gray-500" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-gray-500" />
-          )}
-        </button>
-
-        {isOpen('presets') && (
-          <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600">
-            <PresetManager
-              savedPresets={layoutPresets}
-              onSavePreset={handleSavePreset}
-              onLoadPreset={handleLoadPreset}
-              onDeletePreset={handleDeletePreset}
-              title="Presets Rouleau sauvegardés"
-              emptyMessage="Aucun preset rouleau sauvegardé"
-            />
-          </div>
-        )}
       </div>
     </div>
   );

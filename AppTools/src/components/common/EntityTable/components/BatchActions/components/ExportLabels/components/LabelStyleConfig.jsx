@@ -41,25 +41,24 @@ const TabButton = ({ active, onClick, icon: Icon, label, enabled, onToggle }) =>
     <span>{label}</span>
 
     {/* Toggle visibility */}
-    <button
-      type="button"
+    <span
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
         onToggle?.();
       }}
       className={`
-        ml-1 p-0.5 rounded transition-colors
-        ${
-          enabled
-            ? 'text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300'
-            : 'text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400'
-        }
-      `}
+    ml-1 p-0.5 rounded transition-colors cursor-pointer
+    ${
+      enabled
+        ? 'text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300'
+        : 'text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400'
+    }
+  `}
       title={enabled ? 'Masquer' : 'Afficher'}
     >
       {enabled ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-    </button>
+    </span>
   </button>
 );
 
@@ -371,16 +370,18 @@ const LabelStyleConfig = () => {
 
   // Handlers presets
   const handleSavePreset = async (name, isPublic = false) => {
-    return await managePresets('save', 'style', { name, isPublic });
+    return await managePresets('save', { name, isPublic });
   };
 
   const handleLoadPreset = async (presetId) => {
-    return await managePresets('apply', 'style', { id: presetId });
+    return await managePresets('apply', { id: presetId });
   };
 
   const handleDeletePreset = async (presetId) => {
-    return await managePresets('delete', 'style', { id: presetId });
+    return await managePresets('delete', { id: presetId });
   };
+
+  const allPresets = savedPresets || [];
 
   const stylePresets = savedPresets.style || [];
 
@@ -504,12 +505,12 @@ const LabelStyleConfig = () => {
         {isOpen('presets') && (
           <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-600">
             <PresetManager
-              savedPresets={stylePresets}
+              savedPresets={allPresets}
               onSavePreset={handleSavePreset}
               onLoadPreset={handleLoadPreset}
               onDeletePreset={handleDeletePreset}
-              title="Presets de style"
-              emptyMessage="Aucun preset de style sauvegardé"
+              title="Presets d'étiquettes"
+              emptyMessage="Aucun preset sauvegardé"
             />
           </div>
         )}

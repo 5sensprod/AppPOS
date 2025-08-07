@@ -92,7 +92,7 @@ export const useLabelExportStore = create(
       loading: false,
       enableCellSelection: false,
       disabledCells: new Set(),
-      savedPresets: { style: [], layout: [] },
+      savedPresets: [],
       selectedItems: [],
       productsData: [],
       activeFilters: [],
@@ -187,56 +187,48 @@ export const useLabelExportStore = create(
         }),
 
       // 🎯 PRESETS - API unifiée
-      managePresets: async (action, type, data = {}) => {
-        const category = type === 'style' ? 'label_style' : 'print_layout';
+      managePresets: async (action, data = {}) => {
+        const category = 'label_preset'; // Une seule catégorie !
 
         try {
           switch (action) {
             case 'load':
-              const presets = await userPresetService.refreshPresets(category);
-              set((state) => ({ savedPresets: { ...state.savedPresets, [type]: presets } }));
+              const presets = await userPresetService.getAllPresets(category); // ← Utilise la nouvelle méthode
+              set({ savedPresets: presets });
               break;
 
             case 'save':
-              const content = type === 'style' ? { style: get().labelStyle } : get().currentLayout;
+              const content = {
+                layout: get().currentLayout,
+                style: get().labelStyle,
+              };
               await userPresetService.savePreset(
                 category,
                 data.name,
                 content,
                 data.isPublic || false
               );
-              get().managePresets('load', type);
+              get().managePresets('load');
               return true;
 
             case 'apply':
-              const preset = await userPresetService.loadPreset(
-                category,
-                data.id,
-                get().savedPresets[type]
-              );
+              const preset = get().savedPresets.find((p) => p._id === data.id);
               if (preset?.preset_data) {
-                if (type === 'style') {
-                  set({
-                    labelStyle: {
-                      ...DEFAULT_STYLE,
-                      ...preset.preset_data.style,
-                      duplicateCount: get().labelStyle.duplicateCount,
-                    },
-                  });
-                } else {
-                  set({ currentLayout: { ...DEFAULT_LAYOUTS.A4, ...preset.preset_data } });
-                }
+                set({
+                  currentLayout: { ...DEFAULT_LAYOUTS.A4, ...preset.preset_data.layout },
+                  labelStyle: { ...DEFAULT_STYLE, ...preset.preset_data.style },
+                });
                 return true;
               }
               break;
 
             case 'delete':
+              if (preset?.is_factory) return false; // Protection
               await userPresetService.deletePreset(category, data.id);
-              get().managePresets('load', type);
+              get().managePresets('load');
               return true;
           }
         } catch (error) {
-          console.error(`Erreur preset ${action}:`, error);
           return false;
         }
       },

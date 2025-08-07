@@ -32,24 +32,29 @@ const PresetManager = ({
   const analyzePreset = (preset) => {
     const features = [];
 
-    // Vérifier si c'est un preset de style
+    // Vérifier le layout pour le type de support
+    if (preset.preset_data?.layout) {
+      const layout = preset.preset_data.layout;
+      if (layout.supportType === 'A4') {
+        features.push('A4');
+        if (layout.width && layout.height) {
+          features.push(`${layout.width}×${layout.height}mm`);
+        }
+      } else if (layout.supportType === 'rouleau') {
+        features.push('Rouleau');
+        if (layout.width) {
+          features.push(`${layout.width}mm`);
+        }
+      }
+    }
+
+    // Vérifier le style
     if (preset.preset_data?.style) {
       const style = preset.preset_data.style;
       if (style.showName) features.push('Nom');
       if (style.showPrice) features.push('Prix');
       if (style.showBarcode) features.push('Code-barres');
       if (style.showBorder) features.push('Bordure');
-      if (style.customPositions && Object.keys(style.customPositions).length > 0) {
-        features.push('Positions custom');
-      }
-    }
-
-    // Vérifier si c'est un preset de layout
-    if (preset.preset_data?.supportType) {
-      features.push(`Format ${preset.preset_data.supportType.toUpperCase()}`);
-      if (preset.preset_data.width && preset.preset_data.height) {
-        features.push(`${preset.preset_data.width}×${preset.preset_data.height}mm`);
-      }
     }
 
     return features;
@@ -139,7 +144,12 @@ const PresetManager = ({
 
           {/* 🆕 Métadonnées */}
           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            {isPublicPreset ? (
+            {preset.is_factory ? (
+              <span className="flex items-center">
+                <Globe className="h-3 w-3 mr-1" />
+                Par défaut
+              </span>
+            ) : isPublicPreset ? (
               <span className="flex items-center">
                 <Globe className="h-3 w-3 mr-1" />
                 Public
@@ -150,7 +160,6 @@ const PresetManager = ({
                 Personnel
               </span>
             )}
-            {preset.metadata?.support_type && <span>📄 {preset.metadata.support_type}</span>}
           </div>
         </div>
 
@@ -164,7 +173,7 @@ const PresetManager = ({
           >
             <FolderOpen className="h-3 w-3" />
           </button>
-          {!preset.is_public && (
+          {!preset.is_public && !preset.is_factory && (
             <button
               type="button"
               onClick={() => onDeletePreset(preset._id)}
