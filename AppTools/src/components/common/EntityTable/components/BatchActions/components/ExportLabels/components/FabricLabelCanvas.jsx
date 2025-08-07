@@ -364,7 +364,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
               Rouleau: {physicalRollWidth}mm
             </>
           ) : (
-            `${layout.width}×{layout.height}mm`
+            `${layout.width}×${layout.height}mm`
           )}
         </span>
         {zoomLevel !== 100 && (
