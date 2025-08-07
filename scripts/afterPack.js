@@ -68,6 +68,7 @@ async function ensureBackendNodeModules(appServePath) {
       multer: '^1.4.5-lts.1',
       bonjour: '^3.5.0',
       uuid: '^9.0.1',
+      'bwip-js': '^4.5.1',
     },
   };
 

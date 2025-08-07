@@ -7,6 +7,7 @@ const Product = require('../models/Product');
 const ResponseHandler = require('../handlers/ResponseHandler');
 const iconv = require('iconv-lite');
 const { createBarcodeImage } = require('../utils/barcodeGenerator');
+const bwip = require('bwip-js');
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('fr-FR', {
@@ -420,7 +421,7 @@ class ProductExportController {
       doc.fillColor('#000000').font('Helvetica').fontSize(10);
       x = margins.left;
 
-      columnsConfig.forEach((col) => {
+      for (const col of columnsConfig) {
         // Tracer la ligne verticale de séparation (sauf pour la dernière colonne)
         if (col !== columnsConfig[columnsConfig.length - 1]) {
           doc
@@ -440,18 +441,23 @@ class ProductExportController {
             .rect(x + 5, y + 3, columnWidths[col.key] - 10, rowHeight - 6)
             .stroke();
         } else {
-          // NOUVEAU : Traitement spécial pour la colonne barcode avec génération d'image
+          // ✅ 4. CORRECTION CODES-BARRES AVEC AWAIT
           if (col.key === 'barcode') {
             const barcodeItem = product.meta_data?.find((item) => item.key === 'barcode');
             if (barcodeItem?.value) {
               try {
-                // Générer l'image du code-barres côté serveur
-                const imageBuffer = createBarcodeImage(barcodeItem.value, {
-                  width: 1.5, // Un peu plus fin
-                  height: 35, // Plus haut pour les chiffres
-                  fontSize: 8, // Police plus petite pour les chiffres
-                  margin: 3, // Marge réduite
+                // ✅ AWAIT fonctionne maintenant car generatePdf est async
+                const imageBuffer = await createBarcodeImage(barcodeItem.value, {
+                  width: 1.5,
+                  height: 35,
+                  fontSize: 8,
+                  margin: 3,
                 });
+
+                // Vérifier que c'est bien un Buffer
+                if (!Buffer.isBuffer(imageBuffer)) {
+                  throw new Error("createBarcodeImage n'a pas retourné un Buffer valide");
+                }
 
                 // Calculer les dimensions pour que le code-barres s'adapte à la cellule
                 const maxWidth = columnWidths[col.key] - 10;
@@ -459,13 +465,16 @@ class ProductExportController {
 
                 // Ajouter l'image du code-barres au PDF
                 doc.image(imageBuffer, x + 5, y + 5, {
-                  width: Math.min(maxWidth, 120), // Largeur max 120px
-                  height: Math.min(maxHeight, 30), // Hauteur max 30px
+                  width: Math.min(maxWidth, 120),
+                  height: Math.min(maxHeight, 30),
                 });
 
-                console.log(`✅ Code-barres PDF ajouté pour produit ${product.sku}`);
+                console.log(`✅ Code-barres PDF ajouté (bwip-js) pour produit ${product.sku}`);
               } catch (error) {
-                console.error(`❌ Erreur affichage code-barres pour ${product.sku}:`, error);
+                console.error(
+                  `❌ Erreur affichage code-barres bwip-js pour ${product.sku}:`,
+                  error
+                );
                 // Fallback : afficher le texte du code-barres
                 const value = this.formatCellValue(product, col.key);
                 doc
@@ -489,7 +498,7 @@ class ProductExportController {
                 });
             }
           } else {
-            // Pour les colonnes normales, afficher la valeur
+            // Pour les colonnes normales, afficher la valeur (code existant inchangé)
             const value = this.formatCellValue(product, col.key);
 
             // Traitement spécial pour la colonne catégorie qui peut contenir des sauts de ligne
@@ -506,12 +515,12 @@ class ProductExportController {
               doc
                 .font('Helvetica')
                 .fontSize(8)
-                .fillColor('#6B7280') // Équivalent de text-gray-500
+                .fillColor('#6B7280')
                 .text(lines.slice(1).join('\n'), x + 5, doc.y, {
                   width: columnWidths[col.key] - 10,
                   align: 'left',
                 })
-                .fillColor('#000000'); // Remettre la couleur par défaut
+                .fillColor('#000000');
             } else {
               // Dessiner la valeur de la cellule pour les autres colonnes
               doc
@@ -530,7 +539,7 @@ class ProductExportController {
         }
 
         x += columnWidths[col.key];
-      });
+      } // ✅ Fermer le for...of (remplace le });
 
       y += rowHeight;
     }
@@ -666,7 +675,7 @@ class ProductExportController {
       { key: 'sku', label: 'Référence', weight: 2 },
       { key: 'designation', label: 'Désignation', weight: 3 },
       { key: 'name', label: 'Nom', weight: 3 },
-      { key: 'barcode', label: 'Code-barres', weight: 2 },
+      { key: 'barcode', label: 'Code-barres', weight: 2 }, // ← REMETTRE cette ligne
       { key: 'purchase_price', label: "Prix d'achat", weight: 1.5 },
       { key: 'price', label: 'Prix de vente', weight: 1.5 },
       { key: 'stock', label: 'Stock', weight: 1 },
