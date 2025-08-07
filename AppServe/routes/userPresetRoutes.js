@@ -20,7 +20,7 @@ router.delete('/:category/:id', authMiddleware, controller.deletePreset.bind(con
 
 router.get('/factory', (req, res) => {
   try {
-    const filePath = path.join(__dirname, '../config/factoryPresets.json');
+    const filePath = path.join(__dirname, '../presets/factoryPresets.json');
     const factoryPresets = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
     const enrichedPresets = factoryPresets.map((preset) => ({
