@@ -41,9 +41,9 @@ const PresetManager = ({
           features.push(`${layout.width}×${layout.height}mm`);
         }
       } else if (layout.supportType === 'rouleau') {
-        features.push('Rouleau');
-        if (layout.width) {
-          features.push(`${layout.width}mm`);
+        const rollWidth = layout.rouleau?.width || layout.width;
+        if (rollWidth) {
+          features.push(`${rollWidth}mm`);
         }
       }
     }
