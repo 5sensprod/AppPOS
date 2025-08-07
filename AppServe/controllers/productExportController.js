@@ -250,49 +250,40 @@ class ProductExportController {
 
     // Calculer la hauteur de ligne adaptative selon le contenu
     const calculateRowHeight = (product, columnsConfig, columnWidths, fontSize = 10) => {
-      // Hauteur minimale de ligne
       let rowHeight = 20;
 
-      // NOUVEAU : Vérifier si on a une colonne barcode avec une valeur
       const hasBarcodeColumn = columnsConfig.some((col) => {
         if (col.key === 'barcode') {
           const barcodeItem = product.meta_data?.find((item) => item.key === 'barcode');
-          return barcodeItem?.value; // Retourne true si le produit a un code-barres
+          return barcodeItem?.value;
         }
         return false;
       });
 
-      // Si on a un code-barres, augmenter la hauteur pour laisser la place
+      // ✅ Hauteur équilibrée pour les codes-barres (ni trop, ni pas assez)
       if (hasBarcodeColumn) {
-        rowHeight = Math.max(rowHeight, 45); // 45px pour le code-barres + chiffres
+        rowHeight = Math.max(rowHeight, 42); // ✅ 42px = bon équilibre
       }
 
-      // Vérifier chaque colonne pour le texte
+      // Reste du code inchangé pour les autres colonnes...
       for (const col of columnsConfig) {
-        // Pour la colonne personnalisée, utiliser une hauteur standard
-        if (col.isCustom) continue;
-
-        // Pour la colonne barcode, on a déjà défini la hauteur ci-dessus
-        if (col.key === 'barcode') continue;
+        if (col.isCustom || col.key === 'barcode') continue;
 
         const value = this.formatCellValue(product, col.key);
-        const width = columnWidths[col.key] - 10; // Moins les marges intérieures
+        const width = columnWidths[col.key] - 10;
 
-        // Traitement spécial pour les catégories qui peuvent contenir des sauts de ligne
         if (col.key === 'category' && value.includes('\n')) {
           const lines = value.split('\n').length;
-          const categoryHeight = lines * (fontSize * 1.2) + 4; // 1.2 pour l'interligne + 4px de marge
+          const categoryHeight = lines * (fontSize * 1.2) + 4;
           rowHeight = Math.max(rowHeight, categoryHeight);
           continue;
         }
 
-        // Estimer le nombre de lignes nécessaires pour les autres colonnes
         const charsPerLine = Math.floor(width / (fontSize * 0.5));
         if (charsPerLine <= 0) continue;
 
         const lines = Math.ceil(value.length / charsPerLine);
-        const cellHeight = lines * (fontSize * 1.2) + 4; // 1.2 pour l'interligne + 4px de marge
-
+        const cellHeight = lines * (fontSize * 1.2) + 4;
         rowHeight = Math.max(rowHeight, cellHeight);
       }
 
@@ -446,56 +437,58 @@ class ProductExportController {
             const barcodeItem = product.meta_data?.find((item) => item.key === 'barcode');
             if (barcodeItem?.value) {
               try {
-                // ✅ AWAIT fonctionne maintenant car generatePdf est async
+                // ✅ Paramètres ÉQUILIBRÉS - Lisible mais pas énorme
                 const imageBuffer = await createBarcodeImage(barcodeItem.value, {
-                  width: 1.5,
-                  height: 35,
-                  fontSize: 8,
-                  margin: 3,
+                  width: 2, // ✅ Largeur correcte
+                  height: 10, // ✅ Hauteur équilibrée
+                  fontSize: 9, // ✅ Police lisible
+                  margin: 6, // ✅ Marges correctes
                 });
 
-                // Vérifier que c'est bien un Buffer
                 if (!Buffer.isBuffer(imageBuffer)) {
                   throw new Error("createBarcodeImage n'a pas retourné un Buffer valide");
                 }
 
-                // Calculer les dimensions pour que le code-barres s'adapte à la cellule
-                const maxWidth = columnWidths[col.key] - 10;
-                const maxHeight = rowHeight - 10;
+                // ✅ Dimensions d'affichage équilibrées
+                const maxWidth = columnWidths[col.key] - 8;
+                const maxHeight = Math.min(rowHeight - 8, 36); // ✅ Hauteur max adaptée
 
-                // Ajouter l'image du code-barres au PDF
-                doc.image(imageBuffer, x + 5, y + 5, {
-                  width: Math.min(maxWidth, 120),
-                  height: Math.min(maxHeight, 30),
+                // ✅ Centrage vertical optimal
+                const imageHeight = Math.min(maxHeight, 35);
+                const verticalOffset = Math.max(4, (rowHeight - imageHeight) / 2);
+
+                // Affichage du code-barres avec dimensions équilibrées
+                doc.image(imageBuffer, x + 4, y + verticalOffset, {
+                  width: Math.min(maxWidth, 110), // ✅ Largeur max raisonnable
+                  height: imageHeight, // ✅ Hauteur équilibrée
+                  fit: [maxWidth, imageHeight], // Ajustement proportionnel
                 });
 
-                console.log(`✅ Code-barres PDF ajouté (bwip-js) pour produit ${product.sku}`);
+                console.log(`✅ Code-barres équilibré ajouté pour produit ${product.sku}`);
               } catch (error) {
-                console.error(
-                  `❌ Erreur affichage code-barres bwip-js pour ${product.sku}:`,
-                  error
-                );
-                // Fallback : afficher le texte du code-barres
-                const value = this.formatCellValue(product, col.key);
+                console.error(`❌ Erreur affichage code-barres pour ${product.sku}:`, error);
+                // Fallback lisible
                 doc
-                  .fillColor('#000000')
+                  .fillColor('#666666')
                   .font('Helvetica')
-                  .fontSize(10)
-                  .text(value, x + 5, y + 5, {
-                    width: columnWidths[col.key] - 10,
-                    align: 'left',
-                  });
+                  .fontSize(9)
+                  .text(barcodeItem.value, x + 4, y + rowHeight / 2 - 4, {
+                    width: columnWidths[col.key] - 8,
+                    align: 'center',
+                  })
+                  .fillColor('#000000');
               }
             } else {
-              // Pas de code-barres, afficher un tiret
+              // Pas de code-barres
               doc
-                .fillColor('#000000')
+                .fillColor('#999999')
                 .font('Helvetica')
                 .fontSize(10)
-                .text('-', x + 5, y + 5, {
-                  width: columnWidths[col.key] - 10,
-                  align: 'left',
-                });
+                .text('-', x + 4, y + rowHeight / 2 - 5, {
+                  width: columnWidths[col.key] - 8,
+                  align: 'center',
+                })
+                .fillColor('#000000');
             }
           } else {
             // Pour les colonnes normales, afficher la valeur (code existant inchangé)
