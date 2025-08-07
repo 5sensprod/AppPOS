@@ -30,6 +30,12 @@ const ExportLabelsModal = ({
   // État pour gérer le mode PDF/Impression
   const [exportMode, setExportMode] = useState('print'); // 'pdf' ou 'print'
 
+  // 🆕 Déterminer si on est en mode A4
+  const isA4Mode = currentLayout?.supportType !== 'rouleau';
+
+  // 🆕 Forcer le mode PDF si on est en A4, sinon garder 'print' par défaut pour les rouleaux
+  const effectiveExportMode = isA4Mode ? 'pdf' : exportMode;
+
   useEffect(() => {
     if (isOpen) {
       initialize(selectedItems, productsData, activeFilters, entityNamePlural);
@@ -43,6 +49,16 @@ const ExportLabelsModal = ({
       setExportMode('print'); // Reset au mode Print par défaut
     }
   }, [isOpen, reset]);
+
+  // 🆕 Ajuster le mode d'export selon le type de support
+  useEffect(() => {
+    if (isA4Mode && exportMode !== 'pdf') {
+      setExportMode('pdf');
+    } else if (!isA4Mode && exportMode !== 'print') {
+      // 🆕 En mode rouleau, forcer 'print' par défaut
+      setExportMode('print');
+    }
+  }, [currentLayout?.supportType, isA4Mode, exportMode]);
 
   const handleClose = () => {
     setLoading(false);
@@ -63,10 +79,10 @@ const ExportLabelsModal = ({
         selectedItems,
         exportType: 'labels',
         title:
-          exportMode === 'pdf'
+          effectiveExportMode === 'pdf'
             ? exportTitle.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_')
             : undefined,
-        format: exportMode, // 'pdf' ou 'print'
+        format: effectiveExportMode, // 'pdf' ou 'print'
         labelData: extractLabelData(),
         labelLayout: buildLabelLayout(),
       };
@@ -84,33 +100,43 @@ const ExportLabelsModal = ({
 
   const footer = (
     <>
-      {/* Toggle PDF/Impression */}
-      <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-        <button
-          type="button"
-          onClick={() => setExportMode('pdf')}
-          className={`px-3 py-2 text-sm font-medium rounded-md flex items-center transition-colors ${
-            exportMode === 'pdf'
-              ? 'bg-white dark:bg-gray-600 text-green-600 shadow-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-          }`}
-        >
+      {/* Toggle PDF/Impression - 🆕 Masqué en mode A4 */}
+      {!isA4Mode && (
+        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+          <button
+            type="button"
+            onClick={() => setExportMode('pdf')}
+            className={`px-3 py-2 text-sm font-medium rounded-md flex items-center transition-colors ${
+              effectiveExportMode === 'pdf'
+                ? 'bg-white dark:bg-gray-600 text-green-600 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+            }`}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => setExportMode('print')}
+            className={`px-3 py-2 text-sm font-medium rounded-md flex items-center transition-colors ${
+              effectiveExportMode === 'print'
+                ? 'bg-white dark:bg-gray-600 text-green-600 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+            }`}
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            Impression
+          </button>
+        </div>
+      )}
+
+      {/* 🆕 Indicateur du mode en A4 */}
+      {isA4Mode && (
+        <div className="flex items-center px-3 py-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
           <FileText className="h-4 w-4 mr-2" />
-          PDF
-        </button>
-        <button
-          type="button"
-          onClick={() => setExportMode('print')}
-          className={`px-3 py-2 text-sm font-medium rounded-md flex items-center transition-colors ${
-            exportMode === 'print'
-              ? 'bg-white dark:bg-gray-600 text-green-600 shadow-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-          }`}
-        >
-          <Printer className="h-4 w-4 mr-2" />
-          Impression
-        </button>
-      </div>
+          Mode PDF uniquement (format A4)
+        </div>
+      )}
 
       <div className="flex-1"></div>
 
@@ -123,7 +149,7 @@ const ExportLabelsModal = ({
       </button>
 
       {/* Bouton d'impression directe seulement en mode impression pour les rouleaux */}
-      {exportMode === 'print' && currentLayout?.supportType === 'rouleau' ? (
+      {effectiveExportMode === 'print' && currentLayout?.supportType === 'rouleau' ? (
         <DirectPrintButton onClose={handleClose} />
       ) : (
         <button
@@ -135,11 +161,11 @@ const ExportLabelsModal = ({
           {loading ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              {exportMode === 'pdf' ? 'Génération PDF...' : 'Impression...'}
+              {effectiveExportMode === 'pdf' ? 'Génération PDF...' : 'Impression...'}
             </>
           ) : (
             <>
-              {exportMode === 'pdf' ? (
+              {effectiveExportMode === 'pdf' ? (
                 <>
                   <Tags className="h-4 w-4 mr-2" />
                   Générer PDF
@@ -167,8 +193,8 @@ const ExportLabelsModal = ({
       maxWidth="max-w-4xl"
     >
       <form id="export-labels-form" onSubmit={handleSubmit}>
-        {/* Champ titre seulement en mode PDF */}
-        {exportMode === 'pdf' && (
+        {/* Champ titre seulement en mode PDF - 🆕 Utilise effectiveExportMode */}
+        {effectiveExportMode === 'pdf' && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Titre du document
@@ -185,7 +211,7 @@ const ExportLabelsModal = ({
           </div>
         )}
 
-        <LabelsLayoutConfigurator exportMode={exportMode} />
+        <LabelsLayoutConfigurator exportMode={effectiveExportMode} />
       </form>
     </BaseModal>
   );
