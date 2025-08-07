@@ -230,12 +230,35 @@ export const useLabelExportStore = create(
               break;
 
             case 'delete':
-              if (preset?.is_factory) return false; // Protection
+              console.log('🗑️ Store - Suppression preset:', data.id);
+
+              // 🔧 CORRECTION: Trouver le preset avant de vérifier
+              const presetToDelete = get().savedPresets.find((p) => p._id === data.id);
+
+              if (!presetToDelete) {
+                console.warn('⚠️ Store - Preset non trouvé:', data.id);
+                return false;
+              }
+
+              // Protection contre suppression des presets factory
+              if (presetToDelete.is_factory) {
+                console.warn('⚠️ Store - Tentative suppression preset factory:', data.id);
+                return false;
+              }
+
+              console.log('🔥 Store - Suppression autorisée pour:', presetToDelete.name);
+
+              // Effectuer la suppression
               await userPresetService.deletePreset(category, data.id);
-              get().managePresets('load');
+
+              // Recharger la liste
+              await get().managePresets('load');
+
+              console.log('✅ Store - Preset supprimé et liste rechargée');
               return true;
           }
         } catch (error) {
+          console.error('❌ Store - Erreur managePresets:', { action, data, error });
           return false;
         }
       },
