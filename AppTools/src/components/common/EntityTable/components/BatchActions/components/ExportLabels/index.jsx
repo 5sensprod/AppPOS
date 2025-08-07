@@ -54,9 +54,6 @@ const ExportLabelsModal = ({
   useEffect(() => {
     if (isA4Mode && exportMode !== 'pdf') {
       setExportMode('pdf');
-    } else if (!isA4Mode && exportMode !== 'print') {
-      // 🆕 En mode rouleau, forcer 'print' par défaut
-      setExportMode('print');
     }
   }, [currentLayout?.supportType, isA4Mode, exportMode]);
 
