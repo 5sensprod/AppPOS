@@ -85,7 +85,7 @@ export const useLabelExportStore = create(
     (set, get) => ({
       // ===== ÉTAT PRINCIPAL =====
       labelStyle: DEFAULT_STYLE,
-      currentLayout: DEFAULT_LAYOUTS.A4,
+      currentLayout: DEFAULT_LAYOUTS.rouleau,
       exportTitle: '',
 
       // États volatiles (jamais persistés)
@@ -124,10 +124,11 @@ export const useLabelExportStore = create(
         }),
 
       // 🎯 SUPPORT TYPE
-      changeSupportType: (type) =>
-        set({
-          currentLayout: { ...(DEFAULT_LAYOUTS[type] || DEFAULT_LAYOUTS.A4) },
-        }),
+      changeSupportType: (type) => {
+        set({ currentLayout: { ...(DEFAULT_LAYOUTS[type] || DEFAULT_LAYOUTS.rouleau) } });
+        // Recharger les presets pour le nouveau type
+        get().managePresets('load');
+      },
 
       // 🎯 RESET UNIFIÉ - Une seule méthode pour tout
       reset: (scope = 'all') =>
@@ -193,8 +194,14 @@ export const useLabelExportStore = create(
         try {
           switch (action) {
             case 'load':
-              const presets = await userPresetService.getAllPresets(category); // ← Utilise la nouvelle méthode
-              set({ savedPresets: presets });
+              const allPresets = await userPresetService.getAllPresets(category);
+              // Filtrer par type de support actuel
+              const currentSupportType = get().currentLayout.supportType;
+              const filteredPresets = allPresets.filter((preset) => {
+                if (!preset.preset_data?.layout) return false;
+                return preset.preset_data.layout.supportType === currentSupportType;
+              });
+              set({ savedPresets: filteredPresets });
               break;
 
             case 'save':

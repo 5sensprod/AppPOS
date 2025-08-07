@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid, Ruler, Palette, Eye, Printer, Settings } from 'lucide-react';
+import { Grid, Ruler, Palette } from 'lucide-react';
 import { useAccordion } from '../hooks/useAccordion';
 import { AccordionPanel } from './AccordionPanel';
 import LabelDimensionsConfig from './LabelDimensionsConfig';
@@ -10,9 +10,7 @@ import PrinterSelector from './PrinterSelector';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const LabelsLayoutConfigurator = ({ exportMode }) => {
-  const { currentLayout, extractLabelData, getGridDimensions } = useLabelExportStore();
-
-  const labelData = extractLabelData();
+  const { currentLayout, getGridDimensions } = useLabelExportStore();
 
   // Accordéons fermés par défaut, avec panels différents selon le mode
   const defaultPanels =
