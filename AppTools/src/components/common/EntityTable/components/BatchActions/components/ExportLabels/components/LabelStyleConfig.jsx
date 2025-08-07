@@ -114,14 +114,33 @@ const NameStylePanel = ({ style, onUpdate }) => (
       <div>
         <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Police</label>
         <select
-          value={style.fontFamily || 'Arial'}
-          onChange={(e) => onUpdate({ fontFamily: e.target.value })}
+          value={style.nameFontFamily || style.fontFamily || 'Arial'}
+          onChange={(e) => onUpdate({ nameFontFamily: e.target.value })}
           className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
         >
           <option value="Arial">Arial</option>
           <option value="Helvetica">Helvetica</option>
-          <option value="Times">Times</option>
-          <option value="Courier">Courier</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Verdana">Verdana</option>
+          <option value="Tahoma">Tahoma</option>
+          <option value="Impact">Impact</option>
+        </select>
+      </div>
+    </div>
+    <div className="mt-4">
+      <div>
+        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+          Style de police
+        </label>
+        <select
+          value={style.nameWeight || 'bold'}
+          onChange={(e) => onUpdate({ nameWeight: e.target.value })}
+          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
+        >
+          <option value="normal">Normal</option>
+          <option value="bold">Gras</option>
         </select>
       </div>
     </div>
@@ -150,6 +169,25 @@ const PriceStylePanel = ({ style, onUpdate }) => (
         >
           <option value="normal">Normal</option>
           <option value="bold">Gras</option>
+        </select>
+      </div>
+    </div>
+    <div className="mt-4">
+      <div>
+        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Police</label>
+        <select
+          value={style.priceFontFamily || style.fontFamily || 'Arial'}
+          onChange={(e) => onUpdate({ priceFontFamily: e.target.value })}
+          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
+        >
+          <option value="Arial">Arial</option>
+          <option value="Helvetica">Helvetica</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Verdana">Verdana</option>
+          <option value="Tahoma">Tahoma</option>
+          <option value="Impact">Impact</option>
         </select>
       </div>
     </div>
@@ -303,10 +341,10 @@ const LabelStyleConfig = () => {
   }, [labelStyle.customPositions]);
 
   // Reset des positions lors de changements MAJEURS
-  // useEffect(() => {
-  //   setCustomPositions({});
-  //   updateStyle({ customPositions: {} });
-  // }, [currentLayout.supportType, sampleLabel?.id]);
+  useEffect(() => {
+    setCustomPositions({});
+    updateStyle({ customPositions: {} });
+  }, [currentLayout.supportType, sampleLabel?.id]); // ⭐ SUPPRESSION de updateStyle
 
   // Sélectionner automatiquement le premier onglet activé
   useEffect(() => {

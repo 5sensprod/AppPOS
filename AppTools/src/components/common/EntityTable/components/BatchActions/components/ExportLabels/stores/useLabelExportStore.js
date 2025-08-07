@@ -20,6 +20,8 @@ const DEFAULT_STYLE = {
   priceWeight: 'bold',
   showName: false,
   nameSize: 10,
+  priceFontFamily: 'Arial',
+  nameFontFamily: 'Arial',
   nameWeight: 'bold', // ⭐ NOUVEAU (pour cohérence)
   duplicateCount: 1,
   customPositions: {},

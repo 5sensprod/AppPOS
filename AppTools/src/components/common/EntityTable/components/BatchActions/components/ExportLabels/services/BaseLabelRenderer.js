@@ -85,23 +85,24 @@ class BaseLabelRenderer {
       await this._addBorder(fabricCanvas, layout, style, fabric, scaleFactor);
     }
 
-    // Nom (tolérant)
+    // Nom avec type spécifique
     if (style.showName && label.name?.trim()) {
+      console.log('🔤 Rendu nom avec police:', style.nameFontFamily || style.fontFamily);
       await this._addText(fabricCanvas, label.name, elements.name, style, fabric, 'name');
     }
 
-    // Prix (tolérant)
+    // Prix avec type spécifique
     if (style.showPrice && label.price != null && label.price >= 0) {
       const priceText = formatCurrency(label.price);
+      console.log('🔤 Rendu prix avec police:', style.priceFontFamily || style.fontFamily);
       await this._addText(fabricCanvas, priceText, elements.price, style, fabric, 'price');
     }
 
-    // Code-barres (tolérant avec fallback)
+    // Code-barres
     if (style.showBarcode && label.barcode?.trim()) {
       await this._addBarcode(fabricCanvas, label, elements.barcode, style, fabric, scaleFactor);
     }
   }
-
   // 🎯 Calcul des éléments simplifié
   _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
@@ -184,21 +185,43 @@ class BaseLabelRenderer {
 
   // 🎨 Ajout de texte unifié
   async _addText(fabricCanvas, text, element, style, fabric, type) {
+    // Déterminer les propriétés selon le type d'élément
     let fontWeight = 'normal';
+    let fontFamily = 'Arial'; // Default fallback
 
-    if (type === 'price') {
-      fontWeight = style.priceWeight || 'bold';
-    } else if (type === 'name') {
-      fontWeight = style.nameWeight || 'bold';
+    // ⭐ LOGIQUE SPÉCIFIQUE PAR TYPE
+    switch (type) {
+      case 'price':
+        fontWeight = style.priceWeight || 'bold';
+        fontFamily = style.priceFontFamily || style.fontFamily || 'Arial';
+        break;
+      case 'name':
+        fontWeight = style.nameWeight || 'bold';
+        fontFamily = style.nameFontFamily || style.fontFamily || 'Arial';
+        break;
+      case 'barcodeText':
+        fontWeight = 'normal';
+        fontFamily = 'Courier New'; // Monospace pour code-barres
+        break;
+      default:
+        fontWeight = 'normal';
+        fontFamily = style.fontFamily || 'Arial';
     }
+
+    console.log(`🔤 Création texte "${type}":`, {
+      text: text.substring(0, 20) + (text.length > 20 ? '...' : ''),
+      fontFamily,
+      fontWeight,
+      fontSize: element.fontSize,
+    });
 
     const textObj = new fabric.Text(text, {
       left: element.centerX,
       top: element.y,
       originX: 'center',
       fontSize: element.fontSize,
-      fontFamily: style.fontFamily || 'Arial',
-      fontWeight: fontWeight,
+      fontFamily: fontFamily, // ⭐ Police spécifique appliquée
+      fontWeight: fontWeight, // ⭐ Poids spécifique appliqué
       fill: '#000000',
       selectable: false,
       paintFirst: 'fill',
