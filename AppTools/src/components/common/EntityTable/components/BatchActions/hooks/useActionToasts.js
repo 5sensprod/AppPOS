@@ -2,9 +2,34 @@
 import { useToastStore } from '../stores/useToastStore';
 
 export const useActionToasts = () => {
-  const { success, error, warning, progress, updateToast, removeToast } = useToastStore();
+  // CORRECTION : Ajouter addToast dans la destructuration
+  const { success, error, warning, progress, addToast, updateToast, removeToast } = useToastStore();
 
   const toastActions = {
+    duplicate: {
+      start: (productName = 'produit') => {
+        console.log('duplicate.start appelé avec:', productName);
+
+        // Maintenant addToast est disponible
+        return addToast({
+          type: 'progress',
+          title: 'Duplication en cours',
+          message: `Duplication de "${productName}"...`,
+          progress: { current: 0, total: 100 },
+          dismissible: false,
+        });
+      },
+      success: (originalName, duplicatedName) => {
+        return success(
+          `Produit dupliqué : "${duplicatedName}" créé à partir de "${originalName}"`,
+          { duration: 5000 }
+        );
+      },
+      error: (message) => {
+        return error(`Erreur de duplication : ${message}`);
+      },
+    },
+
     // Actions de suppression
     deletion: {
       start: (count, entityName) => {
@@ -162,6 +187,7 @@ export const useActionToasts = () => {
     error,
     warning,
     progress,
+    addToast, // AJOUT : Exporter addToast également
     updateToast,
     removeToast,
   };

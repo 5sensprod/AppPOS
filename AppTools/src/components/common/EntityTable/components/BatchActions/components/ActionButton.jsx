@@ -1,11 +1,18 @@
-// components/ActionButton.jsx
-import React, { useRef, useCallback } from 'react';
+// components/ActionButton.jsx - Version corrigée
+import React, { useRef, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { useResponsiveDropdown } from '../hooks/useResponsiveDropdown';
 import CategorySelector from '../../../../CategorySelector';
 
-const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, syncStats }) => {
+const ActionButton = ({
+  action,
+  cfg,
+  openDropdown,
+  setOpenDropdown,
+  syncStats,
+  selectedItems = [],
+}) => {
   const isOpen = openDropdown === action;
   const dropdownRef = useRef(null);
 
@@ -17,6 +24,32 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, syncStats })
   const closeDropdown = useCallback(() => {
     setOpenDropdown(null);
   }, [setOpenDropdown]);
+
+  // Vérification de disponibilité selon le nombre d'items
+  const isDisabled = useMemo(() => {
+    if (cfg.maxItems) {
+      return selectedItems.length !== cfg.maxItems;
+    }
+    return false;
+  }, [cfg.maxItems, selectedItems.length]);
+
+  // Tooltip dynamique
+  const getTooltip = () => {
+    if (action === 'duplicate') {
+      if (selectedItems.length === 0) return 'Sélectionnez un produit à dupliquer';
+      if (selectedItems.length > 1) return 'Sélectionnez un seul produit à dupliquer';
+      return cfg.tooltip || 'Dupliquer le produit sélectionné';
+    }
+    return cfg.tooltip;
+  };
+
+  const handleClick = () => {
+    if (isDisabled) return;
+
+    if (cfg.onAction) {
+      cfg.onAction();
+    }
+  };
 
   // Fonction pour basculer l'état du dropdown
   const toggleOpen = () => {
@@ -37,27 +70,45 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, syncStats })
     );
   }
 
-  // Action simple (bouton standard)
+  // ✅ CORRECTION : Action simple (bouton standard) avec gestion du disabled et tooltip
   if (!cfg.options && !cfg.isHierarchical) {
     return (
-      <button
-        onClick={cfg.onAction}
-        className={`px-3 py-1 rounded-md flex items-center text-sm ${cfg.buttonClass}`}
-        aria-label={cfg.label}
-      >
-        <cfg.icon className="h-4 w-4 mr-1" />
-        {cfg.label}
-      </button>
+      <div className="relative" title={getTooltip()}>
+        <button
+          onClick={handleClick}
+          disabled={isDisabled}
+          className={`
+            px-3 py-1 rounded-md flex items-center text-sm transition-colors duration-200
+            ${
+              isDisabled
+                ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-700 text-gray-400'
+                : cfg.buttonClass
+            }
+          `}
+          aria-label={cfg.label}
+        >
+          <cfg.icon className="h-4 w-4 mr-1" />
+          {cfg.label}
+        </button>
+      </div>
     );
   }
 
   // Action avec dropdown
   return (
-    <>
+    <div className="relative" title={getTooltip()}>
       <button
         ref={buttonRef}
         onClick={toggleOpen}
-        className={`px-3 py-1 rounded-md flex items-center text-sm ${cfg.buttonClass}`}
+        disabled={isDisabled}
+        className={`
+          px-3 py-1 rounded-md flex items-center text-sm transition-colors duration-200
+          ${
+            isDisabled
+              ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-700 text-gray-400'
+              : cfg.buttonClass
+          }
+        `}
         aria-label={cfg.label}
       >
         <cfg.icon className="h-4 w-4 mr-1" />
@@ -79,7 +130,6 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, syncStats })
               minWidth: `${Math.max(buttonRect.width, 350)}px`,
             }}
           >
-            {/* ✅ Condition pour afficher le bon composant selon l'action */}
             {cfg.isHierarchical ? (
               // Pour les catégories hiérarchiques
               <CategorySelector
@@ -117,7 +167,7 @@ const ActionButton = ({ action, cfg, openDropdown, setOpenDropdown, syncStats })
           </div>,
           document.body
         )}
-    </>
+    </div>
   );
 };
 

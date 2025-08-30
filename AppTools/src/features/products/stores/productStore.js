@@ -372,10 +372,29 @@ export function useProduct() {
       throw error;
     }
   };
+  const duplicateProduct = async (productId) => {
+    console.log(`Duplication du produit #${productId}`);
+
+    try {
+      const response = await apiService.post(`/api/products/${productId}/duplicate`);
+      console.log('Produit dupliqué avec succès:', response.data);
+
+      // Le nouveau produit sera automatiquement ajouté via WebSocket
+      // Ou on peut forcer un refresh du cache
+      const dataStore = useProductDataStore.getState();
+      dataStore.invalidateCache();
+
+      return response.data.data; // Retourne { original, duplicated }
+    } catch (error) {
+      console.error(`Erreur lors de la duplication du produit #${productId}:`, error);
+      throw error;
+    }
+  };
 
   return {
     ...productStore,
     syncProduct,
+    duplicateProduct,
     // ✅ INITIALISATION WEBSOCKET SIMPLIFIÉE
     initWebSocketListeners: () => {
       const wsStore = useProductDataStore.getState();

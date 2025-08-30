@@ -11,6 +11,7 @@ export const BatchActions = ({
     'status',
     'stock',
     'category',
+    'duplicate',
     'delete',
     'sync',
     'export',
@@ -25,6 +26,7 @@ export const BatchActions = ({
   onBatchCategoryChange,
   onBatchStockChange,
   onCreateSheet,
+  onDuplicate,
   categoryOptions = [],
   syncStats,
 }) => {
@@ -70,6 +72,7 @@ export const BatchActions = ({
     onBatchCategoryChange,
     onBatchStockChange,
     onCreateSheet,
+    onDuplicate,
     setOpenDropdown,
   };
 
@@ -104,6 +107,7 @@ export const BatchActions = ({
               setOpenDropdown={setOpenDropdown}
               hierarchicalData={hierarchicalCategories}
               syncStats={syncStats}
+              selectedItems={selectedItems} // ✅ AJOUT - Passer selectedItems
             />
           );
         })}

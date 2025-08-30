@@ -54,6 +54,7 @@ const EntityTable = ({
   onBatchDelete,
   onBatchSync,
   onSearch,
+  onDuplicate,
   onFilter,
   searchFields = ['name'],
   searchPlaceholder,
@@ -456,6 +457,7 @@ const EntityTable = ({
           onCreateSheet={hasCreateSheet ? onCreateSheet : undefined}
           categoryOptions={categoryOptions}
           syncStats={syncStats}
+          onDuplicate={onDuplicate}
         />
       )}
 

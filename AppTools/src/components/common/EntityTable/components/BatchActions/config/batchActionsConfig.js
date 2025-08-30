@@ -7,6 +7,7 @@ import {
   FileOutput,
   Package,
   Tags,
+  Copy,
 } from 'lucide-react';
 import SyncButton from '../components/SyncButton';
 
@@ -58,6 +59,15 @@ export const createActionsConfig = (callbacks, hierarchicalCategories, syncStats
     label: 'Créer fiche',
     buttonClass: 'bg-amber-100 hover:bg-amber-200 text-amber-800',
     onAction: () => callbacks.onCreateSheet(callbacks.selectedItems),
+  },
+  duplicate: {
+    available: typeof callbacks.onDuplicate === 'function',
+    icon: Copy,
+    label: 'Dupliquer', // ← Vérifiez ce label
+    buttonClass: 'bg-orange-100 hover:bg-orange-200 text-orange-800',
+    onAction: () => callbacks.onDuplicate(callbacks.selectedItems),
+    maxItems: 1,
+    tooltip: 'Dupliquer le produit sélectionné',
   },
   category: {
     available:

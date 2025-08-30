@@ -37,6 +37,8 @@ router.get('/:id/category-path', async (req, res) => {
 router.post('/stock/statistics/export-pdf', productController.exportStockStatisticsToPDF);
 router.post('/', validateSchema(createProductSchema), productController.create);
 
+router.post('/:id/duplicate', productController.duplicate);
+
 // Middleware de synchronisation pour les routes de mise à jour
 router.put(
   '/:id',

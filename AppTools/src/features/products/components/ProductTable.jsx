@@ -18,7 +18,7 @@ import { useActionToasts } from '../../../components/common/EntityTable/componen
 import { productSearchProcessor } from '../../../utils/productSearchProcessor';
 
 function ProductTable(props) {
-  const { deleteProduct, syncProduct, updateProduct } = useProduct();
+  const { deleteProduct, syncProduct, updateProduct, duplicateProduct } = useProduct();
   const {
     products,
     loading: productsLoading,
@@ -302,6 +302,45 @@ function ProductTable(props) {
     [updateProduct, toastActions, fetchProducts]
   );
 
+  const handleDuplicate = useCallback(
+    async (selectedItems) => {
+      if (selectedItems.length !== 1) {
+        toastActions.duplicate.error('Veuillez sélectionner un seul produit à dupliquer');
+        return;
+      }
+
+      const productId = selectedItems[0];
+      const product = enrichedProducts.find((p) => p._id === productId);
+      const productName = product?.name || product?.designation || product?.sku || 'Produit';
+
+      const toastId = toastActions.duplicate.start(productName);
+
+      try {
+        // Appel API de duplication
+        const result = await duplicateProduct(productId);
+
+        // Supprimer le toast de progression
+        removeToast(toastId);
+
+        // Toast de succès avec les noms
+        toastActions.duplicate.success(
+          result.original.name || result.original.sku || 'Produit original',
+          result.duplicated.name || result.duplicated.sku || 'Produit dupliqué'
+        );
+
+        // Actualiser la liste des produits après un délai
+        setTimeout(async () => {
+          await fetchProducts();
+        }, 500);
+      } catch (error) {
+        removeToast(toastId);
+        toastActions.duplicate.error(error.message);
+        console.error('Erreur duplication:', error);
+      }
+    },
+    [duplicateProduct, toastActions, removeToast, fetchProducts, enrichedProducts]
+  );
+
   return (
     <>
       <ToastContainer />
@@ -331,6 +370,7 @@ function ProductTable(props) {
           'status',
           'stock',
           'category',
+          'duplicate',
           'createSheet',
           'export',
           'labels',
@@ -348,6 +388,7 @@ function ProductTable(props) {
         onBatchStockChange={handleStockAction}
         onCreateSheet={handleCreateSheet}
         categoryOptions={categorySelectOptions}
+        onDuplicate={handleDuplicate}
         pagination={{
           enabled: true,
           pageSize: persistedPageSize || 10,
