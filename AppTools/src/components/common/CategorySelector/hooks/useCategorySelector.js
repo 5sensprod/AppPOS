@@ -97,6 +97,7 @@ export const useCategorySelector = ({
     searchTerm,
     setSearchTerm,
     expandedItems,
+    setExpandedItems,
     containerRef,
 
     // Données
