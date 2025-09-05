@@ -293,14 +293,15 @@ class PDFKitService {
   }
 
   async renderSimplifiedCategorySummary(doc, styles, dimensions, groupedProducts, stockStats) {
-    console.log('MODE SIMPLIFIÉ : Génération du tableau des totaux par catégorie');
+    console.log('MODE SIMPLIFIÉ : Génération du tableau groupé par catégorie parente');
 
     let y = this.contentRenderer.getCurrentY();
 
-    // NOUVEAU : Affichage des catégories racines (parentes)
-    const rootCategories = this.extractRootCategories(groupedProducts);
+    // Groupement par catégorie parente
+    const groupedByParent = this.groupByParentCategory(groupedProducts);
+    const rootCategories = Object.keys(groupedByParent).sort();
+
     if (rootCategories.length > 0) {
-      // Titre informatif avec catégories parentes
       this.layoutHelper.applyTextStyle(doc, styles.summary.text);
       const categoryInfo =
         rootCategories.length === 1
@@ -313,14 +314,12 @@ class PDFKitService {
       });
       y += 15;
 
-      // Ligne de séparation
       doc.moveTo(dimensions.left, y).lineTo(dimensions.right, y).stroke('#CCCCCC');
       y += 10;
-
       this.contentRenderer.currentY = y;
     }
 
-    // Configuration du tableau simplifié
+    // Configuration du tableau
     const summaryTableConfig = {
       columns: {
         category: { title: 'Catégorie', align: 'left' },
@@ -344,7 +343,7 @@ class PDFKitService {
     );
     y = this.contentRenderer.getCurrentY();
 
-    // En-tête du tableau de synthèse
+    // En-tête du tableau
     y = this.contentRenderer.renderTableHeader(
       doc,
       styles,
@@ -354,38 +353,61 @@ class PDFKitService {
       summaryTableConfig.columns
     );
 
-    // Données par catégorie
-    for (const [categoryName, products] of Object.entries(groupedProducts)) {
-      const categoryStats = this.calculateCategoryStats(products);
+    // Rendu groupé par catégorie parente
+    for (const [parentCategory, subcategories] of Object.entries(groupedByParent)) {
+      // Ligne de la catégorie parente (en gras)
+      if (Object.keys(subcategories).length > 1) {
+        const parentStats = this.calculateParentCategoryStats(subcategories);
+        const parentRowData = {
+          category: `${parentCategory.toUpperCase()}`,
+          product_count: this.layoutHelper.formatNumber(parentStats.totalProducts),
+          stock_total: this.layoutHelper.formatNumber(parentStats.totalStock),
+          inventory_value: this.layoutHelper.formatCurrency(parentStats.totalInventoryValue),
+          tax_collected: this.layoutHelper.formatCurrency(parentStats.totalTaxCollected),
+        };
+        y = this.renderParentCategoryRow(
+          doc,
+          styles,
+          dimensions.left,
+          y,
+          columnWidths,
+          summaryTableConfig.columns,
+          parentRowData
+        );
+      }
 
-      // Calcul du stock total et de la TVA collectée pour cette catégorie
-      let totalStock = 0;
-      let taxCollected = 0;
+      // Lignes des sous-catégories (indentées)
+      for (const [subcategoryName, products] of Object.entries(subcategories)) {
+        const categoryStats = this.calculateCategoryStats(products);
+        let totalStock = 0,
+          taxCollected = 0;
 
-      products.forEach((product) => {
-        totalStock += product.stock || 0;
-        const retailValue = (product.stock || 0) * (product.price || 0);
-        const taxRate = product.tax_rate || 0;
-        taxCollected += taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
-      });
+        products.forEach((product) => {
+          totalStock += product.stock || 0;
+          const retailValue = (product.stock || 0) * (product.price || 0);
+          const taxRate = product.tax_rate || 0;
+          taxCollected += taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
+        });
 
-      const summaryRowData = {
-        category: categoryName,
-        product_count: this.layoutHelper.formatNumber(categoryStats.totalProducts),
-        stock_total: this.layoutHelper.formatNumber(totalStock),
-        inventory_value: this.layoutHelper.formatCurrency(categoryStats.totalInventoryValue),
-        tax_collected: this.layoutHelper.formatCurrency(taxCollected),
-      };
+        const summaryRowData = {
+          category:
+            Object.keys(subcategories).length > 1 ? `  ${subcategoryName}` : subcategoryName,
+          product_count: this.layoutHelper.formatNumber(categoryStats.totalProducts),
+          stock_total: this.layoutHelper.formatNumber(totalStock),
+          inventory_value: this.layoutHelper.formatCurrency(categoryStats.totalInventoryValue),
+          tax_collected: this.layoutHelper.formatCurrency(taxCollected),
+        };
 
-      y = this.contentRenderer.renderTableRow(
-        doc,
-        styles,
-        dimensions.left,
-        y,
-        columnWidths,
-        summaryTableConfig.columns,
-        summaryRowData
-      );
+        y = this.contentRenderer.renderTableRow(
+          doc,
+          styles,
+          dimensions.left,
+          y,
+          columnWidths,
+          summaryTableConfig.columns,
+          summaryRowData
+        );
+      }
     }
 
     // Totaux généraux
@@ -411,7 +433,6 @@ class PDFKitService {
       finalTotalsData,
       true
     );
-
     this.contentRenderer.currentY = y + 15;
   }
 
@@ -622,6 +643,76 @@ class PDFKitService {
         Producer: 'APPPOS PDFKit Service',
       },
     };
+  }
+
+  /**
+   * 📂 Groupement des sous-catégories par catégorie parente
+   */
+  groupByParentCategory(groupedProducts) {
+    const groupedByParent = {};
+
+    Object.entries(groupedProducts).forEach(([categoryName, products]) => {
+      // Extraction de la catégorie parente
+      let parentCategory = 'Autres';
+
+      if (products.length > 0 && products[0].category_info?.primary) {
+        const primary = products[0].category_info.primary;
+        if (primary.path && Array.isArray(primary.path) && primary.path.length > 0) {
+          parentCategory = primary.path[0];
+        } else if (primary.path_string && primary.path_string.includes(' > ')) {
+          parentCategory = primary.path_string.split(' > ')[0];
+        } else {
+          parentCategory = categoryName;
+        }
+      }
+
+      if (!groupedByParent[parentCategory]) {
+        groupedByParent[parentCategory] = {};
+      }
+      groupedByParent[parentCategory][categoryName] = products;
+    });
+
+    return groupedByParent;
+  }
+
+  /**
+   * 📊 Calcul des stats pour une catégorie parente
+   */
+  calculateParentCategoryStats(subcategories) {
+    let totalProducts = 0,
+      totalStock = 0,
+      totalInventoryValue = 0,
+      totalTaxCollected = 0;
+
+    Object.values(subcategories).forEach((products) => {
+      products.forEach((product) => {
+        totalProducts++;
+        totalStock += product.stock || 0;
+        totalInventoryValue += (product.stock || 0) * (product.purchase_price || 0);
+        const retailValue = (product.stock || 0) * (product.price || 0);
+        const taxRate = product.tax_rate || 0;
+        totalTaxCollected += taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
+      });
+    });
+
+    return { totalProducts, totalStock, totalInventoryValue, totalTaxCollected };
+  }
+
+  /**
+   * 📋 Rendu d'une ligne de catégorie parente (en gras)
+   */
+  renderParentCategoryRow(doc, styles, x, y, columnWidths, columns, rowData) {
+    // Utiliser le style de totaux pour mettre en gras
+    return this.contentRenderer.renderTableRow(
+      doc,
+      styles,
+      x,
+      y,
+      columnWidths,
+      columns,
+      rowData,
+      true
+    );
   }
 
   /**
