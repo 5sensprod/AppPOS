@@ -96,7 +96,7 @@ class PDFKitService {
   }
 
   /**
-   * 📊 Génération du rapport détaillé
+   * 📊 Génération du rapport détaillé - Support rapport simplifié
    */
   async generateDetailedReport(doc, stockStats, styles, options) {
     const {
@@ -106,11 +106,21 @@ class PDFKitService {
       productsInStock = [],
       sortBy = 'name',
       sortOrder = 'asc',
+      isSimplified = false,
     } = options;
+
+    console.log('DEBUG paramètres extraits:', {
+      groupByCategory,
+      isSimplified,
+      productsCount: productsInStock.length,
+    });
+
+    // Stocker les options courantes pour les méthodes appelées
+    this.currentOptions = options;
 
     // En-tête principal
     this.contentRenderer.renderHeader(doc, styles, {
-      title: 'Rapport de Stock Détaillé',
+      title: isSimplified ? 'Rapport de Stock Simplifié' : 'Rapport de Stock Détaillé',
       subtitle: `Généré le ${this.layoutHelper.formatDate()} à ${this.layoutHelper.formatTime()}`,
     });
 
@@ -123,13 +133,13 @@ class PDFKitService {
     this.contentRenderer.renderQuickSummary(doc, styles, stockStats);
 
     if (groupByCategory) {
-      // Mode groupé par catégorie
+      console.log('AVANT appel renderGroupedProductDetails avec isSimplified:', isSimplified);
       await this.renderGroupedProductDetails(doc, styles, stockStats, productsInStock, {
         sortBy,
         sortOrder,
       });
+      console.log('APRÈS appel renderGroupedProductDetails');
     } else {
-      // Mode liste simple
       await this.renderSimpleProductDetails(doc, styles, stockStats, productsInStock, {
         sortBy,
         sortOrder,
@@ -199,15 +209,31 @@ class PDFKitService {
     productsInStock,
     { sortBy, sortOrder }
   ) {
+    console.log('DEBUT renderGroupedProductDetails');
+    console.log('Etape 1: Récupération isSimplified');
+
+    const { isSimplified = false } = this.currentOptions || {};
+
+    console.log('Etape 2: isSimplified =', isSimplified);
+    console.log('Etape 3: Groupement des produits');
+
     // Groupement par catégorie
     const groupedProducts = this.groupProductsByCategory(productsInStock);
 
+    console.log('Etape 4: Calcul dimensions');
     // Titre de section
     const dimensions = this.layoutHelper.getUsablePageDimensions(doc);
     let y = this.contentRenderer.getCurrentY();
 
+    console.log('Etape 5: Application du style');
     this.layoutHelper.applyTextStyle(doc, styles.metrics.sectionTitle);
-    doc.text('DÉTAIL PAR CATÉGORIE', dimensions.left, y, {
+
+    console.log('Etape 6: Choix du titre');
+    const sectionTitle = isSimplified ? 'SYNTHÈSE PAR CATÉGORIE' : 'DÉTAIL PAR CATÉGORIE';
+    console.log('TITRE CHOISI:', sectionTitle);
+
+    console.log('Etape 7: Rendu du titre');
+    doc.text(sectionTitle, dimensions.left, y, {
       width: dimensions.width,
       align: 'left',
     });
@@ -215,39 +241,142 @@ class PDFKitService {
 
     this.contentRenderer.currentY = y;
 
-    // Configuration du tableau
-    const tableConfig = this.getDetailedTableConfig();
-    const columnWidths = this.layoutHelper.calculateColumnWidths(
-      dimensions.width,
-      tableConfig.widths
-    );
+    console.log('Etape 8: Test de la condition isSimplified =', isSimplified);
+    if (isSimplified === true || isSimplified === 'true') {
+      console.log('MODE SIMPLIFIÉ ACTIVÉ');
+      await this.renderSimplifiedCategorySummary(
+        doc,
+        styles,
+        dimensions,
+        groupedProducts,
+        stockStats
+      );
+    } else {
+      console.log('MODE DÉTAILLÉ ACTIVÉ - valeur isSimplified:', isSimplified);
 
-    // Rendu de chaque catégorie
-    for (const [categoryName, products] of Object.entries(groupedProducts)) {
-      const sortedProducts = this.sortProducts(products, sortBy, sortOrder);
-      const categoryStats = this.calculateCategoryStats(sortedProducts);
+      // Configuration du tableau
+      const tableConfig = this.getDetailedTableConfig();
+      const columnWidths = this.layoutHelper.calculateColumnWidths(
+        dimensions.width,
+        tableConfig.widths
+      );
 
-      await this.contentRenderer.renderCategorySection(
+      // Rendu de chaque catégorie
+      for (const [categoryName, products] of Object.entries(groupedProducts)) {
+        const sortedProducts = this.sortProducts(products, sortBy, sortOrder);
+        const categoryStats = this.calculateCategoryStats(sortedProducts);
+
+        await this.contentRenderer.renderCategorySection(
+          doc,
+          styles,
+          dimensions.left,
+          columnWidths,
+          tableConfig.columns,
+          categoryName,
+          sortedProducts,
+          categoryStats
+        );
+      }
+
+      // Tableau final des totaux
+      await this.contentRenderer.renderFinalTotals(
         doc,
         styles,
         dimensions.left,
         columnWidths,
         tableConfig.columns,
-        categoryName,
-        sortedProducts,
-        categoryStats
+        stockStats
       );
     }
 
-    // Tableau final des totaux
-    await this.contentRenderer.renderFinalTotals(
+    console.log('FIN renderGroupedProductDetails');
+  }
+
+  async renderSimplifiedCategorySummary(doc, styles, dimensions, groupedProducts, stockStats) {
+    console.log('MODE SIMPLIFIÉ : Génération du tableau des totaux par catégorie');
+
+    // Configuration du tableau simplifié
+    const summaryTableConfig = {
+      columns: {
+        category: { title: 'Catégorie', align: 'left' },
+        product_count: { title: 'Nb Produits', align: 'center' },
+        inventory_value: { title: "Valeur d'Achat", align: 'right' },
+        retail_value: { title: 'Valeur de Vente', align: 'right' },
+        margin_value: { title: 'Marge Brute', align: 'right' },
+        margin_percent: { title: 'Marge %', align: 'right' },
+      },
+      widths: {
+        category: 25,
+        product_count: 12,
+        inventory_value: 18,
+        retail_value: 18,
+        margin_value: 18,
+        margin_percent: 9,
+      },
+    };
+
+    const columnWidths = this.layoutHelper.calculateColumnWidths(
+      dimensions.width,
+      summaryTableConfig.widths
+    );
+    let y = this.contentRenderer.getCurrentY();
+
+    // En-tête du tableau de synthèse
+    y = this.contentRenderer.renderTableHeader(
       doc,
       styles,
       dimensions.left,
+      y,
       columnWidths,
-      tableConfig.columns,
-      stockStats
+      summaryTableConfig.columns
     );
+
+    // Données par catégorie
+    for (const [categoryName, products] of Object.entries(groupedProducts)) {
+      const categoryStats = this.calculateCategoryStats(products);
+
+      const summaryRowData = {
+        category: categoryName,
+        product_count: this.layoutHelper.formatNumber(categoryStats.totalProducts),
+        inventory_value: this.layoutHelper.formatCurrency(categoryStats.totalInventoryValue),
+        retail_value: this.layoutHelper.formatCurrency(categoryStats.totalRetailValue),
+        margin_value: this.layoutHelper.formatCurrency(categoryStats.totalMargin),
+        margin_percent: this.layoutHelper.formatPercentage(categoryStats.marginPercentage),
+      };
+
+      y = this.contentRenderer.renderTableRow(
+        doc,
+        styles,
+        dimensions.left,
+        y,
+        columnWidths,
+        summaryTableConfig.columns,
+        summaryRowData
+      );
+    }
+
+    // Totaux généraux
+    const finalTotalsData = {
+      category: 'TOTAL GÉNÉRAL',
+      product_count: this.layoutHelper.formatNumber(stockStats.summary.products_in_stock),
+      inventory_value: this.layoutHelper.formatCurrency(stockStats.financial.inventory_value),
+      retail_value: this.layoutHelper.formatCurrency(stockStats.financial.retail_value),
+      margin_value: this.layoutHelper.formatCurrency(stockStats.financial.potential_margin),
+      margin_percent: this.layoutHelper.formatPercentage(stockStats.financial.margin_percentage),
+    };
+
+    y = this.contentRenderer.renderTableRow(
+      doc,
+      styles,
+      dimensions.left,
+      y,
+      columnWidths,
+      summaryTableConfig.columns,
+      finalTotalsData,
+      true
+    );
+
+    this.contentRenderer.currentY = y + 15;
   }
 
   /**

@@ -201,6 +201,7 @@ class ProductStockController extends BaseController {
         groupByCategory: params.groupByCategory,
         sortBy: params.sortBy,
         sortOrder: params.sortOrder,
+        isSimplified: params.isSimplified, // 🔥 NOUVEAU paramètre
       };
 
       const pdfBuffer = await this.pdfService.generateStockReport(stockStats, pdfOptions);
