@@ -295,23 +295,21 @@ class PDFKitService {
   async renderSimplifiedCategorySummary(doc, styles, dimensions, groupedProducts, stockStats) {
     console.log('MODE SIMPLIFIÉ : Génération du tableau des totaux par catégorie');
 
-    // Configuration du tableau simplifié
+    // Configuration du tableau simplifié - CORRIGÉE avec TVA Collectée
     const summaryTableConfig = {
       columns: {
         category: { title: 'Catégorie', align: 'left' },
         product_count: { title: 'Nb Produits', align: 'center' },
-        inventory_value: { title: "Valeur d'Achat", align: 'right' },
-        retail_value: { title: 'Valeur de Vente', align: 'right' },
-        margin_value: { title: 'Marge Brute', align: 'right' },
-        margin_percent: { title: 'Marge %', align: 'right' },
+        stock_total: { title: 'Stock Total', align: 'center' },
+        inventory_value: { title: 'Valeur Stock', align: 'right' },
+        tax_collected: { title: 'TVA Collectée', align: 'right' },
       },
       widths: {
-        category: 25,
-        product_count: 12,
-        inventory_value: 18,
-        retail_value: 18,
-        margin_value: 18,
-        margin_percent: 9,
+        category: 30,
+        product_count: 15,
+        stock_total: 15,
+        inventory_value: 20,
+        tax_collected: 20,
       },
     };
 
@@ -335,13 +333,23 @@ class PDFKitService {
     for (const [categoryName, products] of Object.entries(groupedProducts)) {
       const categoryStats = this.calculateCategoryStats(products);
 
+      // Calcul du stock total et de la TVA collectée pour cette catégorie
+      let totalStock = 0;
+      let taxCollected = 0;
+
+      products.forEach((product) => {
+        totalStock += product.stock || 0;
+        const retailValue = (product.stock || 0) * (product.price || 0);
+        const taxRate = product.tax_rate || 0;
+        taxCollected += taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
+      });
+
       const summaryRowData = {
         category: categoryName,
         product_count: this.layoutHelper.formatNumber(categoryStats.totalProducts),
+        stock_total: this.layoutHelper.formatNumber(totalStock),
         inventory_value: this.layoutHelper.formatCurrency(categoryStats.totalInventoryValue),
-        retail_value: this.layoutHelper.formatCurrency(categoryStats.totalRetailValue),
-        margin_value: this.layoutHelper.formatCurrency(categoryStats.totalMargin),
-        margin_percent: this.layoutHelper.formatPercentage(categoryStats.marginPercentage),
+        tax_collected: this.layoutHelper.formatCurrency(taxCollected),
       };
 
       y = this.contentRenderer.renderTableRow(
@@ -359,10 +367,13 @@ class PDFKitService {
     const finalTotalsData = {
       category: 'TOTAL GÉNÉRAL',
       product_count: this.layoutHelper.formatNumber(stockStats.summary.products_in_stock),
+      stock_total: this.layoutHelper.formatNumber(
+        Object.values(groupedProducts)
+          .flat()
+          .reduce((sum, p) => sum + (p.stock || 0), 0)
+      ),
       inventory_value: this.layoutHelper.formatCurrency(stockStats.financial.inventory_value),
-      retail_value: this.layoutHelper.formatCurrency(stockStats.financial.retail_value),
-      margin_value: this.layoutHelper.formatCurrency(stockStats.financial.potential_margin),
-      margin_percent: this.layoutHelper.formatPercentage(stockStats.financial.margin_percentage),
+      tax_collected: this.layoutHelper.formatCurrency(stockStats.financial.tax_amount),
     };
 
     y = this.contentRenderer.renderTableRow(
