@@ -64,7 +64,7 @@ const UnifiedFilterBar = ({
   const availableTypes = useMemo(() => {
     const baseTypes = Object.entries(filterGroups)
       .filter(([type]) => {
-        const allowMultiple = ['supplier', 'brand', 'category', 'barcode', 'stock'].includes(type); // ✅ Ajout stock
+        const allowMultiple = ['supplier', 'brand', 'category', 'barcode'].includes(type); // ✅ Ajout stock
         return allowMultiple || !selectedTypes.has(type);
       })
       .map(([type]) => ({
@@ -154,17 +154,17 @@ const UnifiedFilterBar = ({
     const stockValue = parseInt(stockInputValue.trim(), 10);
     if (isNaN(stockValue) || stockValue < 0) return;
 
-    // Vérifier si ce filtre stock existe déjà
-    if (!selectedValues.has(`stock:${stockValue}`)) {
-      const newFilter = {
-        type: 'stock',
-        value: stockValue,
-        label: `Stock = ${stockValue}`,
-      };
+    // ✅ NOUVEAU : Supprimer tous les anciens filtres stock et ajouter le nouveau
+    const filtersWithoutStock = selectedFilters.filter((f) => f.type !== 'stock');
 
-      onChange([...selectedFilters, newFilter]);
-    }
+    const newFilter = {
+      type: 'stock',
+      value: stockValue,
+      label: `Stock = ${stockValue}`,
+    };
 
+    // ✅ Remplacer les filtres stock existants par le nouveau
+    onChange([...filtersWithoutStock, newFilter]);
     closeFilterDropdown();
   };
 
