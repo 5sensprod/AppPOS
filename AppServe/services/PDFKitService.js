@@ -295,7 +295,32 @@ class PDFKitService {
   async renderSimplifiedCategorySummary(doc, styles, dimensions, groupedProducts, stockStats) {
     console.log('MODE SIMPLIFIÉ : Génération du tableau des totaux par catégorie');
 
-    // Configuration du tableau simplifié - CORRIGÉE avec TVA Collectée
+    let y = this.contentRenderer.getCurrentY();
+
+    // NOUVEAU : Affichage des catégories racines (parentes)
+    const rootCategories = this.extractRootCategories(groupedProducts);
+    if (rootCategories.length > 0) {
+      // Titre informatif avec catégories parentes
+      this.layoutHelper.applyTextStyle(doc, styles.summary.text);
+      const categoryInfo =
+        rootCategories.length === 1
+          ? `Catégorie sélectionnée : ${rootCategories[0]}`
+          : `Catégories sélectionnées : ${rootCategories.join(', ')}`;
+
+      doc.text(categoryInfo, dimensions.left, y, {
+        width: dimensions.width,
+        align: 'left',
+      });
+      y += 15;
+
+      // Ligne de séparation
+      doc.moveTo(dimensions.left, y).lineTo(dimensions.right, y).stroke('#CCCCCC');
+      y += 10;
+
+      this.contentRenderer.currentY = y;
+    }
+
+    // Configuration du tableau simplifié
     const summaryTableConfig = {
       columns: {
         category: { title: 'Catégorie', align: 'left' },
@@ -317,7 +342,7 @@ class PDFKitService {
       dimensions.width,
       summaryTableConfig.widths
     );
-    let y = this.contentRenderer.getCurrentY();
+    y = this.contentRenderer.getCurrentY();
 
     // En-tête du tableau de synthèse
     y = this.contentRenderer.renderTableHeader(
@@ -388,6 +413,34 @@ class PDFKitService {
     );
 
     this.contentRenderer.currentY = y + 15;
+  }
+
+  /**
+   * 📂 Extraction des catégories racines à partir des sous-catégories
+   */
+  extractRootCategories(groupedProducts) {
+    const rootCategoryIds = new Set();
+    const rootCategoryNames = new Set();
+
+    Object.values(groupedProducts).forEach((products) => {
+      products.forEach((product) => {
+        if (product.category_info && product.category_info.primary) {
+          const primary = product.category_info.primary;
+
+          // Utiliser path_ids pour récupérer l'ID de la catégorie racine
+          if (primary.path_ids && Array.isArray(primary.path_ids) && primary.path_ids.length > 0) {
+            rootCategoryIds.add(primary.path_ids[0]);
+          }
+
+          // Utiliser path pour récupérer le nom de la catégorie racine
+          if (primary.path && Array.isArray(primary.path) && primary.path.length > 0) {
+            rootCategoryNames.add(primary.path[0]);
+          }
+        }
+      });
+    });
+
+    return Array.from(rootCategoryNames).sort();
   }
 
   /**

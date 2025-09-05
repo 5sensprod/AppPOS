@@ -262,7 +262,9 @@ const CategoryTreeSelector = ({
               }
               className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
-            <span className="text-xs text-gray-700 dark:text-gray-300">Rapport simplifié</span>
+            <span className="text-xs text-gray-700 dark:text-gray-300">
+              Rapport simplifié avec TVA
+            </span>
           </label>
           <div className="text-xs text-gray-500 italic mt-1">
             Affiche uniquement les totaux par catégorie racine (sans le détail des produits)
