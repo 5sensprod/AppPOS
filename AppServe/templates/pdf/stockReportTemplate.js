@@ -1,5 +1,4 @@
 // AppServe/templates/pdf/stockReportTemplate.js
-// 🔧 MODIFICATION UNIQUEMENT de la méthode renderTaxSection pour éviter le débordement
 
 const TemplateHelpers = require('./helpers/templateHelpers');
 

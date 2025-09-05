@@ -1,12 +1,13 @@
-// AppServe/controllers/productStockController.js - MODIFICATION HYBRIDE
+// AppServe/controllers/product/productStockController.js - VERSION PDFKIT
 
 const BaseController = require('../base/BaseController');
 const Product = require('../../models/Product');
 const productWooCommerceService = require('../../services/ProductWooCommerceService');
 const ResponseHandler = require('../../handlers/ResponseHandler');
 const exportController = require('../../utils/exportController');
-const StockReportTemplate = require('../../templates/pdf/stockReportTemplate');
-const DetailedStockReportTemplate = require('../../templates/pdf/detailedStockReportTemplate');
+
+// 🚀 NOUVEAU : Service PDFKit au lieu des templates HTML
+const PDFKitService = require('../../services/PDFKitService');
 
 class ProductStockController extends BaseController {
   constructor() {
@@ -14,8 +15,9 @@ class ProductStockController extends BaseController {
       image: { type: 'gallery' },
       deleteFromWoo: (id) => productWooCommerceService.deleteProduct(id),
     });
-    this.stockTemplate = new StockReportTemplate();
-    this.detailedTemplate = new DetailedStockReportTemplate();
+
+    // 🔥 NOUVEAU : Instance du service PDFKit
+    this.pdfService = new PDFKitService();
   }
 
   async updateStock(req, res) {
@@ -176,19 +178,33 @@ class ProductStockController extends BaseController {
     });
   }
 
-  // 🚀 MÉTHODE MODIFIÉE : Support données pré-filtrées
+  // 🚀 MÉTHODE ENTIÈREMENT REFACTORISÉE : PDFKit au lieu d'HTML-PDF
   async exportStockStatisticsToPDF(req, res) {
     try {
-      const pdf = require('html-pdf');
+      console.log('🔄 Génération PDF avec PDFKit...');
+
+      // Extraction des paramètres
       const params = this.extractPDFParams(req.body);
 
-      // 🔥 NOUVEAUTÉ : Utiliser données front-end si disponibles
+      // 🔥 Support données pré-filtrées (logique hybride conservée)
       const { productsInStock, stockStats } = await this.getOptimizedProductsForPDF(req.body);
 
-      const htmlContent = await this.generateHTMLContent(params, stockStats, productsInStock);
-      const pdfBuffer = await this.generatePDFBuffer(htmlContent, params.reportType, params, pdf);
-      this.sendPDFResponse(res, pdfBuffer, params.reportType, params);
+      // 🎯 NOUVEAU : Génération avec PDFKit
+      const pdfBuffer = await this.pdfService.generateStockReport(stockStats, {
+        reportType: params.reportType,
+        companyInfo: params.companyInfo,
+        includeCompanyInfo: params.includeCompanyInfo,
+        includeCharts: params.includeCharts,
+        orientation:
+          params.reportType === 'detailed' && !params.isSimplified ? 'landscape' : 'portrait',
+      });
+
+      console.log('✅ PDF généré avec succès');
+
+      // 📤 Envoi de la réponse
+      PDFKitService.sendPDFResponse(res, pdfBuffer, params.reportType, params);
     } catch (error) {
+      console.error('❌ Erreur génération PDF:', error);
       return ResponseHandler.error(res, {
         message: 'Erreur lors de la génération du PDF',
         details: error.message,
@@ -212,7 +228,7 @@ class ProductStockController extends BaseController {
     };
   }
 
-  // 🚀 NOUVELLE MÉTHODE : Support hybride optimisé
+  // 🚀 NOUVELLE MÉTHODE : Support hybride optimisé (inchangée)
   async getOptimizedProductsForPDF(body) {
     const { preFilteredData } = body;
 
@@ -254,72 +270,14 @@ class ProductStockController extends BaseController {
     return { productsInStock, stockStats };
   }
 
-  async generateHTMLContent(params, stockStats, productsInStock) {
-    // ... méthode inchangée
-    const templateOptions = {
-      companyInfo: params.companyInfo,
-      includeCompanyInfo: params.includeCompanyInfo,
-      includeCharts: params.includeCharts,
-      groupByCategory: params.groupByCategory,
-      selectedCategories: params.selectedCategories,
-      includeUncategorized: params.includeUncategorized,
-      isSimplified: params.isSimplified,
-    };
+  // 🗑️ MÉTHODES SUPPRIMÉES : Plus besoin avec PDFKit
+  // - generateHTMLContent()
+  // - generatePDFBuffer()
+  // - sendPDFResponse() -> déplacée dans PDFKitService
 
-    if (params.reportType === 'detailed') {
-      const sortedProducts = this.sortProducts(productsInStock, params.sortBy, params.sortOrder);
-      return await this.detailedTemplate.generateDetailedStockReportHTML(
-        stockStats,
-        sortedProducts,
-        templateOptions
-      );
-    } else {
-      return this.stockTemplate.generateStockReportHTML.length === 3
-        ? this.stockTemplate.generateStockReportHTML(stockStats, templateOptions)
-        : this.stockTemplate.generateStockReportHTML(stockStats, templateOptions.companyInfo);
-    }
-  }
-
-  async generatePDFBuffer(htmlContent, reportType, params, pdf) {
-    // ... méthode inchangée
-    const orientation =
-      reportType === 'detailed' && !params.isSimplified ? 'landscape' : 'portrait';
-    const options = {
-      format: 'A4',
-      orientation: orientation,
-      border:
-        orientation === 'landscape'
-          ? { top: '12mm', right: '8mm', bottom: '12mm', left: '8mm' }
-          : { top: '15mm', right: '12mm', bottom: '15mm', left: '12mm' },
-      type: 'pdf',
-      quality: '75',
-      dpi: 150,
-      timeout: 30000,
-      phantomjsOptions: {
-        '--web-security': 'no',
-        '--load-images': 'yes',
-        '--ignore-ssl-errors': 'yes',
-      },
-    };
-
-    return new Promise((resolve, reject) => {
-      pdf.create(htmlContent, options).toBuffer((err, buffer) => {
-        err ? reject(err) : resolve(buffer);
-      });
-    });
-  }
-
+  // ✅ CONSERVATION de sendPDFResponse pour compatibilité
   sendPDFResponse(res, pdfBuffer, reportType, params) {
-    // ... méthode inchangée
-    let filename = `rapport_stock_${reportType}`;
-    if (params.isSimplified) filename += '_simplifie';
-    if (params.groupByCategory) filename += '_categories';
-    filename += `_${new Date().toISOString().split('T')[0]}.pdf`;
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
-    res.send(pdfBuffer);
+    PDFKitService.sendPDFResponse(res, pdfBuffer, reportType, params);
   }
 }
 

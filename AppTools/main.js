@@ -1,10 +1,20 @@
-// main.js - AVEC MODULE SPLASH PROFESSIONNEL
+// main.js - AVEC MODULE SPLASH PROFESSIONNEL + SINGLE INSTANCE
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const bonjour = require('bonjour')();
+
+// ✅ NOUVEAU : Protection single instance - PLACER EN PREMIER
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  console.log("🔒 [SINGLE-INSTANCE] Application déjà en cours d'exécution");
+  app.quit();
+} else {
+  console.log('✅ [SINGLE-INSTANCE] Verrou obtenu - application autorisée');
+}
 
 // ✅ NOUVEAU : Importation du module splash
 const { createSplashWindow, updateSplashStatus, closeSplash } = require(
@@ -54,11 +64,44 @@ environment.checkEnvironment(app);
 // Charger les variables d'environnement
 environment.loadEnvVariables(app);
 
+// ✅ NOUVEAU : Gestionnaire pour la seconde instance
+app.on('second-instance', (event, commandLine, workingDirectory) => {
+  console.log("🔄 [SINGLE-INSTANCE] Tentative de lancement d'une seconde instance détectée");
+  console.log('📁 [SINGLE-INSTANCE] Répertoire de travail:', workingDirectory);
+  console.log('💻 [SINGLE-INSTANCE] Ligne de commande:', commandLine);
+
+  // Si notre fenêtre existe, la restaurer et la mettre au premier plan
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+      console.log('↗️ [SINGLE-INSTANCE] Fenêtre restaurée depuis la minimisation');
+    }
+
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+      console.log('👁️ [SINGLE-INSTANCE] Fenêtre rendue visible');
+    }
+
+    mainWindow.focus();
+    console.log('🎯 [SINGLE-INSTANCE] Fenêtre mise au premier plan');
+
+    // ✅ BONUS : Notification à l'utilisateur dans l'app
+    mainWindow.webContents.send('app-focus', {
+      message: "Application déjà en cours d'exécution",
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    console.log('⚠️ [SINGLE-INSTANCE] Fenêtre principale non disponible');
+    // Créer une nouvelle fenêtre si nécessaire
+    createWindow();
+  }
+});
+
 // ✅ NOUVEAU : Fonction pour démarrer/arrêter la vérification automatique des mises à jour
 function scheduleUpdateCheck() {
   if (!app.isPackaged || !isUserAuthenticated) {
     console.log(
-      '🔒 [UPDATER] Vérification des mises à jour différée - utilisateur non authentifié'
+      '🔐 [UPDATER] Vérification des mises à jour différée - utilisateur non authentifié'
     );
     return;
   }
@@ -90,7 +133,7 @@ function stopUpdateCheck() {
   if (updateCheckTimer) {
     clearInterval(updateCheckTimer);
     updateCheckTimer = null;
-    console.log('⏹️ [UPDATER] Vérification automatique des mises à jour arrêtée');
+    console.log('ℹ️ [UPDATER] Vérification automatique des mises à jour arrêtée');
   }
 }
 
@@ -273,7 +316,7 @@ function createWindow() {
 
   // ✅ MODIFIÉ : Ne pas vérifier les mises à jour automatiquement au démarrage
   // La vérification se fera seulement après authentification
-  console.log("🔒 [UPDATER] Vérification des mises à jour en attente d'authentification");
+  console.log("🔐 [UPDATER] Vérification des mises à jour en attente d'authentification");
 
   // Démarrer le serveur web si mainWindow est prêt
   mainWindow.webContents.on('did-finish-load', () => {
@@ -291,7 +334,7 @@ ipcMain.on('check-for-updates', () => {
 
   // ✅ NOUVEAU : Vérifier l'authentification avant de permettre la vérification manuelle
   if (!isUserAuthenticated) {
-    console.log('🔒 [UPDATER] Vérification refusée - utilisateur non authentifié');
+    console.log('🔐 [UPDATER] Vérification refusée - utilisateur non authentifié');
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-message', {
         message: 'Authentification requise pour vérifier les mises à jour',
