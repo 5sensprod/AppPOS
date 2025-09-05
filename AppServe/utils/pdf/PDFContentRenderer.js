@@ -279,99 +279,8 @@ class PDFContentRenderer {
     return this.currentY;
   }
 
-  /**
-   * 📋 Rendu de l'en-tête d'un tableau avec protection contre les débordements
-   */
-  renderTableHeader(doc, styles, x, y, columnWidths, columns) {
-    const headerHeight = 35; // Plus de hauteur pour les titres
-    let currentX = x;
-
-    // Fond et bordures de l'en-tête
-    Object.keys(columns).forEach((colKey) => {
-      this.layoutHelper.drawBorderedBox(doc, currentX, y, columnWidths[colKey], headerHeight, {
-        fillColor: styles.table.header.fillColor,
-        borderColor: styles.table.header.borderColor,
-        borderWidth: 2,
-      });
-      currentX += columnWidths[colKey];
-    });
-
-    // Texte de l'en-tête avec gestion multiligne
-    currentX = x;
-    this.layoutHelper.applyTextStyle(doc, styles.table.header);
-
-    Object.entries(columns).forEach(([colKey, colConfig]) => {
-      const padding = 4;
-      const availableWidth = columnWidths[colKey] - padding * 2;
-
-      let title = colConfig.title;
-      let fontSize = styles.table.header.fontSize;
-
-      // Test si le titre rentre
-      let textWidth = doc.widthOfString(title, fontSize);
-
-      // Si trop large, réduire la police
-      if (textWidth > availableWidth) {
-        fontSize = 8;
-        doc.fontSize(fontSize);
-        textWidth = doc.widthOfString(title, fontSize);
-
-        // Si encore trop large, permettre le retour à la ligne
-        if (textWidth > availableWidth) {
-          const words = title.split(' ');
-          if (words.length > 1) {
-            title = words.join('\n'); // Saut de ligne entre les mots
-          }
-        }
-      }
-
-      // Calcul de la position pour l'alignement
-      let textX = currentX + padding;
-      if (colConfig.align === 'center') {
-        textX =
-          currentX + (columnWidths[colKey] - doc.widthOfString(title.split('\n')[0], fontSize)) / 2;
-      } else if (colConfig.align === 'right') {
-        textX =
-          currentX +
-          columnWidths[colKey] -
-          padding -
-          doc.widthOfString(title.split('\n')[0], fontSize);
-      }
-
-      // Centrage vertical du texte
-      const lines = title.split('\n');
-      const totalTextHeight = lines.length * fontSize * 1.2;
-      const startY = y + (headerHeight - totalTextHeight) / 2 + 4;
-
-      lines.forEach((line, lineIndex) => {
-        const lineY = startY + lineIndex * fontSize * 1.2;
-        let lineX = textX;
-
-        // Réajustement pour chaque ligne si centré ou aligné à droite
-        if (colConfig.align === 'center') {
-          lineX = currentX + (columnWidths[colKey] - doc.widthOfString(line, fontSize)) / 2;
-        } else if (colConfig.align === 'right') {
-          lineX = currentX + columnWidths[colKey] - padding - doc.widthOfString(line, fontSize);
-        }
-
-        doc.text(line, lineX, lineY, {
-          width: availableWidth,
-          align: 'left', // Gestion manuelle de l'alignement
-          lineBreak: false,
-        });
-      });
-
-      currentX += columnWidths[colKey];
-    });
-
-    return y + headerHeight;
-  }
-
-  /**
-   * 📊 Rendu d'une ligne de tableau avec protection contre les débordements
-   */
   renderTableRow(doc, styles, x, y, columnWidths, columns, rowData, isTotals = false) {
-    const rowHeight = 22; // Légèrement augmenté
+    const rowHeight = 22;
     let currentX = x;
 
     const cellStyle = isTotals ? styles.table.totals : styles.table.cell;
@@ -385,51 +294,137 @@ class PDFContentRenderer {
       currentX += columnWidths[colKey];
     });
 
-    // Contenu des cellules avec protection contre les débordements
+    // CORRECTION PRINCIPALE : Gestion du contenu avec positionnement précis
     currentX = x;
     this.layoutHelper.applyTextStyle(doc, cellStyle);
 
     Object.entries(columns).forEach(([colKey, colConfig]) => {
       const value = rowData[colKey] || '';
-      const padding = 3;
+      const padding = 4; // Padding uniforme
       const availableWidth = columnWidths[colKey] - padding * 2;
 
-      // Troncature du texte si trop long
+      // Troncature du texte si nécessaire
       let displayValue = value.toString();
       const maxWidth = availableWidth;
-      const textWidth = doc.widthOfString(displayValue, cellStyle.fontSize);
 
-      if (textWidth > maxWidth) {
-        // Troncature progressive jusqu'à ce que ça rentre
-        while (
-          doc.widthOfString(displayValue + '...', cellStyle.fontSize) > maxWidth &&
-          displayValue.length > 0
-        ) {
-          displayValue = displayValue.slice(0, -1);
-        }
-        if (displayValue.length > 0) {
-          displayValue += '...';
-        }
+      // Test de la largeur du texte
+      while (
+        doc.widthOfString(displayValue, cellStyle.fontSize) > maxWidth &&
+        displayValue.length > 0
+      ) {
+        displayValue = displayValue.slice(0, -1);
       }
 
-      const textX = this.layoutHelper.getAlignedX(
-        currentX + padding,
-        availableWidth,
-        displayValue,
-        doc._font,
-        cellStyle.fontSize,
-        colConfig.align
-      );
+      // CORRECTION : Calcul précis de la position X selon l'alignement
+      let textX;
+      const textWidth = doc.widthOfString(displayValue, cellStyle.fontSize);
 
-      doc.text(displayValue, textX, y + 7, {
+      switch (colConfig.align) {
+        case 'center':
+          textX = currentX + (columnWidths[colKey] - textWidth) / 2;
+          break;
+        case 'right':
+          textX = currentX + columnWidths[colKey] - padding - textWidth;
+          break;
+        default: // 'left'
+          textX = currentX + padding;
+          break;
+      }
+
+      // CORRECTION : Position Y centrée dans la cellule
+      const textY = y + (rowHeight - cellStyle.fontSize) / 2 + 2;
+
+      // Rendu du texte avec position calculée précisément
+      doc.text(displayValue, textX, textY, {
         width: availableWidth,
-        align: colConfig.align,
+        align: 'left', // On gère l'alignement manuellement
+        lineBreak: false, // Pas de retour à la ligne automatique
       });
 
       currentX += columnWidths[colKey];
     });
 
     return y + rowHeight;
+  }
+
+  /**
+   * 📋 Rendu de l'en-tête de tableau CORRIGÉ
+   */
+  renderTableHeader(doc, styles, x, y, columnWidths, columns) {
+    const headerHeight = 35;
+    let currentX = x;
+
+    // Fond et bordures de l'en-tête
+    Object.keys(columns).forEach((colKey) => {
+      this.layoutHelper.drawBorderedBox(doc, currentX, y, columnWidths[colKey], headerHeight, {
+        fillColor: styles.table.header.fillColor,
+        borderColor: styles.table.header.borderColor,
+        borderWidth: 2,
+      });
+      currentX += columnWidths[colKey];
+    });
+
+    // CORRECTION : Gestion du texte d'en-tête avec positionnement précis
+    currentX = x;
+    this.layoutHelper.applyTextStyle(doc, styles.table.header);
+
+    Object.entries(columns).forEach(([colKey, colConfig]) => {
+      const padding = 4;
+      const availableWidth = columnWidths[colKey] - padding * 2;
+
+      let title = colConfig.title;
+      let fontSize = styles.table.header.fontSize;
+
+      // Ajustement de la taille de police si nécessaire
+      let textWidth = doc.widthOfString(title, fontSize);
+      if (textWidth > availableWidth) {
+        fontSize = Math.max(8, fontSize - 1); // Réduction progressive
+        doc.fontSize(fontSize);
+        textWidth = doc.widthOfString(title, fontSize);
+
+        // Si encore trop large, permettre le retour à la ligne
+        if (textWidth > availableWidth) {
+          const words = title.split(' ');
+          if (words.length > 1) {
+            title = words.join('\n');
+          }
+        }
+      }
+
+      // CORRECTION : Calcul de position précis pour l'en-tête
+      const lines = title.split('\n');
+      const lineHeight = fontSize * 1.2;
+      const totalTextHeight = lines.length * lineHeight;
+      const startY = y + (headerHeight - totalTextHeight) / 2 + 2;
+
+      lines.forEach((line, lineIndex) => {
+        const lineY = startY + lineIndex * lineHeight;
+        const lineWidth = doc.widthOfString(line, fontSize);
+
+        let lineX;
+        switch (colConfig.align) {
+          case 'center':
+            lineX = currentX + (columnWidths[colKey] - lineWidth) / 2;
+            break;
+          case 'right':
+            lineX = currentX + columnWidths[colKey] - padding - lineWidth;
+            break;
+          default: // 'left'
+            lineX = currentX + padding;
+            break;
+        }
+
+        doc.text(line, lineX, lineY, {
+          width: availableWidth,
+          align: 'left', // Gestion manuelle de l'alignement
+          lineBreak: false,
+        });
+      });
+
+      currentX += columnWidths[colKey];
+    });
+
+    return y + headerHeight;
   }
 
   /**
