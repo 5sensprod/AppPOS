@@ -109,12 +109,6 @@ class PDFKitService {
       isSimplified = false,
     } = options;
 
-    console.log('DEBUG paramètres extraits:', {
-      groupByCategory,
-      isSimplified,
-      productsCount: productsInStock.length,
-    });
-
     // Stocker les options courantes pour les méthodes appelées
     this.currentOptions = options;
 
@@ -133,12 +127,10 @@ class PDFKitService {
     this.contentRenderer.renderQuickSummary(doc, styles, stockStats);
 
     if (groupByCategory) {
-      console.log('AVANT appel renderGroupedProductDetails avec isSimplified:', isSimplified);
       await this.renderGroupedProductDetails(doc, styles, stockStats, productsInStock, {
         sortBy,
         sortOrder,
       });
-      console.log('APRÈS appel renderGroupedProductDetails');
     } else {
       await this.renderSimpleProductDetails(doc, styles, stockStats, productsInStock, {
         sortBy,
@@ -209,30 +201,19 @@ class PDFKitService {
     productsInStock,
     { sortBy, sortOrder }
   ) {
-    console.log('DEBUT renderGroupedProductDetails');
-    console.log('Etape 1: Récupération isSimplified');
-
     const { isSimplified = false } = this.currentOptions || {};
-
-    console.log('Etape 2: isSimplified =', isSimplified);
-    console.log('Etape 3: Groupement des produits');
 
     // Groupement par catégorie
     const groupedProducts = this.groupProductsByCategory(productsInStock);
 
-    console.log('Etape 4: Calcul dimensions');
     // Titre de section
     const dimensions = this.layoutHelper.getUsablePageDimensions(doc);
     let y = this.contentRenderer.getCurrentY();
 
-    console.log('Etape 5: Application du style');
     this.layoutHelper.applyTextStyle(doc, styles.metrics.sectionTitle);
 
-    console.log('Etape 6: Choix du titre');
     const sectionTitle = isSimplified ? 'SYNTHÈSE PAR CATÉGORIE' : 'DÉTAIL PAR CATÉGORIE';
-    console.log('TITRE CHOISI:', sectionTitle);
 
-    console.log('Etape 7: Rendu du titre');
     doc.text(sectionTitle, dimensions.left, y, {
       width: dimensions.width,
       align: 'left',
@@ -241,9 +222,7 @@ class PDFKitService {
 
     this.contentRenderer.currentY = y;
 
-    console.log('Etape 8: Test de la condition isSimplified =', isSimplified);
     if (isSimplified === true || isSimplified === 'true') {
-      console.log('MODE SIMPLIFIÉ ACTIVÉ');
       await this.renderSimplifiedCategorySummary(
         doc,
         styles,
@@ -252,8 +231,6 @@ class PDFKitService {
         stockStats
       );
     } else {
-      console.log('MODE DÉTAILLÉ ACTIVÉ - valeur isSimplified:', isSimplified);
-
       // Groupement par catégorie parente pour le mode détaillé
       const groupedByParent = this.groupByParentCategory(groupedProducts);
 
@@ -339,13 +316,9 @@ class PDFKitService {
         stockStats
       );
     }
-
-    console.log('FIN renderGroupedProductDetails');
   }
 
   async renderSimplifiedCategorySummary(doc, styles, dimensions, groupedProducts, stockStats) {
-    console.log('MODE SIMPLIFIÉ : Génération du tableau groupé par catégorie parente');
-
     let y = this.contentRenderer.getCurrentY();
 
     // Groupement par catégorie parente
@@ -575,8 +548,6 @@ class PDFKitService {
    * 📂 Groupement des produits par catégorie - Version finalisée
    */
   groupProductsByCategory(products) {
-    console.log(`🔍 Groupement de ${products.length} produits par catégorie...`);
-
     const grouped = {};
 
     products.forEach((product) => {
@@ -621,11 +592,6 @@ class PDFKitService {
       }
       grouped[categoryName].push(product);
     });
-
-    console.log(
-      '📊 Groupement final:',
-      Object.keys(grouped).map((cat) => `"${cat}": ${grouped[cat].length} produits`)
-    );
 
     // Tri alphabétique des catégories
     const sortedGrouped = {};

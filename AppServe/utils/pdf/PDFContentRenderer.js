@@ -682,12 +682,11 @@ class PDFContentRenderer {
     const subtotalData = {
       sku: '',
       name: `SOUS-TOTAL ${categoryName.toUpperCase()}`,
-      purchase_price: '',
-      price: '',
       stock: this.layoutHelper.formatNumber(categoryStats.totalProducts),
       tax_rate: '',
       inventory_value: this.layoutHelper.formatCurrency(categoryStats.totalInventoryValue),
       retail_value: this.layoutHelper.formatCurrency(categoryStats.totalRetailValue),
+      tax_collected: this.layoutHelper.formatCurrency(this.calculateCategoryTaxCollected(products)), // <- AJOUT ICI
     };
 
     y = this.renderSubtotalRow(doc, styles, x, y, columnWidths, columns, subtotalData);
@@ -791,6 +790,21 @@ class PDFContentRenderer {
 
     this.currentY = y + summaryHeight + 15;
     return this.currentY;
+  }
+
+  /**
+   * 📊 Calcul de la TVA collectée pour une catégorie
+   */
+  calculateCategoryTaxCollected(products) {
+    let totalTaxCollected = 0;
+
+    products.forEach((product) => {
+      const retailValue = (product.stock || 0) * (product.price || 0);
+      const taxRate = product.tax_rate || 0;
+      totalTaxCollected += taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
+    });
+
+    return totalTaxCollected;
   }
 
   /**
