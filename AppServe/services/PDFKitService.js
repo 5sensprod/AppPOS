@@ -309,18 +309,60 @@ class PDFKitService {
   }
 
   /**
-   * 📂 Groupement des produits par catégorie
+   * 📂 Groupement des produits par catégorie - Version finalisée
    */
   groupProductsByCategory(products) {
+    console.log(`🔍 Groupement de ${products.length} produits par catégorie...`);
+
     const grouped = {};
 
     products.forEach((product) => {
-      const category = product.category || product.category_name || 'Non catégorisé';
-      if (!grouped[category]) {
-        grouped[category] = [];
+      let categoryName = 'Non catégorisé';
+
+      // Récupération du nom de catégorie depuis category_info
+      if (product.category_info && product.category_info.primary) {
+        const primary = product.category_info.primary;
+
+        // Priorité au nom, puis au path_string
+        if (primary.name && typeof primary.name === 'string' && primary.name.trim() !== '') {
+          categoryName = primary.name;
+        } else if (
+          primary.path_string &&
+          typeof primary.path_string === 'string' &&
+          primary.path_string.trim() !== ''
+        ) {
+          categoryName = primary.path_string;
+        }
       }
-      grouped[category].push(product);
+      // Fallback sur refs si pas de primary
+      else if (
+        product.category_info &&
+        product.category_info.refs &&
+        product.category_info.refs.length > 0
+      ) {
+        const firstRef = product.category_info.refs[0];
+
+        if (firstRef.name && typeof firstRef.name === 'string' && firstRef.name.trim() !== '') {
+          categoryName = firstRef.name;
+        } else if (
+          firstRef.path_string &&
+          typeof firstRef.path_string === 'string' &&
+          firstRef.path_string.trim() !== ''
+        ) {
+          categoryName = firstRef.path_string;
+        }
+      }
+
+      if (!grouped[categoryName]) {
+        grouped[categoryName] = [];
+      }
+      grouped[categoryName].push(product);
     });
+
+    console.log(
+      '📊 Groupement final:',
+      Object.keys(grouped).map((cat) => `"${cat}": ${grouped[cat].length} produits`)
+    );
 
     // Tri alphabétique des catégories
     const sortedGrouped = {};

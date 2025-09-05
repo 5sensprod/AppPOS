@@ -244,7 +244,7 @@ class ProductStockController extends BaseController {
     };
   }
 
-  // 🚀 NOUVELLE MÉTHODE : Support hybride optimisé (inchangée)
+  // 🚀 NOUVELLE MÉTHODE : Support hybride optimisé avec filtrage catégorie
   async getOptimizedProductsForPDF(body) {
     const { preFilteredData } = body;
 
@@ -267,22 +267,90 @@ class ProductStockController extends BaseController {
       };
     }
 
-    // 🔄 MODE FALLBACK : Logique originale (compatibilité totale)
+    // 🔄 MODE FALLBACK : Logique backend avec filtrage catégorie
     console.log('📊 FALLBACK: Utilisation logique backend classique');
-    return this.getProductsForPDF();
+    return this.getProductsForPDFWithFiltering(body);
   }
 
-  async getProductsForPDF() {
-    // ... méthode inchangée (fallback)
-    const allProducts = await this.model.findAll();
-    const simpleProducts = allProducts.filter((p) => p.type === 'simple');
-    const productsInStock = simpleProducts.filter((p) => (p.stock || 0) > 0);
+  /**
+   * 🎯 Récupération des produits avec filtrage par catégorie
+   */
+  async getProductsForPDFWithFiltering(body) {
+    const { selectedCategories = [], includeUncategorized = true, groupByCategory = false } = body;
 
-    if (productsInStock.length === 0) {
-      throw new Error('Aucun produit en stock à exporter');
+    console.log('📊 Récupération des produits avec informations de catégories...');
+    console.log('🎯 Filtres appliqués:', {
+      selectedCategories,
+      includeUncategorized,
+      groupByCategory,
+    });
+
+    // Récupération des produits de base
+    const allProducts = await this.model.findAll();
+
+    // 🎯 ENRICHISSEMENT : Ajouter les informations de catégorie pour chaque produit
+    const enrichedProducts = await Promise.all(
+      allProducts.map(async (product) => {
+        try {
+          const enrichedProduct = await this.model.findByIdWithCategoryInfo(product._id);
+          return enrichedProduct || product;
+        } catch (error) {
+          console.warn(
+            `⚠️ Erreur enrichissement catégorie pour produit ${product._id}:`,
+            error.message
+          );
+          return product;
+        }
+      })
+    );
+
+    console.log(`✅ Enrichissement terminé: ${enrichedProducts.length} produits traités`);
+
+    // Filtrage selon la logique originale
+    const simpleProducts = enrichedProducts.filter((p) => p.type === 'simple');
+    let productsInStock = simpleProducts.filter((p) => (p.stock || 0) > 0);
+
+    // 🎯 FILTRAGE PAR CATÉGORIE si des catégories sont sélectionnées
+    if (selectedCategories && selectedCategories.length > 0) {
+      console.log(`🔍 Filtrage par catégories: ${selectedCategories.join(', ')}`);
+
+      productsInStock = productsInStock.filter((product) => {
+        // Vérifier si le produit appartient à l'une des catégories sélectionnées
+        if (product.category_info && product.category_info.primary) {
+          const primaryCategoryId = product.category_info.primary.id;
+          const primaryCategoryName = product.category_info.primary.name;
+
+          // Vérifier par ID ou par nom de catégorie
+          const matchesSelection =
+            selectedCategories.includes(primaryCategoryId) ||
+            selectedCategories.includes(primaryCategoryName);
+
+          if (matchesSelection) {
+            return true;
+          }
+
+          // Vérifier aussi dans les refs si pas de match avec primary
+          if (product.category_info.refs) {
+            return product.category_info.refs.some(
+              (ref) => selectedCategories.includes(ref.id) || selectedCategories.includes(ref.name)
+            );
+          }
+        }
+
+        // Si includeUncategorized est true et que le produit n'a pas de catégorie
+        return includeUncategorized && (!product.category_info || !product.category_info.primary);
+      });
+
+      console.log(
+        `📋 Produits après filtrage: ${productsInStock.length} sur ${simpleProducts.filter((p) => (p.stock || 0) > 0).length}`
+      );
     }
 
-    const stockStats = this.buildStatistics(productsInStock, allProducts, simpleProducts);
+    if (productsInStock.length === 0) {
+      throw new Error('Aucun produit en stock à exporter avec les filtres appliqués');
+    }
+
+    const stockStats = this.buildStatistics(productsInStock, enrichedProducts, simpleProducts);
     return { productsInStock, stockStats };
   }
 
