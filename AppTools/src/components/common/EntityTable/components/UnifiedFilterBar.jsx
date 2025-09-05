@@ -17,8 +17,10 @@ const UnifiedFilterBar = ({
   const [isAddingFilter, setIsAddingFilter] = useState(false);
   const [newFilterType, setNewFilterType] = useState(null);
   const [selectedCategoriesForFilter, setSelectedCategoriesForFilter] = useState([]);
+  const [stockInputValue, setStockInputValue] = useState('');
   const valueSelectRef = useRef(null);
   const filterButtonRef = useRef(null);
+  const stockInputRef = useRef(null);
 
   // ✅ Hook simplifié - plus besoin de fetchHierarchicalCategories
   const { getCategoryName, isReady: categoriesReady, categoriesLoading } = useCategoryUtils();
@@ -27,6 +29,7 @@ const UnifiedFilterBar = ({
     setIsAddingFilter(false);
     setNewFilterType(null);
     setSelectedCategoriesForFilter([]);
+    setStockInputValue('');
   };
 
   useClickOutside(valueSelectRef, isAddingFilter, closeFilterDropdown);
@@ -51,7 +54,8 @@ const UnifiedFilterBar = ({
     description: 'Description',
     brand: 'Marque',
     category: 'Catégorie',
-    barcode: 'Code barre', // ✅ NOUVEAU
+    barcode: 'Code barre',
+    stock: 'Stock', // ✅ NOUVEAU
   };
 
   const selectedTypes = new Set(selectedFilters.map((f) => f.type));
@@ -60,7 +64,7 @@ const UnifiedFilterBar = ({
   const availableTypes = useMemo(() => {
     const baseTypes = Object.entries(filterGroups)
       .filter(([type]) => {
-        const allowMultiple = ['supplier', 'brand', 'category', 'barcode'].includes(type); // ✅ Ajout barcode
+        const allowMultiple = ['supplier', 'brand', 'category', 'barcode', 'stock'].includes(type); // ✅ Ajout stock
         return allowMultiple || !selectedTypes.has(type);
       })
       .map(([type]) => ({
@@ -77,6 +81,14 @@ const UnifiedFilterBar = ({
       }
     }
 
+    // ✅ Ajouter le filtre stock s'il n'existe pas dans filterGroups
+    if (!baseTypes.find((type) => type.value === 'stock')) {
+      baseTypes.push({
+        label: filterTypeLabels.stock,
+        value: 'stock',
+      });
+    }
+
     return baseTypes.sort((a, b) => {
       const order = [
         'woo',
@@ -87,7 +99,8 @@ const UnifiedFilterBar = ({
         'brand',
         'supplier',
         'barcode',
-      ]; // ✅ Ajout barcode
+        'stock', // ✅ Ajout stock
+      ];
       return order.indexOf(a.value) - order.indexOf(b.value);
     });
   }, [filterGroups, selectedTypes, enableCategories, categoriesReady]);
@@ -96,12 +109,23 @@ const UnifiedFilterBar = ({
     setNewFilterType(selected?.value || null);
     setIsAddingFilter(true);
     setSelectedCategoriesForFilter([]);
+    setStockInputValue('');
+
+    // ✅ Auto-focus pour l'input stock
+    if (selected?.value === 'stock') {
+      setTimeout(() => {
+        if (stockInputRef.current) {
+          stockInputRef.current.focus();
+        }
+      }, 100);
+    }
   };
 
   const handleValueSelect = (selected) => {
-    if (!newFilterType || !selected || newFilterType === 'category') return;
+    if (!newFilterType || !selected || newFilterType === 'category' || newFilterType === 'stock')
+      return;
 
-    const isMulti = ['supplier', 'brand', 'barcode'].includes(newFilterType); // ✅ Ajout barcode
+    const isMulti = ['supplier', 'brand', 'barcode'].includes(newFilterType);
     const selectedValuesList = Array.isArray(selected) ? selected : [selected];
 
     const newFilters = selectedValuesList
@@ -123,6 +147,37 @@ const UnifiedFilterBar = ({
     closeFilterDropdown();
   };
 
+  // ✅ Nouvelle fonction pour gérer l'input stock
+  const handleStockInputSubmit = () => {
+    if (!stockInputValue || stockInputValue.trim() === '' || newFilterType !== 'stock') return;
+
+    const stockValue = parseInt(stockInputValue.trim(), 10);
+    if (isNaN(stockValue) || stockValue < 0) return;
+
+    // Vérifier si ce filtre stock existe déjà
+    if (!selectedValues.has(`stock:${stockValue}`)) {
+      const newFilter = {
+        type: 'stock',
+        value: stockValue,
+        label: `Stock = ${stockValue}`,
+      };
+
+      onChange([...selectedFilters, newFilter]);
+    }
+
+    closeFilterDropdown();
+  };
+
+  // ✅ Gérer la touche Entrée pour l'input stock
+  const handleStockInputKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleStockInputSubmit();
+    } else if (e.key === 'Escape') {
+      closeFilterDropdown();
+    }
+  };
+
   const handleRemoveFilter = (filterToRemove) => {
     onChange(
       selectedFilters.filter(
@@ -137,7 +192,7 @@ const UnifiedFilterBar = ({
   };
 
   const getOptionsForType = (type) => {
-    if (type === 'category') return [];
+    if (type === 'category' || type === 'stock') return [];
     const selectedFilterValues = selectedFilters.filter((f) => f.type === type).map((f) => f.value);
     const options = (filterGroups[type] || []).map((opt) => ({
       ...opt,
@@ -246,28 +301,63 @@ const UnifiedFilterBar = ({
         </div>
       )}
 
-      {isAddingFilter && newFilterType && newFilterType !== 'category' && (
+      {/* ✅ NOUVEAU - Input pour le filtre stock */}
+      {isAddingFilter && newFilterType === 'stock' && (
         <div ref={valueSelectRef} className="relative">
-          <Select
-            options={getOptionsForType(newFilterType)}
-            onChange={handleValueSelect}
-            placeholder={`Choisir ${filterTypeLabels[newFilterType]?.toLowerCase()}`}
-            isMulti={['supplier', 'brand', 'barcode'].includes(newFilterType)} // ✅ Ajout barcode
-            classNamePrefix="react-select"
-            className="w-64"
-            autoFocus
-            menuIsOpen={true}
-            menuPortalTarget={document.body}
-            menuPlacement="auto"
-            menuPosition="fixed"
-            styles={{
-              menuPortal: (base) => ({ ...base, zIndex: 99999 }),
-            }}
-            onMenuClose={closeFilterDropdown}
-            onBlur={closeFilterDropdown}
-          />
+          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 shadow-sm">
+            <input
+              ref={stockInputRef}
+              type="number"
+              min="0"
+              value={stockInputValue}
+              onChange={(e) => setStockInputValue(e.target.value)}
+              onKeyDown={handleStockInputKeyDown}
+              onBlur={() => {
+                // Délai pour permettre le clic sur le bouton valider
+                setTimeout(() => {
+                  if (document.activeElement !== stockInputRef.current) {
+                    closeFilterDropdown();
+                  }
+                }, 200);
+              }}
+              placeholder="Quantité en stock"
+              className="w-32 border-0 outline-none bg-transparent text-sm dark:text-white"
+            />
+            <button
+              onClick={handleStockInputSubmit}
+              className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+            >
+              ✓
+            </button>
+          </div>
         </div>
       )}
+
+      {isAddingFilter &&
+        newFilterType &&
+        newFilterType !== 'category' &&
+        newFilterType !== 'stock' && (
+          <div ref={valueSelectRef} className="relative">
+            <Select
+              options={getOptionsForType(newFilterType)}
+              onChange={handleValueSelect}
+              placeholder={`Choisir ${filterTypeLabels[newFilterType]?.toLowerCase()}`}
+              isMulti={['supplier', 'brand', 'barcode'].includes(newFilterType)}
+              classNamePrefix="react-select"
+              className="w-64"
+              autoFocus
+              menuIsOpen={true}
+              menuPortalTarget={document.body}
+              menuPlacement="auto"
+              menuPosition="fixed"
+              styles={{
+                menuPortal: (base) => ({ ...base, zIndex: 99999 }),
+              }}
+              onMenuClose={closeFilterDropdown}
+              onBlur={closeFilterDropdown}
+            />
+          </div>
+        )}
 
       {selectedFilters.map((filter, idx) => (
         <div
@@ -282,6 +372,8 @@ const UnifiedFilterBar = ({
               setIsAddingFilter(true);
               if (filter.type === 'category') {
                 setSelectedCategoriesForFilter([filter.value]);
+              } else if (filter.type === 'stock') {
+                setStockInputValue(filter.value.toString());
               }
             }}
           >

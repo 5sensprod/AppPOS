@@ -155,7 +155,8 @@ export const useProductFilters = (products = []) => {
     const categoryFilters = selectedFilters.filter((f) => f.type === 'category');
     const descriptionFilter = selectedFilters.find((f) => f.type === 'description')?.value;
     const statusFilter = selectedFilters.find((f) => f.type === 'status')?.value;
-    const barcodeFilter = selectedFilters.find((f) => f.type === 'barcode')?.value; // ✅ NOUVEAU
+    const barcodeFilter = selectedFilters.find((f) => f.type === 'barcode')?.value;
+    const stockFilters = selectedFilters.filter((f) => f.type === 'stock');
 
     // Filtre par statut de synchronisation WooCommerce
     if (wooFilter === 'woo_synced') {
@@ -262,6 +263,17 @@ export const useProductFilters = (products = []) => {
     if (statusFilter) {
       const status = statusFilter.replace('status_', '');
       data = data.filter((p) => p.status === status);
+    }
+
+    //Filtre par stock
+    if (stockFilters.length > 0) {
+      data = data.filter((p) => {
+        return stockFilters.some((filter) => {
+          const filterValue = parseInt(filter.value, 10);
+          const productStock = parseInt(p.stock, 10) || 0;
+          return productStock === filterValue;
+        });
+      });
     }
 
     return data;
