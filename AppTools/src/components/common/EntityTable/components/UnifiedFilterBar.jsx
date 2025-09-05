@@ -22,6 +22,10 @@ const UnifiedFilterBar = ({
   const filterButtonRef = useRef(null);
   const stockInputRef = useRef(null);
 
+  const [stockFilterMode, setStockFilterMode] = useState('exact'); // 'exact', 'min', 'max', 'range'
+  const [stockMinValue, setStockMinValue] = useState('');
+  const [stockMaxValue, setStockMaxValue] = useState('');
+
   // ✅ Hook simplifié - plus besoin de fetchHierarchicalCategories
   const { getCategoryName, isReady: categoriesReady, categoriesLoading } = useCategoryUtils();
 
@@ -30,6 +34,9 @@ const UnifiedFilterBar = ({
     setNewFilterType(null);
     setSelectedCategoriesForFilter([]);
     setStockInputValue('');
+    setStockFilterMode('exact');
+    setStockMinValue('');
+    setStockMaxValue('');
   };
 
   useClickOutside(valueSelectRef, isAddingFilter, closeFilterDropdown);
@@ -149,21 +156,99 @@ const UnifiedFilterBar = ({
 
   // ✅ Nouvelle fonction pour gérer l'input stock
   const handleStockInputSubmit = () => {
-    if (!stockInputValue || stockInputValue.trim() === '' || newFilterType !== 'stock') return;
+    if (newFilterType !== 'stock') return;
 
-    const stockValue = parseInt(stockInputValue.trim(), 10);
-    if (isNaN(stockValue) || stockValue < 0) return;
+    let newFilter = null;
 
-    // ✅ NOUVEAU : Supprimer tous les anciens filtres stock et ajouter le nouveau
+    switch (stockFilterMode) {
+      case 'exact':
+        if (!stockInputValue || stockInputValue.trim() === '') return;
+        const exactValue = parseInt(stockInputValue.trim(), 10);
+        if (isNaN(exactValue) || exactValue < 0) return;
+        newFilter = {
+          type: 'stock',
+          mode: 'exact',
+          value: exactValue,
+          label: `Stock = ${exactValue}`,
+        };
+        break;
+
+      case 'min':
+        if (!stockInputValue || stockInputValue.trim() === '') return;
+        const minValue = parseInt(stockInputValue.trim(), 10);
+        if (isNaN(minValue) || minValue < 0) return;
+        newFilter = {
+          type: 'stock',
+          mode: 'min',
+          value: minValue,
+          label: `Stock ≥ ${minValue}`,
+        };
+        break;
+
+      case 'max':
+        if (!stockInputValue || stockInputValue.trim() === '') return;
+        const maxValue = parseInt(stockInputValue.trim(), 10);
+        if (isNaN(maxValue) || maxValue < 0) return;
+        newFilter = {
+          type: 'stock',
+          mode: 'max',
+          value: maxValue,
+          label: `Stock ≤ ${maxValue}`,
+        };
+        break;
+
+      case 'range':
+        if (
+          !stockMinValue ||
+          !stockMaxValue ||
+          stockMinValue.trim() === '' ||
+          stockMaxValue.trim() === ''
+        )
+          return;
+        const rangeMin = parseInt(stockMinValue.trim(), 10);
+        const rangeMax = parseInt(stockMaxValue.trim(), 10);
+        if (
+          isNaN(rangeMin) ||
+          isNaN(rangeMax) ||
+          rangeMin < 0 ||
+          rangeMax < 0 ||
+          rangeMin > rangeMax
+        )
+          return;
+        newFilter = {
+          type: 'stock',
+          mode: 'range',
+          value: { min: rangeMin, max: rangeMax },
+          label: `Stock ${rangeMin}-${rangeMax}`,
+        };
+        break;
+
+      case 'zero':
+        newFilter = {
+          type: 'stock',
+          mode: 'zero',
+          value: 0,
+          label: 'Rupture de stock',
+        };
+        break;
+
+      case 'low':
+        newFilter = {
+          type: 'stock',
+          mode: 'low',
+          value: 5,
+          label: 'Stock faible (≤ 5)',
+        };
+        break;
+
+      default:
+        return;
+    }
+
+    if (!newFilter) return;
+
+    // Supprimer tous les anciens filtres stock et ajouter le nouveau
     const filtersWithoutStock = selectedFilters.filter((f) => f.type !== 'stock');
-
-    const newFilter = {
-      type: 'stock',
-      value: stockValue,
-      label: `Stock = ${stockValue}`,
-    };
-
-    // ✅ Remplacer les filtres stock existants par le nouveau
     onChange([...filtersWithoutStock, newFilter]);
     closeFilterDropdown();
   };
@@ -304,31 +389,139 @@ const UnifiedFilterBar = ({
       {/* ✅ NOUVEAU - Input pour le filtre stock */}
       {isAddingFilter && newFilterType === 'stock' && (
         <div ref={valueSelectRef} className="relative">
-          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 shadow-sm">
-            <input
-              ref={stockInputRef}
-              type="number"
-              min="0"
-              value={stockInputValue}
-              onChange={(e) => setStockInputValue(e.target.value)}
-              onKeyDown={handleStockInputKeyDown}
-              onBlur={() => {
-                // Délai pour permettre le clic sur le bouton valider
-                setTimeout(() => {
-                  if (document.activeElement !== stockInputRef.current) {
-                    closeFilterDropdown();
-                  }
-                }, 200);
-              }}
-              placeholder="Quantité en stock"
-              className="w-32 border-0 outline-none bg-transparent text-sm dark:text-white"
-            />
-            <button
-              onClick={handleStockInputSubmit}
-              className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
-            >
-              ✓
-            </button>
+          <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-3 shadow-sm min-w-80">
+            {/* Sélecteur de mode */}
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Type de filtre
+              </label>
+              <select
+                value={stockFilterMode}
+                onChange={(e) => setStockFilterMode(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white"
+              >
+                <option value="exact">Stock exactement égal à</option>
+                <option value="min">Stock minimum</option>
+                <option value="max">Stock maximum</option>
+                <option value="range">Stock entre (plage)</option>
+                <option value="zero">Stock à zéro (rupture)</option>
+                <option value="low">Stock faible (≤ 5)</option>
+              </select>
+            </div>
+
+            {/* Inputs selon le mode sélectionné */}
+            <div className="mb-3">
+              {stockFilterMode === 'exact' && (
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Quantité exacte
+                  </label>
+                  <input
+                    ref={stockInputRef}
+                    type="number"
+                    min="0"
+                    value={stockInputValue}
+                    onChange={(e) => setStockInputValue(e.target.value)}
+                    onKeyDown={handleStockInputKeyDown}
+                    placeholder="Quantité en stock"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              )}
+
+              {stockFilterMode === 'min' && (
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Stock minimum
+                  </label>
+                  <input
+                    ref={stockInputRef}
+                    type="number"
+                    min="0"
+                    value={stockInputValue}
+                    onChange={(e) => setStockInputValue(e.target.value)}
+                    onKeyDown={handleStockInputKeyDown}
+                    placeholder="Stock ≥"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              )}
+
+              {stockFilterMode === 'max' && (
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Stock maximum
+                  </label>
+                  <input
+                    ref={stockInputRef}
+                    type="number"
+                    min="0"
+                    value={stockInputValue}
+                    onChange={(e) => setStockInputValue(e.target.value)}
+                    onKeyDown={handleStockInputKeyDown}
+                    placeholder="Stock ≤"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              )}
+
+              {stockFilterMode === 'range' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Minimum
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={stockMinValue}
+                      onChange={(e) => setStockMinValue(e.target.value)}
+                      placeholder="Min"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Maximum
+                    </label>
+                    <input
+                      ref={stockInputRef}
+                      type="number"
+                      min="0"
+                      value={stockMaxValue}
+                      onChange={(e) => setStockMaxValue(e.target.value)}
+                      onKeyDown={handleStockInputKeyDown}
+                      placeholder="Max"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {(stockFilterMode === 'zero' || stockFilterMode === 'low') && (
+                <div className="text-sm text-gray-600 dark:text-gray-400 italic">
+                  {stockFilterMode === 'zero'
+                    ? 'Affiche les produits en rupture de stock (stock = 0)'
+                    : 'Affiche les produits avec un stock faible (≤ 5 unités)'}
+                </div>
+              )}
+            </div>
+
+            {/* Boutons d'action */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleStockInputSubmit}
+                className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+              >
+                Appliquer
+              </button>
+              <button
+                onClick={closeFilterDropdown}
+                className="px-4 py-2 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400 transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
           </div>
         </div>
       )}

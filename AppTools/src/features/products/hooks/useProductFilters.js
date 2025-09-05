@@ -268,10 +268,41 @@ export const useProductFilters = (products = []) => {
     //Filtre par stock
     if (stockFilters.length > 0) {
       data = data.filter((p) => {
+        const productStock = parseInt(p.stock, 10) || 0;
+
         return stockFilters.some((filter) => {
-          const filterValue = parseInt(filter.value, 10);
-          const productStock = parseInt(p.stock, 10) || 0;
-          return productStock === filterValue;
+          const mode = filter.mode || 'exact'; // compatibilité arrière
+
+          switch (mode) {
+            case 'exact':
+              return productStock === parseInt(filter.value, 10);
+
+            case 'min':
+              return productStock >= parseInt(filter.value, 10);
+
+            case 'max':
+              return productStock <= parseInt(filter.value, 10);
+
+            case 'range':
+              if (
+                typeof filter.value === 'object' &&
+                filter.value.min !== undefined &&
+                filter.value.max !== undefined
+              ) {
+                return productStock >= filter.value.min && productStock <= filter.value.max;
+              }
+              return false;
+
+            case 'zero':
+              return productStock === 0;
+
+            case 'low':
+              return productStock > 0 && productStock <= 5;
+
+            default:
+              // Compatibilité arrière pour les anciens filtres sans mode
+              return productStock === parseInt(filter.value, 10);
+          }
         });
       });
     }
