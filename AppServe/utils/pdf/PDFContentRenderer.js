@@ -582,15 +582,18 @@ class PDFContentRenderer {
     const retailPrice = product.price || 0;
     const taxRate = product.tax_rate || 0;
 
+    const inventoryValue = stock * purchasePrice;
+    const retailValue = stock * retailPrice;
+    const taxCollected = taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
+
     return {
       sku: product.sku || '',
       name: product.name || '',
-      purchase_price: this.layoutHelper.formatCurrency(purchasePrice),
-      price: this.layoutHelper.formatCurrency(retailPrice),
       stock: this.layoutHelper.formatNumber(stock),
       tax_rate: `${taxRate}%`,
-      inventory_value: this.layoutHelper.formatCurrency(stock * purchasePrice),
-      retail_value: this.layoutHelper.formatCurrency(stock * retailPrice),
+      inventory_value: this.layoutHelper.formatCurrency(inventoryValue),
+      retail_value: this.layoutHelper.formatCurrency(retailValue),
+      tax_collected: this.layoutHelper.formatCurrency(taxCollected),
     };
   }
 
@@ -601,12 +604,11 @@ class PDFContentRenderer {
     return {
       sku: '',
       name: 'TOTAL GÉNÉRAL',
-      purchase_price: '',
-      price: '',
       stock: this.layoutHelper.formatNumber(stockStats.summary.products_in_stock),
       tax_rate: '',
       inventory_value: this.layoutHelper.formatCurrency(stockStats.financial.inventory_value),
       retail_value: this.layoutHelper.formatCurrency(stockStats.financial.retail_value),
+      tax_collected: this.layoutHelper.formatCurrency(stockStats.financial.tax_amount),
     };
   }
 

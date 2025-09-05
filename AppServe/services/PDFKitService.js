@@ -523,22 +523,20 @@ class PDFKitService {
       columns: {
         sku: { title: 'SKU', align: 'left' },
         name: { title: 'Nom du Produit', align: 'left' },
-        purchase_price: { title: 'PA HT', align: 'right' },
-        price: { title: 'PV HT', align: 'right' },
         stock: { title: 'Stock', align: 'center' },
         tax_rate: { title: 'TVA', align: 'center' },
         inventory_value: { title: 'Valeur Achat', align: 'right' },
         retail_value: { title: 'Valeur Vente', align: 'right' },
+        tax_collected: { title: 'TVA Collectée', align: 'right' },
       },
       widths: {
         sku: 12,
-        name: 24,
-        purchase_price: 9,
-        price: 9,
-        stock: 7,
-        tax_rate: 7,
+        name: 28, // Plus large car moins de colonnes
+        stock: 8,
+        tax_rate: 8,
         inventory_value: 16,
         retail_value: 16,
+        tax_collected: 12,
       },
     };
   }
