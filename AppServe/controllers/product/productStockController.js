@@ -189,17 +189,23 @@ class ProductStockController extends BaseController {
       // 🔥 Support données pré-filtrées (logique hybride conservée)
       const { productsInStock, stockStats } = await this.getOptimizedProductsForPDF(req.body);
 
-      // 🎯 NOUVEAU : Génération avec PDFKit
-      const pdfBuffer = await this.pdfService.generateStockReport(stockStats, {
+      // 🎯 NOUVEAU : Génération avec PDFKit selon le type de rapport
+      const pdfOptions = {
         reportType: params.reportType,
         companyInfo: params.companyInfo,
         includeCompanyInfo: params.includeCompanyInfo,
         includeCharts: params.includeCharts,
-        orientation:
-          params.reportType === 'detailed' && !params.isSimplified ? 'landscape' : 'portrait',
-      });
+        orientation: this.getPDFOrientation(params),
+        // 🔥 NOUVEAU : Support du rapport détaillé
+        productsInStock: productsInStock,
+        groupByCategory: params.groupByCategory,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
+      };
 
-      console.log('✅ PDF généré avec succès');
+      const pdfBuffer = await this.pdfService.generateStockReport(stockStats, pdfOptions);
+
+      console.log(`✅ PDF ${params.reportType} généré avec succès`);
 
       // 📤 Envoi de la réponse
       PDFKitService.sendPDFResponse(res, pdfBuffer, params.reportType, params);
@@ -210,6 +216,16 @@ class ProductStockController extends BaseController {
         details: error.message,
       });
     }
+  }
+
+  /**
+   * 🖼️ Détermine l'orientation du PDF selon le type et les options
+   */
+  getPDFOrientation(params) {
+    if (params.reportType === 'detailed') {
+      return params.isSimplified ? 'portrait' : 'landscape';
+    }
+    return 'portrait';
   }
 
   extractPDFParams(body) {
