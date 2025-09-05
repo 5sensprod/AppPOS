@@ -254,6 +254,9 @@ class PDFKitService {
     } else {
       console.log('MODE DÉTAILLÉ ACTIVÉ - valeur isSimplified:', isSimplified);
 
+      // Groupement par catégorie parente pour le mode détaillé
+      const groupedByParent = this.groupByParentCategory(groupedProducts);
+
       // Configuration du tableau
       const tableConfig = this.getDetailedTableConfig();
       const columnWidths = this.layoutHelper.calculateColumnWidths(
@@ -261,21 +264,69 @@ class PDFKitService {
         tableConfig.widths
       );
 
-      // Rendu de chaque catégorie
-      for (const [categoryName, products] of Object.entries(groupedProducts)) {
-        const sortedProducts = this.sortProducts(products, sortBy, sortOrder);
-        const categoryStats = this.calculateCategoryStats(sortedProducts);
+      // Rendu de chaque catégorie parente
+      for (const [parentCategory, subcategories] of Object.entries(groupedByParent)) {
+        let currentY = this.contentRenderer.getCurrentY();
 
-        await this.contentRenderer.renderCategorySection(
-          doc,
-          styles,
-          dimensions.left,
-          columnWidths,
-          tableConfig.columns,
-          categoryName,
-          sortedProducts,
-          categoryStats
-        );
+        // En-tête de la catégorie parente (si plusieurs sous-catégories)
+        if (Object.keys(subcategories).length > 1) {
+          // Vérification du saut de page
+          if (currentY + 150 > dimensions.bottom - 50) {
+            doc.addPage();
+            currentY = doc.page.margins.top;
+          }
+
+          // En-tête de catégorie parente
+          const parentHeight = 40;
+          this.layoutHelper.drawBorderedBox(
+            doc,
+            dimensions.left,
+            currentY,
+            dimensions.width,
+            parentHeight,
+            {
+              fillColor: '#e0e0e0',
+              borderColor: '#000000',
+              borderWidth: 3,
+            }
+          );
+
+          this.layoutHelper.applyTextStyle(doc, styles.metrics.sectionTitle);
+          doc.fontSize(13);
+          doc.text(parentCategory.toUpperCase(), dimensions.left + 12, currentY + 12, {
+            width: dimensions.width - 24,
+            align: 'left',
+          });
+
+          currentY += parentHeight + 8;
+          this.contentRenderer.currentY = currentY;
+        }
+
+        // Rendu de chaque sous-catégorie
+        for (const [subcategoryName, products] of Object.entries(subcategories)) {
+          const sortedProducts = this.sortProducts(products, sortBy, sortOrder);
+          const categoryStats = this.calculateCategoryStats(sortedProducts);
+
+          // Nom avec hiérarchie
+          const displayName =
+            Object.keys(subcategories).length > 1
+              ? `${parentCategory} › ${subcategoryName}`
+              : subcategoryName;
+
+          await this.contentRenderer.renderCategorySection(
+            doc,
+            styles,
+            dimensions.left,
+            columnWidths,
+            tableConfig.columns,
+            displayName,
+            sortedProducts,
+            categoryStats
+          );
+        }
+
+        // Espacement entre groupes
+        this.contentRenderer.currentY += 10;
       }
 
       // Tableau final des totaux
