@@ -438,7 +438,7 @@ class PDFContentRenderer {
     y = this.layoutHelper.checkPageBreak(doc, y, 120);
 
     // Bordure du résumé
-    const summaryHeight = 110; // Augmenté pour plus d'espace
+    const summaryHeight = 110;
     this.layoutHelper.drawBorderedBox(doc, dimensions.left, y, dimensions.width, summaryHeight, {
       borderColor: '#000000',
       borderWidth: 2,
@@ -470,14 +470,14 @@ class PDFContentRenderer {
 
     paragraphs.forEach((paragraph, index) => {
       // Protection contre le débordement
-      if (textY + 20 > y + summaryHeight - padding - 15) return;
+      if (textY + 25 > y + summaryHeight - padding - 15) return; // Augmenté de 20 à 25
 
       doc.text(paragraph, contentX, textY, {
         width: contentWidth,
         align: 'justify',
-        lineGap: 2, // Espacement entre les lignes
+        lineGap: 1, // CORRECTION: Réduit de 2 à 1
       });
-      textY += 18; // Espacement entre paragraphes
+      textY += 22; // CORRECTION: Augmenté de 18 à 22
     });
 
     // Pied de page du rapport avec position fixe
