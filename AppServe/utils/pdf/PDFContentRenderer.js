@@ -576,27 +576,7 @@ class PDFContentRenderer {
   /**
    * 📦 Préparation des données d'une ligne produit
    */
-  prepareProductRowData(product) {
-    const stock = product.stock || 0;
-    const purchasePrice = product.purchase_price || 0;
-    const retailPrice = product.price || 0;
-    const taxRate = product.tax_rate || 0;
-
-    const inventoryValue = stock * purchasePrice;
-    const retailValue = stock * retailPrice;
-    const taxCollected = taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
-
-    return {
-      sku: product.sku || '',
-      name: product.name || '',
-      stock: this.layoutHelper.formatNumber(stock),
-      tax_rate: `${taxRate}%`,
-      inventory_value: this.layoutHelper.formatCurrency(inventoryValue),
-      retail_value: this.layoutHelper.formatCurrency(retailValue),
-      tax_collected: this.layoutHelper.formatCurrency(taxCollected),
-    };
-  }
-
+  prepareProductRowData;
   /**
    * 📊 Préparation des données de la ligne totaux
    */
@@ -801,7 +781,11 @@ class PDFContentRenderer {
     products.forEach((product) => {
       const retailValue = (product.stock || 0) * (product.price || 0);
       const taxRate = product.tax_rate || 0;
-      totalTaxCollected += taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
+
+      // CORRECTION : Même formule corrigée ici
+      // Ancienne : (retailValue * taxRate) / (100 + taxRate)
+      // Nouvelle : (retailValue * taxRate) / 100
+      totalTaxCollected += taxRate > 0 ? (retailValue * taxRate) / 100 : 0;
     });
 
     return totalTaxCollected;

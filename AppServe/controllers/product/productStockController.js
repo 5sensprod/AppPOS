@@ -65,7 +65,6 @@ class ProductStockController extends BaseController {
   }
 
   buildStatistics(productsInStock, allProducts, simpleProducts) {
-    // ... méthode inchangée (déjà optimale)
     const stats = {
       summary: {
         total_products: allProducts.length,
@@ -117,8 +116,11 @@ class ProductStockController extends BaseController {
       breakdown.inventory_value += productInventoryValue;
       breakdown.retail_value += productRetailValue;
 
-      const productTaxAmount =
-        tax_rate > 0 ? (productRetailValue * tax_rate) / (100 + tax_rate) : 0;
+      // CORRECTION : Formule de calcul TVA
+      // ANCIEN (incorrect) : (productRetailValue * tax_rate) / (100 + tax_rate)
+      // NOUVEAU (correct) : (productRetailValue * tax_rate) / 100
+      const productTaxAmount = tax_rate > 0 ? (productRetailValue * tax_rate) / 100 : 0;
+
       breakdown.tax_amount += productTaxAmount;
       totalTaxAmount += productTaxAmount;
     });

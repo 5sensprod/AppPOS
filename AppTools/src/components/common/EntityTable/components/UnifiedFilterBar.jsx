@@ -1,5 +1,5 @@
 //AppTools\src\components\common\EntityTable\components\UnifiedFilterBar.jsx
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import Select from 'react-select';
 import { X, Filter, ChevronDown, Trash2 } from 'lucide-react';
 import CategorySelector from '../../../common/CategorySelector';
