@@ -343,21 +343,23 @@ class PDFKitService {
       this.contentRenderer.currentY = y;
     }
 
-    // Configuration du tableau
+    // Configuration du tableau CORRIGÉE
     const summaryTableConfig = {
       columns: {
         category: { title: 'Catégorie', align: 'left' },
         product_count: { title: 'Nb Produits', align: 'center' },
         stock_total: { title: 'Stock Total', align: 'center' },
         inventory_value: { title: 'Valeur Stock', align: 'right' },
+        retail_value_ht: { title: 'Valeur Vente HT', align: 'right' },
         tax_collected: { title: 'TVA Collectée', align: 'right' },
       },
       widths: {
-        category: 30,
-        product_count: 15,
-        stock_total: 15,
-        inventory_value: 20,
-        tax_collected: 20,
+        category: 25,
+        product_count: 12,
+        stock_total: 12,
+        inventory_value: 17,
+        retail_value_ht: 17,
+        tax_collected: 17,
       },
     };
 
@@ -381,12 +383,13 @@ class PDFKitService {
     for (const [parentCategory, subcategories] of Object.entries(groupedByParent)) {
       // Ligne de la catégorie parente (en gras)
       if (Object.keys(subcategories).length > 1) {
-        const parentStats = this.calculateParentCategoryStats(subcategories);
+        const parentStats = this.calculateParentCategoryStatsCorrige(subcategories);
         const parentRowData = {
           category: `${parentCategory.toUpperCase()}`,
           product_count: this.layoutHelper.formatNumber(parentStats.totalProducts),
           stock_total: this.layoutHelper.formatNumber(parentStats.totalStock),
           inventory_value: this.layoutHelper.formatCurrency(parentStats.totalInventoryValue),
+          retail_value_ht: this.layoutHelper.formatCurrency(parentStats.totalRetailValueHT),
           tax_collected: this.layoutHelper.formatCurrency(parentStats.totalTaxCollected),
         };
         y = this.renderParentCategoryRow(
@@ -404,13 +407,17 @@ class PDFKitService {
       for (const [subcategoryName, products] of Object.entries(subcategories)) {
         const categoryStats = this.calculateCategoryStats(products);
         let totalStock = 0,
-          taxCollected = 0;
+          taxCollected = 0,
+          retailValueHT = 0;
 
         products.forEach((product) => {
           totalStock += product.stock || 0;
           const retailValue = (product.stock || 0) * (product.price || 0);
           const taxRate = product.tax_rate || 0;
-          taxCollected += taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
+
+          retailValueHT += retailValue;
+          // CORRECTION : TVA calculée sur HT
+          taxCollected += taxRate > 0 ? (retailValue * taxRate) / 100 : 0;
         });
 
         const summaryRowData = {
@@ -419,6 +426,7 @@ class PDFKitService {
           product_count: this.layoutHelper.formatNumber(categoryStats.totalProducts),
           stock_total: this.layoutHelper.formatNumber(totalStock),
           inventory_value: this.layoutHelper.formatCurrency(categoryStats.totalInventoryValue),
+          retail_value_ht: this.layoutHelper.formatCurrency(retailValueHT),
           tax_collected: this.layoutHelper.formatCurrency(taxCollected),
         };
 
@@ -434,7 +442,11 @@ class PDFKitService {
       }
     }
 
-    // Totaux généraux
+    // Totaux généraux CORRIGÉS
+    const totalRetailValueHT = Object.values(groupedProducts)
+      .flat()
+      .reduce((sum, p) => sum + (p.stock || 0) * (p.price || 0), 0);
+
     const finalTotalsData = {
       category: 'TOTAL GÉNÉRAL',
       product_count: this.layoutHelper.formatNumber(stockStats.summary.products_in_stock),
@@ -444,6 +456,7 @@ class PDFKitService {
           .reduce((sum, p) => sum + (p.stock || 0), 0)
       ),
       inventory_value: this.layoutHelper.formatCurrency(stockStats.financial.inventory_value),
+      retail_value_ht: this.layoutHelper.formatCurrency(totalRetailValueHT),
       tax_collected: this.layoutHelper.formatCurrency(stockStats.financial.tax_amount),
     };
 
@@ -458,6 +471,39 @@ class PDFKitService {
       true
     );
     this.contentRenderer.currentY = y + 15;
+  }
+
+  /**
+   * Calcul des stats pour une catégorie parente - VERSION CORRIGÉE
+   */
+  calculateParentCategoryStatsCorrige(subcategories) {
+    let totalProducts = 0,
+      totalStock = 0,
+      totalInventoryValue = 0,
+      totalRetailValueHT = 0,
+      totalTaxCollected = 0;
+
+    Object.values(subcategories).forEach((products) => {
+      products.forEach((product) => {
+        totalProducts++;
+        totalStock += product.stock || 0;
+        totalInventoryValue += (product.stock || 0) * (product.purchase_price || 0);
+        const retailValue = (product.stock || 0) * (product.price || 0);
+        const taxRate = product.tax_rate || 0;
+
+        totalRetailValueHT += retailValue;
+        // CORRECTION : TVA calculée correctement sur HT
+        totalTaxCollected += taxRate > 0 ? (retailValue * taxRate) / 100 : 0;
+      });
+    });
+
+    return {
+      totalProducts,
+      totalStock,
+      totalInventoryValue,
+      totalRetailValueHT,
+      totalTaxCollected,
+    };
   }
 
   /**
@@ -499,7 +545,7 @@ class PDFKitService {
         stock: { title: 'Stock', align: 'center' },
         tax_rate: { title: 'TVA', align: 'center' },
         inventory_value: { title: 'Valeur Achat', align: 'right' },
-        retail_value: { title: 'Valeur Vente', align: 'right' },
+        retail_value: { title: 'Valeur Vente HT', align: 'right' },
         tax_collected: { title: 'TVA Collectée', align: 'right' },
       },
       widths: {
@@ -706,7 +752,7 @@ class PDFKitService {
         totalInventoryValue += (product.stock || 0) * (product.purchase_price || 0);
         const retailValue = (product.stock || 0) * (product.price || 0);
         const taxRate = product.tax_rate || 0;
-        totalTaxCollected += taxRate > 0 ? (retailValue * taxRate) / (100 + taxRate) : 0;
+        totalTaxCollected += taxRate > 0 ? (retailValue * taxRate) / 100 : 0;
       });
     });
 

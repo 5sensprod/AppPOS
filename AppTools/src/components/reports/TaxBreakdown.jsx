@@ -20,14 +20,24 @@ const TaxRateCard = ({ taxKey, data }) => {
 
       <div className="space-y-2">
         <div className="flex justify-between">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Valeur achat:</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">Valeur achat HT:</span>
           <span className="font-medium text-gray-900 dark:text-white">
             {formatCurrency(data.inventory_value)}
           </span>
         </div>
 
+        {/* Affichage conditionnel selon les données disponibles */}
+        {data.retail_value_ht !== undefined && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Valeur vente HT:</span>
+            <span className="font-medium text-gray-900 dark:text-white">
+              {formatCurrency(data.retail_value_ht)}
+            </span>
+          </div>
+        )}
+
         <div className="flex justify-between">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Valeur vente:</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">Valeur vente HT:</span>
           <span className="font-medium text-gray-900 dark:text-white">
             {formatCurrency(data.retail_value)}
           </span>
@@ -57,6 +67,13 @@ const TaxBreakdown = ({ breakdown }) => {
       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
         Répartition par Taux de TVA
       </h3>
+
+      {/* Note explicative */}
+      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <p className="text-sm text-blue-700 dark:text-blue-300">
+          💡 <strong>TVA collectée</strong> = calculée sur le prix de vente HT × taux de TVA
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {Object.entries(breakdown).map(([key, data]) => (

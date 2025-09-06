@@ -576,7 +576,27 @@ class PDFContentRenderer {
   /**
    * 📦 Préparation des données d'une ligne produit
    */
-  prepareProductRowData;
+  prepareProductRowData(product) {
+    const stock = product.stock || 0;
+    const purchasePrice = product.purchase_price || 0;
+    const salePrice = product.price || 0;
+    const taxRate = product.tax_rate || 0;
+
+    // Calculs pour ce produit
+    const inventoryValue = stock * purchasePrice;
+    const retailValue = stock * salePrice;
+    const taxCollected = taxRate > 0 ? (retailValue * taxRate) / 100 : 0;
+
+    return {
+      sku: product.sku || '',
+      name: product.name || 'Sans nom',
+      stock: this.layoutHelper.formatNumber(stock),
+      tax_rate: taxRate > 0 ? `${taxRate}%` : '0%',
+      inventory_value: this.layoutHelper.formatCurrency(inventoryValue),
+      retail_value: this.layoutHelper.formatCurrency(retailValue),
+      tax_collected: this.layoutHelper.formatCurrency(taxCollected),
+    };
+  }
   /**
    * 📊 Préparation des données de la ligne totaux
    */
