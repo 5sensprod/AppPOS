@@ -186,8 +186,11 @@ export const useProductFilters = (products = []) => {
 
         // Chercher au moins une image trop petite
         return allImages.some((img) => {
-          const width = img?.metadata?.dimensions?.width || 0;
-          const height = img?.metadata?.dimensions?.height || 0;
+          // ✅ CORRIGÉ - Vérifier les bonnes propriétés
+          const width = img?.dimensions?.width || img?.metadata?.dimensions?.width || 0;
+          const height = img?.dimensions?.height || img?.metadata?.dimensions?.height || 0;
+
+          // ✅ CORRIGÉ - Seuil cohérent et logique
           return width < 700 || height < 700;
         });
       });

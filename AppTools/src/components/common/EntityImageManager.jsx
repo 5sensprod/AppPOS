@@ -31,14 +31,27 @@ const getImageSize = (image) => {
 
 const getImageDimensions = (image) => {
   if (!image) return null;
+
+  // Vérifier d'abord si les dimensions sont directement sur l'objet image
   if (image.width && image.height) {
     return { width: image.width, height: image.height };
   }
+
+  // Vérifier dans metadata.dimensions (structure de votre API)
+  if (image.metadata && image.metadata.dimensions) {
+    const { width, height } = image.metadata.dimensions;
+    if (width && height) {
+      return { width, height };
+    }
+  }
+
+  // Fallback : vérifier directement dans metadata (pour compatibilité)
   if (image.metadata) {
     if (image.metadata.width && image.metadata.height) {
       return { width: image.metadata.width, height: image.metadata.height };
     }
   }
+
   return null;
 };
 
