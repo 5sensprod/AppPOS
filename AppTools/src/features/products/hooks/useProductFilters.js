@@ -87,6 +87,7 @@ export const useProductFilters = (products = []) => {
     const wooOptions = [
       { label: 'Synchronisé', value: 'woo_synced', type: 'woo' },
       { label: 'Non synchronisé', value: 'woo_unsynced', type: 'woo' },
+      { label: 'En attente', value: 'woo_pending', type: 'woo' },
     ];
 
     const statusOptions = [
@@ -163,6 +164,9 @@ export const useProductFilters = (products = []) => {
       data = data.filter((p) => p.woo_id != null);
     } else if (wooFilter === 'woo_unsynced') {
       data = data.filter((p) => p.woo_id == null);
+    } else if (wooFilter === 'woo_pending') {
+      // ✅ NOUVEAU
+      data = data.filter((p) => p.pending_sync === true);
     }
 
     // Filtre par présence d'images et taille d'images
