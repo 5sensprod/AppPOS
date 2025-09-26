@@ -8,7 +8,7 @@ module.exports = {
   baseUrl: 'https://generativelanguage.googleapis.com/v1/models',
 
   // Modèle à utiliser
-  modelName: 'gemini-1.5-flash',
+  modelName: 'gemini-2.5-flash',
 
   // Paramètres de sécurité pour toutes les requêtes
   safetySettings: [
