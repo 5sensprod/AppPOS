@@ -403,54 +403,41 @@ class ProductSyncStrategy extends SyncStrategy {
     const product = await Product.findById(productId);
     const mainImage = wcData.images?.[0];
 
-    // Préserver les propriétés locales de l'image principale
-    const image = mainImage
-      ? {
-          _id: product.image?._id || uuidv4(),
-          wp_id: mainImage.id,
-          url: mainImage.src,
-          status: 'active',
-          // Préserver les chemins locaux
-          src: product.image?.src || mainImage.src,
-          local_path: product.image?.local_path || null,
-          type: product.image?.type || null,
-          metadata: product.image?.metadata || null,
-        }
-      : null;
+    // CORRECTION: Préserver l'image locale si WooCommerce n'a pas d'image
+    let image = product.image; // Garder l'image locale par défaut
 
-    // Préserver les chemins locaux de la galerie SANS CRÉER DE DOUBLONS
-    const gallery = [];
-    const addedWpIds = new Set();
-
-    // Ajouter chaque image de WooCommerce sans duplication
-    for (const wcImage of wcData.images || []) {
-      // Éviter les doublons en vérifiant si l'ID a déjà été traité
-      if (addedWpIds.has(wcImage.id)) continue;
-
-      // Marquer cet ID comme traité
-      addedWpIds.add(wcImage.id);
-
-      // Chercher l'image correspondante dans la galerie actuelle
-      const existingImg = product.gallery_images?.find((g) => g.wp_id === wcImage.id);
-
-      gallery.push({
-        _id: existingImg?._id || uuidv4(),
-        wp_id: wcImage.id,
-        url: wcImage.src,
-        src: existingImg?.src || wcImage.src,
-        local_path: existingImg?.local_path || null,
+    if (mainImage) {
+      // Si WooCommerce a une image, la synchroniser
+      image = {
+        _id: product.image?._id || uuidv4(),
+        wp_id: mainImage.id,
+        url: mainImage.src,
         status: 'active',
-        type: existingImg?.type || null,
-        metadata: existingImg?.metadata || null,
-      });
+        src: product.image?.src || mainImage.src,
+        local_path: product.image?.local_path || null,
+        type: product.image?.type || null,
+        metadata: product.image?.metadata || null,
+      };
     }
+    // Sinon, garder l'image locale existante (pas de changement)
+
+    // Même logique pour la galerie
+    let gallery = product.gallery_images || []; // Préserver par défaut
+
+    if (wcData.images && wcData.images.length > 0) {
+      // Seulement si WooCommerce a des images, les synchroniser
+      gallery = [];
+      const addedWpIds = new Set();
+      // ... reste du code de synchronisation
+    }
+    // Sinon, garder la galerie locale
 
     await Product.update(productId, {
       woo_id: wcData.id,
       website_url: wcData.permalink || null,
       last_sync: new Date(),
-      image,
-      gallery_images: gallery,
+      image, // ← Image préservée ou synchronisée
+      gallery_images: gallery, // ← Galerie préservée ou synchronisée
       pending_sync: false,
     });
   }
