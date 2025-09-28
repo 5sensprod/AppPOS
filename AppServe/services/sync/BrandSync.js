@@ -27,11 +27,13 @@ class BrandSyncStrategy extends SyncStrategy {
       }
     }
 
-    // Upload image locale si pas de wp_id
-    if (brand.image && !brand.image.wp_id && brand.image.local_path) {
+    // ✅ MODIFIÉ : Upload image locale si pas de wp_id - utiliser src en priorité
+    if (brand.image && !brand.image.wp_id && (brand.image.src || brand.image.local_path)) {
       try {
         const wpSync = new WordPressImageSync();
-        const wpData = await wpSync.uploadToWordPress(brand.image.local_path);
+        // Priorité à src qui est stable entre environnements
+        const pathToUpload = brand.image.src || brand.image.local_path;
+        const wpData = await wpSync.uploadToWordPress(pathToUpload);
 
         await Brand.update(brand._id, {
           image: { ...brand.image, wp_id: wpData.id, url: wpData.url },

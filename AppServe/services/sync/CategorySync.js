@@ -42,10 +42,17 @@ class CategorySyncStrategy extends SyncStrategy {
       }
     }
 
-    if (category.image && !category.image.wp_id && category.image.local_path) {
+    // ✅ MODIFIÉ : Upload image locale si pas de wp_id - utiliser src en priorité
+    if (
+      category.image &&
+      !category.image.wp_id &&
+      (category.image.src || category.image.local_path)
+    ) {
       try {
         const wpSync = new WordPressImageSync();
-        const wpData = await wpSync.uploadToWordPress(category.image.local_path);
+        // Priorité à src qui est stable entre environnements
+        const pathToUpload = category.image.src || category.image.local_path;
+        const wpData = await wpSync.uploadToWordPress(pathToUpload);
 
         await Category.update(category._id, {
           image: { ...category.image, wp_id: wpData.id, url: wpData.url },

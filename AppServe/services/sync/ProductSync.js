@@ -329,11 +329,14 @@ class ProductSyncStrategy extends SyncStrategy {
     // Téléverser chaque image en attente
     for (let i = 0; i < updatedGallery.length; i++) {
       const img = updatedGallery[i];
-      if (!img.wp_id && img.local_path) {
+      if (!img.wp_id && (img.src || img.local_path)) {
         try {
-          // Si cette image a déjà été téléversée (même chemin), réutiliser les résultats
-          if (processedPaths.has(img.local_path)) {
-            const existingUpload = processedPaths.get(img.local_path);
+          // ✅ Utiliser src en priorité car il est stable entre environnements
+          const pathToUpload = img.src || img.local_path;
+
+          if (processedPaths.has(pathToUpload)) {
+            // Réutiliser le résultat existant
+            const existingUpload = processedPaths.get(pathToUpload);
             updatedGallery[i] = {
               ...img,
               wp_id: existingUpload.wp_id,
@@ -341,22 +344,13 @@ class ProductSyncStrategy extends SyncStrategy {
               status: 'active',
             };
           } else {
-            // Sinon, téléverser l'image
-            const wpData = await wpSync.uploadToWordPress(img.local_path);
-            updatedGallery[i] = {
-              ...img,
-              wp_id: wpData.id,
-              url: wpData.url,
-              status: 'active',
-            };
-            // Enregistrer ce résultat pour réutilisation
-            processedPaths.set(img.local_path, {
-              wp_id: wpData.id,
-              url: wpData.url,
-            });
+            // Téléverser l'image
+            const wpData = await wpSync.uploadToWordPress(pathToUpload);
+            updatedGallery[i] = { ...img, wp_id: wpData.id, url: wpData.url, status: 'active' };
+            processedPaths.set(pathToUpload, { wp_id: wpData.id, url: wpData.url });
           }
         } catch (error) {
-          console.error(`Erreur upload WP pour image ${i}:`, error);
+          console.error(`Erreur upload WP pour image ${i}:`, error.message);
         }
       }
     }

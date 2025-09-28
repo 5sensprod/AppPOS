@@ -100,6 +100,7 @@ export const useProductFilters = (products = []) => {
       { label: 'Avec image', value: 'has_image', type: 'image' },
       { label: 'Sans image', value: 'no_image', type: 'image' },
       { label: 'Images trop petites (<800px)', value: 'small_image', type: 'image' },
+      { label: 'Images grandes (≥800px)', value: 'large_image', type: 'image' }, // ✅ NOUVEAU
     ];
 
     const descriptionOptions = [
@@ -195,7 +196,27 @@ export const useProductFilters = (products = []) => {
           const height = img?.dimensions?.height || img?.metadata?.dimensions?.height || 0;
 
           // ✅ CORRIGÉ - Seuil cohérent et logique
-          return width < 700 || height < 700;
+          return width < 800 || height < 800;
+        });
+      });
+    } else if (imageFilter === 'large_image') {
+      // ✅ NOUVEAU - Filtre pour images ≥800px
+      data = data.filter((p) => {
+        // Vérifier l'image principale et les images de la galerie
+        const mainImage = p.image;
+        const galleryImages = p.gallery_images || [];
+        const allImages = [mainImage, ...galleryImages].filter(Boolean);
+
+        // S'il n'y a pas d'image, exclure ce produit
+        if (allImages.length === 0) return false;
+
+        // Chercher au moins une image suffisamment grande
+        return allImages.some((img) => {
+          const width = img?.dimensions?.width || img?.metadata?.dimensions?.width || 0;
+          const height = img?.dimensions?.height || img?.metadata?.dimensions?.height || 0;
+
+          // Image considérée comme grande si largeur ET hauteur ≥ 800px
+          return width >= 800 && height >= 800;
         });
       });
     }
