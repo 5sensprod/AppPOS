@@ -1,10 +1,13 @@
-// services/gemini/GeminiDirectService.js - Version nettoyée et fonctionnelle
+// services/gemini/GeminiDirectService.js - Version optimisée JSON → HTML
 const axios = require('axios');
 const fs = require('fs');
 const apiConfig = require('./config/apiConfig');
-const { cleanGeneratedDescription } = require('./utils/cleanGeneratedDescription');
 const { getMimeType } = require('./utils/mimeTypeHelper');
 const { getChatResponsePrompt } = require('./prompts/chatResponse');
+const {
+  formatProductSheetToHtml,
+  extractJsonFromResponse,
+} = require('./utils/productSheetFormatter');
 
 /**
  * Service pour interagir avec l'API Gemini
@@ -17,7 +20,7 @@ class GeminiDirectService {
   }
 
   /**
-   * Génère une réponse de chat
+   * Génère une réponse de chat avec format JSON → HTML
    */
   async generateChatResponse(productData, userMessage, conversation, filePaths) {
     try {
@@ -27,7 +30,7 @@ class GeminiDirectService {
       // Formatter la conversation
       const conversationFormatted = this._formatConversation(systemContext, conversation);
 
-      // Obtenir le prompt pour la réponse de chat
+      // Obtenir le prompt JSON optimisé
       const optimizedPrompt = getChatResponsePrompt(productData);
 
       // Préparer le message utilisateur final avec images
@@ -44,7 +47,7 @@ class GeminiDirectService {
         contents: conversationFormatted,
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 1500,
+          maxOutputTokens: 2000,
           topP: 0.95,
           topK: 40,
         },
@@ -56,15 +59,19 @@ class GeminiDirectService {
 
       // Traitement de la réponse
       if (this._isValidResponse(response)) {
-        const generatedText = response.data.candidates[0].content.parts[0].text;
+        const rawText = response.data.candidates[0].content.parts[0].text;
 
-        // Nettoyer la description
-        const cleanedDescription = cleanGeneratedDescription(generatedText);
+        // Extraire et parser le JSON de la réponse
+        const productSheet = extractJsonFromResponse(rawText);
+
+        // Convertir le JSON en HTML formaté
+        const htmlDescription = formatProductSheetToHtml(productSheet);
 
         return {
-          message: generatedText,
-          description: cleanedDescription,
+          message: rawText, // Le JSON brut pour debug/historique
+          description: htmlDescription, // Le HTML formaté pour la base
           product_name: productData.name,
+          json: productSheet, // Le JSON structuré si besoin
         };
       } else {
         throw new Error('Format de réponse inattendu de Gemini');
@@ -80,13 +87,9 @@ class GeminiDirectService {
    */
   async generateProductTitle(productData, imagePath = null) {
     try {
-      // Importer le template de génération de titre
       const { getProductTitlePrompt } = require('./prompts/productTitleGenerator');
 
-      // Construire le prompt pour le titre
       const prompt = getProductTitlePrompt(productData);
-
-      // Préparer la requête API
       const requestData = this._prepareApiRequest(prompt, 0.7);
 
       // Ajouter une image si fournie
@@ -94,10 +97,8 @@ class GeminiDirectService {
         this._addImageToRequest(requestData, imagePath);
       }
 
-      // Envoyer la requête à l'API Gemini
       const response = await this._sendApiRequest(requestData);
 
-      // Traiter la réponse
       if (this._isValidResponse(response)) {
         const rawTitle = response.data.candidates[0].content.parts[0].text;
         const title = this._cleanResponse(rawTitle);
@@ -156,15 +157,24 @@ class GeminiDirectService {
   }
 
   _addImageToRequest(requestData, imagePath) {
-    const imageData = fs.readFileSync(imagePath);
-    const base64Image = imageData.toString('base64');
+    if (!fs.existsSync(imagePath)) {
+      console.warn(`Image non trouvée: ${imagePath}`);
+      return;
+    }
 
-    requestData.contents[0].parts.push({
-      inline_data: {
-        mime_type: getMimeType(imagePath),
-        data: base64Image,
-      },
-    });
+    try {
+      const imageData = fs.readFileSync(imagePath);
+      const base64Image = imageData.toString('base64');
+
+      requestData.contents[0].parts.push({
+        inline_data: {
+          mime_type: getMimeType(imagePath),
+          data: base64Image,
+        },
+      });
+    } catch (error) {
+      console.error(`Erreur ajout image: ${error.message}`);
+    }
   }
 
   async _sendApiRequest(requestData) {
@@ -186,10 +196,8 @@ class GeminiDirectService {
   }
 
   _createSystemContext(productData) {
-    let systemContext = `Tu es un assistant spécialisé dans la création de fiches produit e-commerce WooCommerce.
-    Chacune de tes réponses doit être une fiche produit en HTML pur, sans commentaires ni explications.
-    
-    Informations sur le produit "${productData.name || 'ce produit'}":`;
+    let systemContext = `Tu es un assistant spécialisé dans la création de fiches produit e-commerce.
+    Tu dois générer une fiche produit structurée en JSON pour "${productData.name || 'ce produit'}".`;
 
     if (productData.category) {
       systemContext += `\n- Catégorie: ${productData.category}`;
@@ -199,9 +207,6 @@ class GeminiDirectService {
     }
     if (productData.price) {
       systemContext += `\n- Prix: ${productData.price} €`;
-    }
-    if (productData.currentDescription) {
-      systemContext += `\n\nDescription actuelle:\n"${productData.currentDescription}"`;
     }
 
     return systemContext;
@@ -242,7 +247,7 @@ class GeminiDirectService {
     ];
 
     if (filePaths && filePaths.length > 0) {
-      console.log(`Ajout de ${filePaths.length} images à la requête finale`);
+      console.log(`📸 Ajout de ${filePaths.length} image(s) à la requête`);
 
       for (const filePath of filePaths) {
         if (fs.existsSync(filePath)) {
@@ -257,10 +262,10 @@ class GeminiDirectService {
               },
             });
           } catch (error) {
-            console.error(`Erreur lors du traitement de l'image ${filePath}:`, error);
+            console.error(`Erreur traitement image ${filePath}:`, error);
           }
         } else {
-          console.warn(`Le fichier ${filePath} n'existe pas`);
+          console.warn(`Fichier introuvable: ${filePath}`);
         }
       }
     }

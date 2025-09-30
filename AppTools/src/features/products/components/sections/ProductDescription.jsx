@@ -177,12 +177,17 @@ const ProductDescription = ({ product, editable = false, register, setValue, wat
 
       // Appel à l'API
       const response = await apiService.post('/api/descriptions/chat', formData);
-      const aiResponse = response.data.data?.message || response.data.message;
+
+      const aiResponse = response.data.data?.description || response.data.description;
+
+      const jsonForChat = response.data.data?.message || response.data.message;
+
       const newAiMessage = {
         type: 'assistant',
-        content: aiResponse,
-        description: response.data.data?.description || response.data.description,
+        content: aiResponse, // Affiche le HTML formaté dans le chat
+        description: aiResponse, // Utilise le HTML pour appliquer
       };
+
       setMessages((prev) => [...prev, newAiMessage]);
     } catch (error) {
       console.error("Erreur lors de la communication avec l'IA:", error);
