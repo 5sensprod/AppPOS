@@ -52,7 +52,6 @@ RÈGLES :
 Informations produit disponibles :
 ${productData.category ? `- Catégorie: ${productData.category}` : ''}
 ${productData.brand ? `- Marque: ${productData.brand}` : ''}
-${productData.price ? `- Prix: ${productData.price}€` : ''}
 ${productData.currentDescription ? `- Description existante: ${productData.currentDescription.replace(/<[^>]*>/g, ' ').trim()}` : ''}`;
 }
 
