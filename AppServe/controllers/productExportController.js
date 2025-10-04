@@ -33,6 +33,27 @@ class ProductExportController {
   }
 
   /**
+   * Encode un nom de fichier pour l'en-tête Content-Disposition (RFC 5987)
+   * @param {string} filename - Le nom de fichier à encoder
+   * @returns {string} - L'en-tête Content-Disposition complet
+   */
+  getContentDispositionHeader(filename) {
+    // Version ASCII sécurisée (pour navigateurs anciens)
+    const asciiFilename = filename
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Retirer les accents
+      .replace(/[^\x20-\x7E]/g, '_'); // Remplacer caractères non-ASCII
+
+    // Version encodée UTF-8 (pour navigateurs modernes)
+    const encodedFilename = encodeURIComponent(filename)
+      .replace(/['()]/g, escape)
+      .replace(/\*/g, '%2A');
+
+    // Format RFC 5987 avec fallback ASCII
+    return `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`;
+  }
+
+  /**
    * Exporte les produits au format PDF
    * @param {Request} req - La requête Express
    * @param {Response} res - La réponse Express
@@ -81,7 +102,7 @@ class ProductExportController {
 
       // Envoyer le fichier en réponse
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Disposition', this.getContentDispositionHeader(filename));
 
       // Lire le fichier et l'envoyer comme réponse
       const fileStream = fs.createReadStream(tempFilePath);
@@ -144,7 +165,7 @@ class ProductExportController {
 
       // Envoyer le fichier en réponse avec le bon charset
       res.setHeader('Content-Type', 'text/csv; charset=Windows-1252');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Disposition', this.getContentDispositionHeader(filename));
 
       const fileStream = fs.createReadStream(tempFilePath);
       fileStream.pipe(res);
