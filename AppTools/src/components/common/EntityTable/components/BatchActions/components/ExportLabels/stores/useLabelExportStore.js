@@ -26,6 +26,12 @@ const DEFAULT_STYLE = {
   nameFontFamily: 'Arial',
   nameWeight: 'bold', // ⭐ NOUVEAU (pour cohérence)
   duplicateCount: 1,
+  showWooQR: false,
+  showWooQRText: true,
+  wooQRTextSize: 7,
+  wooQRText: 'Voir en ligne',
+
+  wooQRSize: 10,
   customPositions: {},
 };
 
@@ -333,6 +339,7 @@ export const useLabelExportStore = create(
             barcode: product.meta_data?.find((m) => m.key === 'barcode')?.value || '',
             sku: product.sku || '',
             designation: product.designation || '',
+            websiteUrl: product.website_url || '',
           }));
       },
 

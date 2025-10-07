@@ -104,11 +104,18 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
               objectType = 'name';
             } else if (text.includes('€') || text.includes(label.price)) {
               objectType = 'price';
+            } else if (text === (style.wooQRText || 'Voir en ligne')) {
+              objectType = 'wooQRText'; // 🆕 Texte QR WooCommerce
             } else {
               objectType = 'barcodeText';
             }
           } else if (obj.type === 'image') {
-            objectType = 'barcode';
+            // Distinguer barcode normal et QR WooCommerce
+            if (obj.wooQRCode) {
+              objectType = 'wooQR'; // 🆕 QR Code WooCommerce
+            } else {
+              objectType = 'barcode';
+            }
           }
 
           obj.set({
@@ -176,6 +183,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     label?.name,
     label?.price,
     label?.barcode,
+    label?.websiteUrl,
     layout.width,
     layout.height,
     layout.supportType,
@@ -196,6 +204,11 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     style.barcodeTextSize,
     style.qrCodeSize,
     style.barcodeType,
+    style.showWooQR,
+    style.wooQRSize,
+    style.showWooQRText,
+    style.wooQRTextSize,
+    style.wooQRText,
     JSON.stringify(style.customPositions),
   ]);
 

@@ -100,6 +100,12 @@ class BaseLabelRenderer {
     if (style.showBarcode && label.barcode?.trim()) {
       await this._addBarcode(fabricCanvas, label, elements.barcode, style, fabric, scaleFactor);
     }
+
+    // 🆕 QR CODE WOOCOMMERCE
+    if (style.showWooQR && label.websiteUrl?.trim()) {
+      console.log('🌐 Rendu QR Code WooCommerce:', label.websiteUrl);
+      await this._addWooQRCode(fabricCanvas, label, elements.wooQR, style, fabric, scaleFactor);
+    }
   }
   // 🎯 Calcul des éléments simplifié
   _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
@@ -159,12 +165,11 @@ class BaseLabelRenderer {
       };
     }
 
-    // ⭐ Barcode/QR Code avec calcul adaptatif
+    // Barcode/QR Code produit (code existant inchangé)
     if (style.showBarcode) {
       let totalHeight;
 
       if (style.barcodeType === 'qrcode') {
-        // QR Code : dimension carrée
         const qrSize = (style.qrCodeSize || 20) * this.mmToPx * scaleFactor;
         const textHeight = style.showBarcodeText !== false ? 12 * scaleFactor : 0;
         totalHeight = qrSize + textHeight + (textHeight > 0 ? 4 * scaleFactor : 0);
@@ -181,7 +186,6 @@ class BaseLabelRenderer {
 
         elements.barcode.barcodeHeight = qrSize;
       } else {
-        // Code-barres classique
         const barcodeHeight = (style.barcodeHeight || 15) * this.mmToPx * 0.4 * scaleFactor;
         const textHeight = style.showBarcodeText !== false ? 12 * scaleFactor : 0;
         totalHeight = barcodeHeight + textHeight + (textHeight > 0 ? 4 * scaleFactor : 0);
@@ -200,6 +204,37 @@ class BaseLabelRenderer {
       }
 
       elements.barcode.textHeight = style.showBarcodeText !== false ? 12 * scaleFactor : 0;
+    }
+
+    // 🆕 QR CODE WOOCOMMERCE - Position par défaut en bas à droite
+    if (style.showWooQR) {
+      const qrSize = (style.wooQRSize || 10) * this.mmToPx * scaleFactor;
+      const textHeight =
+        style.showWooQRText !== false ? (style.wooQRTextSize || 7) * scaleFactor * 1.4 : 0;
+      const totalHeight = qrSize + textHeight + (textHeight > 0 ? 2 * scaleFactor : 0);
+
+      // Position par défaut : bas à droite avec marge
+      const defaultX = canvasWidth - paddingH - qrSize;
+      const defaultY = canvasHeight - paddingV - totalHeight;
+
+      elements.wooQR = customPositions.wooQR
+        ? {
+            x: customPositions.wooQR.x * this.mmToPx * scaleFactor,
+            y: customPositions.wooQR.y * this.mmToPx * scaleFactor,
+            width: qrSize,
+            height: totalHeight,
+            centerX: customPositions.wooQR.centerX * this.mmToPx * scaleFactor,
+          }
+        : {
+            x: defaultX,
+            y: defaultY,
+            width: qrSize,
+            height: totalHeight,
+            centerX: defaultX + qrSize / 2,
+          };
+
+      elements.wooQR.qrSize = qrSize;
+      elements.wooQR.textHeight = textHeight;
     }
 
     return elements;
@@ -465,6 +500,137 @@ class BaseLabelRenderer {
     }
   }
 
+  async _addWooQRCode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
+    const qrSize = element.qrSize;
+
+    console.log('🌐 Génération QR Code WooCommerce:', label.websiteUrl, 'taille:', qrSize);
+
+    try {
+      // Créer un conteneur temporaire invisible
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '-9999px';
+      tempContainer.style.pointerEvents = 'none';
+      document.body.appendChild(tempContainer);
+
+      const qrContainer = document.createElement('div');
+      tempContainer.appendChild(qrContainer);
+
+      const React = await import('react');
+      const { createRoot } = await import('react-dom/client');
+
+      // Rendre le QRCodeSVG avec l'URL WooCommerce
+      const qrElement = React.createElement(QRCodeSVG, {
+        value: label.websiteUrl, // 🎯 URL WooCommerce au lieu du barcode
+        size: Math.round(qrSize),
+        level: 'M',
+        includeMargin: false,
+        bgColor: '#ffffff',
+        fgColor: '#000000',
+      });
+
+      await new Promise((resolve, reject) => {
+        try {
+          const root = createRoot(qrContainer);
+          root.render(qrElement);
+
+          setTimeout(() => {
+            try {
+              const svgElement = qrContainer.querySelector('svg');
+              if (svgElement) {
+                const svgString = new XMLSerializer().serializeToString(svgElement);
+                const img = new Image();
+
+                img.onload = () => {
+                  const qrImage = new fabric.Image(img, {
+                    left: element.centerX || element.x + qrSize / 2,
+                    top: element.y,
+                    originX: 'center',
+                    originY: 'top',
+                    selectable: false,
+                  });
+
+                  // 🎯 Marqueur pour identification dans FabricLabelCanvas
+                  qrImage.wooQRCode = true;
+
+                  fabricCanvas.add(qrImage);
+
+                  root.unmount();
+                  document.body.removeChild(tempContainer);
+
+                  console.log('✅ QR Code WooCommerce ajouté au canvas');
+                  resolve();
+                };
+
+                img.onerror = () => {
+                  console.error('❌ Erreur chargement image QR WooCommerce');
+                  root.unmount();
+                  document.body.removeChild(tempContainer);
+                  this._addFallbackWooQR(
+                    fabricCanvas,
+                    element,
+                    label.websiteUrl,
+                    fabric,
+                    scaleFactor
+                  );
+                  reject(new Error('Erreur chargement QR WooCommerce'));
+                };
+
+                img.src =
+                  'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+              } else {
+                console.error('❌ SVG QR WooCommerce non trouvé');
+                root.unmount();
+                document.body.removeChild(tempContainer);
+                this._addFallbackWooQR(
+                  fabricCanvas,
+                  element,
+                  label.websiteUrl,
+                  fabric,
+                  scaleFactor
+                );
+                reject(new Error('SVG non généré'));
+              }
+            } catch (err) {
+              console.error('❌ Erreur traitement QR WooCommerce:', err);
+              root.unmount();
+              document.body.removeChild(tempContainer);
+              this._addFallbackWooQR(fabricCanvas, element, label.websiteUrl, fabric, scaleFactor);
+              reject(err);
+            }
+          }, 100);
+        } catch (err) {
+          console.error('❌ Erreur createRoot WooCommerce:', err);
+          this._addFallbackWooQR(fabricCanvas, element, label.websiteUrl, fabric, scaleFactor);
+          reject(err);
+        }
+      });
+
+      // 🆕 Texte sous le QR Code WooCommerce
+      if (style.showWooQRText && element.textHeight > 0) {
+        const fontSize = (style.wooQRTextSize || 7) * scaleFactor;
+        const displayText = style.wooQRText || 'Voir en ligne';
+
+        const wooQRText = new fabric.Text(displayText, {
+          left: element.centerX || element.x + qrSize / 2,
+          top: element.y + qrSize + 2 * scaleFactor,
+          originX: 'center',
+          fontSize: fontSize,
+          fontFamily: 'Arial',
+          fill: '#000000',
+          selectable: false,
+          paintFirst: 'fill',
+        });
+
+        fabricCanvas.add(wooQRText);
+      }
+    } catch (error) {
+      console.error('❌ Erreur génération QR WooCommerce:', error);
+      this._addFallbackWooQR(fabricCanvas, element, label.websiteUrl, fabric, scaleFactor);
+    }
+  }
+
   // ⭐ QR Code de secours en cas d'erreur
   _addFallbackQR(fabricCanvas, element, barcodeText, fabric) {
     console.log('🔄 Utilisation QR Code de secours');
@@ -472,6 +638,7 @@ class BaseLabelRenderer {
     // QR Code très basique avec bordure
     const qrSize = element.barcodeHeight || 60;
     const border = qrSize * 0.1;
+    const centerX = element.centerX || element.x + qrSize / 2;
 
     // Fond blanc
     const background = new fabric.Rect({
@@ -482,7 +649,7 @@ class BaseLabelRenderer {
       width: qrSize,
       height: qrSize,
       fill: '#ffffff',
-      stroke: '#cccccc',
+      stroke: '#0084ff',
       strokeWidth: 1,
       selectable: false,
     });
@@ -534,6 +701,31 @@ class BaseLabelRenderer {
       selectable: false,
     });
     fabricCanvas.add(centerText);
+
+    // Icône globe simple au centre
+    const globeText = new fabric.Text('🌐', {
+      left: centerX,
+      top: element.y + qrSize / 2,
+      originX: 'center',
+      originY: 'center',
+      fontSize: qrSize * 0.4,
+      selectable: false,
+    });
+    fabricCanvas.add(globeText);
+
+    // Texte "WEB"
+    const webText = new fabric.Text('WEB', {
+      left: centerX,
+      top: element.y + qrSize * 0.75,
+      originX: 'center',
+      originY: 'center',
+      fontSize: qrSize * 0.15,
+      fontFamily: 'Arial',
+      fontWeight: 'bold',
+      fill: '#0084ff',
+      selectable: false,
+    });
+    fabricCanvas.add(webText);
   }
 
   // 🎯 Formatage code-barres simplifié

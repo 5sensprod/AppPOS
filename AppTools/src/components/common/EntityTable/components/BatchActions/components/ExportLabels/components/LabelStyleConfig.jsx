@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
   Palette,
+  Globe,
 } from 'lucide-react';
 import { useAccordion } from '../hooks/useAccordion';
 import FabricLabelCanvas from './FabricLabelCanvas';
@@ -353,6 +354,85 @@ const BorderStylePanel = ({ style, onUpdate }) => (
   </ControlGroup>
 );
 
+const WooQRStylePanel = ({ style, onUpdate }) => (
+  <ControlGroup title="Configuration du lien WooCommerce">
+    <div className="mb-3">
+      <NumberInput
+        label="Taille du QR Code"
+        value={style.wooQRSize || 10}
+        onChange={(value) => onUpdate({ wooQRSize: value })}
+        min={5}
+        max={30}
+        unit="mm"
+      />
+    </div>
+
+    <label className="flex items-center mb-2">
+      <input
+        type="checkbox"
+        checked={style.showWooQRText !== false}
+        onChange={(e) => onUpdate({ showWooQRText: e.target.checked })}
+        className="mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+      />
+      <span className="text-xs text-gray-700 dark:text-gray-300">
+        Afficher le texte sous le QR Code
+      </span>
+    </label>
+
+    {style.showWooQRText !== false && (
+      <div className="ml-5 pl-3 border-l-2 border-gray-200 dark:border-gray-600 space-y-3">
+        <div>
+          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+            Texte à afficher
+          </label>
+          <input
+            type="text"
+            value={style.wooQRText || 'Voir en ligne'}
+            onChange={(e) => onUpdate({ wooQRText: e.target.value })}
+            placeholder="Voir en ligne"
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
+          />
+        </div>
+
+        <NumberInput
+          label="Taille du texte"
+          value={style.wooQRTextSize || 7}
+          onChange={(value) => onUpdate({ wooQRTextSize: value })}
+          min={6}
+          max={12}
+          unit="pt"
+        />
+      </div>
+    )}
+
+    {/* Info sur la source de l'URL */}
+    <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded text-xs text-blue-700 dark:text-blue-300">
+      <div className="flex items-start gap-2">
+        <svg
+          className="h-4 w-4 mt-0.5 flex-shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+        <div>
+          <div className="font-medium mb-0.5">URL WooCommerce</div>
+          <div className="text-xs opacity-90">
+            Le QR code pointera vers l'URL du produit sur votre boutique (champ{' '}
+            <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">website_url</code>)
+          </div>
+        </div>
+      </div>
+    </div>
+  </ControlGroup>
+);
+
 // ===== COMPOSANT PRINCIPAL =====
 const LabelStyleConfig = () => {
   const {
@@ -400,6 +480,13 @@ const LabelStyleConfig = () => {
       icon: Square,
       enabled: labelStyle.showBorder,
       toggle: () => updateStyle({ showBorder: !labelStyle.showBorder }),
+    },
+    {
+      id: 'wooqr',
+      label: 'Lien Web',
+      icon: Globe, // Importez Globe depuis lucide-react
+      enabled: labelStyle.showWooQR,
+      toggle: () => updateStyle({ showWooQR: !labelStyle.showWooQR }),
     },
   ];
 
@@ -474,6 +561,10 @@ const LabelStyleConfig = () => {
       case 'border':
         return (
           labelStyle.showBorder && <BorderStylePanel style={labelStyle} onUpdate={updateStyle} />
+        );
+      case 'wooqr':
+        return (
+          labelStyle.showWooQR && <WooQRStylePanel style={labelStyle} onUpdate={updateStyle} />
         );
       default:
         return null;
