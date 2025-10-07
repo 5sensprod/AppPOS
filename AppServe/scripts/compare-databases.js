@@ -6,7 +6,7 @@ const fs = require('fs');
 
 // Configuration des chemins
 const MY_DB_PATH = path.join(__dirname, '../data/products.db');
-const CLIENT_DB_PATH = path.join(__dirname, '../data/source/products.db');
+const CLIENT_DB_PATH = path.join(__dirname, '../data/source/products-axe.db');
 
 console.log('🔍 [COMPARAISON] Analyse des différences entre les bases de données');
 console.log(`📂 [MA BDD] ${MY_DB_PATH}`);
