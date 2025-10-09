@@ -1,4 +1,4 @@
-// src/components/menu/initializeMenus.js - Ajout du menu WordPress
+// src/components/menu/initializeMenus.js - COMPLET avec WordPress + Gestion Users
 import React from 'react';
 import { menuRegistry } from './MenuRegistry';
 import {
@@ -13,7 +13,8 @@ import {
   Monitor,
   Printer,
   Cog,
-  Globe, // ✅ NOUVELLE ICÔNE POUR WORDPRESS
+  Globe,
+  Users, // ✅ ICÔNE POUR GESTION UTILISATEURS
 } from 'lucide-react';
 
 export function initializeMenus() {
@@ -67,7 +68,7 @@ export function initializeMenus() {
     path: '/sales',
   });
 
-  // ✅ NOUVEAU : Section WordPress
+  // ✅ Section WordPress
   menuRegistry.addSidebarItem({
     id: 'wordpress',
     icon: <Globe className="h-6 w-6" />,
@@ -90,12 +91,20 @@ export function initializeMenus() {
     path: '/rapports',
   });
 
+  // ✅ Section Paramètres avec Gestion Utilisateurs
   menuRegistry.addSidebarItem({
     id: 'settings',
     icon: <Settings className="h-6 w-6" />,
     label: 'Paramètres',
     path: '/settings',
     children: [
+      {
+        id: 'users-management',
+        icon: <Users className="h-5 w-5" />,
+        label: 'Utilisateurs',
+        path: '/settings/users',
+        adminOnly: true, // ✅ Visible uniquement pour les admins
+      },
       {
         id: 'lcd-config',
         icon: <Monitor className="h-5 w-5" />,

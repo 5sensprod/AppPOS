@@ -75,13 +75,33 @@ async function registerUser(req, res) {
 
 /**
  * Contrôleur pour récupérer les informations de l'utilisateur connecté
+ * Les informations viennent du token JWT décodé par authMiddleware
  */
 function getCurrentUser(req, res) {
-  // Les informations de l'utilisateur sont ajoutées à req.user par le middleware d'authentification
-  res.json({
-    success: true,
-    user: req.user,
-  });
+  try {
+    // req.user est ajouté par authMiddleware après validation du token
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Utilisateur non authentifié',
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Erreur getCurrentUser:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des informations utilisateur',
+    });
+  }
 }
 
 module.exports = {

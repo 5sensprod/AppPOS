@@ -1,14 +1,9 @@
-// utils/auth.js - MODIFIÉ POUR TOKEN 24H EN DEV
+// utils/auth.js - VERSION CORRIGÉE AVEC INSTANCE UNIQUE
 const jwt = require('jsonwebtoken');
-const Datastore = require('nedb');
-const path = require('path');
 const bcrypt = require('bcrypt');
-const pathManager = require('./PathManager');
 
-const usersDb = new Datastore({
-  filename: pathManager.getDataPath('users.db'),
-  autoload: true,
-});
+// ✅ UTILISER L'INSTANCE UNIQUE CENTRALISÉE (au lieu de créer une nouvelle)
+const usersDb = require('../models/User');
 
 // Clé secrète pour signer les tokens JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'votre_clé_secrète_par_défaut';
@@ -17,34 +12,23 @@ const JWT_SECRET = process.env.JWT_SECRET || 'votre_clé_secrète_par_défaut';
 const currentEnv = process.env.NODE_ENV || 'development';
 
 const config = {
-  // Expiration du token depuis .env ou défaut selon environnement
   expiresIn: process.env.JWT_EXPIRES_IN || (currentEnv === 'development' ? '24h' : '24h'),
-
-  // Invalider au redémarrage depuis .env ou défaut selon environnement
   useServerRestart:
     process.env.JWT_INVALIDATE_ON_RESTART === 'true' ||
     (currentEnv === 'production' && process.env.JWT_INVALIDATE_ON_RESTART !== 'false'),
 };
 
-// ID unique du serveur généré au démarrage (utilisé seulement en production)
+// ID unique du serveur généré au démarrage
 const SERVER_STARTUP_ID = Date.now().toString();
 
 console.log(`🔧 [AUTH] Mode: ${currentEnv}`);
 console.log(`🔧 [AUTH] Token expiration: ${config.expiresIn || 'Aucune'}`);
 console.log(`🔧 [AUTH] Validation redémarrage serveur: ${config.useServerRestart ? 'Oui' : 'Non'}`);
 
-/**
- * Récupère l'ID de démarrage du serveur actuel
- */
 function getServerStartupId() {
   return SERVER_STARTUP_ID;
 }
 
-/**
- * Génère un token JWT selon la configuration d'environnement
- * @param {Object} user Objet utilisateur (sans le mot de passe)
- * @returns {String} Token JWT
- */
 function generateToken(user) {
   const userForToken = {
     id: user._id,
@@ -53,7 +37,6 @@ function generateToken(user) {
     iat: Math.floor(Date.now() / 1000),
   };
 
-  // Ajouter l'ID serveur seulement si nécessaire (production)
   if (config.useServerRestart) {
     userForToken.server_id = SERVER_STARTUP_ID;
   }
@@ -64,7 +47,6 @@ function generateToken(user) {
     audience: 'AppPOS-Client',
   };
 
-  // Ajouter l'expiration seulement si configurée
   if (config.expiresIn) {
     signOptions.expiresIn = config.expiresIn;
   }
@@ -72,9 +54,6 @@ function generateToken(user) {
   return jwt.sign(userForToken, JWT_SECRET, signOptions);
 }
 
-/**
- * Vérifie les identifiants et connecte un utilisateur
- */
 function login(username, password) {
   return new Promise((resolve, reject) => {
     usersDb.findOne({ username }, async (err, user) => {
@@ -90,7 +69,6 @@ function login(username, password) {
       }
 
       try {
-        // Vérification du mot de passe
         const isMatch = await bcrypt.compare(password, user.passwordHash);
 
         if (!isMatch) {
@@ -100,13 +78,9 @@ function login(username, password) {
           });
         }
 
-        // Générer un token JWT selon la config
         const token = generateToken(user);
-
-        // Ne jamais retourner le hash du mot de passe
         const { passwordHash, ...userWithoutPassword } = user;
 
-        // Message adapté selon l'environnement
         const tokenMessage = config.expiresIn
           ? `Token valide pendant ${config.expiresIn}`
           : "Token valide jusqu'à redémarrage serveur";
@@ -130,13 +104,9 @@ function login(username, password) {
   });
 }
 
-/**
- * Crée un nouvel utilisateur
- */
 async function register(userData) {
   return new Promise(async (resolve, reject) => {
     try {
-      // Vérifier si l'utilisateur existe déjà
       usersDb.findOne({ username: userData.username }, async (err, existingUser) => {
         if (err) {
           return reject(new Error('Erreur de base de données'));
@@ -149,11 +119,9 @@ async function register(userData) {
           });
         }
 
-        // Hacher le mot de passe
         const saltRounds = 10;
         const passwordHash = await bcrypt.hash(userData.password, saltRounds);
 
-        // Créer l'utilisateur
         const newUser = {
           username: userData.username,
           passwordHash,
@@ -161,13 +129,11 @@ async function register(userData) {
           createdAt: new Date(),
         };
 
-        // Sauvegarder l'utilisateur dans la base de données
         usersDb.insert(newUser, (err, user) => {
           if (err) {
             return reject(new Error("Erreur lors de la création de l'utilisateur"));
           }
 
-          // Ne jamais retourner le hash du mot de passe
           const { passwordHash, ...userWithoutPassword } = user;
 
           resolve({
@@ -182,11 +148,7 @@ async function register(userData) {
   });
 }
 
-/**
- * Middleware pour vérifier l'authentification selon la configuration
- */
 function authMiddleware(req, res, next) {
-  // Récupérer le token d'authentification
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -199,15 +161,12 @@ function authMiddleware(req, res, next) {
   const token = authHeader.split(' ')[1];
 
   try {
-    // Options de vérification selon l'environnement
     const verifyOptions = {
-      ignoreExpiration: !config.expiresIn, // Ignorer expiration si pas configurée
+      ignoreExpiration: !config.expiresIn,
     };
 
-    // Vérifier et décoder le token
     const decoded = jwt.verify(token, JWT_SECRET, verifyOptions);
 
-    // Vérifier l'ID serveur seulement si configuré (production)
     if (config.useServerRestart && decoded.server_id && decoded.server_id !== SERVER_STARTUP_ID) {
       console.log(
         `🔄 [AUTH] Token invalide - serveur redémarré. Token ID: ${decoded.server_id}, Serveur ID: ${SERVER_STARTUP_ID}`
@@ -219,7 +178,6 @@ function authMiddleware(req, res, next) {
       });
     }
 
-    // En production, invalider les tokens anciens sans server_id
     if (config.useServerRestart && !decoded.server_id) {
       console.log('🔄 [AUTH] Token ancien sans server_id - invalidation');
       return res.status(401).json({
@@ -229,7 +187,6 @@ function authMiddleware(req, res, next) {
       });
     }
 
-    // Ajouter les informations de l'utilisateur à la requête
     req.user = decoded;
     next();
   } catch (error) {
@@ -255,9 +212,6 @@ function authMiddleware(req, res, next) {
   }
 }
 
-/**
- * Middleware pour vérifier les rôles
- */
 function roleMiddleware(roles) {
   return (req, res, next) => {
     if (!req.user || !req.user.role) {
