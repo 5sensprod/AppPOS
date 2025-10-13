@@ -132,6 +132,7 @@ const userPresetRoutes = require('./routes/userPresetRoutes');
 
 const wordpressMenuRoutes = require('./routes/wordpress/menuRoutes');
 const userManagementRoutes = require('./routes/userManagementRoutes');
+const rolePermissionsRoutes = require('./routes/rolePermissionsRoutes');
 
 // Protection des routes API avec le middleware d'authentification
 app.use('/api/categories', authMiddleware, categoryRoutes);
@@ -154,6 +155,8 @@ const dataCopyRoutes = require('./routes/dataCopyRoutes');
 app.use('/api/data-copy', authMiddleware, dataCopyRoutes);
 
 app.use('/api/users', userManagementRoutes);
+
+app.use('/api/role-permissions', rolePermissionsRoutes);
 
 // ✅ ROUTE D'INFO SERVEUR AVEC ID D'AUTH ET STATUS BACKUP
 app.get('/api/server-info', (req, res) => {

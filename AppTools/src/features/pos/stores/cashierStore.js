@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import salesService from '../../../services/salesService';
 import cashierSessionService from '../../../services/cashierSessionService';
 import { useSessionStore } from '../../../stores/sessionStore';
+
 export const useCashierStore = create((set, get) => ({
   // ✅ ÉTAT DU PANIER - APERÇU FRONTEND UNIQUEMENT
   cart: {
@@ -154,7 +155,6 @@ export const useCashierStore = create((set, get) => ({
     setTimeout(async () => {
       console.log('🔍 [STORE] Dans setTimeout LCD...');
       try {
-        // ✅ UTILISER L'IMPORT DIRECT au lieu de window
         const sessionState = useSessionStore.getState();
         console.log('🔍 [STORE] sessionState récupéré via import');
 
@@ -216,7 +216,6 @@ export const useCashierStore = create((set, get) => ({
         if (sessionState?.lcdStatus?.owned) {
           const updatedItem = newItems.find((item) => item.product_id === productId);
           if (updatedItem) {
-            // Tronquer le nom à 14 chars pour laisser place à " x99"
             const productNameTruncated =
               updatedItem.product_name.length > 14
                 ? updatedItem.product_name.substring(0, 14)
@@ -241,6 +240,8 @@ export const useCashierStore = create((set, get) => ({
   },
 
   clearCart: () => {
+    console.log('🗑️ [STORE] Vidage du panier...');
+
     set({
       cart: {
         items: [],
@@ -258,13 +259,15 @@ export const useCashierStore = create((set, get) => ({
     setTimeout(() => {
       get().notifyAPICartChange();
     }, 100);
+
+    console.log('✅ [STORE] Panier vidé');
   },
 
   // 🆕 ACTIONS RÉDUCTIONS (aperçu frontend)
   applyItemDiscount: (productId, discountData) => {
     const state = get();
 
-    console.log('🔧 [STORE] Application réduction item:', { productId, discountData }); // DEBUG
+    console.log('🔧 [STORE] Application réduction item:', { productId, discountData });
 
     const newItems = state.cart.items.map((item) => {
       if (item.product_id === productId) {
@@ -312,7 +315,6 @@ export const useCashierStore = create((set, get) => ({
   applyTicketDiscount: (discountData) => {
     const state = get();
 
-    // Calculer sur le sous-total après réductions items
     const subtotalAfterItems = state.cart.items.reduce((sum, item) => {
       const itemTotal = item.unit_price * item.quantity;
       const itemDiscount = item.discount?.amount || 0;
@@ -356,7 +358,6 @@ export const useCashierStore = create((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      // 🎯 ENVOYER DONNÉES BRUTES À L'API (pas les calculs frontend)
       const saleData = {
         items: state.cart.items.map((item) => ({
           product_id: item.product_id,
@@ -378,8 +379,6 @@ export const useCashierStore = create((set, get) => ({
       console.log("🎯 [STORE] Envoi données brutes à l'API (calculs officiels):", saleData);
 
       const response = await salesService.createSale(saleData);
-
-      // 🎯 UTILISER LES CALCULS OFFICIELS DE L'API
       const officialReceipt = response.data.receipt;
 
       console.log("🎯 [STORE] Calculs officiels reçus de l'API:", officialReceipt);
@@ -387,7 +386,7 @@ export const useCashierStore = create((set, get) => ({
       set((state) => ({
         ...state,
         loading: false,
-        lastReceipt: officialReceipt, // 🎯 Calculs officiels de l'API
+        lastReceipt: officialReceipt,
         showReceiptModal: true,
         currentSale: response.data.sale,
       }));
@@ -434,3 +433,35 @@ export const useCashierStore = create((set, get) => ({
   setShowReceiptModal: (show) => set({ showReceiptModal: show }),
   setError: (error) => set({ error }),
 }));
+
+// ========================================
+// 🆕 ÉCOUTER LA FERMETURE DE SESSION ET VIDER LE PANIER
+// ========================================
+console.log('🎣 [CASHIER STORE] Initialisation de la subscription à la session...');
+
+useSessionStore.subscribe(
+  // Sélecteur: surveiller cashierSession
+  (state) => state.cashierSession,
+  // Callback: appelé quand cashierSession change
+  (currentSession, previousSession) => {
+    console.log('🔍 [CASHIER STORE] Session changée:', {
+      previous: previousSession?.status,
+      current: currentSession?.status,
+    });
+
+    // ✅ Si on passe d'une session active à null ou closed
+    const hadActiveSession = previousSession?.status === 'active';
+    const hasNoSession = !currentSession || currentSession.status === 'closed';
+
+    if (hadActiveSession && hasNoSession) {
+      console.log('🗑️ [CASHIER STORE] Session fermée détectée, vidage du panier...');
+
+      // Vider le panier
+      useCashierStore.getState().clearCart();
+
+      console.log('✅ [CASHIER STORE] Panier vidé automatiquement suite à la fermeture de session');
+    }
+  }
+);
+
+console.log('✅ [CASHIER STORE] Subscription à la session initialisée');

@@ -23,6 +23,7 @@ import BrandsPage from './features/brands/BrandsPage';
 import BrandDetail from './features/brands/components/BrandDetail';
 import CashierPage from './features/pos/CashierPage';
 import UserManagementPage from './pages/UserManagementPage';
+import RolePermissionsEditor from './pages/RolePermissionsEditor';
 
 // Pages WordPress
 import WordPressMenuPage from './features/wordpress/WordPressMenuPage'; // ✅ NOUVELLE PAGE
@@ -276,6 +277,19 @@ function AppRoutes() {
               <AdminRoute>
                 <MainLayout>
                   <UserManagementPage />
+                </MainLayout>
+              </AdminRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/settings/permissions"
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <MainLayout>
+                  <RolePermissionsEditor />
                 </MainLayout>
               </AdminRoute>
             </ProtectedRoute>

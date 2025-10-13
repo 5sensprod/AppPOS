@@ -1,10 +1,11 @@
-// src/components/menu/SidebarMenuItem.jsx - VERSION CORRIGÉE AVEC PERMISSIONS
+// src/components/menu/SidebarMenuItem.jsx - VERSION FINALE CORRIGÉE
 import React, { memo, useCallback, useMemo, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { useMenu } from './useMenu';
 import { useAuth } from '../../contexts/AuthContext';
-import { hasAccessToMenu } from '../../config/rolePermissions';
+import { usePermissions } from '../../contexts/PermissionsProvider';
+import { hasAccessToMenu } from '../../hooks/useRolePermissions'; // ✅ BON IMPORT
 
 // Vérifie si un élément est actif
 const isActive = (menuPath, currentPath) =>
@@ -14,15 +15,13 @@ const isActive = (menuPath, currentPath) =>
 const hasActiveChild = (children, currentPath) =>
   children?.some((child) => isActive(child.path, currentPath));
 
-const SubMenu = memo(({ children, expanded, currentPath, userRole }) => {
-  // ✅ FILTRER LES ENFANTS SELON LES PERMISSIONS
+const SubMenu = memo(({ children, expanded, currentPath, userRole, permissions }) => {
+  // ✅ FILTRER LES ENFANTS AVEC PERMISSIONS DYNAMIQUES
   const visibleChildren = children.filter((child) => {
-    // Si adminOnly est défini, vérifier le rôle admin
     if (child.adminOnly) {
       return userRole === 'admin';
     }
-    // Sinon, vérifier les permissions générales
-    return hasAccessToMenu(userRole, child.id);
+    return hasAccessToMenu(permissions, userRole, child.id);
   });
 
   if (visibleChildren.length === 0) return null;
@@ -85,17 +84,17 @@ const SidebarMenuItem = ({ item, collapsed = false }) => {
   const location = useLocation();
   const { isExpanded, toggleExpanded } = useMenu();
   const { user } = useAuth();
+  const { permissions } = usePermissions();
   const currentPath = location.pathname;
 
-  // ✅ VÉRIFIER L'ACCÈS AU MENU PARENT EN PREMIER
+  // ✅ VÉRIFIER L'ACCÈS AVEC PERMISSIONS DYNAMIQUES
   const hasParentAccess = useMemo(() => {
-    // Si adminOnly est défini, vérifier le rôle admin
+    if (!permissions) return true; // Afficher pendant le chargement
     if (item.adminOnly) {
       return user?.role === 'admin';
     }
-    // Sinon, vérifier les permissions générales
-    return hasAccessToMenu(user?.role, item.id);
-  }, [user, item.id, item.adminOnly]);
+    return hasAccessToMenu(permissions, user?.role, item.id);
+  }, [permissions, user, item.id, item.adminOnly]);
 
   // ✅ BLOQUER L'AFFICHAGE SI PAS D'ACCÈS
   if (!hasParentAccess) {
@@ -111,18 +110,16 @@ const SidebarMenuItem = ({ item, collapsed = false }) => {
     [toggleExpanded, item.id]
   );
 
-  // ✅ FILTRER LES ENFANTS SELON LES PERMISSIONS
+  // ✅ FILTRER LES ENFANTS AVEC PERMISSIONS DYNAMIQUES
   const visibleChildren = useMemo(() => {
-    if (!children) return [];
+    if (!children || !permissions) return [];
     return children.filter((child) => {
-      // Si adminOnly est défini, vérifier le rôle admin
       if (child.adminOnly) {
         return user?.role === 'admin';
       }
-      // Sinon, vérifier les permissions générales
-      return hasAccessToMenu(user?.role, child.id);
+      return hasAccessToMenu(permissions, user?.role, child.id);
     });
-  }, [children, user]);
+  }, [children, user, permissions]);
 
   // Vérifier si l'élément actuel est actif ou si l'un de ses enfants est actif
   const active = useMemo(() => isActive(path, currentPath), [path, currentPath]);
@@ -147,7 +144,6 @@ const SidebarMenuItem = ({ item, collapsed = false }) => {
     );
   }
 
-  // ✅ NE PAS AFFICHER SI TOUS LES ENFANTS SONT FILTRÉS
   const hasVisibleChildren = visibleChildren.length > 0;
 
   return (
@@ -194,6 +190,7 @@ const SidebarMenuItem = ({ item, collapsed = false }) => {
             expanded={expanded}
             currentPath={currentPath}
             userRole={user?.role}
+            permissions={permissions}
           />
         )}
       </div>

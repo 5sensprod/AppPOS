@@ -5,6 +5,7 @@ import { HashRouter } from 'react-router-dom';
 import App from './App.jsx';
 import './index.css';
 import { AuthProvider } from './contexts/AuthContext';
+import { PermissionsProvider } from './contexts/PermissionsProvider';
 
 // Initialiser le système de thème
 import { themeManager } from './utils/themeManager';
@@ -18,9 +19,11 @@ initializeMenus();
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AuthProvider>
-      <HashRouter>
-        <App />
-      </HashRouter>
+      <PermissionsProvider>
+        <HashRouter>
+          <App />
+        </HashRouter>
+      </PermissionsProvider>
     </AuthProvider>
   </React.StrictMode>
 );

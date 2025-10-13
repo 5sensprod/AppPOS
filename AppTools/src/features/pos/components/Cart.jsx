@@ -1,12 +1,21 @@
-// src/features/pos/components/Cart.jsx
+// src/features/pos/components/Cart.jsx - CORRECTION PERMISSIONS
 import React, { useState } from 'react';
-import { ShoppingCart, CreditCard, Percent } from 'lucide-react';
+import { ShoppingCart, CreditCard, Percent, Lock } from 'lucide-react';
 import { useCashierStore } from '../stores/cashierStore';
 import CartItem from './CartItem';
 import DiscountModal from './DiscountModal';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { useAuth } from '../../../contexts/AuthContext';
+import { usePermissions } from '../../../contexts/PermissionsProvider';
+import {
+  canApplyItemDiscount,
+  canApplyTicketDiscount,
+  getDiscountPermissions,
+} from '../../../hooks/useRolePermissions';
 
 const Cart = () => {
+  const { user } = useAuth();
+  const { permissions, loading } = usePermissions();
   const {
     cart,
     updateCartItemQuantity,
@@ -20,12 +29,39 @@ const Cart = () => {
   } = useCashierStore();
 
   const [showDiscountModal, setShowDiscountModal] = useState(false);
-  const [discountModalType, setDiscountModalType] = useState(null); // 'item' ou 'ticket'
+  const [discountModalType, setDiscountModalType] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
+
+  // ✅ VÉRIFIER LES PERMISSIONS CORRECTEMENT
+  const userRole = user?.role || 'user';
+
+  // ✅ PASSER L'OBJET PERMISSIONS AUX FONCTIONS
+  const canDoItemDiscount = permissions ? canApplyItemDiscount(permissions, userRole) : false;
+  const canDoTicketDiscount = permissions ? canApplyTicketDiscount(permissions, userRole) : false;
+  const discountPerms = permissions
+    ? getDiscountPermissions(permissions, userRole)
+    : {
+        canApplyItemDiscount: false,
+        canApplyTicketDiscount: false,
+        maxItemDiscountPercent: 0,
+        maxTicketDiscountPercent: 0,
+      };
+
+  console.log('🔍 [Cart] Vérification permissions:', {
+    userRole,
+    hasPermissions: !!permissions,
+    canDoItemDiscount,
+    canDoTicketDiscount,
+    discountPerms,
+  });
 
   // Ouvrir la modale de réduction pour un item
   const handleItemDiscount = (item) => {
-    console.log('🔍 [Cart] handleItemDiscount appelé avec:', item); // DEBUG
+    if (!canDoItemDiscount) {
+      alert("Vous n'avez pas la permission d'appliquer des réductions sur les articles");
+      return;
+    }
+
     setDiscountModalType('item');
     setSelectedItem(item);
     setShowDiscountModal(true);
@@ -33,6 +69,11 @@ const Cart = () => {
 
   // Ouvrir la modale de réduction globale
   const handleTicketDiscount = () => {
+    if (!canDoTicketDiscount) {
+      alert("Vous n'avez pas la permission d'appliquer des réductions globales");
+      return;
+    }
+
     setDiscountModalType('ticket');
     setSelectedItem(null);
     setShowDiscountModal(true);
@@ -40,32 +81,20 @@ const Cart = () => {
 
   // Appliquer une réduction depuis la modale
   const handleApplyDiscount = (discountData) => {
-    console.log('🔍 [Cart] handleApplyDiscount appelé:', {
-      discountModalType,
-      selectedItem,
-      discountData,
-    }); // DEBUG
-
     if (discountModalType === 'item' && selectedItem) {
-      console.log('🔍 [Cart] Applying item discount to:', selectedItem.product_id); // DEBUG
       if (discountData === null) {
-        // Supprimer la réduction
         removeItemDiscount(selectedItem.product_id);
       } else {
-        // Appliquer/modifier la réduction
         applyItemDiscount(selectedItem.product_id, discountData);
       }
     } else if (discountModalType === 'ticket') {
       if (discountData === null) {
-        // Supprimer la réduction ticket
         removeTicketDiscount();
       } else {
-        // Appliquer/modifier la réduction ticket
         applyTicketDiscount(discountData);
       }
     }
 
-    console.log('🔍 [Cart] Tentative fermeture modale...'); // DEBUG
     setShowDiscountModal(false);
   };
 
@@ -74,7 +103,7 @@ const Cart = () => {
     const taxBreakdown = {};
 
     cart.items.forEach((item) => {
-      const taxRate = Number(item.tax_rate || 20); // 👈 transforme bien "20" en 20 (number)
+      const taxRate = Number(item.tax_rate || 20);
 
       if (!taxBreakdown[taxRate]) {
         taxBreakdown[taxRate] = 0;
@@ -86,7 +115,6 @@ const Cart = () => {
   };
 
   const taxBreakdown = getTaxBreakdown();
-  console.log('🧾 Détails panier (cart.items):', cart.items); // 👈
 
   // Calculer les totaux avec réductions
   const subtotalBeforeDiscounts = cart.items.reduce((sum, item) => {
@@ -101,7 +129,6 @@ const Cart = () => {
   const ticketDiscountAmount = cart.ticket_discount?.amount || 0;
   const totalDiscounts = totalItemDiscounts + ticketDiscountAmount;
 
-  // Vérifier si le ticket a une réduction globale
   const hasTicketDiscount = cart.ticket_discount && cart.ticket_discount.amount > 0;
 
   // Récupérer la réduction actuelle pour la modale
@@ -113,6 +140,15 @@ const Cart = () => {
     }
     return null;
   };
+
+  // ✅ AFFICHER UN INDICATEUR DE CHARGEMENT
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md h-[60vh] flex items-center justify-center">
+        <div className="text-gray-500 dark:text-gray-400">Chargement des permissions...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md h-[60vh] flex flex-col">
@@ -133,6 +169,23 @@ const Cart = () => {
             </button>
           )}
         </div>
+
+        {/* ✅ INDICATEUR PERMISSIONS */}
+        {!canDoItemDiscount && !canDoTicketDiscount && (
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+            <Lock className="h-3 w-3" />
+            Réductions désactivées pour votre rôle
+          </div>
+        )}
+        {(canDoItemDiscount || canDoTicketDiscount) && (
+          <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+            {canDoItemDiscount &&
+              `Réductions articles: max ${discountPerms.maxItemDiscountPercent}%`}
+            {canDoItemDiscount && canDoTicketDiscount && ' • '}
+            {canDoTicketDiscount &&
+              `Réductions globales: max ${discountPerms.maxTicketDiscountPercent}%`}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -152,7 +205,7 @@ const Cart = () => {
                 item={item}
                 onUpdateQuantity={updateCartItemQuantity}
                 onRemove={removeFromCart}
-                onApplyDiscount={handleItemDiscount}
+                onApplyDiscount={canDoItemDiscount ? handleItemDiscount : null}
               />
             ))}
           </div>
@@ -162,14 +215,12 @@ const Cart = () => {
       {cart.items.length > 0 && (
         <div className="p-4 border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
           <div className="space-y-2 mb-4">
-            {/* Note d'aperçu */}
             {cart.is_preview && (
               <div className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
                 💡 Aperçu estimatif - Calculs définitifs à la validation
               </div>
             )}
 
-            {/* Sous-total avant réductions */}
             {totalDiscounts > 0 && (
               <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
                 <span>Sous-total initial</span>
@@ -177,7 +228,6 @@ const Cart = () => {
               </div>
             )}
 
-            {/* Réductions items */}
             {totalItemDiscounts > 0 && (
               <div className="flex justify-between text-sm text-red-600 dark:text-red-400">
                 <span>Réductions articles</span>
@@ -185,24 +235,24 @@ const Cart = () => {
               </div>
             )}
 
-            {/* Sous-total après réductions items */}
             <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
               <span>Sous-total HT</span>
               <span>{cart.subtotal.toFixed(2)}€</span>
             </div>
 
-            {/* Réduction ticket */}
             {hasTicketDiscount && (
               <div className="flex justify-between items-center text-sm">
                 <div className="flex items-center space-x-2">
                   <span className="text-red-600 dark:text-red-400">Réduction globale</span>
-                  <button
-                    onClick={handleTicketDiscount}
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                    title="Modifier la réduction globale"
-                  >
-                    <Percent className="h-3 w-3" />
-                  </button>
+                  {canDoTicketDiscount && (
+                    <button
+                      onClick={handleTicketDiscount}
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                      title="Modifier la réduction globale"
+                    >
+                      <Percent className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="text-red-600 dark:text-red-400">
@@ -215,7 +265,6 @@ const Cart = () => {
               </div>
             )}
 
-            {/* Affichage détaillé de la TVA par taux */}
             {Object.entries(taxBreakdown).map(([taxRate, taxAmount]) => (
               <div
                 key={taxRate}
@@ -226,12 +275,11 @@ const Cart = () => {
               </div>
             ))}
 
-            {/* Total avec économies */}
             <div className="border-t pt-2">
               <div className="flex justify-between text-lg font-bold text-gray-900 dark:text-white">
                 <div className="flex items-center space-x-2">
                   <span>Total TTC</span>
-                  {!hasTicketDiscount && (
+                  {!hasTicketDiscount && canDoTicketDiscount && (
                     <button
                       onClick={handleTicketDiscount}
                       className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
@@ -244,7 +292,6 @@ const Cart = () => {
                 <span>{cart.total.toFixed(2)}€</span>
               </div>
 
-              {/* Résumé des économies */}
               {totalDiscounts > 0 && (
                 <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
                   <div className="flex justify-between text-sm text-green-700 dark:text-green-300">
@@ -264,11 +311,8 @@ const Cart = () => {
               try {
                 const sessionState = useSessionStore.getState();
                 if (sessionState?.lcdStatus?.owned) {
-                  // ✅ LIGNE 1 : Montant
                   const line1 = `TOTAL ${cart.total.toFixed(2)}EUR`;
-                  // ✅ LIGNE 2 : TOTAL + nombre + singulier/pluriel
                   const line2 = `${cart.itemCount} Article${cart.itemCount > 1 ? 's' : ''}`;
-
                   await sessionState.lcd.writeMessage(line1, line2);
                 }
               } catch (error) {
@@ -285,7 +329,6 @@ const Cart = () => {
         </div>
       )}
 
-      {/* Modale de réduction */}
       <DiscountModal
         isOpen={showDiscountModal}
         onClose={() => setShowDiscountModal(false)}
@@ -293,7 +336,9 @@ const Cart = () => {
         discountType={discountModalType}
         itemData={selectedItem}
         currentDiscount={getCurrentDiscount()}
-        cartTotal={subtotalAfterItemDiscounts} // 🆕 Passer le sous-total pour aperçu
+        cartTotal={subtotalAfterItemDiscounts}
+        userRole={userRole}
+        discountPermissions={discountPerms}
       />
     </div>
   );

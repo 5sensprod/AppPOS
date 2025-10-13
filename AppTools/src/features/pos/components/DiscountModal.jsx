@@ -1,23 +1,28 @@
-// src/features/pos/components/DiscountModal.jsx
+// src/features/pos/components/DiscountModal.jsx - AVEC VALIDATION PERMISSIONS
 import React, { useState, useEffect } from 'react';
-import { Percent, Check, X } from 'lucide-react';
+import { Percent, Check, X, AlertCircle } from 'lucide-react';
 import BaseModal from '../../../components/common/ui/BaseModal';
+import { usePermissions } from '../../../contexts/PermissionsProvider';
+import { validateDiscount } from '../../../hooks/useRolePermissions';
 
 const DiscountModal = ({
   isOpen,
   onClose,
   onApply,
   discountType, // 'item' ou 'ticket'
-  itemData = null, // Pour les réductions item
-  currentDiscount = null, // Discount existant à modifier
-  cartTotal = 0, // 🆕 Total du panier pour aperçu réductions globales
+  itemData = null,
+  currentDiscount = null,
+  cartTotal = 0,
+  userRole = 'user', // ✅ NOUVEAU
+  discountPermissions = null, // ✅ NOUVEAU
 }) => {
-  const [discountMethod, setDiscountMethod] = useState('percentage'); // 'percentage' ou 'fixed'
+  const { permissions } = usePermissions();
+  const [discountMethod, setDiscountMethod] = useState('percentage');
   const [discountValue, setDiscountValue] = useState('');
   const [discountReason, setDiscountReason] = useState('');
   const [errors, setErrors] = useState({});
+  const [validationError, setValidationError] = useState(null); // ✅ NOUVEAU
 
-  // Motifs prédéfinis
   const predefinedReasons = [
     'Client fidèle',
     'Geste commercial',
@@ -28,40 +33,73 @@ const DiscountModal = ({
     'Autre',
   ];
 
-  // Réinitialiser le formulaire à l'ouverture
+  // ✅ OBTENIR LES LIMITES SELON LE RÔLE
+  const getMaxValues = () => {
+    if (!discountPermissions) return { maxPercent: 100, maxAmount: null };
+
+    if (discountType === 'item') {
+      return {
+        maxPercent: discountPermissions.maxItemDiscountPercent,
+        maxAmount: discountPermissions.maxItemDiscountAmount,
+      };
+    } else {
+      return {
+        maxPercent: discountPermissions.maxTicketDiscountPercent,
+        maxAmount: discountPermissions.maxTicketDiscountAmount,
+      };
+    }
+  };
+
+  const { maxPercent, maxAmount } = getMaxValues();
+  const requiresReason = discountPermissions?.requiresReason || false;
+
   useEffect(() => {
     if (isOpen) {
       if (currentDiscount) {
-        // Mode édition
         setDiscountMethod(currentDiscount.type);
         setDiscountValue(currentDiscount.value.toString());
         setDiscountReason(currentDiscount.reason || '');
       } else {
-        // Mode création
         setDiscountMethod('percentage');
         setDiscountValue('');
         setDiscountReason('');
       }
       setErrors({});
+      setValidationError(null);
     }
   }, [isOpen, currentDiscount]);
 
+  // ✅ VALIDATION AVEC LIMITES DU RÔLE
   const validateForm = () => {
     const newErrors = {};
+    setValidationError(null);
 
-    // Validation valeur
     const value = parseFloat(discountValue);
     if (!discountValue || isNaN(value) || value <= 0) {
       newErrors.value = 'Valeur de réduction requise et positive';
-    } else if (discountMethod === 'percentage' && value > 100) {
-      newErrors.value = 'Pourcentage maximum : 100%';
-    } else if (discountMethod === 'fixed' && itemData && value > itemData.total_price) {
-      newErrors.value = "Réduction fixe ne peut dépasser le prix de l'article";
+    } else {
+      // ✅ VALIDATION POURCENTAGE SELON RÔLE
+      if (discountMethod === 'percentage') {
+        if (value > 100) {
+          newErrors.value = 'Pourcentage maximum : 100%';
+        } else if (value > maxPercent) {
+          newErrors.value = `Pourcentage maximum autorisé pour votre rôle : ${maxPercent}%`;
+        }
+      }
+
+      // ✅ VALIDATION MONTANT FIXE SELON RÔLE
+      if (discountMethod === 'fixed') {
+        if (itemData && value > itemData.total_price) {
+          newErrors.value = "Réduction fixe ne peut dépasser le prix de l'article";
+        } else if (maxAmount !== null && value > maxAmount) {
+          newErrors.value = `Montant maximum autorisé pour votre rôle : ${maxAmount}€`;
+        }
+      }
     }
 
-    // Validation motif
-    if (!discountReason.trim()) {
-      newErrors.reason = 'Motif de réduction obligatoire';
+    // ✅ VALIDATION MOTIF SELON RÔLE
+    if (requiresReason && !discountReason.trim()) {
+      newErrors.reason = 'Motif de réduction obligatoire pour votre rôle';
     }
 
     setErrors(newErrors);
@@ -77,12 +115,27 @@ const DiscountModal = ({
       reason: discountReason.trim(),
     };
 
+    // ✅ VALIDATION FINALE AVEC LA FONCTION CENTRALISÉE
+    const itemPrice = itemData?.total_price || 0;
+    const validation = validateDiscount(
+      permissions,
+      userRole,
+      discountType,
+      discountData,
+      itemPrice
+    );
+
+    if (!validation.valid) {
+      setValidationError(validation.error);
+      return;
+    }
+
     onApply(discountData);
     onClose();
   };
 
   const handleRemoveDiscount = () => {
-    onApply(null); // null = supprimer la réduction
+    onApply(null);
     onClose();
   };
 
@@ -101,7 +154,6 @@ const DiscountModal = ({
         discountAmount = Math.min(value, baseAmount);
       }
     } else if (discountType === 'ticket' && cartTotal > 0) {
-      // 🆕 Aperçu pour réductions globales
       baseAmount = cartTotal;
       if (discountMethod === 'percentage') {
         discountAmount = (baseAmount * value) / 100;
@@ -112,7 +164,6 @@ const DiscountModal = ({
       return null;
     }
 
-    // Vérifier que tous les calculs sont valides
     if (isNaN(baseAmount) || isNaN(discountAmount)) {
       return null;
     }
@@ -172,6 +223,33 @@ const DiscountModal = ({
       maxWidth="max-w-md"
     >
       <div className="space-y-6">
+        {/* ✅ AFFICHAGE DES LIMITES DU RÔLE */}
+        {discountPermissions && (maxPercent < 100 || maxAmount !== null) && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                <p className="font-medium mb-1">Limites pour votre rôle ({userRole}) :</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {maxPercent < 100 && <li>Réduction maximale : {maxPercent}%</li>}
+                  {maxAmount !== null && <li>Montant maximal : {maxAmount}€</li>}
+                  {requiresReason && <li>Motif obligatoire</li>}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ ERREUR DE VALIDATION GLOBALE */}
+        {validationError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <X className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800 dark:text-red-200">{validationError}</p>
+            </div>
+          </div>
+        )}
+
         {/* Type de réduction */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -197,6 +275,11 @@ const DiscountModal = ({
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Pourcentage
                 </span>
+                {maxPercent < 100 && (
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    max {maxPercent}%
+                  </span>
+                )}
               </div>
             </label>
 
@@ -219,6 +302,11 @@ const DiscountModal = ({
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Montant fixe
                 </span>
+                {maxAmount !== null && (
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    max {maxAmount}€
+                  </span>
+                )}
               </div>
             </label>
           </div>
@@ -237,7 +325,7 @@ const DiscountModal = ({
               placeholder={discountMethod === 'percentage' ? '10' : '5.00'}
               step={discountMethod === 'percentage' ? '1' : '0.01'}
               min="0"
-              max={discountMethod === 'percentage' ? '100' : undefined}
+              max={discountMethod === 'percentage' ? maxPercent : maxAmount || undefined}
               className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                 errors.value ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -254,7 +342,7 @@ const DiscountModal = ({
         {/* Motif de réduction */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Motif de la réduction *
+            Motif de la réduction {requiresReason && <span className="text-red-500">*</span>}
           </label>
           <div className="space-y-2">
             <select

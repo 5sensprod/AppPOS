@@ -14,7 +14,8 @@ import {
   Printer,
   Cog,
   Globe,
-  Users, // ✅ ICÔNE POUR GESTION UTILISATEURS
+  Users,
+  Shield,
 } from 'lucide-react';
 
 export function initializeMenus() {
@@ -104,6 +105,13 @@ export function initializeMenus() {
         label: 'Utilisateurs',
         path: '/settings/users',
         adminOnly: true, // ✅ Visible uniquement pour les admins
+      },
+      {
+        id: 'permissions-config',
+        icon: <Shield className="h-5 w-5" />,
+        label: 'Permissions',
+        path: '/settings/permissions',
+        adminOnly: true,
       },
       {
         id: 'lcd-config',
