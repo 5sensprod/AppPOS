@@ -119,6 +119,21 @@ class BaseLabelRenderer {
     if (style.showWooQR && label.websiteUrl?.trim()) {
       await this._addWooQRCode(fabricCanvas, label, elements.wooQR, style, fabric, scaleFactor);
     }
+
+    // 🆕 Textes personnalisés
+    if (style.customTexts?.length > 0) {
+      for (const text of style.customTexts) {
+        if (text.enabled && text.content?.trim() && elements[text.id]) {
+          // Remplacer les variables
+          let content = text.content;
+          content = content.replace(/\{brand\}/gi, label.brand || '');
+          content = content.replace(/\{supplier\}/gi, label.supplier || '');
+          content = content.replace(/\{sku\}/gi, label.sku || '');
+
+          await this._addCustomText(fabricCanvas, content, elements[text.id], text, fabric);
+        }
+      }
+    }
   }
 
   _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
@@ -275,6 +290,20 @@ class BaseLabelRenderer {
       elements.wooQR.textHeight = textHeight;
     }
 
+    // 🆕 Textes personnalisés
+    if (style.customTexts?.length > 0) {
+      style.customTexts.forEach((text) => {
+        if (text.enabled && text.content?.trim()) {
+          const height = Math.max(15, text.fontSize * 1.2) * scaleFactor;
+          elements[text.id] = {
+            ...createElement(text.id, height, customPositions[text.id]),
+            fontSize: text.fontSize * scaleFactor,
+            text: text,
+          };
+        }
+      });
+    }
+
     return elements;
   }
 
@@ -334,6 +363,22 @@ class BaseLabelRenderer {
       fontFamily: fontFamily,
       fontWeight: fontWeight,
       fill: textColor, // 🎨 Couleur appliquée
+      selectable: false,
+      paintFirst: 'fill',
+    });
+
+    fabricCanvas.add(textObj);
+  }
+
+  async _addCustomText(fabricCanvas, content, element, textConfig, fabric) {
+    const textObj = new fabric.Text(content, {
+      left: element.centerX,
+      top: element.y,
+      originX: 'center',
+      fontSize: element.fontSize,
+      fontFamily: textConfig.fontFamily,
+      fontWeight: textConfig.fontWeight,
+      fill: textConfig.color,
       selectable: false,
       paintFirst: 'fill',
     });

@@ -101,7 +101,18 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
 
           if (obj.type === 'text') {
             const text = obj.text;
-            if (text === label.name) {
+            // 🆕 Vérifier si c'est un texte personnalisé
+            const customText = style.customTexts?.find((t) => {
+              let content = t.content;
+              content = content.replace(/\{brand\}/gi, label.brand || '');
+              content = content.replace(/\{supplier\}/gi, label.supplier || '');
+              content = content.replace(/\{sku\}/gi, label.sku || '');
+              return content === text;
+            });
+
+            if (customText) {
+              objectType = customText.id;
+            } else if (text === label.name) {
               objectType = 'name';
             } else if (text.includes('€') || text.includes(label.price)) {
               objectType = 'price';
@@ -227,6 +238,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     style.supplierSize,
     JSON.stringify(style.customPositions),
     JSON.stringify(style.colors),
+    JSON.stringify(style.customTexts),
   ]);
 
   // Cleanup au démontage

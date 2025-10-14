@@ -45,6 +45,7 @@ const DEFAULT_STYLE = {
   skuFontFamily: 'Arial',
   brandFontFamily: 'Arial',
   supplierFontFamily: 'Arial',
+  customTexts: [],
 
   // 🎨 NOUVEAU : Couleurs personnalisées
   colors: {
@@ -156,6 +157,69 @@ export const useLabelExportStore = create(
           },
         })),
 
+      // 🆕 Gestion des textes personnalisés
+      updateCustomText: (textId, changes) =>
+        set((state) => ({
+          labelStyle: {
+            ...state.labelStyle,
+            customTexts: state.labelStyle.customTexts.map((text) =>
+              text.id === textId ? { ...text, ...changes } : text
+            ),
+          },
+        })),
+
+      addCustomText: () =>
+        set((state) => ({
+          labelStyle: {
+            ...state.labelStyle,
+            customTexts: [
+              ...state.labelStyle.customTexts,
+              {
+                id: `text_${Date.now()}`,
+                enabled: true,
+                content: 'Nouveau texte',
+                fontSize: 10,
+                fontFamily: 'Arial',
+                fontWeight: 'normal',
+                color: '#000000',
+                position: null, // Position par défaut calculée
+              },
+            ],
+          },
+        })),
+
+      removeCustomText: (textId) =>
+        set((state) => ({
+          labelStyle: {
+            ...state.labelStyle,
+            customTexts: state.labelStyle.customTexts.filter((text) => text.id !== textId),
+            customPositions: Object.fromEntries(
+              Object.entries(state.labelStyle.customPositions).filter(([key]) => key !== textId)
+            ),
+          },
+        })),
+
+      duplicateCustomText: (textId) =>
+        set((state) => {
+          const textToDuplicate = state.labelStyle.customTexts.find((t) => t.id === textId);
+          if (!textToDuplicate) return {};
+
+          return {
+            labelStyle: {
+              ...state.labelStyle,
+              customTexts: [
+                ...state.labelStyle.customTexts,
+                {
+                  ...textToDuplicate,
+                  id: `text_${Date.now()}`,
+                  content: `${textToDuplicate.content} (copie)`,
+                  position: null,
+                },
+              ],
+            },
+          };
+        }),
+
       // 🎯 LAYOUT - Une seule méthode
       updateLayout: (field, value) =>
         set((state) => {
@@ -185,6 +249,7 @@ export const useLabelExportStore = create(
               ...DEFAULT_STYLE,
               duplicateCount: 1,
               customPositions: state.labelStyle.customPositions || {},
+              customTexts: [],
             };
           }
           if (scope === 'all' || scope === 'layout') {

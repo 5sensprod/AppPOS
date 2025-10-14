@@ -13,6 +13,12 @@ import {
   EyeOff,
   Palette,
   Globe,
+  Type, // 🆕 AJOUTER
+  Plus,
+  Trash2,
+  Copy,
+  ChevronUp,
+  ChevronDown as ChevronDownIcon,
 } from 'lucide-react';
 import { useAccordion } from '../hooks/useAccordion';
 import FabricLabelCanvas from './FabricLabelCanvas';
@@ -344,6 +350,213 @@ const InfoStylePanel = ({ style, onUpdate, onUpdateColor }) => (
   </ControlGroup>
 );
 
+const CustomTextPanel = ({
+  style,
+  onUpdateCustomText,
+  onAddCustomText,
+  onRemoveCustomText,
+  onDuplicateCustomText,
+  onUpdateColor,
+}) => {
+  const [expandedTexts, setExpandedTexts] = useState(new Set());
+
+  const toggleExpand = (textId) => {
+    setExpandedTexts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(textId)) {
+        newSet.delete(textId);
+      } else {
+        newSet.add(textId);
+      }
+      return newSet;
+    });
+  };
+
+  const moveText = (index, direction) => {
+    const newTexts = [...style.customTexts];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newTexts.length) return;
+    [newTexts[index], newTexts[newIndex]] = [newTexts[newIndex], newTexts[index]];
+  };
+
+  return (
+    <ControlGroup title="Textes personnalisés">
+      <button
+        type="button"
+        onClick={onAddCustomText}
+        className="w-full mb-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+      >
+        <Plus className="h-4 w-4" />
+        Ajouter un texte
+      </button>
+
+      {style.customTexts?.length === 0 ? (
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <Type className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">Aucun texte personnalisé</p>
+          <p className="text-xs mt-1">Cliquez sur "Ajouter un texte" pour commencer</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {style.customTexts.map((text, index) => {
+            const isExpanded = expandedTexts.has(text.id);
+
+            return (
+              <div key={text.id} className="border border-gray-200 dark:border-gray-600 rounded-lg">
+                {/* Header */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg">
+                  <div className="flex items-center gap-2 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(text.id)}
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                    >
+                      {isExpanded ? (
+                        <ChevronDownIcon className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </button>
+
+                    <input
+                      type="checkbox"
+                      checked={text.enabled}
+                      onChange={(e) => onUpdateCustomText(text.id, { enabled: e.target.checked })}
+                      className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate flex-1">
+                      {text.content || 'Texte vide'}
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1">
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => moveText(index, 'up')}
+                        disabled={index === 0}
+                        className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded disabled:opacity-30"
+                        title="Monter"
+                      >
+                        <ChevronUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveText(index, 'down')}
+                        disabled={index === style.customTexts.length - 1}
+                        className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded disabled:opacity-30"
+                        title="Descendre"
+                      >
+                        <ChevronDownIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => onDuplicateCustomText(text.id)}
+                      className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                      title="Dupliquer"
+                    >
+                      <Copy className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onRemoveCustomText(text.id)}
+                      className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Configuration - SANS overflow-hidden ! */}
+                {isExpanded && text.enabled && (
+                  <div className="p-4 space-y-3 bg-white dark:bg-gray-800 rounded-b-lg">
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Contenu du texte
+                      </label>
+                      <textarea
+                        value={text.content}
+                        onChange={(e) => onUpdateCustomText(text.id, { content: e.target.value })}
+                        placeholder="Entrez votre texte..."
+                        rows={3}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 resize-none"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Variables disponibles : {'{brand}'}, {'{supplier}'}, {'{sku}'}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <NumberInput
+                        label="Taille"
+                        value={text.fontSize}
+                        onChange={(value) => onUpdateCustomText(text.id, { fontSize: value })}
+                        min={6}
+                        max={32}
+                        unit="pt"
+                      />
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                          Police
+                        </label>
+                        <select
+                          value={text.fontFamily}
+                          onChange={(e) =>
+                            onUpdateCustomText(text.id, { fontFamily: e.target.value })
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
+                        >
+                          <option value="Arial">Arial</option>
+                          <option value="Helvetica">Helvetica</option>
+                          <option value="Times New Roman">Times New Roman</option>
+                          <option value="Courier New">Courier New</option>
+                          <option value="Georgia">Georgia</option>
+                          <option value="Verdana">Verdana</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                          Style
+                        </label>
+                        <select
+                          value={text.fontWeight}
+                          onChange={(e) =>
+                            onUpdateCustomText(text.id, { fontWeight: e.target.value })
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
+                        >
+                          <option value="normal">Normal</option>
+                          <option value="bold">Gras</option>
+                        </select>
+                      </div>
+
+                      <ColorPicker
+                        label="Couleur"
+                        value={text.color}
+                        onChange={(color) => onUpdateCustomText(text.id, { color })}
+                        defaultColor="#000000"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </ControlGroup>
+  );
+};
+
 // 🎨 MISE À JOUR : Panneau Code-barres avec ColorPicker
 const BarcodeStylePanel = ({ style, onUpdate, onUpdateColor }) => (
   <ControlGroup title="Configuration du code">
@@ -644,6 +857,10 @@ const LabelStyleConfig = () => {
     currentLayout,
     updateStyle,
     updateColor,
+    updateCustomText,
+    addCustomText,
+    removeCustomText,
+    duplicateCustomText,
     extractLabelData,
     reset,
     managePresets,
@@ -662,13 +879,15 @@ const LabelStyleConfig = () => {
       id: 'info',
       label: 'Info',
       icon: Tag, // ou Info de lucide-react
-      enabled:
-        labelStyle.showName ||
-        labelStyle.showPrice ||
-        labelStyle.showSku ||
-        labelStyle.showBrand ||
-        labelStyle.showSupplier,
+      enabled: true,
       toggle: null, // Pas de toggle global
+    },
+    {
+      id: 'customText',
+      label: 'Texte',
+      icon: Type, // Importer Type de lucide-react
+      enabled: true,
+      toggle: null, // Pas de toggle, on gère avec add/remove
     },
     {
       id: 'barcode',
@@ -753,6 +972,17 @@ const LabelStyleConfig = () => {
       case 'info':
         return (
           <InfoStylePanel style={labelStyle} onUpdate={updateStyle} onUpdateColor={updateColor} />
+        );
+      case 'customText':
+        return (
+          <CustomTextPanel
+            style={labelStyle}
+            onUpdateCustomText={updateCustomText}
+            onAddCustomText={addCustomText}
+            onRemoveCustomText={removeCustomText}
+            onDuplicateCustomText={duplicateCustomText}
+            onUpdateColor={updateColor}
+          />
         );
       case 'barcode':
         return (
