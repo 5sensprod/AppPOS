@@ -1,4 +1,4 @@
-//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\FabricLabelCanvas.jsx
+// FabricLabelCanvas.jsx - VERSION CORRIGÉE
 import React, { useEffect, useRef, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import fabricExportService from '@services/fabricExportService';
@@ -7,7 +7,10 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
   const canvasRef = useRef();
   const fabricCanvasRef = useRef();
   const [error, setError] = useState(null);
-  const [zoomLevel, setZoomLevel] = useState(100); // Zoom de 100% à 200%
+  const [zoomLevel, setZoomLevel] = useState(100);
+
+  // 🆕 REF pour éviter les re-renders inutiles
+  const isUpdatingPositionRef = useRef(false);
 
   // Cleanup
   const cleanupCanvas = () => {
@@ -22,18 +25,15 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
     }
   };
 
-  // Handlers de zoom avec Fabric.js natif + redimensionnement canvas
+  // Handlers de zoom
   const handleZoomChange = (newZoom) => {
     const clampedZoom = Math.max(100, Math.min(200, newZoom));
     setZoomLevel(clampedZoom);
 
     if (fabricCanvasRef.current) {
       const zoomFactor = clampedZoom / 100;
-
-      // Appliquer le zoom aux éléments
       fabricCanvasRef.current.setZoom(zoomFactor);
 
-      // Redimensionner le canvas HTML pour qu'il grandisse visuellement
       const baseWidth = window.basePrintableWidth || layout.width * mmToPx;
       const baseHeight = window.basePrintableHeight || layout.height * mmToPx;
       const newWidth = baseWidth * zoomFactor;
@@ -41,7 +41,6 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
 
       fabricCanvasRef.current.setWidth(newWidth);
       fabricCanvasRef.current.setHeight(newHeight);
-
       fabricCanvasRef.current.renderAll();
     }
   };
@@ -64,7 +63,31 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
     handleZoomChange(100);
   };
 
-  // useEffect principal pour le rendu
+  // 🆕 EFFET SÉPARÉ pour les mises à jour de positions (sans recréer le canvas)
+  useEffect(() => {
+    if (!fabricCanvasRef.current || !style.customPositions) return;
+    if (isUpdatingPositionRef.current) return; // Éviter les boucles
+
+    const mmToPx = 3.779527559;
+    const fabricCanvas = fabricCanvasRef.current;
+
+    // Mettre à jour les positions de tous les objets
+    fabricCanvas.getObjects().forEach((obj) => {
+      if (!obj.objectType) return;
+
+      const savedPosition = style.customPositions[obj.objectType];
+      if (savedPosition) {
+        obj.set({
+          left: savedPosition.x * mmToPx,
+          top: savedPosition.y * mmToPx,
+        });
+      }
+    });
+
+    fabricCanvas.renderAll();
+  }, [style.customPositions]); // ✅ Dépend uniquement des positions
+
+  // useEffect principal pour le rendu INITIAL
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
       const canvasEl = canvasRef.current;
@@ -89,7 +112,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
           }
         );
 
-        // 🆕 Gestion de la sélection d'objet
+        // Gestion de la sélection d'objet
         fabricCanvas.on('selection:created', (e) => {
           handleObjectSelection(e.selected?.[0]);
         });
@@ -98,7 +121,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
           handleObjectSelection(e.selected?.[0]);
         });
 
-        // 🆕 Fonction helper pour identifier l'élément
+        // Fonction helper pour identifier l'élément
         const handleObjectSelection = (obj) => {
           if (!obj || !onElementSelect) return;
 
@@ -117,30 +140,30 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
             });
 
             if (customText) {
-              elementType = 'customText'; // Onglet Texte
+              elementType = 'customText';
             } else if (text === label.name) {
-              elementType = 'info'; // Onglet Info
+              elementType = 'info';
             } else if (text.includes('€') || text.includes(label.price)) {
-              elementType = 'info'; // Onglet Info
+              elementType = 'info';
             } else if (text === label.sku) {
-              elementType = 'info'; // Onglet Info
+              elementType = 'info';
             } else if (text === label.brand) {
-              elementType = 'info'; // Onglet Info
+              elementType = 'info';
             } else if (text === label.supplier) {
-              elementType = 'info'; // Onglet Info
+              elementType = 'info';
             } else if (text === (style.wooQRText || 'Voir en ligne')) {
-              elementType = 'wooqr'; // Onglet Lien Web
+              elementType = 'wooqr';
             } else {
-              elementType = 'barcode'; // Texte du code-barres
+              elementType = 'barcode';
             }
           } else if (obj.type === 'image') {
             if (obj.wooQRCode) {
-              elementType = 'wooqr'; // QR Code WooCommerce
+              elementType = 'wooqr';
             } else {
-              elementType = 'barcode'; // Code-barres
+              elementType = 'barcode';
             }
           } else if (obj.type === 'rect') {
-            elementType = 'border'; // Bordure
+            elementType = 'border';
           }
 
           if (elementType) {
@@ -151,6 +174,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
         fabricCanvasRef.current = fabricCanvas;
 
         // Stocker les dimensions de base pour le zoom
+        const mmToPx = 3.779527559;
         window.basePrintableWidth = layout.width * mmToPx;
         window.basePrintableHeight = layout.height * mmToPx;
 
@@ -160,7 +184,6 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
 
           if (obj.type === 'text') {
             const text = obj.text;
-            // 🆕 Vérifier si c'est un texte personnalisé
             const customText = style.customTexts?.find((t) => {
               let content = t.content;
               content = content.replace(/\{brand\}/gi, label.brand || '');
@@ -176,13 +199,10 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
             } else if (text.includes('€') || text.includes(label.price)) {
               objectType = 'price';
             } else if (text === label.sku) {
-              // 🆕 AJOUTER
               objectType = 'sku';
             } else if (text === label.brand) {
-              // 🆕 AJOUTER
               objectType = 'brand';
             } else if (text === label.supplier) {
-              // 🆕 AJOUTER
               objectType = 'supplier';
             } else if (text === (style.wooQRText || 'Voir en ligne')) {
               objectType = 'wooQRText';
@@ -190,9 +210,8 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
               objectType = 'barcodeText';
             }
           } else if (obj.type === 'image') {
-            // Distinguer barcode normal et QR WooCommerce
             if (obj.wooQRCode) {
-              objectType = 'wooQR'; // 🆕 QR Code WooCommerce
+              objectType = 'wooQR';
             } else {
               objectType = 'barcode';
             }
@@ -215,22 +234,21 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
           const zoomFactor = zoomLevel / 100;
           fabricCanvas.setZoom(zoomFactor);
 
-          // Ajuster les dimensions du canvas HTML pour correspondre au zoom
           const newWidth = window.basePrintableWidth * zoomFactor;
           const newHeight = window.basePrintableHeight * zoomFactor;
           fabricCanvas.setWidth(newWidth);
           fabricCanvas.setHeight(newHeight);
         }
 
-        // Gestion modifications
+        // 🆕 Gestion modifications - AVEC FLAG pour éviter boucles
         let modificationTimeout;
         fabricCanvas.on('object:modified', (e) => {
           clearTimeout(modificationTimeout);
           modificationTimeout = setTimeout(() => {
             const obj = e.target;
             if (obj && obj.objectType && onPositionChange) {
-              // Les coordonnées sont automatiquement corrigées par Fabric.js
-              // même avec le zoom appliqué
+              isUpdatingPositionRef.current = true; // 🔒 Bloquer l'effet de position
+
               const mmToPx = 3.779527559;
               const leftMm = obj.left / mmToPx;
               const topMm = obj.top / mmToPx;
@@ -243,6 +261,11 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
                   centerX: leftMm,
                 },
               });
+
+              // 🔓 Débloquer après un court délai
+              setTimeout(() => {
+                isUpdatingPositionRef.current = false;
+              }, 50);
             }
           }, 100);
         });
@@ -259,6 +282,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
       clearTimeout(timeoutId);
     };
   }, [
+    // ⚠️ RETIRER style.customPositions d'ici !
     label?.id,
     label?.name,
     label?.price,
@@ -295,7 +319,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
     style.skuSize,
     style.brandSize,
     style.supplierSize,
-    JSON.stringify(style.customPositions),
+    // JSON.stringify(style.customPositions), ❌ RETIRÉ !
     JSON.stringify(style.colors),
     JSON.stringify(style.customTexts),
   ]);
@@ -311,22 +335,18 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
   const physicalRollWidth = isRollMode ? layout.rouleau?.width || 58 : layout.width;
   const physicalRollHeight = layout.height;
 
-  // Facteur de zoom
   const zoomFactor = zoomLevel / 100;
 
-  // Dimensions de base
   const baseRollBgWidth = physicalRollWidth * mmToPx;
   const baseRollBgHeight = physicalRollHeight * mmToPx;
   const basePrintableWidth = layout.width * mmToPx;
   const basePrintableHeight = layout.height * mmToPx;
 
-  // Dimensions avec zoom appliqué
   const rollBgWidth = baseRollBgWidth * zoomFactor;
   const rollBgHeight = baseRollBgHeight * zoomFactor;
   const printableWidth = basePrintableWidth * zoomFactor;
   const printableHeight = basePrintableHeight * zoomFactor;
 
-  // Calcul de l'offset pour centrer la zone imprimable
   const offsetX = isRollMode ? (rollBgWidth - printableWidth) / 2 : 0;
 
   // Affichage d'erreur
@@ -336,7 +356,6 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
 
     return (
       <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
-        {/* Contrôles de zoom même en cas d'erreur */}
         <div className="mb-3 flex items-center justify-center gap-1 bg-gray-200 dark:bg-gray-600 p-2 rounded">
           <button
             onClick={handleZoomOut}
@@ -392,7 +411,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
 
   return (
     <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
-      {/* CONTRÔLES DE ZOOM compacts dans la zone grisée */}
+      {/* CONTRÔLES DE ZOOM */}
       <div className="mb-3 flex items-center justify-center gap-1 bg-gray-200 dark:bg-gray-600 p-2 rounded">
         <button
           onClick={handleZoomOut}
@@ -428,25 +447,22 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
         </button>
       </div>
 
-      {/* CONTENEUR avec dimensions adaptatives au zoom */}
+      {/* CONTENEUR */}
       <div className="relative overflow-visible">
         <div
           className="relative mx-auto"
           style={{
             width: `${isRollMode ? rollBgWidth : printableWidth}px`,
             height: `${isRollMode ? rollBgHeight : printableHeight}px`,
-            // Suppression de minHeight qui créait l'espace gris inutile
             border: isRollMode ? '1px solid #e5e7eb' : 'none',
             borderRadius: isRollMode ? '4px' : '0',
             backgroundColor: isRollMode ? '#f9fafb' : 'transparent',
           }}
         >
-          {/* CANVAS Fabric.js avec zoom natif */}
           <canvas
             ref={canvasRef}
             className="absolute"
             style={{
-              // Le canvas va maintenant prendre ses vraies dimensions zoomées
               backgroundColor: 'transparent',
               top: 0,
               left: isRollMode ? `${offsetX}px` : 0,
@@ -456,7 +472,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
         </div>
       </div>
 
-      {/* INFORMATIONS EN BAS */}
+      {/* INFORMATIONS */}
       <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 text-center">
         <span className="font-medium">{label?.name || 'Aperçu étiquette'}</span>
         <span className="mx-2">•</span>
