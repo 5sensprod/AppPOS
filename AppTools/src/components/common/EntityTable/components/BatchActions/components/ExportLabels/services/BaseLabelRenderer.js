@@ -88,6 +88,28 @@ class BaseLabelRenderer {
       await this._addText(fabricCanvas, priceText, elements.price, style, fabric, 'price');
     }
 
+    // SKU
+    if (style.showSku && label.sku?.trim()) {
+      await this._addText(fabricCanvas, label.sku, elements.sku, style, fabric, 'sku');
+    }
+
+    // Brand
+    if (style.showBrand && label.brand?.trim()) {
+      await this._addText(fabricCanvas, label.brand, elements.brand, style, fabric, 'brand');
+    }
+
+    // Supplier
+    if (style.showSupplier && label.supplier?.trim()) {
+      await this._addText(
+        fabricCanvas,
+        label.supplier,
+        elements.supplier,
+        style,
+        fabric,
+        'supplier'
+      );
+    }
+
     // Code-barres
     if (style.showBarcode && label.barcode?.trim()) {
       await this._addBarcode(fabricCanvas, label, elements.barcode, style, fabric, scaleFactor);
@@ -152,6 +174,33 @@ class BaseLabelRenderer {
       elements.price = {
         ...createElement('price', height, customPositions.price),
         fontSize: (style.priceSize || 14) * scaleFactor,
+      };
+    }
+
+    // SKU
+    if (style.showSku) {
+      const height = Math.max(15, (style.skuSize || 10) * 1.2) * scaleFactor;
+      elements.sku = {
+        ...createElement('sku', height, customPositions.sku),
+        fontSize: (style.skuSize || 10) * scaleFactor,
+      };
+    }
+
+    // Brand
+    if (style.showBrand) {
+      const height = Math.max(15, (style.brandSize || 10) * 1.2) * scaleFactor;
+      elements.brand = {
+        ...createElement('brand', height, customPositions.brand),
+        fontSize: (style.brandSize || 10) * scaleFactor,
+      };
+    }
+
+    // Supplier
+    if (style.showSupplier) {
+      const height = Math.max(15, (style.supplierSize || 10) * 1.2) * scaleFactor;
+      elements.supplier = {
+        ...createElement('supplier', height, customPositions.supplier),
+        fontSize: (style.supplierSize || 10) * scaleFactor,
       };
     }
 
@@ -245,6 +294,21 @@ class BaseLabelRenderer {
         fontWeight = style.nameWeight || 'bold';
         fontFamily = style.nameFontFamily || style.fontFamily || 'Arial';
         textColor = this._getElementColor(style, 'name', '#000000'); // 🎨
+        break;
+      case 'sku':
+        fontWeight = style.skuWeight || 'normal';
+        fontFamily = style.skuFontFamily || 'Arial';
+        textColor = this._getElementColor(style, 'sku', '#000000');
+        break;
+      case 'brand':
+        fontWeight = style.brandWeight || 'normal';
+        fontFamily = style.brandFontFamily || 'Arial';
+        textColor = this._getElementColor(style, 'brand', '#000000');
+        break;
+      case 'supplier':
+        fontWeight = style.supplierWeight || 'normal';
+        fontFamily = style.supplierFontFamily || 'Arial';
+        textColor = this._getElementColor(style, 'supplier', '#000000');
         break;
       case 'barcodeText':
         fontWeight = 'normal';

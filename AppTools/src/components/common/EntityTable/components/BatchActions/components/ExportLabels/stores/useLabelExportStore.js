@@ -33,6 +33,18 @@ const DEFAULT_STYLE = {
   wooQRText: 'Voir en ligne',
   wooQRSize: 10,
   customPositions: {},
+  showSku: false,
+  showBrand: false,
+  showSupplier: false,
+  skuSize: 10,
+  brandSize: 10,
+  supplierSize: 10,
+  skuWeight: 'normal',
+  brandWeight: 'normal',
+  supplierWeight: 'normal',
+  skuFontFamily: 'Arial',
+  brandFontFamily: 'Arial',
+  supplierFontFamily: 'Arial',
 
   // 🎨 NOUVEAU : Couleurs personnalisées
   colors: {
@@ -43,6 +55,9 @@ const DEFAULT_STYLE = {
     wooQR: '#000000',
     wooQRText: '#000000',
     border: '#000000',
+    sku: '#000000',
+    brand: '#000000',
+    supplier: '#000000',
   },
 };
 
@@ -343,6 +358,8 @@ export const useLabelExportStore = create(
             sku: product.sku || '',
             designation: product.designation || '',
             websiteUrl: product.website_url || '',
+            brand: product.brand_ref?.name || '',
+            supplier: product.supplier_ref?.name || '',
           }));
       },
 

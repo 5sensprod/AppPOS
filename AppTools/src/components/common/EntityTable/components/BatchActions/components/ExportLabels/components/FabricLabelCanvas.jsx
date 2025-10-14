@@ -105,8 +105,17 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
               objectType = 'name';
             } else if (text.includes('€') || text.includes(label.price)) {
               objectType = 'price';
+            } else if (text === label.sku) {
+              // 🆕 AJOUTER
+              objectType = 'sku';
+            } else if (text === label.brand) {
+              // 🆕 AJOUTER
+              objectType = 'brand';
+            } else if (text === label.supplier) {
+              // 🆕 AJOUTER
+              objectType = 'supplier';
             } else if (text === (style.wooQRText || 'Voir en ligne')) {
-              objectType = 'wooQRText'; // 🆕 Texte QR WooCommerce
+              objectType = 'wooQRText';
             } else {
               objectType = 'barcodeText';
             }
@@ -210,6 +219,12 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     style.showWooQRText,
     style.wooQRTextSize,
     style.wooQRText,
+    style.showSku,
+    style.showBrand,
+    style.showSupplier,
+    style.skuSize,
+    style.brandSize,
+    style.supplierSize,
     JSON.stringify(style.customPositions),
     JSON.stringify(style.colors),
   ]);

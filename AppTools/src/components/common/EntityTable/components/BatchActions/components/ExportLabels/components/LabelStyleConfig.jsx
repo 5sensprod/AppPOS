@@ -104,116 +104,242 @@ const NumberInput = ({ label, value, onChange, min, max, step = 1, unit = '' }) 
 
 // ===== PANNEAUX DE CONFIGURATION =====
 
-// 🎨 MISE À JOUR : Panneau Nom avec ColorPicker
-const NameStylePanel = ({ style, onUpdate, onUpdateColor }) => (
-  <ControlGroup title="Configuration du nom">
-    <div className="grid grid-cols-2 gap-4">
-      <NumberInput
-        label="Taille de police"
-        value={style.nameSize}
-        onChange={(value) => onUpdate({ nameSize: value })}
-        min={6}
-        max={24}
-        unit="pt"
-      />
-      <div>
-        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Police</label>
-        <select
-          value={style.nameFontFamily || style.fontFamily || 'Arial'}
-          onChange={(e) => onUpdate({ nameFontFamily: e.target.value })}
-          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
-        >
-          <option value="Arial">Arial</option>
-          <option value="Helvetica">Helvetica</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Courier New">Courier New</option>
-          <option value="Georgia">Georgia</option>
-          <option value="Verdana">Verdana</option>
-          <option value="Tahoma">Tahoma</option>
-          <option value="Impact">Impact</option>
-        </select>
-      </div>
+const InfoStylePanel = ({ style, onUpdate, onUpdateColor }) => (
+  <ControlGroup title="Informations produit">
+    {/* NOM */}
+    <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-600">
+      <label className="flex items-center mb-2">
+        <input
+          type="checkbox"
+          checked={style.showName}
+          onChange={(e) => onUpdate({ showName: e.target.checked })}
+          className="mr-2 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+        />
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Afficher le nom
+        </span>
+      </label>
+
+      {style.showName && (
+        <div className="ml-6 pl-4 border-l-2 border-blue-200 dark:border-blue-700 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberInput
+              label="Taille"
+              value={style.nameSize}
+              onChange={(value) => onUpdate({ nameSize: value })}
+              min={6}
+              max={24}
+              unit="pt"
+            />
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Style</label>
+              <select
+                value={style.nameWeight || 'bold'}
+                onChange={(e) => onUpdate({ nameWeight: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
+              >
+                <option value="normal">Normal</option>
+                <option value="bold">Gras</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Police</label>
+              <select
+                value={style.nameFontFamily || 'Arial'}
+                onChange={(e) => onUpdate({ nameFontFamily: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
+              >
+                <option value="Arial">Arial</option>
+                <option value="Helvetica">Helvetica</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Courier New">Courier New</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Verdana">Verdana</option>
+              </select>
+            </div>
+            <ColorPicker
+              label="Couleur"
+              value={style.colors?.name || '#000000'}
+              onChange={(color) => onUpdateColor('name', color)}
+              defaultColor="#000000"
+            />
+          </div>
+        </div>
+      )}
     </div>
 
-    <div className="mt-4 grid grid-cols-2 gap-4">
-      <div>
-        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-          Style de police
-        </label>
-        <select
-          value={style.nameWeight || 'bold'}
-          onChange={(e) => onUpdate({ nameWeight: e.target.value })}
-          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
-        >
-          <option value="normal">Normal</option>
-          <option value="bold">Gras</option>
-        </select>
-      </div>
+    {/* PRIX */}
+    <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-600">
+      <label className="flex items-center mb-2">
+        <input
+          type="checkbox"
+          checked={style.showPrice}
+          onChange={(e) => onUpdate({ showPrice: e.target.checked })}
+          className="mr-2 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+        />
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Afficher le prix
+        </span>
+      </label>
 
-      {/* 🎨 NOUVEAU : ColorPicker pour le nom */}
-      <ColorPicker
-        label="Couleur du texte"
-        value={style.colors?.name || '#000000'}
-        onChange={(color) => onUpdateColor('name', color)}
-        defaultColor="#000000"
-      />
+      {style.showPrice && (
+        <div className="ml-6 pl-4 border-l-2 border-green-200 dark:border-green-700 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberInput
+              label="Taille"
+              value={style.priceSize}
+              onChange={(value) => onUpdate({ priceSize: value })}
+              min={8}
+              max={32}
+              unit="pt"
+            />
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Style</label>
+              <select
+                value={style.priceWeight || 'bold'}
+                onChange={(e) => onUpdate({ priceWeight: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
+              >
+                <option value="normal">Normal</option>
+                <option value="bold">Gras</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Police</label>
+              <select
+                value={style.priceFontFamily || 'Arial'}
+                onChange={(e) => onUpdate({ priceFontFamily: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
+              >
+                <option value="Arial">Arial</option>
+                <option value="Helvetica">Helvetica</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Courier New">Courier New</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Verdana">Verdana</option>
+              </select>
+            </div>
+            <ColorPicker
+              label="Couleur"
+              value={style.colors?.price || '#000000'}
+              onChange={(color) => onUpdateColor('price', color)}
+              defaultColor="#000000"
+            />
+          </div>
+        </div>
+      )}
     </div>
-  </ControlGroup>
-);
 
-// 🎨 MISE À JOUR : Panneau Prix avec ColorPicker
-const PriceStylePanel = ({ style, onUpdate, onUpdateColor }) => (
-  <ControlGroup title="Configuration du prix">
-    <div className="grid grid-cols-2 gap-4">
-      <NumberInput
-        label="Taille de police"
-        value={style.priceSize}
-        onChange={(value) => onUpdate({ priceSize: value })}
-        min={8}
-        max={32}
-        unit="pt"
-      />
-      <div>
-        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-          Style de police
-        </label>
-        <select
-          value={style.priceWeight || 'bold'}
-          onChange={(e) => onUpdate({ priceWeight: e.target.value })}
-          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
-        >
-          <option value="normal">Normal</option>
-          <option value="bold">Gras</option>
-        </select>
-      </div>
+    {/* SKU */}
+    <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-600">
+      <label className="flex items-center mb-2">
+        <input
+          type="checkbox"
+          checked={style.showSku}
+          onChange={(e) => onUpdate({ showSku: e.target.checked })}
+          className="mr-2 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+        />
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Afficher le SKU
+        </span>
+      </label>
+
+      {style.showSku && (
+        <div className="ml-6 pl-4 border-l-2 border-purple-200 dark:border-purple-700 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberInput
+              label="Taille"
+              value={style.skuSize || 10}
+              onChange={(value) => onUpdate({ skuSize: value })}
+              min={6}
+              max={24}
+              unit="pt"
+            />
+            <ColorPicker
+              label="Couleur"
+              value={style.colors?.sku || '#000000'}
+              onChange={(color) => onUpdateColor('sku', color)}
+              defaultColor="#000000"
+            />
+          </div>
+        </div>
+      )}
     </div>
 
-    <div className="mt-4 grid grid-cols-2 gap-4">
-      <div>
-        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Police</label>
-        <select
-          value={style.priceFontFamily || style.fontFamily || 'Arial'}
-          onChange={(e) => onUpdate({ priceFontFamily: e.target.value })}
-          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700"
-        >
-          <option value="Arial">Arial</option>
-          <option value="Helvetica">Helvetica</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Courier New">Courier New</option>
-          <option value="Georgia">Georgia</option>
-          <option value="Verdana">Verdana</option>
-          <option value="Tahoma">Tahoma</option>
-          <option value="Impact">Impact</option>
-        </select>
-      </div>
+    {/* MARQUE */}
+    <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-600">
+      <label className="flex items-center mb-2">
+        <input
+          type="checkbox"
+          checked={style.showBrand}
+          onChange={(e) => onUpdate({ showBrand: e.target.checked })}
+          className="mr-2 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+        />
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Afficher la marque
+        </span>
+      </label>
 
-      {/* 🎨 NOUVEAU : ColorPicker pour le prix */}
-      <ColorPicker
-        label="Couleur du texte"
-        value={style.colors?.price || '#000000'}
-        onChange={(color) => onUpdateColor('price', color)}
-        defaultColor="#000000"
-      />
+      {style.showBrand && (
+        <div className="ml-6 pl-4 border-l-2 border-orange-200 dark:border-orange-700 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberInput
+              label="Taille"
+              value={style.brandSize || 10}
+              onChange={(value) => onUpdate({ brandSize: value })}
+              min={6}
+              max={24}
+              unit="pt"
+            />
+            <ColorPicker
+              label="Couleur"
+              value={style.colors?.brand || '#000000'}
+              onChange={(color) => onUpdateColor('brand', color)}
+              defaultColor="#000000"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* FOURNISSEUR */}
+    <div className="mb-4">
+      <label className="flex items-center mb-2">
+        <input
+          type="checkbox"
+          checked={style.showSupplier}
+          onChange={(e) => onUpdate({ showSupplier: e.target.checked })}
+          className="mr-2 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+        />
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Afficher le fournisseur
+        </span>
+      </label>
+
+      {style.showSupplier && (
+        <div className="ml-6 pl-4 border-l-2 border-red-200 dark:border-red-700 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberInput
+              label="Taille"
+              value={style.supplierSize || 10}
+              onChange={(value) => onUpdate({ supplierSize: value })}
+              min={6}
+              max={24}
+              unit="pt"
+            />
+            <ColorPicker
+              label="Couleur"
+              value={style.colors?.supplier || '#000000'}
+              onChange={(color) => onUpdateColor('supplier', color)}
+              defaultColor="#000000"
+            />
+          </div>
+        </div>
+      )}
     </div>
   </ControlGroup>
 );
@@ -533,18 +659,16 @@ const LabelStyleConfig = () => {
   // Configuration des onglets (SANS l'onglet Couleurs séparé)
   const tabs = [
     {
-      id: 'name',
-      label: 'Nom',
-      icon: Tag,
-      enabled: labelStyle.showName,
-      toggle: () => updateStyle({ showName: !labelStyle.showName }),
-    },
-    {
-      id: 'price',
-      label: 'Prix',
-      icon: Euro,
-      enabled: labelStyle.showPrice,
-      toggle: () => updateStyle({ showPrice: !labelStyle.showPrice }),
+      id: 'info',
+      label: 'Info',
+      icon: Tag, // ou Info de lucide-react
+      enabled:
+        labelStyle.showName ||
+        labelStyle.showPrice ||
+        labelStyle.showSku ||
+        labelStyle.showBrand ||
+        labelStyle.showSupplier,
+      toggle: null, // Pas de toggle global
     },
     {
       id: 'barcode',
@@ -626,21 +750,9 @@ const LabelStyleConfig = () => {
   // Panneau actuel selon l'onglet sélectionné (avec onUpdateColor)
   const renderActivePanel = () => {
     switch (activeTab) {
-      case 'name':
+      case 'info':
         return (
-          labelStyle.showName && (
-            <NameStylePanel style={labelStyle} onUpdate={updateStyle} onUpdateColor={updateColor} />
-          )
-        );
-      case 'price':
-        return (
-          labelStyle.showPrice && (
-            <PriceStylePanel
-              style={labelStyle}
-              onUpdate={updateStyle}
-              onUpdateColor={updateColor}
-            />
-          )
+          <InfoStylePanel style={labelStyle} onUpdate={updateStyle} onUpdateColor={updateColor} />
         );
       case 'barcode':
         return (
