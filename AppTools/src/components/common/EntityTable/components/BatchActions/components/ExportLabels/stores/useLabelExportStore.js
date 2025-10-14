@@ -1,3 +1,4 @@
+// useLabelExportStore.js - VERSION AVEC COULEURS
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import userPresetService from '../../../../../../../../services/userPresetService';
@@ -24,15 +25,25 @@ const DEFAULT_STYLE = {
   nameSize: 10,
   priceFontFamily: 'Arial',
   nameFontFamily: 'Arial',
-  nameWeight: 'bold', // ⭐ NOUVEAU (pour cohérence)
+  nameWeight: 'bold',
   duplicateCount: 1,
   showWooQR: false,
   showWooQRText: true,
   wooQRTextSize: 7,
   wooQRText: 'Voir en ligne',
-
   wooQRSize: 10,
   customPositions: {},
+
+  // 🎨 NOUVEAU : Couleurs personnalisées
+  colors: {
+    name: '#000000',
+    price: '#000000',
+    barcode: '#000000',
+    barcodeText: '#000000',
+    wooQR: '#000000',
+    wooQRText: '#000000',
+    border: '#000000',
+  },
 };
 
 const DEFAULT_LAYOUTS = {
@@ -118,6 +129,18 @@ export const useLabelExportStore = create(
           labelStyle: { ...state.labelStyle, ...changes },
         })),
 
+      // 🎨 NOUVEAU : Méthode dédiée aux couleurs
+      updateColor: (element, color) =>
+        set((state) => ({
+          labelStyle: {
+            ...state.labelStyle,
+            colors: {
+              ...state.labelStyle.colors,
+              [element]: color,
+            },
+          },
+        })),
+
       // 🎯 LAYOUT - Une seule méthode
       updateLayout: (field, value) =>
         set((state) => {
@@ -134,11 +157,10 @@ export const useLabelExportStore = create(
       // 🎯 SUPPORT TYPE
       changeSupportType: (type) => {
         set({ currentLayout: { ...(DEFAULT_LAYOUTS[type] || DEFAULT_LAYOUTS.rouleau) } });
-        // Recharger les presets pour le nouveau type
         get().managePresets('load');
       },
 
-      // 🎯 RESET UNIFIÉ - Une seule méthode pour tout
+      // 🎯 RESET UNIFIÉ
       reset: (scope = 'all') =>
         set((state) => {
           const updates = {};
@@ -165,11 +187,14 @@ export const useLabelExportStore = create(
           if (scope === 'all' || scope === 'positions') {
             updates.labelStyle = { ...state.labelStyle, customPositions: {} };
           }
+          if (scope === 'all' || scope === 'colors') {
+            updates.labelStyle = { ...state.labelStyle, colors: DEFAULT_STYLE.colors };
+          }
 
           return updates;
         }),
 
-      // 🎯 CELLULES - API simplifiée
+      // 🎯 CELLULES
       toggleCells: (action, cellIndex = null) =>
         set((state) => {
           switch (action) {
@@ -195,15 +220,14 @@ export const useLabelExportStore = create(
           return {};
         }),
 
-      // 🎯 PRESETS - API unifiée
+      // 🎯 PRESETS
       managePresets: async (action, data = {}) => {
-        const category = 'label_preset'; // Une seule catégorie !
+        const category = 'label_preset';
 
         try {
           switch (action) {
             case 'load':
               const allPresets = await userPresetService.getAllPresets(category);
-              // Filtrer par type de support actuel
               const currentSupportType = get().currentLayout.supportType;
               const filteredPresets = allPresets.filter((preset) => {
                 if (!preset.preset_data?.layout) return false;
@@ -238,31 +262,12 @@ export const useLabelExportStore = create(
               break;
 
             case 'delete':
-              console.log('🗑️ Store - Suppression preset:', data.id);
-
-              // 🔧 CORRECTION: Trouver le preset avant de vérifier
               const presetToDelete = get().savedPresets.find((p) => p._id === data.id);
+              if (!presetToDelete) return false;
+              if (presetToDelete.is_factory) return false;
 
-              if (!presetToDelete) {
-                console.warn('⚠️ Store - Preset non trouvé:', data.id);
-                return false;
-              }
-
-              // Protection contre suppression des presets factory
-              if (presetToDelete.is_factory) {
-                console.warn('⚠️ Store - Tentative suppression preset factory:', data.id);
-                return false;
-              }
-
-              console.log('🔥 Store - Suppression autorisée pour:', presetToDelete.name);
-
-              // Effectuer la suppression
               await userPresetService.deletePreset(category, data.id);
-
-              // Recharger la liste
               await get().managePresets('load');
-
-              console.log('✅ Store - Preset supprimé et liste rechargée');
               return true;
           }
         } catch (error) {
@@ -271,7 +276,7 @@ export const useLabelExportStore = create(
         }
       },
 
-      // 🎯 IMPRESSION - API simplifiée
+      // 🎯 IMPRESSION
       print: async (action, data = {}) => {
         switch (action) {
           case 'loadPrinters':
@@ -316,11 +321,9 @@ export const useLabelExportStore = create(
         }
       },
 
-      // ===== UTILITAIRES (mémorisés) =====
+      // ===== UTILITAIRES =====
       getSupportTypes: () => SUPPORT_TYPES,
-
       getGridDimensions: () => calculateGridDimensions(get().currentLayout),
-
       getCellStats: () => {
         const { disabledCells, currentLayout } = get();
         const total = calculateGridDimensions(currentLayout).total;
@@ -363,7 +366,6 @@ export const useLabelExportStore = create(
           labelStyle: { ...get().labelStyle, duplicateCount: 1 },
         });
 
-        // Charger presets avec la bonne méthode
         get().managePresets('load', 'style');
         get().managePresets('load', 'layout');
       },

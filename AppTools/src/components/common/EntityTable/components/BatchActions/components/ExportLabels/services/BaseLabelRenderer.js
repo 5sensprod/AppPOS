@@ -1,3 +1,4 @@
+// BaseLabelRenderer.js - VERSION AVEC COULEURS
 import JsBarcode from 'jsbarcode';
 import { formatCurrency } from '../../../../../../../../utils/formatters.js';
 import { QRCodeSVG } from 'qrcode.react';
@@ -6,25 +7,26 @@ class BaseLabelRenderer {
   constructor() {
     this.mmToPx = 3.779527559;
 
-    // 🎯 ÉCHELLES SIMPLIFIÉES
     this.SCALES = {
-      display: 1, // 96 DPI pour affichage
-      highRes: 200 / 96, // 200 DPI pour print/export (2.083)
+      display: 1,
+      highRes: 200 / 96,
     };
   }
 
-  // 🚀 Facteur d'échelle unifié
   getScaleFactor(context = 'display') {
     return context === 'display' || context === 'preview'
       ? this.SCALES.display
       : this.SCALES.highRes;
   }
 
-  // 🎯 Rendu canvas optimisé
+  // 🎨 NOUVEAU : Helper pour obtenir la couleur d'un élément
+  _getElementColor(style, elementType, defaultColor = '#000000') {
+    return style.colors?.[elementType] || defaultColor;
+  }
+
   async renderToCanvas(canvasElement, label, layout, style, options = {}) {
     const fabric = await import('fabric');
 
-    // Cleanup canvas existant
     if (canvasElement.__fabricCanvas__) {
       canvasElement.__fabricCanvas__.dispose();
       canvasElement.__fabricCanvas__ = null;
@@ -32,12 +34,9 @@ class BaseLabelRenderer {
 
     const baseScale = options.highRes ? 4 : 1;
     const contextScale = this.getScaleFactor(options.context || 'display');
-
-    // 🔧 Facteurs séparés pour qualité optimale
     const canvasScale = baseScale * contextScale;
     const elementScale = baseScale;
 
-    // Configuration canvas
     const canvasWidth = layout.width * this.mmToPx * canvasScale;
     const canvasHeight = layout.height * this.mmToPx * canvasScale;
 
@@ -52,16 +51,13 @@ class BaseLabelRenderer {
 
     canvasElement.__fabricCanvas__ = fabricCanvas;
 
-    // 🎯 Transformation pour haute résolution
     if (contextScale > 1) {
       const offsetX = (canvasWidth - layout.width * this.mmToPx * elementScale * contextScale) / 2;
       const offsetY =
         (canvasHeight - layout.height * this.mmToPx * elementScale * contextScale) / 2;
-
       fabricCanvas.viewportTransform = [contextScale, 0, 0, contextScale, offsetX, offsetY];
     }
 
-    // Calcul des éléments
     const elements = this._calculateElements(
       layout,
       style,
@@ -69,30 +65,26 @@ class BaseLabelRenderer {
       style.customPositions || {}
     );
 
-    // 🎨 Rendu des éléments
     await this._renderElements(fabricCanvas, label, elements, style, fabric, elementScale, layout);
 
     fabricCanvas.renderAll();
     return fabricCanvas;
   }
 
-  // 🚀 Rendu unifié des éléments
   async _renderElements(fabricCanvas, label, elements, style, fabric, scaleFactor, layout) {
-    // Bordure
+    // Bordure avec couleur personnalisée
     if (style.showBorder) {
       await this._addBorder(fabricCanvas, layout, style, fabric, scaleFactor);
     }
 
-    // Nom avec type spécifique
+    // Nom
     if (style.showName && label.name?.trim()) {
-      console.log('🔤 Rendu nom avec police:', style.nameFontFamily || style.fontFamily);
       await this._addText(fabricCanvas, label.name, elements.name, style, fabric, 'name');
     }
 
-    // Prix avec type spécifique
+    // Prix
     if (style.showPrice && label.price != null && label.price >= 0) {
       const priceText = formatCurrency(label.price);
-      console.log('🔤 Rendu prix avec police:', style.priceFontFamily || style.fontFamily);
       await this._addText(fabricCanvas, priceText, elements.price, style, fabric, 'price');
     }
 
@@ -101,13 +93,12 @@ class BaseLabelRenderer {
       await this._addBarcode(fabricCanvas, label, elements.barcode, style, fabric, scaleFactor);
     }
 
-    // 🆕 QR CODE WOOCOMMERCE
+    // QR Code WooCommerce
     if (style.showWooQR && label.websiteUrl?.trim()) {
-      console.log('🌐 Rendu QR Code WooCommerce:', label.websiteUrl);
       await this._addWooQRCode(fabricCanvas, label, elements.wooQR, style, fabric, scaleFactor);
     }
   }
-  // 🎯 Calcul des éléments simplifié
+
   _calculateElements(layout, style, scaleFactor = 1, customPositions = {}) {
     const canvasWidth = layout.width * this.mmToPx * scaleFactor;
     const canvasHeight = layout.height * this.mmToPx * scaleFactor;
@@ -123,7 +114,6 @@ class BaseLabelRenderer {
     let currentY = paddingV;
     const spacing = 8 * scaleFactor;
 
-    // Helper pour créer un élément
     const createElement = (type, height, customPos) => {
       if (customPos) {
         return {
@@ -165,7 +155,7 @@ class BaseLabelRenderer {
       };
     }
 
-    // Barcode/QR Code produit (code existant inchangé)
+    // Barcode/QR Code
     if (style.showBarcode) {
       let totalHeight;
 
@@ -206,14 +196,13 @@ class BaseLabelRenderer {
       elements.barcode.textHeight = style.showBarcodeText !== false ? 12 * scaleFactor : 0;
     }
 
-    // 🆕 QR CODE WOOCOMMERCE - Position par défaut en bas à droite
+    // QR Code WooCommerce
     if (style.showWooQR) {
       const qrSize = (style.wooQRSize || 10) * this.mmToPx * scaleFactor;
       const textHeight =
         style.showWooQRText !== false ? (style.wooQRTextSize || 7) * scaleFactor * 1.4 : 0;
       const totalHeight = qrSize + textHeight + (textHeight > 0 ? 2 * scaleFactor : 0);
 
-      // Position par défaut : bas à droite avec marge
       const defaultX = canvasWidth - paddingH - qrSize;
       const defaultY = canvasHeight - paddingV - totalHeight;
 
@@ -240,46 +229,47 @@ class BaseLabelRenderer {
     return elements;
   }
 
-  // 🎨 Ajout de texte unifié
+  // 🎨 MISE À JOUR : Ajout de texte avec couleur personnalisée
   async _addText(fabricCanvas, text, element, style, fabric, type) {
-    // Déterminer les propriétés selon le type d'élément
     let fontWeight = 'normal';
-    let fontFamily = 'Arial'; // Default fallback
+    let fontFamily = 'Arial';
+    let textColor = '#000000'; // 🎨 Couleur par défaut
 
-    // ⭐ LOGIQUE SPÉCIFIQUE PAR TYPE
     switch (type) {
       case 'price':
         fontWeight = style.priceWeight || 'bold';
         fontFamily = style.priceFontFamily || style.fontFamily || 'Arial';
+        textColor = this._getElementColor(style, 'price', '#000000'); // 🎨
         break;
       case 'name':
         fontWeight = style.nameWeight || 'bold';
         fontFamily = style.nameFontFamily || style.fontFamily || 'Arial';
+        textColor = this._getElementColor(style, 'name', '#000000'); // 🎨
         break;
       case 'barcodeText':
         fontWeight = 'normal';
-        fontFamily = 'Courier New'; // Monospace pour code-barres
+        fontFamily = 'Courier New';
+        textColor = this._getElementColor(style, 'barcodeText', '#000000'); // 🎨
+        break;
+      case 'wooQRText':
+        fontWeight = 'normal';
+        fontFamily = 'Arial';
+        textColor = this._getElementColor(style, 'wooQRText', '#000000'); // 🎨
         break;
       default:
         fontWeight = 'normal';
         fontFamily = style.fontFamily || 'Arial';
+        textColor = '#000000';
     }
-
-    console.log(`🔤 Création texte "${type}":`, {
-      text: text.substring(0, 20) + (text.length > 20 ? '...' : ''),
-      fontFamily,
-      fontWeight,
-      fontSize: element.fontSize,
-    });
 
     const textObj = new fabric.Text(text, {
       left: element.centerX,
       top: element.y,
       originX: 'center',
       fontSize: element.fontSize,
-      fontFamily: fontFamily, // ⭐ Police spécifique appliquée
-      fontWeight: fontWeight, // ⭐ Poids spécifique appliqué
-      fill: '#000000',
+      fontFamily: fontFamily,
+      fontWeight: fontWeight,
+      fill: textColor, // 🎨 Couleur appliquée
       selectable: false,
       paintFirst: 'fill',
     });
@@ -287,12 +277,15 @@ class BaseLabelRenderer {
     fabricCanvas.add(textObj);
   }
 
-  // 🎯 Bordure simplifiée
+  // 🎨 MISE À JOUR : Bordure avec couleur personnalisée
   async _addBorder(fabricCanvas, layout, style, fabric, scaleFactor = 1) {
     const width = layout.width * this.mmToPx * scaleFactor;
     const height = layout.height * this.mmToPx * scaleFactor;
-    const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor * 2; // x2 plus épais
-    const offset = borderWidth; // Décalage complet au lieu de halfStroke
+    const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor * 2;
+    const offset = borderWidth;
+
+    // 🎨 Utiliser la couleur personnalisée ou fallback sur borderColor
+    const borderColor = this._getElementColor(style, 'border', style.borderColor || '#000000');
 
     const border = new fabric.Rect({
       left: offset,
@@ -300,7 +293,7 @@ class BaseLabelRenderer {
       width: width - offset * 2,
       height: height - offset * 2,
       fill: 'transparent',
-      stroke: style.borderColor || '#000000',
+      stroke: borderColor, // 🎨 Couleur appliquée
       strokeWidth: borderWidth,
       strokeUniform: true,
       selectable: false,
@@ -309,14 +302,12 @@ class BaseLabelRenderer {
     fabricCanvas.add(border);
   }
 
-  // 🎯 Code-barres avec réduction proportionnelle de la largeur
+  // 🎨 MISE À JOUR : Code-barres avec couleur personnalisée
   async _addBarcode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     try {
       if (style.barcodeType === 'qrcode') {
-        // ⭐ NOUVEAU: Rendu QR Code avec qrcode.react
         await this._addQRCode(fabricCanvas, label, element, style, fabric, scaleFactor);
       } else {
-        // Rendu code-barres existant (inchangé)
         const barcodeCanvas = document.createElement('canvas');
 
         const widthPercentage = (style.barcodeWidth || 60) / 100;
@@ -337,13 +328,16 @@ class BaseLabelRenderer {
 
         barWidth *= scaleFactor;
 
+        // 🎨 Couleur personnalisée pour le code-barres
+        const barcodeColor = this._getElementColor(style, 'barcode', '#000000');
+
         JsBarcode(barcodeCanvas, label.barcode, {
           format: 'EAN13',
           width: barWidth,
           height: element.barcodeHeight * 0.85,
           displayValue: false,
           background: '#ffffff',
-          lineColor: '#000000',
+          lineColor: barcodeColor, // 🎨 Couleur appliquée
           margin: 0,
           flat: true,
         });
@@ -358,11 +352,13 @@ class BaseLabelRenderer {
         fabricCanvas.add(barcodeImg);
       }
 
-      // ⭐ Texte sous le code (commun aux deux types)
+      // Texte sous le code avec couleur personnalisée
       if (style.showBarcodeText !== false) {
         const fontSize = (style.barcodeTextSize || 8) * scaleFactor;
         const displayText =
           style.barcodeType === 'qrcode' ? label.barcode : this._formatBarcodeText(label.barcode);
+
+        const textColor = this._getElementColor(style, 'barcodeText', '#000000'); // 🎨
 
         const barcodeText = new fabric.Text(displayText, {
           left: element.centerX,
@@ -370,7 +366,7 @@ class BaseLabelRenderer {
           originX: 'center',
           fontSize: fontSize,
           fontFamily: 'Arial',
-          fill: '#000000',
+          fill: textColor, // 🎨 Couleur appliquée
           selectable: false,
           paintFirst: 'fill',
         });
@@ -392,13 +388,12 @@ class BaseLabelRenderer {
     }
   }
 
+  // 🎨 MISE À JOUR : QR Code avec couleur personnalisée
   async _addQRCode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const qrSize = (style.qrCodeSize || 20) * this.mmToPx * scaleFactor;
-
-    console.log('🔶 Génération QR Code:', label.barcode, 'taille:', qrSize);
+    const qrColor = this._getElementColor(style, 'barcode', '#000000'); // 🎨
 
     try {
-      // Créer un conteneur temporaire invisible pour rendre le QRCode React
       const tempContainer = document.createElement('div');
       tempContainer.style.position = 'absolute';
       tempContainer.style.left = '-9999px';
@@ -406,43 +401,33 @@ class BaseLabelRenderer {
       tempContainer.style.pointerEvents = 'none';
       document.body.appendChild(tempContainer);
 
-      // Créer un élément pour recevoir le QR Code
       const qrContainer = document.createElement('div');
       tempContainer.appendChild(qrContainer);
 
-      // ⭐ REACT 18 : Utiliser createRoot au lieu de ReactDOM.render
       const React = await import('react');
       const { createRoot } = await import('react-dom/client');
 
-      // Rendre le QRCodeSVG
       const qrElement = React.createElement(QRCodeSVG, {
         value: label.barcode,
         size: Math.round(qrSize),
-        level: 'M', // Niveau de correction d'erreur Medium
+        level: 'M',
         includeMargin: false,
         bgColor: '#ffffff',
-        fgColor: '#000000',
+        fgColor: qrColor, // 🎨 Couleur appliquée
       });
 
-      // Rendu avec une Promise pour attendre le résultat
       await new Promise((resolve, reject) => {
         try {
-          // ⭐ Créer le root React 18
           const root = createRoot(qrContainer);
-
-          // ⭐ Rendre le composant
           root.render(qrElement);
 
-          // Attendre le rendu
           setTimeout(() => {
             try {
               const svgElement = qrContainer.querySelector('svg');
               if (svgElement) {
-                // Récupérer le SVG généré
                 const svgString = new XMLSerializer().serializeToString(svgElement);
-
-                // Créer une image pour Fabric.js
                 const img = new Image();
+
                 img.onload = () => {
                   const qrImage = new fabric.Image(img, {
                     left: element.centerX,
@@ -453,43 +438,34 @@ class BaseLabelRenderer {
                   });
 
                   fabricCanvas.add(qrImage);
-
-                  // ⭐ REACT 18 : Nettoyer avec unmount()
                   root.unmount();
                   document.body.removeChild(tempContainer);
-
-                  console.log('✅ QR Code ajouté au canvas (React 18)');
                   resolve();
                 };
 
                 img.onerror = () => {
-                  console.error('❌ Erreur chargement image QR Code');
                   root.unmount();
                   document.body.removeChild(tempContainer);
                   this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
                   reject(new Error('Erreur chargement QR Code'));
                 };
 
-                // Encoder le SVG en base64 pour l'image
                 img.src =
                   'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
               } else {
-                console.error('❌ SVG QR Code non trouvé');
                 root.unmount();
                 document.body.removeChild(tempContainer);
                 this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
                 reject(new Error('SVG non généré'));
               }
             } catch (err) {
-              console.error('❌ Erreur traitement QR Code:', err);
               root.unmount();
               document.body.removeChild(tempContainer);
               this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
               reject(err);
             }
-          }, 100); // Délai pour React 18
+          }, 100);
         } catch (err) {
-          console.error('❌ Erreur createRoot:', err);
           this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
           reject(err);
         }
@@ -500,13 +476,12 @@ class BaseLabelRenderer {
     }
   }
 
+  // 🎨 MISE À JOUR : QR Code WooCommerce avec couleur personnalisée
   async _addWooQRCode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const qrSize = element.qrSize;
-
-    console.log('🌐 Génération QR Code WooCommerce:', label.websiteUrl, 'taille:', qrSize);
+    const qrColor = this._getElementColor(style, 'wooQR', '#000000'); // 🎨
 
     try {
-      // Créer un conteneur temporaire invisible
       const tempContainer = document.createElement('div');
       tempContainer.style.position = 'absolute';
       tempContainer.style.left = '-9999px';
@@ -520,14 +495,13 @@ class BaseLabelRenderer {
       const React = await import('react');
       const { createRoot } = await import('react-dom/client');
 
-      // Rendre le QRCodeSVG avec l'URL WooCommerce
       const qrElement = React.createElement(QRCodeSVG, {
-        value: label.websiteUrl, // 🎯 URL WooCommerce au lieu du barcode
+        value: label.websiteUrl,
         size: Math.round(qrSize),
         level: 'M',
         includeMargin: false,
         bgColor: '#ffffff',
-        fgColor: '#000000',
+        fgColor: qrColor, // 🎨 Couleur appliquée
       });
 
       await new Promise((resolve, reject) => {
@@ -551,20 +525,15 @@ class BaseLabelRenderer {
                     selectable: false,
                   });
 
-                  // 🎯 Marqueur pour identification dans FabricLabelCanvas
                   qrImage.wooQRCode = true;
-
                   fabricCanvas.add(qrImage);
 
                   root.unmount();
                   document.body.removeChild(tempContainer);
-
-                  console.log('✅ QR Code WooCommerce ajouté au canvas');
                   resolve();
                 };
 
                 img.onerror = () => {
-                  console.error('❌ Erreur chargement image QR WooCommerce');
                   root.unmount();
                   document.body.removeChild(tempContainer);
                   this._addFallbackWooQR(
@@ -580,7 +549,6 @@ class BaseLabelRenderer {
                 img.src =
                   'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
               } else {
-                console.error('❌ SVG QR WooCommerce non trouvé');
                 root.unmount();
                 document.body.removeChild(tempContainer);
                 this._addFallbackWooQR(
@@ -593,7 +561,6 @@ class BaseLabelRenderer {
                 reject(new Error('SVG non généré'));
               }
             } catch (err) {
-              console.error('❌ Erreur traitement QR WooCommerce:', err);
               root.unmount();
               document.body.removeChild(tempContainer);
               this._addFallbackWooQR(fabricCanvas, element, label.websiteUrl, fabric, scaleFactor);
@@ -601,16 +568,16 @@ class BaseLabelRenderer {
             }
           }, 100);
         } catch (err) {
-          console.error('❌ Erreur createRoot WooCommerce:', err);
           this._addFallbackWooQR(fabricCanvas, element, label.websiteUrl, fabric, scaleFactor);
           reject(err);
         }
       });
 
-      // 🆕 Texte sous le QR Code WooCommerce
+      // Texte sous le QR Code WooCommerce avec couleur
       if (style.showWooQRText && element.textHeight > 0) {
         const fontSize = (style.wooQRTextSize || 7) * scaleFactor;
         const displayText = style.wooQRText || 'Voir en ligne';
+        const textColor = this._getElementColor(style, 'wooQRText', '#000000'); // 🎨
 
         const wooQRText = new fabric.Text(displayText, {
           left: element.centerX || element.x + qrSize / 2,
@@ -618,7 +585,7 @@ class BaseLabelRenderer {
           originX: 'center',
           fontSize: fontSize,
           fontFamily: 'Arial',
-          fill: '#000000',
+          fill: textColor, // 🎨 Couleur appliquée
           selectable: false,
           paintFirst: 'fill',
         });
@@ -631,16 +598,10 @@ class BaseLabelRenderer {
     }
   }
 
-  // ⭐ QR Code de secours en cas d'erreur
   _addFallbackQR(fabricCanvas, element, barcodeText, fabric) {
-    console.log('🔄 Utilisation QR Code de secours');
-
-    // QR Code très basique avec bordure
     const qrSize = element.barcodeHeight || 60;
-    const border = qrSize * 0.1;
     const centerX = element.centerX || element.x + qrSize / 2;
 
-    // Fond blanc
     const background = new fabric.Rect({
       left: element.centerX,
       top: element.y,
@@ -655,12 +616,11 @@ class BaseLabelRenderer {
     });
     fabricCanvas.add(background);
 
-    // Patterns de coins (simulation QR Code)
     const cornerSize = qrSize * 0.2;
     const positions = [
-      { x: element.centerX - qrSize / 2 + cornerSize / 2, y: element.y + cornerSize / 2 }, // Top-left
-      { x: element.centerX + qrSize / 2 - cornerSize / 2, y: element.y + cornerSize / 2 }, // Top-right
-      { x: element.centerX - qrSize / 2 + cornerSize / 2, y: element.y + qrSize - cornerSize / 2 }, // Bottom-left
+      { x: element.centerX - qrSize / 2 + cornerSize / 2, y: element.y + cornerSize / 2 },
+      { x: element.centerX + qrSize / 2 - cornerSize / 2, y: element.y + cornerSize / 2 },
+      { x: element.centerX - qrSize / 2 + cornerSize / 2, y: element.y + qrSize - cornerSize / 2 },
     ];
 
     positions.forEach((pos) => {
@@ -689,7 +649,6 @@ class BaseLabelRenderer {
       fabricCanvas.add(innerCorner);
     });
 
-    // Texte central
     const centerText = new fabric.Text('QR', {
       left: element.centerX,
       top: element.y + qrSize / 2,
@@ -701,8 +660,26 @@ class BaseLabelRenderer {
       selectable: false,
     });
     fabricCanvas.add(centerText);
+  }
 
-    // Icône globe simple au centre
+  _addFallbackWooQR(fabricCanvas, element, url, fabric, scaleFactor) {
+    const qrSize = element.qrSize || 60;
+    const centerX = element.centerX || element.x + qrSize / 2;
+
+    const background = new fabric.Rect({
+      left: centerX,
+      top: element.y,
+      originX: 'center',
+      originY: 'top',
+      width: qrSize,
+      height: qrSize,
+      fill: '#ffffff',
+      stroke: '#0084ff',
+      strokeWidth: 1,
+      selectable: false,
+    });
+    fabricCanvas.add(background);
+
     const globeText = new fabric.Text('🌐', {
       left: centerX,
       top: element.y + qrSize / 2,
@@ -713,7 +690,6 @@ class BaseLabelRenderer {
     });
     fabricCanvas.add(globeText);
 
-    // Texte "WEB"
     const webText = new fabric.Text('WEB', {
       left: centerX,
       top: element.y + qrSize * 0.75,
@@ -728,7 +704,6 @@ class BaseLabelRenderer {
     fabricCanvas.add(webText);
   }
 
-  // 🎯 Formatage code-barres simplifié
   _formatBarcodeText(barcode) {
     const clean = barcode.replace(/[\s-]/g, '');
     if (/^\d{13}$/.test(clean)) return `${clean[0]} ${clean.slice(1, 7)} ${clean.slice(7)}`;
@@ -737,12 +712,10 @@ class BaseLabelRenderer {
     return clean;
   }
 
-  // 🚀 Utilitaires optimisés
   _prepareDuplicatedLabels(labelData, duplicateCount) {
     return labelData.flatMap((label) => Array(duplicateCount).fill(label));
   }
 
-  // 🎯 Génération d'image optimisée
   async _renderSingleLabelToCanvas(label, layout, style, context = 'print') {
     const tempCanvas = document.createElement('canvas');
     try {
@@ -751,15 +724,14 @@ class BaseLabelRenderer {
         context: context,
       });
 
-      // Cela évite les marges automatiques ajoutées par Fabric.js
       const imgData = fabricCanvas.toDataURL({
         format: 'png',
         quality: 1.0,
-        multiplier: 1, // Pas de sur-échantillonnage
-        left: 0, // Départ exact à 0
-        top: 0, // Départ exact à 0
-        width: fabricCanvas.width, // Largeur exacte du canvas
-        height: fabricCanvas.height, // Hauteur exacte du canvas
+        multiplier: 1,
+        left: 0,
+        top: 0,
+        width: fabricCanvas.width,
+        height: fabricCanvas.height,
       });
 
       fabricCanvas.dispose();

@@ -1,3 +1,4 @@
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\FabricLabelCanvas.jsx
 import React, { useEffect, useRef, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import fabricExportService from '@services/fabricExportService';
@@ -210,6 +211,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
     style.wooQRTextSize,
     style.wooQRText,
     JSON.stringify(style.customPositions),
+    JSON.stringify(style.colors),
   ]);
 
   // Cleanup au démontage
