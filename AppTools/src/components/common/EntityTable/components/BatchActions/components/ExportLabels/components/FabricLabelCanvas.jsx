@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import fabricExportService from '@services/fabricExportService';
 
-const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
+const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSelect }) => {
   const canvasRef = useRef();
   const fabricCanvasRef = useRef();
   const [error, setError] = useState(null);
@@ -88,6 +88,65 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange }) => {
             context: 'preview',
           }
         );
+
+        // 🆕 Gestion de la sélection d'objet
+        fabricCanvas.on('selection:created', (e) => {
+          handleObjectSelection(e.selected?.[0]);
+        });
+
+        fabricCanvas.on('selection:updated', (e) => {
+          handleObjectSelection(e.selected?.[0]);
+        });
+
+        // 🆕 Fonction helper pour identifier l'élément
+        const handleObjectSelection = (obj) => {
+          if (!obj || !onElementSelect) return;
+
+          let elementType = null;
+
+          if (obj.type === 'text') {
+            const text = obj.text;
+
+            // Vérifier texte personnalisé
+            const customText = style.customTexts?.find((t) => {
+              let content = t.content;
+              content = content.replace(/\{brand\}/gi, label.brand || '');
+              content = content.replace(/\{supplier\}/gi, label.supplier || '');
+              content = content.replace(/\{sku\}/gi, label.sku || '');
+              return content === text;
+            });
+
+            if (customText) {
+              elementType = 'customText'; // Onglet Texte
+            } else if (text === label.name) {
+              elementType = 'info'; // Onglet Info
+            } else if (text.includes('€') || text.includes(label.price)) {
+              elementType = 'info'; // Onglet Info
+            } else if (text === label.sku) {
+              elementType = 'info'; // Onglet Info
+            } else if (text === label.brand) {
+              elementType = 'info'; // Onglet Info
+            } else if (text === label.supplier) {
+              elementType = 'info'; // Onglet Info
+            } else if (text === (style.wooQRText || 'Voir en ligne')) {
+              elementType = 'wooqr'; // Onglet Lien Web
+            } else {
+              elementType = 'barcode'; // Texte du code-barres
+            }
+          } else if (obj.type === 'image') {
+            if (obj.wooQRCode) {
+              elementType = 'wooqr'; // QR Code WooCommerce
+            } else {
+              elementType = 'barcode'; // Code-barres
+            }
+          } else if (obj.type === 'rect') {
+            elementType = 'border'; // Bordure
+          }
+
+          if (elementType) {
+            onElementSelect(elementType);
+          }
+        };
 
         fabricCanvasRef.current = fabricCanvas;
 

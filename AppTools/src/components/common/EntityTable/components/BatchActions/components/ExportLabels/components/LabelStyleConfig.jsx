@@ -871,7 +871,7 @@ const LabelStyleConfig = () => {
   const labelData = extractLabelData();
   const sampleLabel = labelData.length > 0 ? labelData[0] : null;
   const [customPositions, setCustomPositions] = useState({});
-  const [activeTab, setActiveTab] = useState('name');
+  const [activeTab, setActiveTab] = useState('info');
 
   // Configuration des onglets (SANS l'onglet Couleurs séparé)
   const tabs = [
@@ -948,6 +948,22 @@ const LabelStyleConfig = () => {
   const handleResetStyle = () => {
     reset('style');
     setCustomPositions({});
+  };
+
+  // 🆕 Handler quand un élément est sélectionné dans le canvas
+  const handleElementSelect = (elementType) => {
+    const targetTab = tabs.find((tab) => tab.id === elementType);
+    if (targetTab && targetTab.enabled) {
+      setActiveTab(elementType);
+
+      // 🆕 Scroll jusqu'à la section si hors vue
+      setTimeout(() => {
+        const tabElement = document.getElementById(`tab-${elementType}`);
+        if (tabElement) {
+          tabElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+    }
   };
 
   // Handlers presets
@@ -1074,6 +1090,7 @@ const LabelStyleConfig = () => {
               customPositions: customPositions,
             }}
             onPositionChange={handlePositionChange}
+            onElementSelect={handleElementSelect} // 🆕 AJOUTER
           />
         </div>
       )}
