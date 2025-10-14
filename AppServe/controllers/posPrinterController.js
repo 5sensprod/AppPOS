@@ -131,6 +131,7 @@ class POSPrinterController {
         message: result.message,
         total: result.total,
         itemCount: result.itemCount,
+        effectiveWidth: result.effectiveWidth,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
@@ -209,6 +210,24 @@ class POSPrinterController {
     }
   }
 
+  // === NOUVELLE MÉTHODE : CALIBRATION ===
+
+  async calibratePrinter(req, res) {
+    try {
+      const { paperWidth = 80, fontSize = 10 } = req.body;
+
+      const result = await posPrinterService.calibratePrinter(paperWidth, fontSize);
+      return ResponseHandler.success(res, {
+        message: result.message,
+        instructions: result.instructions,
+        testedWidths: result.testedWidths,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   // === MÉTHODES UTILITAIRES ===
   detectClientType(req) {
     const userAgent = req.headers['user-agent'] || '';
@@ -240,7 +259,7 @@ class POSPrinterController {
         }
       },
       5 * 60 * 1000
-    ); // 5 minutes
+    );
 
     this.sessionTimeouts.set(portPath, timeoutId);
   }

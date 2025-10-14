@@ -129,6 +129,21 @@ class PrinterService {
     }
   }
 
+  // === NOUVELLE MÉTHODE : CALIBRATION ===
+
+  async calibratePrinter(paperWidth = 80, fontSize = 10) {
+    try {
+      const response = await apiService.post(`${this.baseEndpoint}/calibrate`, {
+        paperWidth,
+        fontSize,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la calibration:', error);
+      throw error;
+    }
+  }
+
   // Test des capacités
   async testCapabilities() {
     try {
@@ -226,7 +241,7 @@ class PrinterService {
       fontSize: 10,
       fontBold: true,
       fontFamily: 'Courier New',
-      charactersPerLine: 48,
+      charactersPerLine: 30, // VALEUR PAR DÉFAUT : 30 caractères
       printMethod: 'powershell_dotnet',
       marginLeft: 0,
       marginTop: 0,

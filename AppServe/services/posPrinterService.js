@@ -1,4 +1,4 @@
-// services/posPrinterService.js - Version nettoyée et optimisée
+// services/posPrinterService.js - Version optimisée avec correction alignement
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
@@ -138,6 +138,60 @@ class POSPrinterService {
     };
   }
 
+  // === CALCUL DE LA LARGEUR EFFECTIVE ===
+
+  calculateEffectiveWidth(options = {}) {
+    const { paperWidth = 80, charsPerLine = null, fontSize = 10 } = options;
+
+    // PRIORITÉ 1 : charsPerLine explicite
+    if (charsPerLine && charsPerLine > 0) {
+      console.log(`Largeur FORCÉE: ${charsPerLine} caractères`);
+      return charsPerLine;
+    }
+
+    // PRIORITÉ 2 : Calcul automatique selon paperWidth ET fontSize
+    let baseWidth;
+
+    // Calcul de base selon la largeur physique
+    if (paperWidth <= 30) {
+      baseWidth = 20;
+    } else if (paperWidth <= 58) {
+      baseWidth = 32;
+    } else if (paperWidth <= 80) {
+      baseWidth = 48;
+    } else {
+      baseWidth = 64;
+    }
+
+    // CORRECTION SELON LA TAILLE DE POLICE
+    // Plus la police est grande, moins on peut mettre de caractères
+    let fontMultiplier = 1.0;
+
+    if (fontSize <= 8) {
+      fontMultiplier = 1.2; // Police petite = plus de caractères
+    } else if (fontSize === 9) {
+      fontMultiplier = 1.1;
+    } else if (fontSize === 10) {
+      fontMultiplier = 1.0; // Taille standard
+    } else if (fontSize === 11) {
+      fontMultiplier = 0.9;
+    } else if (fontSize >= 12) {
+      fontMultiplier = 0.8; // Police grande = moins de caractères
+    }
+
+    const calculatedWidth = Math.floor(baseWidth * fontMultiplier);
+
+    console.log(`╔════════════════════════════════════════╗`);
+    console.log(`║ CALCUL LARGEUR EFFECTIVE               ║`);
+    console.log(`╠════════════════════════════════════════╣`);
+    console.log(`║ Papier: ${paperWidth}mm → Base: ${baseWidth} chars   ║`);
+    console.log(`║ Police: ${fontSize}pt → Multiplicateur: ${fontMultiplier}  ║`);
+    console.log(`║ RÉSULTAT: ${calculatedWidth} caractères/ligne    ║`);
+    console.log(`╚════════════════════════════════════════╝`);
+
+    return calculatedWidth;
+  }
+
   // === IMPRESSION MODERNE ===
 
   async printText(text, options = {}) {
@@ -158,7 +212,6 @@ class POSPrinterService {
 
     try {
       if (autoWrap) {
-        // Méthode moderne avec retour à la ligne
         return await this.printTextWithWrapping(text, {
           fontSize,
           fontBold: bold,
@@ -169,13 +222,12 @@ class POSPrinterService {
           lineSpacing,
         });
       } else {
-        // Méthode simple (une seule ligne, sans wrap)
         return await this.printTextWithWrapping(text, {
           fontSize,
           fontBold: bold,
           fontFamily,
           align,
-          charsPerLine: text.length + 10, // Éviter le wrap
+          charsPerLine: text.length + 10,
           lineSpacing,
         });
       }
@@ -185,37 +237,8 @@ class POSPrinterService {
     }
   }
 
-  // Méthode pour découper le texte selon la largeur du papier
   wrapText(text, options = {}) {
-    const {
-      fontSize = 10,
-      paperWidth = 80,
-      marginLeft = 0,
-      marginRight = 0,
-      charsPerLine = null,
-    } = options;
-
-    // Si charsPerLine est spécifié, l'utiliser directement
-    let calculatedCharsPerLine;
-    if (charsPerLine && charsPerLine > 0) {
-      calculatedCharsPerLine = charsPerLine;
-      console.log(`Caractères par ligne FORCÉ: ${calculatedCharsPerLine}`);
-    } else {
-      // Calcul automatique selon la largeur du papier
-      if (paperWidth <= 30) {
-        calculatedCharsPerLine = 20; // Très petit papier
-      } else if (paperWidth <= 58) {
-        calculatedCharsPerLine = 32; // 58mm
-      } else if (paperWidth <= 80) {
-        calculatedCharsPerLine = 48; // 80mm standard
-      } else {
-        calculatedCharsPerLine = 64; // 110mm et plus
-      }
-      console.log(
-        `Largeur papier: ${paperWidth}mm -> ${calculatedCharsPerLine} caractères par ligne (auto)`
-      );
-    }
-
+    const effectiveWidth = this.calculateEffectiveWidth(options);
     const lines = [];
     const words = text.split(' ');
     let currentLine = '';
@@ -223,18 +246,17 @@ class POSPrinterService {
     for (const word of words) {
       const testLine = currentLine ? `${currentLine} ${word}` : word;
 
-      if (testLine.length <= calculatedCharsPerLine) {
+      if (testLine.length <= effectiveWidth) {
         currentLine = testLine;
       } else {
         if (currentLine) {
           lines.push(currentLine);
           currentLine = word;
         } else {
-          // Mot trop long, on le coupe
           let longWord = word;
-          while (longWord.length > calculatedCharsPerLine) {
-            lines.push(longWord.substring(0, calculatedCharsPerLine));
-            longWord = longWord.substring(calculatedCharsPerLine);
+          while (longWord.length > effectiveWidth) {
+            lines.push(longWord.substring(0, effectiveWidth));
+            longWord = longWord.substring(effectiveWidth);
           }
           if (longWord.length > 0) {
             currentLine = longWord;
@@ -247,14 +269,10 @@ class POSPrinterService {
       lines.push(currentLine);
     }
 
-    console.log(
-      `Texte découpé en ${lines.length} lignes avec ${calculatedCharsPerLine} chars/ligne:`,
-      lines
-    );
+    console.log(`Texte découpé en ${lines.length} lignes avec ${effectiveWidth} chars/ligne`);
     return lines;
   }
 
-  // Méthode pour impression avec gestion automatique de la largeur
   async printTextWithWrapping(text, options = {}) {
     const {
       fontSize = 10,
@@ -266,21 +284,16 @@ class POSPrinterService {
       charsPerLine = null,
     } = options;
 
-    const lines = this.wrapText(text, {
-      fontSize,
-      paperWidth,
-      charsPerLine,
-    });
+    const lines = this.wrapText(text, { fontSize, paperWidth, charsPerLine });
 
     const tempDir = require('os').tmpdir();
     const scriptFile = path.join(tempDir, `print_wrapped_${Date.now()}.ps1`);
     const fontStyle = fontBold ? 'Bold' : 'Regular';
 
-    // Encoder correctement les caractères UTF-8
     const encodedLines = lines.map((line) => {
       return line
-        .replace(/"/g, '""') // Échapper les guillemets
-        .replace(/è/g, 'e') // Remplacer les accents problématiques
+        .replace(/"/g, '""')
+        .replace(/è/g, 'e')
         .replace(/é/g, 'e')
         .replace(/à/g, 'a')
         .replace(/ù/g, 'u')
@@ -294,7 +307,6 @@ class POSPrinterService {
     const linesArray = encodedLines.map((line) => `"${line}"`).join(', ');
 
     const powershellScript = `
-# Forcer l'encodage UTF-8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms
@@ -302,23 +314,18 @@ Add-Type -AssemblyName System.Windows.Forms
 $lignes = @(${linesArray})
 $nomImprimante = "${this.connectedPrinter.name}"
 
-Write-Host "=== IMPRESSION MODERNE ==="
-Write-Host "Largeur papier: ${paperWidth}mm"
-Write-Host "Caractères par ligne: ${charsPerLine || 'auto'}"
-Write-Host "Nombre de lignes: $($lignes.Count)"
+Write-Host "=== IMPRESSION ==="
+Write-Host "Lignes: $($lignes.Count)"
 
 try {
     $printDoc = New-Object System.Drawing.Printing.PrintDocument
     $printDoc.PrinterSettings.PrinterName = $nomImprimante
     
     if (-not $printDoc.PrinterSettings.IsValid) {
-        throw "Imprimante '$nomImprimante' invalide"
+        throw "Imprimante invalide"
     }
     
-    # Définir une largeur de papier personnalisée
     $customWidth = ${paperWidth <= 30 ? 150 : paperWidth <= 58 ? 200 : paperWidth <= 80 ? 280 : 380}
-    Write-Host "Largeur personnalisée: $customWidth pixels"
-    
     $customPaperSize = New-Object System.Drawing.Printing.PaperSize("Custom", $customWidth, 1000)
     $printDoc.DefaultPageSettings.PaperSize = $customPaperSize
     $printDoc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
@@ -348,11 +355,10 @@ try {
         
         $font.Dispose()
         $brush.Dispose()
-        Write-Host "Toutes les lignes imprimées"
     })
     
     $printDoc.Print()
-    Write-Host "SUCCESS: ${lines.length} lignes imprimées"
+    Write-Host "SUCCESS"
     
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)"
@@ -364,13 +370,10 @@ try {
     fs.writeFileSync(scriptFile, powershellScript, 'utf8');
 
     try {
-      const { stdout, stderr } = await execAsync(
+      const { stdout } = await execAsync(
         `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptFile}"`,
         { encoding: 'utf8', timeout: 30000 }
       );
-
-      console.log('=== PowerShell Output ===');
-      console.log(stdout);
 
       if (stdout.includes('ERROR:')) {
         const errorMsg = stdout.split('ERROR: ')[1]?.split('\n')[0] || 'Erreur inconnue';
@@ -379,10 +382,8 @@ try {
 
       return {
         success: true,
-        message: `${lines.length} ligne(s) imprimée(s) avec retour automatique`,
+        message: `${lines.length} ligne(s) imprimée(s)`,
         linesCount: lines.length,
-        paperWidth: paperWidth,
-        charsPerLine: charsPerLine || 'auto',
       };
     } finally {
       if (fs.existsSync(scriptFile)) {
@@ -391,20 +392,16 @@ try {
     }
   }
 
-  // === MÉTHODE DE FALLBACK POUR COMPATIBILITÉ ===
-
   async printViaWindowsFallback(text, options = {}) {
     const { charsPerLine = 48, autoWrap = false } = options;
 
     let finalText = text;
 
-    // Appliquer le word wrap manuellement si nécessaire
     if (autoWrap && charsPerLine) {
       const lines = this.wrapText(text, { charsPerLine });
       finalText = lines.join('\n');
     }
 
-    // Nettoyer les accents pour la méthode fallback
     finalText = finalText
       .replace(/è/g, 'e')
       .replace(/é/g, 'e')
@@ -430,7 +427,7 @@ try {
 
       return {
         success: true,
-        message: 'Impression envoyée (méthode fallback)',
+        message: 'Impression envoyée (fallback)',
         method: 'windows_fallback',
       };
     } finally {
@@ -440,12 +437,12 @@ try {
 
   // === UTILITAIRES DE FORMATAGE ===
 
-  formatText(text, maxLength = 42) {
+  formatText(text, maxLength = 48) {
     if (!text) return '';
 
     return String(text)
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Supprimer les diacritiques
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/[àáâãäå]/g, 'a')
       .replace(/[èéêë]/g, 'e')
       .replace(/[ìíîï]/g, 'i')
@@ -456,40 +453,13 @@ try {
       .replace(/[€]/g, 'EUR')
       .replace(/[£]/g, 'GBP')
       .replace(/[¥]/g, 'YEN')
-      .replace(/[^\x20-\x7E]/g, '') // Garder seulement ASCII imprimable
-      .replace(/\s+/g, ' ') // Normaliser les espaces
+      .replace(/[^\x20-\x7E]/g, '')
+      .replace(/\s+/g, ' ')
       .trim()
       .substring(0, Math.max(1, maxLength));
   }
 
-  centerText(text, width = 42) {
-    if (!text) return '';
-
-    // Nettoyer le texte d'abord
-    const cleanText = this.formatText(text, width);
-    const len = cleanText.length;
-
-    if (len >= width) return cleanText;
-
-    const padding = Math.floor((width - len) / 2);
-    const leftPadding = ' '.repeat(Math.max(0, padding));
-    const result = leftPadding + cleanText;
-
-    // S'assurer qu'on ne dépasse pas la largeur
-    return result.substring(0, width);
-  }
-
-  // === IMPRESSION AVANCÉE (OPTIONNEL) ===
-
-  async printLine(leftText = '', rightText = '', separator = '.') {
-    const totalWidth = 48;
-    const left = this.formatText(leftText, 20);
-    const right = this.formatText(rightText, 15);
-    const separatorLength = totalWidth - left.length - right.length;
-    const separators = separator.repeat(Math.max(1, separatorLength));
-
-    return await this.printText(left + separators + right);
-  }
+  // === IMPRESSION TICKET OPTIMISÉE ===
 
   async printReceipt(items, options = {}) {
     const {
@@ -501,66 +471,49 @@ try {
       fontSize = 10,
       fontBold = true,
       paperWidth = 80,
-      charsPerLine = null, // NOUVEAU : Respect du paramètre charsPerLine
+      charsPerLine = null,
     } = options;
 
-    // Calculer la largeur - PRIORITÉ au charsPerLine
-    let maxWidth;
-    if (charsPerLine && charsPerLine > 0) {
-      maxWidth = charsPerLine;
-    } else if (paperWidth <= 58) {
-      maxWidth = 32;
-    } else if (paperWidth <= 80) {
-      maxWidth = 42;
-    } else {
-      maxWidth = 56;
-    }
+    // Calculer la largeur effective avec la taille de police
+    const effectiveWidth = this.calculateEffectiveWidth({ paperWidth, charsPerLine, fontSize });
 
-    console.log(`Ticket avec largeur max: ${maxWidth} caractères`);
+    console.log(`=== IMPRESSION TICKET ===`);
+    console.log(`Paramètres: ${paperWidth}mm, Police ${fontSize}pt`);
+    console.log(`Largeur effective: ${effectiveWidth} caractères`);
 
     const receiptLines = [];
 
-    // En-tête - TOUT À GAUCHE
-    receiptLines.push(this.formatText(storeName.toUpperCase(), maxWidth));
+    // En-tête
+    receiptLines.push(this.formatText(storeName.toUpperCase(), effectiveWidth));
     if (storeAddress) {
-      receiptLines.push(this.formatText(storeAddress, maxWidth));
+      receiptLines.push(this.formatText(storeAddress, effectiveWidth));
     }
     receiptLines.push('');
 
-    // Informations transaction - FORMAT SÉCURISÉ
+    // Informations transaction
     const now = new Date();
-    const dateStr = now.toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-    const timeStr = now.toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
+    const dateStr = now.toLocaleDateString('fr-FR');
+    const timeStr = now.toLocaleTimeString('fr-FR');
 
-    receiptLines.push(`Date: ${dateStr}`.substring(0, maxWidth));
-    receiptLines.push(`Heure: ${timeStr}`.substring(0, maxWidth));
+    receiptLines.push(`Date: ${dateStr}`.substring(0, effectiveWidth));
+    receiptLines.push(`Heure: ${timeStr}`.substring(0, effectiveWidth));
 
     if (transactionId) {
       const cleanId = String(transactionId)
         .replace(/[^\w-]/g, '')
-        .substring(0, maxWidth - 2);
-      receiptLines.push('Transaction:');
-      receiptLines.push(cleanId);
+        .substring(0, effectiveWidth - 14);
+      receiptLines.push(`Transaction: ${cleanId}`.substring(0, effectiveWidth));
     }
 
     if (cashierName) {
-      const cleanCashier = this.formatText(cashierName, maxWidth);
-      receiptLines.push('Caissier:');
-      receiptLines.push(cleanCashier);
+      const cleanCashier = this.formatText(cashierName, effectiveWidth - 10);
+      receiptLines.push(`Caissier: ${cleanCashier}`.substring(0, effectiveWidth));
     }
 
     receiptLines.push('');
-    receiptLines.push('='.repeat(maxWidth));
+    receiptLines.push('='.repeat(effectiveWidth));
 
-    // Articles avec formatage adapté à la largeur
+    // Articles - CALCUL PRÉCIS DE L'ALIGNEMENT
     let total = 0;
     for (const item of items) {
       const qty = Math.max(1, parseInt(item.quantity) || 1);
@@ -568,55 +521,74 @@ try {
       const lineTotal = qty * price;
       total += lineTotal;
 
-      // Calculer l'espace disponible pour le nom
-      const priceText = `${lineTotal.toFixed(2)}`;
-      const maxNameLength = Math.max(5, maxWidth - priceText.length - 1); // -1 pour l'espace
+      // Format du prix (toujours XX.XX)
+      const priceText = lineTotal.toFixed(2);
+
+      // Espace réservé pour le prix (toujours à droite)
+      const priceSpace = priceText.length;
+
+      // Espace disponible pour le nom (CRITICAL: -1 pour l'espace séparateur)
+      const maxNameLength = effectiveWidth - priceSpace - 1;
+
       const name = this.formatText(item.name || 'Article', maxNameLength);
 
+      // Construction de la ligne avec espaces calculés PRÉCISÉMENT
+      const spacesNeeded = effectiveWidth - name.length - priceText.length;
+      const line = `${name}${' '.repeat(Math.max(1, spacesNeeded))}${priceText}`;
+
+      // VÉRIFICATION: la ligne ne doit JAMAIS dépasser effectiveWidth
+      const finalLine = line.substring(0, effectiveWidth);
+      receiptLines.push(finalLine);
+
+      console.log(
+        `Article: "${name}" (${name.length}) + ${spacesNeeded} espaces + "${priceText}" (${priceText.length}) = ${finalLine.length} chars`
+      );
+
+      // Détail quantité si > 1
       if (qty > 1) {
-        // Article sur 2 lignes pour petits tickets
-        receiptLines.push(name.substring(0, maxWidth));
-        const qtyPriceText = `${qty}x${price.toFixed(2)}`;
-        const spacesNeeded = Math.max(1, maxWidth - qtyPriceText.length - priceText.length);
-        receiptLines.push(
-          `${qtyPriceText}${' '.repeat(spacesNeeded)}${priceText}`.substring(0, maxWidth)
-        );
-      } else {
-        // Article sur 1 ligne avec calcul précis
-        const spacesNeeded = Math.max(1, maxWidth - name.length - priceText.length);
-        const line = `${name}${' '.repeat(spacesNeeded)}${priceText}`;
-        receiptLines.push(line.substring(0, maxWidth));
+        const detailLine = `  ${qty} x ${price.toFixed(2)}`;
+        receiptLines.push(detailLine.substring(0, effectiveWidth));
       }
     }
 
     // Séparateur et total
-    receiptLines.push('-'.repeat(maxWidth));
-    const totalText = 'TOTAL';
-    const totalAmount = `${total.toFixed(2)}`;
-    const spacesTotal = Math.max(1, maxWidth - totalText.length - totalAmount.length);
-    const totalLine = `${totalText}${' '.repeat(spacesTotal)}${totalAmount}`;
-    receiptLines.push(totalLine.substring(0, maxWidth));
-    receiptLines.push('='.repeat(maxWidth));
+    receiptLines.push('-'.repeat(effectiveWidth));
 
-    // Pied de page - TOUT À GAUCHE
+    const totalLabel = 'TOTAL';
+    const totalAmount = total.toFixed(2);
+    const spacesTotal = effectiveWidth - totalLabel.length - totalAmount.length;
+    const totalLine = `${totalLabel}${' '.repeat(Math.max(1, spacesTotal))}${totalAmount}`;
+    const finalTotalLine = totalLine.substring(0, effectiveWidth);
+
+    receiptLines.push(finalTotalLine);
+    console.log(
+      `Total: "${totalLabel}" + ${spacesTotal} espaces + "${totalAmount}" = ${finalTotalLine.length} chars`
+    );
+
+    receiptLines.push('='.repeat(effectiveWidth));
+
+    // Pied de page
     receiptLines.push('');
     receiptLines.push(
-      `Paiement: ${this.formatText(paymentMethod, maxWidth - 10)}`.substring(0, maxWidth)
+      `Paiement: ${this.formatText(paymentMethod, effectiveWidth - 10)}`.substring(
+        0,
+        effectiveWidth
+      )
     );
     receiptLines.push('');
-    receiptLines.push('Merci de votre visite !'.substring(0, maxWidth));
-    receiptLines.push('');
+    receiptLines.push('Merci de votre visite !'.substring(0, effectiveWidth));
     receiptLines.push('');
 
-    // Imprimer tout le ticket en une fois avec options précises
+    // Imprimer tout le ticket
     const fullReceipt = receiptLines.join('\n');
+
     await this.printText(fullReceipt, {
       autoWrap: false,
       fontSize,
       bold: fontBold,
       paperWidth,
       align: 'left',
-      charsPerLine: maxWidth + 2, // Petite marge de sécurité
+      charsPerLine: effectiveWidth,
     });
 
     return {
@@ -624,13 +596,23 @@ try {
       message: 'Ticket imprimé',
       total: total.toFixed(2),
       itemCount: items.length,
+      effectiveWidth,
     };
   }
 
-  // === CONTRÔLES PAPIER (OPTIONNEL) ===
+  // === AUTRES MÉTHODES ===
+
+  async printLine(leftText = '', rightText = '', separator = '.') {
+    const effectiveWidth = this.calculateEffectiveWidth({ paperWidth: 80 });
+    const left = this.formatText(leftText, Math.floor(effectiveWidth * 0.4));
+    const right = this.formatText(rightText, Math.floor(effectiveWidth * 0.3));
+    const separatorLength = effectiveWidth - left.length - right.length;
+    const separators = separator.repeat(Math.max(1, separatorLength));
+
+    return await this.printText(left + separators + right);
+  }
 
   async cutPaper(fullCut = false) {
-    // Simuler la coupe avec des sauts de ligne
     return await this.printText('\n\n\n\n');
   }
 
@@ -643,7 +625,60 @@ try {
     throw new Error('Ouverture tiroir-caisse non supportée via PowerShell .NET');
   }
 
-  // === TEST DE COMPATIBILITÉ ===
+  async printBarcode(data, type = 'CODE128') {
+    throw new Error('Impression code-barres non supportée via PowerShell .NET');
+  }
+
+  async testPrinter() {
+    await this.printText('=== TEST IMPRIMANTE POS ===', { bold: true });
+    await this.printText('');
+    await this.printText('Test impression simple');
+    await this.printLine('Article test', '12.50 EUR');
+    await this.feedPaper(2);
+
+    return {
+      success: true,
+      message: 'Test imprimante terminé',
+    };
+  }
+
+  // === CALIBRATION AUTOMATIQUE ===
+
+  async calibratePrinter(paperWidth = 80, fontSize = 10) {
+    console.log(`\n╔════════════════════════════════════════════════╗`);
+    console.log(`║  CALIBRATION IMPRIMANTE                        ║`);
+    console.log(`╠════════════════════════════════════════════════╣`);
+    console.log(`║  Papier: ${paperWidth}mm | Police: ${fontSize}pt                ║`);
+    console.log(`╚════════════════════════════════════════════════╝\n`);
+
+    // Test de différentes largeurs - SANS FORCER charsPerLine pour voir les débordements
+    const testWidths = [20, 25, 30, 35, 40, 45, 50, 55, 60];
+
+    for (const testWidth of testWidths) {
+      // Créer une ligne de la longueur exacte demandée
+      const line = `${testWidth}: ${'='.repeat(testWidth - 4)}`;
+
+      console.log(`Test ${testWidth} chars: "${line}" (longueur: ${line.length})`);
+
+      // NE PAS forcer charsPerLine - laisser déborder naturellement
+      await this.printText(line, {
+        fontSize,
+        paperWidth,
+        bold: false,
+        align: 'left',
+        autoWrap: false, // Important: pas de wrap automatique
+      });
+    }
+
+    await this.feedPaper(4);
+
+    return {
+      success: true,
+      message: 'Test de calibration imprimé',
+      instructions: 'La ligne parfaite reste sur une seule ligne sans déborder',
+      testedWidths: testWidths,
+    };
+  }
 
   async testPowerShellCapabilities() {
     try {

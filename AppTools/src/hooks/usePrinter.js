@@ -245,6 +245,25 @@ export const usePrinter = () => {
     return response;
   }, [connectionStatus.connected]);
 
+  // === NOUVELLE FONCTION : CALIBRATION ===
+
+  const calibratePrinter = useCallback(
+    async (paperWidth = 80, fontSize = 10) => {
+      if (!connectionStatus.connected) {
+        throw new Error('Imprimante non connectée');
+      }
+
+      const response = await printerService.calibratePrinter(paperWidth, fontSize);
+      setConnectionStatus((prev) => ({
+        ...prev,
+        printCount: prev.printCount + 1,
+        lastPrint: new Date().toLocaleTimeString(),
+      }));
+      return response;
+    },
+    [connectionStatus.connected]
+  );
+
   // Test des capacités PowerShell
   const testCapabilities = useCallback(async () => {
     try {
@@ -338,6 +357,7 @@ export const usePrinter = () => {
 
     // Tests
     testPrinter,
+    calibratePrinter, // NOUVEAU
     testCapabilities,
 
     // Utilitaires

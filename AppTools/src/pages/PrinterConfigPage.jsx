@@ -11,21 +11,19 @@ import {
   CheckCircle,
   XCircle,
   Send,
-  Trash2,
   Info,
-  FileText,
   Receipt,
   Scissors,
   ArrowDown,
-  Type,
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Ruler,
 } from 'lucide-react';
 import { usePrinter } from '../hooks/usePrinter';
+import { useToastStore } from '../components/common/EntityTable/components/BatchActions/stores/useToastStore';
 
 const PrinterConfigPage = () => {
-  // Utilisation du hook Printer
   const {
     printers,
     selectedPrinter,
@@ -38,20 +36,21 @@ const PrinterConfigPage = () => {
     setSelectedPrinter,
     updateConfig,
     printText,
-    printLine,
     printReceipt,
     cutPaper,
     feedPaper,
     testPrinter,
+    calibratePrinter,
     isConnected,
     isLoading,
   } = usePrinter();
 
-  // États locaux pour l'interface
+  const { success, error, info } = useToastStore();
+
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [calibrating, setCalibrating] = useState(false);
 
-  // États des messages de test
   const [testMessage, setTestMessage] = useState({
     text: 'Test impression POS',
     options: {
@@ -60,11 +59,10 @@ const PrinterConfigPage = () => {
       fontSize: 10,
       bold: true,
       align: 'left',
-      charsPerLine: null,
+      charsPerLine: 30, // VALEUR PAR DÉFAUT : 30 caractères
     },
   });
 
-  // États des tests avancés
   const [receiptTest, setReceiptTest] = useState({
     storeName: 'MAGASIN TEST',
     storeAddress: '123 Rue de la Paix',
@@ -82,7 +80,6 @@ const PrinterConfigPage = () => {
     separator: '.',
   });
 
-  // Handlers optimisés
   const handleConnect = async () => {
     try {
       await connect();
@@ -107,38 +104,18 @@ const PrinterConfigPage = () => {
     }
   };
 
-  const handlePrintTestLine = async () => {
-    try {
-      // D'abord imprimer la ligne avec les options de formatage
-      await printText(
-        `${lineTest.leftText}${lineTest.separator.repeat(Math.max(1, 20))}${lineTest.rightText}`,
-        {
-          autoWrap: testMessage.options.autoWrap,
-          paperWidth: testMessage.options.paperWidth,
-          fontSize: testMessage.options.fontSize,
-          bold: testMessage.options.bold,
-          align: testMessage.options.align,
-          charsPerLine: testMessage.options.charsPerLine,
-        }
-      );
-    } catch (error) {
-      console.error('Erreur impression ligne:', error);
-    }
-  };
-
   const handlePrintTestReceipt = async () => {
     try {
-      // Utiliser les options du test message pour l'impression du ticket
       const receiptOptions = {
         storeName: receiptTest.storeName,
         storeAddress: receiptTest.storeAddress,
         cashierName: receiptTest.cashierName,
         paymentMethod: receiptTest.paymentMethod,
         transactionId: `TEST-${Date.now()}`,
-        // Appliquer les options de formatage du test message
         fontSize: testMessage.options.fontSize,
         fontBold: testMessage.options.bold,
         paperWidth: testMessage.options.paperWidth,
+        charsPerLine: testMessage.options.charsPerLine,
       };
 
       await printReceipt(receiptTest.items, receiptOptions);
@@ -174,6 +151,28 @@ const PrinterConfigPage = () => {
     }
   };
 
+  // NOUVELLE FONCTION : Calibration avec toast
+  const handleCalibrate = async () => {
+    setCalibrating(true);
+    try {
+      await calibratePrinter(testMessage.options.paperWidth, testMessage.options.fontSize);
+      success(
+        'Test de calibration imprimé ! Trouvez la ligne qui ne déborde pas et utilisez son numéro dans "Caractères/ligne".',
+        {
+          duration: 8000,
+          title: 'Calibration lancée',
+        }
+      );
+    } catch (error) {
+      console.error('Erreur calibration:', error);
+      error('Erreur lors de la calibration : ' + error.message, {
+        title: 'Erreur de calibration',
+      });
+    } finally {
+      setCalibrating(false);
+    }
+  };
+
   const handleConfigChange = (field, value) => {
     try {
       updateConfig({ [field]: value });
@@ -200,7 +199,6 @@ const PrinterConfigPage = () => {
     }
   };
 
-  // Composant StatusBadge
   const StatusBadge = ({ connected, loading }) => {
     if (loading) {
       return (
@@ -264,7 +262,6 @@ const PrinterConfigPage = () => {
               </button>
             </div>
 
-            {/* Sélection de l'imprimante */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Imprimante
@@ -284,7 +281,6 @@ const PrinterConfigPage = () => {
               </select>
             </div>
 
-            {/* Configuration avancée */}
             <div className="mb-4">
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
@@ -345,7 +341,6 @@ const PrinterConfigPage = () => {
               )}
             </div>
 
-            {/* Boutons de connexion */}
             <div className="flex space-x-3">
               {!isConnected ? (
                 <button
@@ -367,7 +362,6 @@ const PrinterConfigPage = () => {
               )}
             </div>
 
-            {/* Erreur de connexion */}
             {connectionStatus.error && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
                 <div className="flex items-center">
@@ -425,7 +419,6 @@ const PrinterConfigPage = () => {
               )}
             </div>
 
-            {/* Configuration active */}
             {connectionStatus.config && (
               <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                 <div className="flex items-center mb-2">
@@ -442,26 +435,6 @@ const PrinterConfigPage = () => {
                 </div>
               </div>
             )}
-
-            {/* Aperçu des paramètres de test */}
-            <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-md">
-              <div className="flex items-center mb-2">
-                <Info className="w-4 h-4 text-green-500 mr-2" />
-                <span className="text-sm font-medium text-green-800 dark:text-green-300">
-                  Paramètres de test actuels
-                </span>
-              </div>
-              <div className="text-xs text-green-700 dark:text-green-400 space-y-1">
-                <div>Papier: {testMessage.options.paperWidth}mm</div>
-                <div>Police: {testMessage.options.fontSize}pt</div>
-                <div>Gras: {testMessage.options.bold ? 'Oui' : 'Non'}</div>
-                <div>Alignement: {testMessage.options.align}</div>
-                <div>Retour auto: {testMessage.options.autoWrap ? 'Oui' : 'Non'}</div>
-                {testMessage.options.charsPerLine && (
-                  <div>Chars/ligne: {testMessage.options.charsPerLine}</div>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Panneau de test des messages */}
@@ -471,6 +444,15 @@ const PrinterConfigPage = () => {
                 Test d'impression
               </h2>
               <div className="flex space-x-2">
+                <button
+                  onClick={handleCalibrate}
+                  disabled={!isConnected || calibrating}
+                  className="inline-flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded-md hover:bg-orange-200 disabled:opacity-50"
+                  title="Imprimer un test pour trouver la largeur optimale"
+                >
+                  <Ruler className={`w-4 h-4 mr-1 ${calibrating ? 'animate-pulse' : ''}`} />
+                  Calibration
+                </button>
                 <button
                   onClick={handleRunTest}
                   disabled={!isConnected || testing}
@@ -501,7 +483,6 @@ const PrinterConfigPage = () => {
                   />
                 </div>
 
-                {/* Options d'impression */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -522,6 +503,27 @@ const PrinterConfigPage = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                      Taille police
+                    </label>
+                    <select
+                      value={testMessage.options.fontSize}
+                      onChange={(e) =>
+                        handleTestMessageChange('options.fontSize', parseInt(e.target.value))
+                      }
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                    >
+                      <option value={8}>8pt</option>
+                      <option value={9}>9pt</option>
+                      <option value={10}>10pt</option>
+                      <option value={11}>11pt</option>
+                      <option value={12}>12pt</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                       Caractères/ligne
                     </label>
                     <input
@@ -539,31 +541,17 @@ const PrinterConfigPage = () => {
                       placeholder="Auto"
                     />
                   </div>
-                </div>
-
-                <div className="flex items-center space-x-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={testMessage.options.autoWrap}
-                      onChange={(e) =>
-                        handleTestMessageChange('options.autoWrap', e.target.checked)
-                      }
-                      className="mr-2"
-                    />
-                    <span className="text-xs text-gray-700 dark:text-gray-300">
-                      Retour automatique
-                    </span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={testMessage.options.bold}
-                      onChange={(e) => handleTestMessageChange('options.bold', e.target.checked)}
-                      className="mr-2"
-                    />
-                    <span className="text-xs text-gray-700 dark:text-gray-300">Gras</span>
-                  </label>
+                  <div className="flex items-end">
+                    <label className="flex items-center w-full">
+                      <input
+                        type="checkbox"
+                        checked={testMessage.options.bold}
+                        onChange={(e) => handleTestMessageChange('options.bold', e.target.checked)}
+                        className="mr-2"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">Gras</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -605,53 +593,6 @@ const PrinterConfigPage = () => {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Tests avancés
             </h2>
-
-            {/* Test ligne formatée */}
-            <div className="mb-6">
-              <h3 className="text-md font-medium text-gray-900 dark:text-white mb-2">
-                Ligne formatée
-              </h3>
-              <div className="space-y-2">
-                <div className="grid grid-cols-3 gap-2">
-                  <input
-                    type="text"
-                    value={lineTest.leftText}
-                    onChange={(e) => setLineTest((prev) => ({ ...prev, leftText: e.target.value }))}
-                    placeholder="Texte gauche"
-                    className="px-2 py-1 text-sm border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                  <input
-                    type="text"
-                    value={lineTest.separator}
-                    onChange={(e) =>
-                      setLineTest((prev) => ({ ...prev, separator: e.target.value }))
-                    }
-                    placeholder="Sep"
-                    maxLength={1}
-                    className="px-2 py-1 text-sm border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                  <input
-                    type="text"
-                    value={lineTest.rightText}
-                    onChange={(e) =>
-                      setLineTest((prev) => ({ ...prev, rightText: e.target.value }))
-                    }
-                    placeholder="Texte droite"
-                    className="px-2 py-1 text-sm border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-                <button
-                  onClick={handlePrintTestLine}
-                  disabled={!isConnected}
-                  className="w-full px-3 py-2 text-sm bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 disabled:opacity-50"
-                >
-                  <FileText className="w-4 h-4 mr-2 inline" />
-                  Imprimer ligne
-                </button>
-              </div>
-            </div>
-
-            {/* Test ticket complet */}
             <div className="mb-6">
               <h3 className="text-md font-medium text-gray-900 dark:text-white mb-2">
                 Ticket de caisse
@@ -697,7 +638,6 @@ const PrinterConfigPage = () => {
                   <option value="VIREMENT">Virement</option>
                 </select>
 
-                {/* Articles du ticket */}
                 <div className="mt-3 space-y-2">
                   <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Articles :
@@ -741,7 +681,6 @@ const PrinterConfigPage = () => {
                     </div>
                   ))}
 
-                  {/* Boutons pour gérer les articles */}
                   <div className="flex space-x-2">
                     <button
                       onClick={() => {
@@ -789,7 +728,6 @@ const PrinterConfigPage = () => {
               </div>
             </div>
 
-            {/* Contrôles papier */}
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleFeedPaper}
@@ -819,34 +757,51 @@ const PrinterConfigPage = () => {
               <h4 className="font-medium mb-2">Notes d'utilisation :</h4>
               <ul className="space-y-1 list-disc list-inside text-xs">
                 <li>
-                  <strong>Paramètres unifiés :</strong> Les options définies dans "Message simple"
-                  s'appliquent à tous les tests (lignes, tickets)
+                  <strong>Calibration :</strong> Imprime des lignes de différentes longueurs (20-60
+                  caractères). Utilisez le numéro de la dernière ligne qui NE déborde PAS.
                 </li>
                 <li>
-                  <strong>Largeurs supportées :</strong> 30mm, 58mm, 80mm et 110mm avec calcul
-                  automatique des caractères par ligne
+                  <strong>Caractères/ligne (défaut 30) :</strong> Contrôle la largeur du ticket. Si
+                  les totaux débordent → Réduisez. Si trop d'espace → Augmentez.
                 </li>
                 <li>
-                  <strong>Retour automatique :</strong> Découpe intelligent du texte selon la
-                  largeur configurée
+                  <strong>Taille de police :</strong> Plus grande (12pt) = moins de caractères. Plus
+                  petite (8pt) = plus de caractères.
                 </li>
                 <li>
-                  <strong>Contrôle précis :</strong> Forcez le nombre de caractères par ligne pour
-                  un contrôle manuel
-                </li>
-                <li>
-                  <strong>Accents :</strong> Conversion automatique (è→e, é→e, etc.) pour
-                  compatibilité maximale
-                </li>
-                <li>
-                  <strong>Compatibilité :</strong> Méthode PowerShell .NET avec fallback automatique
-                  sur tous Windows
-                </li>
-                <li>
-                  <strong>Ticket personnalisable :</strong> Modifiez les articles, prix et
-                  informations magasin en temps réel
+                  <strong>Largeurs papier :</strong> 30mm, 58mm, 80mm, 110mm supportées
                 </li>
               </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Panneau d'aide calibration */}
+        <div className="mt-6 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+          <div className="flex items-start">
+            <Ruler className="w-5 h-5 text-orange-500 mr-3 mt-0.5" />
+            <div className="text-sm text-orange-800 dark:text-orange-300">
+              <h4 className="font-medium mb-2">🎯 Calibration rapide :</h4>
+              <ol className="space-y-2 list-decimal list-inside text-xs">
+                <li>
+                  Cliquez sur <strong>"Calibration"</strong>
+                </li>
+                <li>Regardez le ticket : lignes numérotées 20, 25, 30, 35, 40, 45, 50, 55, 60</li>
+                <li>
+                  Les lignes trop longues <strong>reviennent à la ligne</strong> (débordement
+                  visible)
+                </li>
+                <li>
+                  Notez le <strong>dernier numéro qui reste sur une seule ligne</strong>
+                </li>
+                <li>
+                  Entrez ce nombre dans <strong>"Caractères/ligne"</strong>
+                </li>
+              </ol>
+              <div className="mt-3 p-2 bg-orange-100 dark:bg-orange-900/40 rounded text-xs">
+                <strong>Exemple :</strong> Si les lignes 20-35 restent sur une ligne, mais 40+
+                débordent → Utilisez <strong>35</strong>
+              </div>
             </div>
           </div>
         </div>

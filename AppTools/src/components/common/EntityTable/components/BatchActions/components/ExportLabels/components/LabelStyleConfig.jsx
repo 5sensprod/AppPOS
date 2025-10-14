@@ -424,8 +424,7 @@ const WooQRStylePanel = ({ style, onUpdate }) => (
         <div>
           <div className="font-medium mb-0.5">URL WooCommerce</div>
           <div className="text-xs opacity-90">
-            Le QR code pointera vers l'URL du produit sur votre boutique (champ{' '}
-            <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">website_url</code>)
+            Le QR code pointera vers l'URL du produit sur votre boutique
           </div>
         </div>
       </div>

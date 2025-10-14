@@ -40,7 +40,12 @@ router.post(
   printerController.openCashDrawer.bind(printerController)
 );
 
-// === TEST ===
+// === TEST & CALIBRATION ===
 router.post('/test', updateActivity, printerController.testPrinter.bind(printerController));
+router.post(
+  '/calibrate',
+  updateActivity,
+  printerController.calibratePrinter.bind(printerController)
+);
 
 module.exports = router;
