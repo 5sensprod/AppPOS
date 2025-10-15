@@ -1,4 +1,4 @@
-// BaseLabelRenderer.js - VERSION AVEC COULEURS
+// BaseLabelRenderer.js - VERSION COMPLÈTE AVEC CACHE QR CODES
 import JsBarcode from 'jsbarcode';
 import { formatCurrency } from '../../../../../../../../utils/formatters.js';
 import { QRCodeSVG } from 'qrcode.react';
@@ -11,6 +11,9 @@ class BaseLabelRenderer {
       display: 1,
       highRes: 200 / 96,
     };
+
+    // 🆕 CACHE pour les QR codes générés
+    this.qrCodeCache = new Map();
   }
 
   getScaleFactor(context = 'display') {
@@ -19,9 +22,44 @@ class BaseLabelRenderer {
       : this.SCALES.highRes;
   }
 
-  // 🎨 NOUVEAU : Helper pour obtenir la couleur d'un élément
+  // 🎨 Helper pour obtenir la couleur d'un élément
   _getElementColor(style, elementType, defaultColor = '#000000') {
     return style.colors?.[elementType] || defaultColor;
+  }
+
+  // 🆕 Méthode pour générer une clé de cache unique
+  _getQRCacheKey(value, size, color) {
+    return `${value}-${Math.round(size)}-${color}`;
+  }
+
+  // 🆕 Méthode pour récupérer un QR code du cache ou le générer
+  async _getOrCreateQRCode(value, size, color, onGenerate) {
+    const cacheKey = this._getQRCacheKey(value, size, color);
+
+    // Si déjà en cache, retourner immédiatement (IMAGE SRC, pas objet Fabric)
+    if (this.qrCodeCache.has(cacheKey)) {
+      console.log('✅ QR Code depuis cache:', cacheKey);
+      return this.qrCodeCache.get(cacheKey);
+    }
+
+    // Sinon, générer et mettre en cache (stocker l'IMAGE SRC)
+    console.log('🔄 Génération nouveau QR Code:', cacheKey);
+    const qrImageSrc = await onGenerate();
+
+    // Limiter la taille du cache (max 50 QR codes)
+    if (this.qrCodeCache.size >= 50) {
+      const firstKey = this.qrCodeCache.keys().next().value;
+      this.qrCodeCache.delete(firstKey);
+    }
+
+    this.qrCodeCache.set(cacheKey, qrImageSrc);
+    return qrImageSrc;
+  }
+
+  // 🆕 Méthode pour vider le cache si nécessaire
+  clearQRCache() {
+    console.log('🗑️ Cache QR codes vidé');
+    this.qrCodeCache.clear();
   }
 
   async renderToCanvas(canvasElement, label, layout, style, options = {}) {
@@ -307,22 +345,22 @@ class BaseLabelRenderer {
     return elements;
   }
 
-  // 🎨 MISE À JOUR : Ajout de texte avec couleur personnalisée
+  // 🎨 Ajout de texte avec couleur personnalisée
   async _addText(fabricCanvas, text, element, style, fabric, type) {
     let fontWeight = 'normal';
     let fontFamily = 'Arial';
-    let textColor = '#000000'; // 🎨 Couleur par défaut
+    let textColor = '#000000';
 
     switch (type) {
       case 'price':
         fontWeight = style.priceWeight || 'bold';
         fontFamily = style.priceFontFamily || style.fontFamily || 'Arial';
-        textColor = this._getElementColor(style, 'price', '#000000'); // 🎨
+        textColor = this._getElementColor(style, 'price', '#000000');
         break;
       case 'name':
         fontWeight = style.nameWeight || 'bold';
         fontFamily = style.nameFontFamily || style.fontFamily || 'Arial';
-        textColor = this._getElementColor(style, 'name', '#000000'); // 🎨
+        textColor = this._getElementColor(style, 'name', '#000000');
         break;
       case 'sku':
         fontWeight = style.skuWeight || 'normal';
@@ -342,12 +380,12 @@ class BaseLabelRenderer {
       case 'barcodeText':
         fontWeight = 'normal';
         fontFamily = 'Courier New';
-        textColor = this._getElementColor(style, 'barcodeText', '#000000'); // 🎨
+        textColor = this._getElementColor(style, 'barcodeText', '#000000');
         break;
       case 'wooQRText':
         fontWeight = 'normal';
         fontFamily = 'Arial';
-        textColor = this._getElementColor(style, 'wooQRText', '#000000'); // 🎨
+        textColor = this._getElementColor(style, 'wooQRText', '#000000');
         break;
       default:
         fontWeight = 'normal';
@@ -362,7 +400,7 @@ class BaseLabelRenderer {
       fontSize: element.fontSize,
       fontFamily: fontFamily,
       fontWeight: fontWeight,
-      fill: textColor, // 🎨 Couleur appliquée
+      fill: textColor,
       selectable: false,
       paintFirst: 'fill',
     });
@@ -386,14 +424,13 @@ class BaseLabelRenderer {
     fabricCanvas.add(textObj);
   }
 
-  // 🎨 MISE À JOUR : Bordure avec couleur personnalisée
+  // 🎨 Bordure avec couleur personnalisée
   async _addBorder(fabricCanvas, layout, style, fabric, scaleFactor = 1) {
     const width = layout.width * this.mmToPx * scaleFactor;
     const height = layout.height * this.mmToPx * scaleFactor;
     const borderWidth = (style.borderWidth || 1) * this.mmToPx * scaleFactor * 2;
     const offset = borderWidth;
 
-    // 🎨 Utiliser la couleur personnalisée ou fallback sur borderColor
     const borderColor = this._getElementColor(style, 'border', style.borderColor || '#000000');
 
     const border = new fabric.Rect({
@@ -402,7 +439,7 @@ class BaseLabelRenderer {
       width: width - offset * 2,
       height: height - offset * 2,
       fill: 'transparent',
-      stroke: borderColor, // 🎨 Couleur appliquée
+      stroke: borderColor,
       strokeWidth: borderWidth,
       strokeUniform: true,
       selectable: false,
@@ -411,7 +448,7 @@ class BaseLabelRenderer {
     fabricCanvas.add(border);
   }
 
-  // 🎨 MISE À JOUR : Code-barres avec couleur personnalisée
+  // 🎨 Code-barres avec couleur personnalisée
   async _addBarcode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     try {
       if (style.barcodeType === 'qrcode') {
@@ -437,7 +474,6 @@ class BaseLabelRenderer {
 
         barWidth *= scaleFactor;
 
-        // 🎨 Couleur personnalisée pour le code-barres
         const barcodeColor = this._getElementColor(style, 'barcode', '#000000');
 
         JsBarcode(barcodeCanvas, label.barcode, {
@@ -446,7 +482,7 @@ class BaseLabelRenderer {
           height: element.barcodeHeight * 0.85,
           displayValue: false,
           background: '#ffffff',
-          lineColor: barcodeColor, // 🎨 Couleur appliquée
+          lineColor: barcodeColor,
           margin: 0,
           flat: true,
         });
@@ -467,7 +503,7 @@ class BaseLabelRenderer {
         const displayText =
           style.barcodeType === 'qrcode' ? label.barcode : this._formatBarcodeText(label.barcode);
 
-        const textColor = this._getElementColor(style, 'barcodeText', '#000000'); // 🎨
+        const textColor = this._getElementColor(style, 'barcodeText', '#000000');
 
         const barcodeText = new fabric.Text(displayText, {
           left: element.centerX,
@@ -475,7 +511,7 @@ class BaseLabelRenderer {
           originX: 'center',
           fontSize: fontSize,
           fontFamily: 'Arial',
-          fill: textColor, // 🎨 Couleur appliquée
+          fill: textColor,
           selectable: false,
           paintFirst: 'fill',
         });
@@ -497,196 +533,139 @@ class BaseLabelRenderer {
     }
   }
 
-  // 🎨 MISE À JOUR : QR Code avec couleur personnalisée
+  // 🎨 QR Code avec cache et couleur personnalisée
   async _addQRCode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
     const qrSize = (style.qrCodeSize || 20) * this.mmToPx * scaleFactor;
-    const qrColor = this._getElementColor(style, 'barcode', '#000000'); // 🎨
+    const qrColor = this._getElementColor(style, 'barcode', '#000000');
 
     try {
-      const tempContainer = document.createElement('div');
-      tempContainer.style.position = 'absolute';
-      tempContainer.style.left = '-9999px';
-      tempContainer.style.top = '-9999px';
-      tempContainer.style.pointerEvents = 'none';
-      document.body.appendChild(tempContainer);
-
-      const qrContainer = document.createElement('div');
-      tempContainer.appendChild(qrContainer);
-
-      const React = await import('react');
-      const { createRoot } = await import('react-dom/client');
-
-      const qrElement = React.createElement(QRCodeSVG, {
-        value: label.barcode,
-        size: Math.round(qrSize),
-        level: 'M',
-        includeMargin: false,
-        bgColor: '#ffffff',
-        fgColor: qrColor, // 🎨 Couleur appliquée
+      // 🎯 Récupérer l'image source depuis le cache (pas l'objet Fabric)
+      const qrImageSrc = await this._getOrCreateQRCode(label.barcode, qrSize, qrColor, async () => {
+        return await this._generateQRCodeImage(label.barcode, qrSize, qrColor);
       });
 
+      // Créer un nouvel objet Fabric.Image à partir de la source
+      const img = new Image();
       await new Promise((resolve, reject) => {
-        try {
-          const root = createRoot(qrContainer);
-          root.render(qrElement);
-
-          setTimeout(() => {
-            try {
-              const svgElement = qrContainer.querySelector('svg');
-              if (svgElement) {
-                const svgString = new XMLSerializer().serializeToString(svgElement);
-                const img = new Image();
-
-                img.onload = () => {
-                  const qrImage = new fabric.Image(img, {
-                    left: element.centerX,
-                    top: element.y,
-                    originX: 'center',
-                    originY: 'top',
-                    selectable: false,
-                  });
-
-                  fabricCanvas.add(qrImage);
-                  root.unmount();
-                  document.body.removeChild(tempContainer);
-                  resolve();
-                };
-
-                img.onerror = () => {
-                  root.unmount();
-                  document.body.removeChild(tempContainer);
-                  this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
-                  reject(new Error('Erreur chargement QR Code'));
-                };
-
-                img.src =
-                  'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
-              } else {
-                root.unmount();
-                document.body.removeChild(tempContainer);
-                this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
-                reject(new Error('SVG non généré'));
-              }
-            } catch (err) {
-              root.unmount();
-              document.body.removeChild(tempContainer);
-              this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
-              reject(err);
-            }
-          }, 100);
-        } catch (err) {
-          this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
-          reject(err);
-        }
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = qrImageSrc;
       });
+
+      const qrImage = new fabric.Image(img, {
+        left: element.centerX,
+        top: element.y,
+        originX: 'center',
+        originY: 'top',
+        selectable: false,
+      });
+
+      fabricCanvas.add(qrImage);
     } catch (error) {
       console.error('❌ Erreur génération QR Code:', error);
       this._addFallbackQR(fabricCanvas, element, label.barcode, fabric);
     }
   }
 
-  // 🎨 MISE À JOUR : QR Code WooCommerce avec couleur personnalisée
-  async _addWooQRCode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
-    const qrSize = element.qrSize;
-    const qrColor = this._getElementColor(style, 'wooQR', '#000000'); // 🎨
+  // 🆕 Méthode séparée pour générer l'image QR (retourne DATA URL)
+  async _generateQRCodeImage(value, qrSize, qrColor) {
+    const tempContainer = document.createElement('div');
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.top = '-9999px';
+    tempContainer.style.pointerEvents = 'none';
+    document.body.appendChild(tempContainer);
 
-    try {
-      const tempContainer = document.createElement('div');
-      tempContainer.style.position = 'absolute';
-      tempContainer.style.left = '-9999px';
-      tempContainer.style.top = '-9999px';
-      tempContainer.style.pointerEvents = 'none';
-      document.body.appendChild(tempContainer);
+    const qrContainer = document.createElement('div');
+    tempContainer.appendChild(qrContainer);
 
-      const qrContainer = document.createElement('div');
-      tempContainer.appendChild(qrContainer);
+    const React = await import('react');
+    const { createRoot } = await import('react-dom/client');
 
-      const React = await import('react');
-      const { createRoot } = await import('react-dom/client');
+    const qrElement = React.createElement(QRCodeSVG, {
+      value: value,
+      size: Math.round(qrSize),
+      level: 'M',
+      includeMargin: false,
+      bgColor: '#ffffff',
+      fgColor: qrColor,
+    });
 
-      const qrElement = React.createElement(QRCodeSVG, {
-        value: label.websiteUrl,
-        size: Math.round(qrSize),
-        level: 'M',
-        includeMargin: false,
-        bgColor: '#ffffff',
-        fgColor: qrColor, // 🎨 Couleur appliquée
-      });
+    return new Promise((resolve, reject) => {
+      try {
+        const root = createRoot(qrContainer);
+        root.render(qrElement);
 
-      await new Promise((resolve, reject) => {
-        try {
-          const root = createRoot(qrContainer);
-          root.render(qrElement);
+        setTimeout(() => {
+          try {
+            const svgElement = qrContainer.querySelector('svg');
+            if (svgElement) {
+              const svgString = new XMLSerializer().serializeToString(svgElement);
 
-          setTimeout(() => {
-            try {
-              const svgElement = qrContainer.querySelector('svg');
-              if (svgElement) {
-                const svgString = new XMLSerializer().serializeToString(svgElement);
-                const img = new Image();
+              // Retourner la DATA URL directement (pas d'objet Fabric)
+              const dataUrl =
+                'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
 
-                img.onload = () => {
-                  const qrImage = new fabric.Image(img, {
-                    left: element.centerX || element.x + qrSize / 2,
-                    top: element.y,
-                    originX: 'center',
-                    originY: 'top',
-                    selectable: false,
-                  });
-
-                  qrImage.wooQRCode = true;
-                  fabricCanvas.add(qrImage);
-
-                  root.unmount();
-                  document.body.removeChild(tempContainer);
-                  resolve();
-                };
-
-                img.onerror = () => {
-                  root.unmount();
-                  document.body.removeChild(tempContainer);
-                  this._addFallbackWooQR(
-                    fabricCanvas,
-                    element,
-                    label.websiteUrl,
-                    fabric,
-                    scaleFactor
-                  );
-                  reject(new Error('Erreur chargement QR WooCommerce'));
-                };
-
-                img.src =
-                  'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
-              } else {
-                root.unmount();
-                document.body.removeChild(tempContainer);
-                this._addFallbackWooQR(
-                  fabricCanvas,
-                  element,
-                  label.websiteUrl,
-                  fabric,
-                  scaleFactor
-                );
-                reject(new Error('SVG non généré'));
-              }
-            } catch (err) {
               root.unmount();
               document.body.removeChild(tempContainer);
-              this._addFallbackWooQR(fabricCanvas, element, label.websiteUrl, fabric, scaleFactor);
-              reject(err);
+              resolve(dataUrl);
+            } else {
+              root.unmount();
+              document.body.removeChild(tempContainer);
+              reject(new Error('SVG non généré'));
             }
-          }, 100);
-        } catch (err) {
-          this._addFallbackWooQR(fabricCanvas, element, label.websiteUrl, fabric, scaleFactor);
-          reject(err);
+          } catch (err) {
+            root.unmount();
+            document.body.removeChild(tempContainer);
+            reject(err);
+          }
+        }, 100);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  // 🎨 QR Code WooCommerce avec cache et couleur personnalisée
+  async _addWooQRCode(fabricCanvas, label, element, style, fabric, scaleFactor = 1) {
+    const qrSize = element.qrSize;
+    const qrColor = this._getElementColor(style, 'wooQR', '#000000');
+
+    try {
+      // 🎯 Récupérer l'image source depuis le cache
+      const qrImageSrc = await this._getOrCreateQRCode(
+        label.websiteUrl,
+        qrSize,
+        qrColor,
+        async () => {
+          return await this._generateQRCodeImage(label.websiteUrl, qrSize, qrColor);
         }
+      );
+
+      // Créer un nouvel objet Fabric.Image à partir de la source
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = qrImageSrc;
       });
+
+      const qrImage = new fabric.Image(img, {
+        left: element.centerX || element.x + qrSize / 2,
+        top: element.y,
+        originX: 'center',
+        originY: 'top',
+        selectable: false,
+      });
+
+      qrImage.wooQRCode = true;
+      fabricCanvas.add(qrImage);
 
       // Texte sous le QR Code WooCommerce avec couleur
       if (style.showWooQRText && element.textHeight > 0) {
         const fontSize = (style.wooQRTextSize || 7) * scaleFactor;
         const displayText = style.wooQRText || 'Voir en ligne';
-        const textColor = this._getElementColor(style, 'wooQRText', '#000000'); // 🎨
+        const textColor = this._getElementColor(style, 'wooQRText', '#000000');
 
         const wooQRText = new fabric.Text(displayText, {
           left: element.centerX || element.x + qrSize / 2,
@@ -694,7 +673,7 @@ class BaseLabelRenderer {
           originX: 'center',
           fontSize: fontSize,
           fontFamily: 'Arial',
-          fill: textColor, // 🎨 Couleur appliquée
+          fill: textColor,
           selectable: false,
           paintFirst: 'fill',
         });
@@ -709,7 +688,6 @@ class BaseLabelRenderer {
 
   _addFallbackQR(fabricCanvas, element, barcodeText, fabric) {
     const qrSize = element.barcodeHeight || 60;
-    const centerX = element.centerX || element.x + qrSize / 2;
 
     const background = new fabric.Rect({
       left: element.centerX,
