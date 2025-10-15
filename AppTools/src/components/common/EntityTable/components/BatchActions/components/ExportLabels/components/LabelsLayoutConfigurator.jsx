@@ -1,3 +1,4 @@
+//AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\LabelsLayoutConfigurator.jsx
 import React from 'react';
 import { Grid, Ruler, Palette } from 'lucide-react';
 import { useAccordion } from '../hooks/useAccordion';
