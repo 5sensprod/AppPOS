@@ -187,7 +187,7 @@ const ExportLabelsModal = ({
       title="Configurer l'export d'étiquettes"
       icon={Tags}
       footer={footer}
-      maxWidth="max-w-4xl"
+      fullScreen
     >
       <form id="export-labels-form" onSubmit={handleSubmit}>
         {/* Champ titre seulement en mode PDF - 🆕 Utilise effectiveExportMode */}

@@ -240,7 +240,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
           fabricCanvas.setHeight(newHeight);
         }
 
-        // 🆕 Gestion modifications - AVEC FLAG pour éviter boucles
+        // Gestion modifications - AVEC FLAG pour éviter boucles
         let modificationTimeout;
         fabricCanvas.on('object:modified', (e) => {
           clearTimeout(modificationTimeout);
@@ -282,7 +282,6 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
       clearTimeout(timeoutId);
     };
   }, [
-    // ⚠️ RETIRER style.customPositions d'ici !
     label?.id,
     label?.name,
     label?.price,

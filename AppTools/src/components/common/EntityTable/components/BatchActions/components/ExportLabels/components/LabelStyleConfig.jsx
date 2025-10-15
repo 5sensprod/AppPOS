@@ -1,4 +1,4 @@
-// LabelStyleConfig.jsx - VERSION AVEC COULEURS INTÉGRÉES
+// AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\LabelStyleConfig.jsx
 import React, { useState, useEffect } from 'react';
 import {
   RotateCcw,
@@ -13,7 +13,7 @@ import {
   EyeOff,
   Palette,
   Globe,
-  Type, // 🆕 AJOUTER
+  Type,
   Plus,
   Trash2,
   Copy,
@@ -23,7 +23,7 @@ import {
 import { useAccordion } from '../hooks/useAccordion';
 import FabricLabelCanvas from './FabricLabelCanvas';
 import PresetManager from './PresetManager';
-import ColorPicker from './ColorPicker'; // 🎨 IMPORT DU COLOR PICKER
+import ColorPicker from './ColorPicker';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 // ===== COMPOSANTS UI COMMUNS =====
