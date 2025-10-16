@@ -1,4 +1,4 @@
-// AppTools/src/components/common/EntityTable/components/BatchActions/components/ExportLabels/components/CustomImagesManager.jsx
+// CustomImagesManager.jsx - VERSION CORRIGÉE
 import React, { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, Upload, Trash2, Copy, Eye, EyeOff, Plus, X } from 'lucide-react';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
@@ -43,6 +43,27 @@ const CustomImagesManager = () => {
     );
   }
 
+  /**
+   * 🆕 Calculer les dimensions idéales basées sur le canvas actuel
+   */
+  const getAutoImageDimensions = () => {
+    const canvasWidth = currentLayout?.width || 50;
+    const canvasHeight = currentLayout?.height || 50;
+
+    console.log('📐 Canvas actuel:', { canvasWidth, canvasHeight });
+
+    // 90% de la largeur, 70% de la hauteur pour bien remplir
+    const calculatedWidth = Math.round(canvasWidth * 0.9);
+    const calculatedHeight = Math.round(canvasHeight * 0.7);
+
+    console.log('📏 Dimensions auto calculées:', { calculatedWidth, calculatedHeight });
+
+    return {
+      width: calculatedWidth,
+      height: calculatedHeight,
+    };
+  };
+
   // Gestion de l'upload
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
@@ -56,9 +77,19 @@ const CustomImagesManager = () => {
         // Recharger la bibliothèque
         await loadAvailableImages();
 
-        // Ajouter automatiquement la première image au preset
+        // 🎯 CORRECTION : Calculer les dimensions AVANT d'ajouter
+        const autoDims = getAutoImageDimensions();
+
+        console.log('✅ Upload réussi, ajout avec dimensions:', autoDims);
+
+        // Ajouter automatiquement la première image au preset avec dimensions auto
         if (result.images[0]) {
-          addCustomImage(result.images[0]);
+          addCustomImage({
+            src: result.images[0].src,
+            filename: result.images[0].filename,
+            width: autoDims.width, // ✅ Passer explicitement width
+            height: autoDims.height, // ✅ Passer explicitement height
+          });
         }
       }
     } catch (error) {
@@ -72,18 +103,23 @@ const CustomImagesManager = () => {
     }
   };
 
-  // Ajouter une image depuis la bibliothèque
+  // Ajouter une image depuis la bibliothèque avec dimensions auto
   const handleAddFromLibrary = (image) => {
+    const autoDims = getAutoImageDimensions();
+
+    console.log('📚 Ajout depuis bibliothèque avec dimensions:', autoDims);
+
     addCustomImage({
       src: image.src,
       filename: image.filename,
-      width: 50,
-      height: 50,
+      width: autoDims.width, // ✅ Passer explicitement width
+      height: autoDims.height, // ✅ Passer explicitement height
     });
     setShowLibrary(false);
   };
 
   const customImages = labelStyle.customImages || [];
+  const autoDims = getAutoImageDimensions();
 
   return (
     <div className="space-y-3">
@@ -98,6 +134,15 @@ const CustomImagesManager = () => {
         <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
           {customImages.length}
         </span>
+      </div>
+
+      {/* Info sur les dimensions auto */}
+      <div className="text-xs text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+        💡 Les images seront dimensionnées à{' '}
+        <strong className="text-blue-700 dark:text-blue-300">
+          {autoDims.width}×{autoDims.height}mm
+        </strong>{' '}
+        (Canvas: {currentLayout?.width}×{currentLayout?.height}mm)
       </div>
 
       {/* Boutons d'action */}
@@ -272,6 +317,28 @@ const ImageItem = ({ image, onUpdate, onRemove, onDuplicate }) => {
       {/* Paramètres détaillés */}
       {expanded && (
         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 space-y-2">
+          {/* Mode de redimensionnement */}
+          <div>
+            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+              Mode d'affichage
+            </label>
+            <select
+              value={image.fitMode || 'contain'}
+              onChange={(e) => onUpdate({ fitMode: e.target.value })}
+              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
+            >
+              <option value="contain">Contenir (proportions préservées)</option>
+              <option value="cover">Remplir (peut rogner)</option>
+              <option value="stretch">Étirer (peut déformer)</option>
+            </select>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {image.fitMode === 'cover' && "⚠️ L'image sera rognée pour remplir l'espace"}
+              {image.fitMode === 'stretch' && "⚠️ L'image peut être déformée"}
+              {(!image.fitMode || image.fitMode === 'contain') &&
+                '✅ Les proportions sont préservées'}
+            </div>
+          </div>
+
           {/* Dimensions */}
           <div className="grid grid-cols-2 gap-2">
             <div>
