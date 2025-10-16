@@ -79,7 +79,7 @@ class UserPresetController extends BaseController {
     }
   }
 
-  // DELETE /api/presets/:category/:id - Supprimer preset
+  // DELETE /api/presets/:category/:id - Supprimer preset personnel
   async deletePreset(req, res) {
     try {
       const { id } = req.params;
@@ -101,12 +101,34 @@ class UserPresetController extends BaseController {
     }
   }
 
+  // 🆕 DELETE /api/presets/:category/public/:id - Supprimer preset public
+  async deletePublicPreset(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const isAdmin = req.user?.role === 'admin';
+
+      const result = await this.model.deletePublicPreset(id, userId, isAdmin);
+
+      if (!result) {
+        return ResponseHandler.notFound(res, 'Preset non trouvé');
+      }
+
+      return ResponseHandler.success(res, { message: 'Preset public supprimé' });
+    } catch (error) {
+      if (error.message.includes('Non autorisé') || error.message.includes("n'est pas public")) {
+        return ResponseHandler.forbidden(res, error.message);
+      }
+      return ResponseHandler.error(res, error);
+    }
+  }
+
   // GET /api/presets/categories - Liste des catégories disponibles
   async getCategories(req, res) {
     try {
       const categories = [
         {
-          id: 'label_preset', // ← Unifié !
+          id: 'label_preset',
           name: "Presets d'étiquettes",
           description: 'Configuration complète (style + layout)',
         },

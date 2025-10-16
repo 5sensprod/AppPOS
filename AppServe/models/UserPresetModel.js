@@ -13,6 +13,7 @@ class UserPresetModel extends BaseModel {
       updated_at: new Date(),
       is_public: true,
       version: 1,
+      is_factory: false, // 🆕 Par défaut, pas un preset d'usine
     };
   }
 
@@ -65,15 +66,71 @@ class UserPresetModel extends BaseModel {
     }
   }
 
-  // Supprimer un preset avec vérification permissions
+  // 🔄 MODIFIÉ : Supprimer un preset utilisateur (personnel uniquement)
   async deleteUserPreset(presetId, userId, isAdmin = false) {
     const preset = await this.findById(presetId);
-    if (!preset) return false;
 
-    if (!isAdmin && preset.user_id !== userId) {
+    if (!preset) {
+      return false;
+    }
+
+    // 🛡️ Vérifier que ce n'est pas un preset d'usine
+    if (preset.is_factory) {
       throw new Error('Non autorisé à supprimer ce preset');
     }
 
+    // 🛡️ Si admin, peut supprimer n'importe quel preset (sauf factory)
+    if (isAdmin) {
+      return this.delete(presetId);
+    }
+
+    // 🛡️ Sinon, vérifier que l'utilisateur est le propriétaire
+    const presetUserId = preset.user_id?.toString() || preset.user_id;
+    const currentUserId = userId?.toString() || userId;
+
+    if (presetUserId !== currentUserId) {
+      throw new Error('Non autorisé à supprimer ce preset');
+    }
+
+    return this.delete(presetId);
+  }
+
+  // 🆕 NOUVEAU : Supprimer un preset public (avec vérifications spécifiques)
+  async deletePublicPreset(presetId, userId, isAdmin = false) {
+    const preset = await this.findById(presetId);
+
+    if (!preset) {
+      return false;
+    }
+
+    // 🛡️ Vérifier que c'est bien un preset public
+    if (!preset.is_public) {
+      throw new Error("Ce preset n'est pas public");
+    }
+
+    // 🛡️ Vérifier que ce n'est pas un preset d'usine
+    if (preset.is_factory) {
+      throw new Error("Non autorisé à supprimer un preset d'usine");
+    }
+
+    // 🛡️ Si admin, peut supprimer
+    if (isAdmin) {
+      return this.delete(presetId);
+    }
+
+    // 🛡️ Sinon, vérifier que l'utilisateur est le créateur
+    const presetUserId = preset.user_id?.toString() || preset.user_id;
+    const currentUserId = userId?.toString() || userId;
+
+    if (presetUserId !== currentUserId) {
+      throw new Error('Non autorisé à supprimer ce preset public');
+    }
+
+    return this.delete(presetId);
+  }
+
+  // 🆕 NOUVEAU : Supprimer par ID sans vérification (utilisé après contrôle)
+  async deleteById(presetId) {
     return this.delete(presetId);
   }
 }

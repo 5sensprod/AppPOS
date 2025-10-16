@@ -344,9 +344,13 @@ export const useLabelExportStore = create(
             case 'delete':
               const presetToDelete = get().savedPresets.find((p) => p._id === data.id);
               if (!presetToDelete) return false;
-              if (presetToDelete.is_factory) return false;
+              if (presetToDelete.is_factory) {
+                console.warn("Impossible de supprimer un preset d'usine");
+                return false;
+              }
 
-              await userPresetService.deletePreset(category, data.id);
+              // Appeler la méthode de suppression avec le flag isPublic
+              await userPresetService.deletePreset(category, data.id, data.isPublic || false);
               await get().managePresets('load');
               return true;
           }

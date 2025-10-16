@@ -9,6 +9,7 @@ import {
   User,
   ChevronDown,
   ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
@@ -20,6 +21,7 @@ const PresetManagerCompact = () => {
   const [presetName, setPresetName] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const handleSave = async () => {
     if (!presetName.trim() || saving) return;
@@ -41,9 +43,18 @@ const PresetManagerCompact = () => {
     await managePresets('apply', { id: presetId });
   };
 
-  const handleDelete = async (presetId) => {
-    if (confirm('Supprimer ce preset ?')) {
-      await managePresets('delete', { id: presetId });
+  const handleDelete = async (presetId, isPublicPreset) => {
+    // Afficher la confirmation
+    setDeleteConfirm(presetId);
+  };
+
+  const confirmDelete = async (presetId, isPublicPreset) => {
+    try {
+      await managePresets('delete', { id: presetId, isPublic: isPublicPreset });
+      setDeleteConfirm(null);
+    } catch (error) {
+      console.error('Erreur suppression:', error);
+      alert('Erreur lors de la suppression du preset');
     }
   };
 
@@ -165,33 +176,53 @@ const PresetManagerCompact = () => {
                 </div>
                 <div className="space-y-1">
                   {groupedPresets.personal.map((preset) => (
-                    <div
-                      key={preset._id}
-                      className="flex items-center justify-between text-xs rounded px-2 py-2 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                    >
-                      <span className="truncate flex-1 text-gray-700 dark:text-gray-300 font-medium">
-                        {preset.name}
-                      </span>
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleLoad(preset._id)}
-                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
-                          title="Charger"
-                        >
-                          <FolderOpen className="h-3.5 w-3.5" />
-                        </button>
-                        {!preset.is_factory && (
+                    <div key={preset._id}>
+                      {deleteConfirm === preset._id ? (
+                        <div className="flex items-center gap-2 text-xs rounded px-2 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700">
+                          <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                          <span className="flex-1 text-red-700 dark:text-red-300">Confirmer ?</span>
                           <button
                             type="button"
-                            onClick={() => handleDelete(preset._id)}
-                            className="text-red-600 hover:text-red-700 dark:text-red-400 p-1 rounded hover:bg-red-100 dark:hover:bg-red-800 transition-colors"
-                            title="Supprimer"
+                            onClick={() => confirmDelete(preset._id, false)}
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            Oui
                           </button>
-                        )}
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirm(null)}
+                            className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                          >
+                            Non
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between text-xs rounded px-2 py-2 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                          <span className="truncate flex-1 text-gray-700 dark:text-gray-300 font-medium">
+                            {preset.name}
+                          </span>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleLoad(preset._id)}
+                              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
+                              title="Charger"
+                            >
+                              <FolderOpen className="h-3.5 w-3.5" />
+                            </button>
+                            {!preset.is_factory && (
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(preset._id, false)}
+                                className="text-red-600 hover:text-red-700 dark:text-red-400 p-1 rounded hover:bg-red-100 dark:hover:bg-red-800 transition-colors"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -207,24 +238,58 @@ const PresetManagerCompact = () => {
                 </div>
                 <div className="space-y-1">
                   {groupedPresets.public.map((preset) => (
-                    <div
-                      key={preset._id}
-                      className="flex items-center justify-between text-xs rounded px-2 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                    >
-                      <div className="flex items-center gap-1 flex-1 min-w-0">
-                        <Globe className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                        <span className="truncate text-gray-700 dark:text-gray-300 font-medium">
-                          {preset.name}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleLoad(preset._id)}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
-                        title="Charger"
-                      >
-                        <FolderOpen className="h-3.5 w-3.5" />
-                      </button>
+                    <div key={preset._id}>
+                      {deleteConfirm === preset._id ? (
+                        <div className="flex items-center gap-2 text-xs rounded px-2 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700">
+                          <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                          <span className="flex-1 text-red-700 dark:text-red-300">
+                            Supprimer ce preset public ?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => confirmDelete(preset._id, true)}
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          >
+                            Oui
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirm(null)}
+                            className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                          >
+                            Non
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between text-xs rounded px-2 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                          <div className="flex items-center gap-1 flex-1 min-w-0">
+                            <Globe className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                            <span className="truncate text-gray-700 dark:text-gray-300 font-medium">
+                              {preset.name}
+                            </span>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleLoad(preset._id)}
+                              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
+                              title="Charger"
+                            >
+                              <FolderOpen className="h-3.5 w-3.5" />
+                            </button>
+                            {!preset.is_factory && (
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(preset._id, true)}
+                                className="text-red-600 hover:text-red-700 dark:text-red-400 p-1 rounded hover:bg-red-100 dark:hover:bg-red-800 transition-colors"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

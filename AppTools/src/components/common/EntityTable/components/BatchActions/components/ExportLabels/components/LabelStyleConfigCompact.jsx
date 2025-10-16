@@ -1,12 +1,10 @@
 // AppTools\src\components\common\EntityTable\components\BatchActions\components\ExportLabels\components\LabelStyleConfigCompact.jsx
 import React, { useState } from 'react';
 import {
-  Tag,
-  Euro,
+  Type,
   Barcode,
   Square,
   Globe,
-  Type,
   Eye,
   EyeOff,
   ChevronDown,
@@ -79,6 +77,7 @@ const CompactInput = ({
   step,
   unit,
   options,
+  placeholder,
 }) => (
   <div>
     <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{label}</label>
@@ -94,6 +93,14 @@ const CompactInput = ({
           </option>
         ))}
       </select>
+    ) : type === 'textarea' ? (
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={2}
+        className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 resize-none"
+      />
     ) : (
       <div className="relative">
         <input
@@ -105,6 +112,7 @@ const CompactInput = ({
           min={min}
           max={max}
           step={step}
+          placeholder={placeholder}
           className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
         />
         {unit && (
@@ -130,15 +138,10 @@ const LabelStyleConfigCompact = () => {
   } = useLabelExportStore();
 
   const [openSections, setOpenSections] = useState({
-    price: true,
-    name: false,
-    sku: false,
-    brand: false,
-    supplier: false,
+    texts: true,
     barcode: false,
     border: false,
     wooqr: false,
-    customTexts: false,
   });
 
   const toggleSection = (section) => {
@@ -159,6 +162,60 @@ const LabelStyleConfigCompact = () => {
     { value: 'bold', label: 'Gras' },
   ];
 
+  // 🎯 TEXTES PRÉDÉFINIS (remplace les anciennes sections séparées)
+  const predefinedTexts = [
+    {
+      id: 'name',
+      label: 'Nom du produit',
+      content: '{name}',
+      sizeKey: 'nameSize',
+      weightKey: 'nameWeight',
+      fontKey: 'nameFontFamily',
+      showKey: 'showName',
+      colorKey: 'name',
+    },
+    {
+      id: 'price',
+      label: 'Prix',
+      content: '{price}',
+      sizeKey: 'priceSize',
+      weightKey: 'priceWeight',
+      fontKey: 'priceFontFamily',
+      showKey: 'showPrice',
+      colorKey: 'price',
+    },
+    {
+      id: 'sku',
+      label: 'SKU / Référence',
+      content: '{sku}',
+      sizeKey: 'skuSize',
+      weightKey: 'skuWeight',
+      fontKey: 'skuFontFamily',
+      showKey: 'showSku',
+      colorKey: 'sku',
+    },
+    {
+      id: 'brand',
+      label: 'Marque',
+      content: '{brand}',
+      sizeKey: 'brandSize',
+      weightKey: 'brandWeight',
+      fontKey: 'brandFontFamily',
+      showKey: 'showBrand',
+      colorKey: 'brand',
+    },
+    {
+      id: 'supplier',
+      label: 'Fournisseur',
+      content: '{supplier}',
+      sizeKey: 'supplierSize',
+      weightKey: 'supplierWeight',
+      fontKey: 'supplierFontFamily',
+      showKey: 'showSupplier',
+      colorKey: 'supplier',
+    },
+  ];
+
   return (
     <div className="space-y-3">
       {/* Header avec reset */}
@@ -177,166 +234,216 @@ const LabelStyleConfigCompact = () => {
         </button>
       </div>
 
-      {/* PRIX */}
+      {/* 🎯 TEXTES UNIFIÉS (prédéfinis + personnalisés) */}
       <SubSection
-        title="Prix"
-        icon={Euro}
-        isOpen={openSections.price}
-        onToggle={() => toggleSection('price')}
-        enabled={labelStyle.showPrice}
-        onToggleEnabled={() => updateStyle({ showPrice: !labelStyle.showPrice })}
+        title="Textes sur l'étiquette"
+        icon={Type}
+        isOpen={openSections.texts}
+        onToggle={() => toggleSection('texts')}
+        enabled={true}
       >
-        <div className="grid grid-cols-2 gap-2">
-          <CompactInput
-            label="Taille"
-            value={labelStyle.priceSize}
-            onChange={(v) => updateStyle({ priceSize: v })}
-            min={8}
-            max={32}
-            unit="pt"
-          />
-          <CompactInput
-            label="Style"
-            value={labelStyle.priceWeight || 'bold'}
-            onChange={(v) => updateStyle({ priceWeight: v })}
-            type="select"
-            options={weightOptions}
-          />
+        {/* Info sur les variables */}
+        <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
+          <div className="font-medium text-blue-900 dark:text-blue-300 mb-1">
+            💡 Variables disponibles
+          </div>
+          <div className="text-blue-700 dark:text-blue-400 space-y-0.5">
+            <div>
+              <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{name}'}</code> = Nom du
+              produit
+            </div>
+            <div>
+              <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{price}'}</code> = Prix
+              formaté
+            </div>
+            <div>
+              <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{sku}'}</code> =
+              Référence
+            </div>
+            <div>
+              <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{brand}'}</code> =
+              Marque
+            </div>
+            <div>
+              <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{supplier}'}</code> =
+              Fournisseur
+            </div>
+            <div>
+              <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{barcode}'}</code> =
+              Code-barres
+            </div>
+          </div>
         </div>
-        <CompactInput
-          label="Police"
-          value={labelStyle.priceFontFamily || 'Arial'}
-          onChange={(v) => updateStyle({ priceFontFamily: v })}
-          type="select"
-          options={fontOptions}
-        />
-        <ColorPicker
-          label="Couleur"
-          value={labelStyle.colors?.price || '#000000'}
-          onChange={(color) => updateColor('price', color)}
-          defaultColor="#000000"
-        />
-      </SubSection>
 
-      {/* NOM */}
-      <SubSection
-        title="Nom du produit"
-        icon={Tag}
-        isOpen={openSections.name}
-        onToggle={() => toggleSection('name')}
-        enabled={labelStyle.showName}
-        onToggleEnabled={() => updateStyle({ showName: !labelStyle.showName })}
-      >
-        <div className="grid grid-cols-2 gap-2">
-          <CompactInput
-            label="Taille"
-            value={labelStyle.nameSize}
-            onChange={(v) => updateStyle({ nameSize: v })}
-            min={6}
-            max={24}
-            unit="pt"
-          />
-          <CompactInput
-            label="Style"
-            value={labelStyle.nameWeight || 'bold'}
-            onChange={(v) => updateStyle({ nameWeight: v })}
-            type="select"
-            options={weightOptions}
-          />
+        {/* Textes prédéfinis */}
+        <div className="space-y-3 mb-4">
+          <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
+            Textes standards
+          </div>
+          {predefinedTexts.map((textDef) => (
+            <div
+              key={textDef.id}
+              className="border border-gray-200 dark:border-gray-600 rounded p-2 space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <label className="flex items-center text-xs font-medium">
+                  <input
+                    type="checkbox"
+                    checked={labelStyle[textDef.showKey]}
+                    onChange={(e) => updateStyle({ [textDef.showKey]: e.target.checked })}
+                    className="mr-2 text-blue-600 rounded"
+                  />
+                  {textDef.label}
+                </label>
+                <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                  {textDef.content}
+                </code>
+              </div>
+
+              {labelStyle[textDef.showKey] && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <CompactInput
+                      label="Taille"
+                      value={labelStyle[textDef.sizeKey] || 10}
+                      onChange={(v) => updateStyle({ [textDef.sizeKey]: v })}
+                      min={6}
+                      max={32}
+                      unit="pt"
+                    />
+                    <CompactInput
+                      label="Style"
+                      value={labelStyle[textDef.weightKey] || 'normal'}
+                      onChange={(v) => updateStyle({ [textDef.weightKey]: v })}
+                      type="select"
+                      options={weightOptions}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <CompactInput
+                      label="Police"
+                      value={labelStyle[textDef.fontKey] || 'Arial'}
+                      onChange={(v) => updateStyle({ [textDef.fontKey]: v })}
+                      type="select"
+                      options={fontOptions}
+                    />
+                    <ColorPicker
+                      label="Couleur"
+                      value={labelStyle.colors?.[textDef.colorKey] || '#000000'}
+                      onChange={(color) => updateColor(textDef.colorKey, color)}
+                      defaultColor="#000000"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
         </div>
-        <CompactInput
-          label="Police"
-          value={labelStyle.nameFontFamily || 'Arial'}
-          onChange={(v) => updateStyle({ nameFontFamily: v })}
-          type="select"
-          options={fontOptions}
-        />
-        <ColorPicker
-          label="Couleur"
-          value={labelStyle.colors?.name || '#000000'}
-          onChange={(color) => updateColor('name', color)}
-          defaultColor="#000000"
-        />
-      </SubSection>
 
-      {/* SKU */}
-      <SubSection
-        title="SKU"
-        icon={Tag}
-        isOpen={openSections.sku}
-        onToggle={() => toggleSection('sku')}
-        enabled={labelStyle.showSku}
-        onToggleEnabled={() => updateStyle({ showSku: !labelStyle.showSku })}
-      >
-        <div className="grid grid-cols-2 gap-2">
-          <CompactInput
-            label="Taille"
-            value={labelStyle.skuSize || 10}
-            onChange={(v) => updateStyle({ skuSize: v })}
-            min={6}
-            max={24}
-            unit="pt"
-          />
-          <ColorPicker
-            label="Couleur"
-            value={labelStyle.colors?.sku || '#000000'}
-            onChange={(color) => updateColor('sku', color)}
-            defaultColor="#000000"
-          />
-        </div>
-      </SubSection>
+        {/* Textes personnalisés */}
+        <div className="space-y-2 pt-3 border-t border-gray-200 dark:border-gray-600">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
+              Textes personnalisés
+            </div>
+            <button
+              type="button"
+              onClick={addCustomText}
+              className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded flex items-center gap-1 transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              Ajouter
+            </button>
+          </div>
 
-      {/* MARQUE */}
-      <SubSection
-        title="Marque"
-        icon={Tag}
-        isOpen={openSections.brand}
-        onToggle={() => toggleSection('brand')}
-        enabled={labelStyle.showBrand}
-        onToggleEnabled={() => updateStyle({ showBrand: !labelStyle.showBrand })}
-      >
-        <div className="grid grid-cols-2 gap-2">
-          <CompactInput
-            label="Taille"
-            value={labelStyle.brandSize || 10}
-            onChange={(v) => updateStyle({ brandSize: v })}
-            min={6}
-            max={24}
-            unit="pt"
-          />
-          <ColorPicker
-            label="Couleur"
-            value={labelStyle.colors?.brand || '#000000'}
-            onChange={(color) => updateColor('brand', color)}
-            defaultColor="#000000"
-          />
-        </div>
-      </SubSection>
+          {labelStyle.customTexts?.length === 0 ? (
+            <div className="text-center py-3 text-gray-500 dark:text-gray-400 text-xs">
+              Aucun texte personnalisé
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {labelStyle.customTexts?.map((text) => (
+                <div
+                  key={text.id}
+                  className="border border-gray-200 dark:border-gray-600 rounded p-2"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center text-xs font-medium flex-1 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={text.enabled}
+                        onChange={(e) => updateCustomText(text.id, { enabled: e.target.checked })}
+                        className="mr-2 text-blue-600 rounded"
+                      />
+                      <span className="truncate">{text.content || 'Texte vide'}</span>
+                    </label>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => duplicateCustomText(text.id)}
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                        title="Dupliquer"
+                      >
+                        <Copy className="h-3 w-3 text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeCustomText(text.id)}
+                        className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-3 w-3 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
 
-      {/* FOURNISSEUR */}
-      <SubSection
-        title="Fournisseur"
-        icon={Tag}
-        isOpen={openSections.supplier}
-        onToggle={() => toggleSection('supplier')}
-        enabled={labelStyle.showSupplier}
-        onToggleEnabled={() => updateStyle({ showSupplier: !labelStyle.showSupplier })}
-      >
-        <div className="grid grid-cols-2 gap-2">
-          <CompactInput
-            label="Taille"
-            value={labelStyle.supplierSize || 10}
-            onChange={(v) => updateStyle({ supplierSize: v })}
-            min={6}
-            max={24}
-            unit="pt"
-          />
-          <ColorPicker
-            label="Couleur"
-            value={labelStyle.colors?.supplier || '#000000'}
-            onChange={(color) => updateColor('supplier', color)}
-            defaultColor="#000000"
-          />
+                  {text.enabled && (
+                    <div className="space-y-2">
+                      <CompactInput
+                        label="Contenu (utilisez les variables)"
+                        value={text.content}
+                        onChange={(v) => updateCustomText(text.id, { content: v })}
+                        type="textarea"
+                        placeholder="Ex: Marque: {brand} - Ref: {sku}"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <CompactInput
+                          label="Taille"
+                          value={text.fontSize}
+                          onChange={(v) => updateCustomText(text.id, { fontSize: v })}
+                          min={6}
+                          max={32}
+                          unit="pt"
+                        />
+                        <CompactInput
+                          label="Police"
+                          value={text.fontFamily}
+                          onChange={(v) => updateCustomText(text.id, { fontFamily: v })}
+                          type="select"
+                          options={fontOptions}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <CompactInput
+                          label="Style"
+                          value={text.fontWeight}
+                          onChange={(v) => updateCustomText(text.id, { fontWeight: v })}
+                          type="select"
+                          options={weightOptions}
+                        />
+                        <ColorPicker
+                          label="Couleur"
+                          value={text.color}
+                          onChange={(color) => updateCustomText(text.id, { color })}
+                          defaultColor="#000000"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </SubSection>
 
@@ -437,7 +544,7 @@ const LabelStyleConfigCompact = () => {
           <>
             <CompactInput
               label="Taille QR"
-              value={labelStyle.qrCodeSize || 5}
+              value={labelStyle.qrCodeSize || 20}
               onChange={(v) => updateStyle({ qrCodeSize: v })}
               min={5}
               max={30}
@@ -462,7 +569,7 @@ const LabelStyleConfigCompact = () => {
         enabled={labelStyle.showBorder}
         onToggleEnabled={() => updateStyle({ showBorder: !labelStyle.showBorder })}
       >
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <CompactInput
             label="Épaisseur"
             value={labelStyle.borderWidth || 0.1}
@@ -471,17 +578,6 @@ const LabelStyleConfigCompact = () => {
             max={2}
             step={0.1}
             unit="mm"
-          />
-          <CompactInput
-            label="Style"
-            value={labelStyle.borderStyle || 'solid'}
-            onChange={(v) => updateStyle({ borderStyle: v })}
-            type="select"
-            options={[
-              { value: 'solid', label: 'Continu' },
-              { value: 'dashed', label: 'Tirets' },
-              { value: 'dotted', label: 'Points' },
-            ]}
           />
           <ColorPicker
             label="Couleur"
@@ -548,116 +644,6 @@ const LabelStyleConfigCompact = () => {
                 defaultColor="#000000"
               />
             </div>
-          </div>
-        )}
-      </SubSection>
-
-      {/* TEXTES PERSONNALISÉS */}
-      <SubSection
-        title="Textes personnalisés"
-        icon={Type}
-        isOpen={openSections.customTexts}
-        onToggle={() => toggleSection('customTexts')}
-        enabled={true}
-      >
-        <button
-          type="button"
-          onClick={addCustomText}
-          className="w-full mb-3 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded flex items-center justify-center gap-2 transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Ajouter un texte
-        </button>
-
-        {labelStyle.customTexts?.length === 0 ? (
-          <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-xs">
-            Aucun texte personnalisé
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {labelStyle.customTexts?.map((text) => (
-              <div
-                key={text.id}
-                className="border border-gray-200 dark:border-gray-600 rounded p-2"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <label className="flex items-center text-xs font-medium flex-1 min-w-0">
-                    <input
-                      type="checkbox"
-                      checked={text.enabled}
-                      onChange={(e) => updateCustomText(text.id, { enabled: e.target.checked })}
-                      className="mr-2 text-blue-600 rounded"
-                    />
-                    <span className="truncate">{text.content || 'Texte vide'}</span>
-                  </label>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => duplicateCustomText(text.id)}
-                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                      title="Dupliquer"
-                    >
-                      <Copy className="h-3 w-3 text-blue-600" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeCustomText(text.id)}
-                      className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="h-3 w-3 text-red-600" />
-                    </button>
-                  </div>
-                </div>
-
-                {text.enabled && (
-                  <div className="space-y-2">
-                    <textarea
-                      value={text.content}
-                      onChange={(e) => updateCustomText(text.id, { content: e.target.value })}
-                      placeholder="Contenu du texte..."
-                      rows={2}
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 resize-none"
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Variables: {'{brand}'}, {'{supplier}'}, {'{sku}'}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <CompactInput
-                        label="Taille"
-                        value={text.fontSize}
-                        onChange={(v) => updateCustomText(text.id, { fontSize: v })}
-                        min={6}
-                        max={32}
-                        unit="pt"
-                      />
-                      <CompactInput
-                        label="Police"
-                        value={text.fontFamily}
-                        onChange={(v) => updateCustomText(text.id, { fontFamily: v })}
-                        type="select"
-                        options={fontOptions}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <CompactInput
-                        label="Style"
-                        value={text.fontWeight}
-                        onChange={(v) => updateCustomText(text.id, { fontWeight: v })}
-                        type="select"
-                        options={weightOptions}
-                      />
-                      <ColorPicker
-                        label="Couleur"
-                        value={text.color}
-                        onChange={(color) => updateCustomText(text.id, { color })}
-                        defaultColor="#000000"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
         )}
       </SubSection>

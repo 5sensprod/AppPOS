@@ -103,11 +103,16 @@ class UserPresetService {
     }
   }
 
-  // 🗑️ SUPPRIMER un preset
-  async deletePreset(category, presetId) {
+  // 🗑️ SUPPRIMER un preset (personnel ou public)
+  async deletePreset(category, presetId, isPublic = false) {
     try {
-      await apiService.delete(`${this.baseUrl}/${category}/${presetId}`);
-      console.log(`✅ Preset ${category} supprimé:`, presetId);
+      // Si c'est un preset public, utiliser l'endpoint spécifique
+      const endpoint = isPublic
+        ? `${this.baseUrl}/${category}/public/${presetId}`
+        : `${this.baseUrl}/${category}/${presetId}`;
+
+      await apiService.delete(endpoint);
+      console.log(`✅ Preset ${category} ${isPublic ? 'public' : 'personnel'} supprimé:`, presetId);
       return true;
     } catch (error) {
       console.error(`❌ Erreur suppression preset ${category}:`, error);

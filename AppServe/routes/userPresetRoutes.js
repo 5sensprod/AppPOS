@@ -16,6 +16,15 @@ router.get('/:category/public', controller.getPublicPresets.bind(controller));
 // Routes protégées (auth requise)
 router.get('/:category/my', authMiddleware, controller.getMyPresets.bind(controller));
 router.post('/:category', authMiddleware, controller.createOrUpdatePreset.bind(controller));
+
+// 🆕 NOUVEAU : Route pour supprimer un preset public
+router.delete(
+  '/:category/public/:id',
+  authMiddleware,
+  controller.deletePublicPreset.bind(controller)
+);
+
+// Route pour supprimer un preset personnel
 router.delete('/:category/:id', authMiddleware, controller.deletePreset.bind(controller));
 
 router.get('/factory', (req, res) => {
