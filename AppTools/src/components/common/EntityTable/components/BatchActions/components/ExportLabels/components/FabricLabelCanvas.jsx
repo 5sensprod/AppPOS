@@ -159,6 +159,9 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
           } else if (obj.type === 'image') {
             if (obj.wooQRCode) {
               elementType = 'wooqr';
+            } else if (obj.objectType && obj.objectType.startsWith('img_')) {
+              // 🆕 C'est une image personnalisée
+              elementType = 'customImage';
             } else {
               elementType = 'barcode';
             }
@@ -215,6 +218,11 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
             } else {
               objectType = 'barcode';
             }
+          }
+
+          if (obj.type === 'image' && !obj.wooQRCode && obj.objectType) {
+            // C'est une image personnalisée
+            objectType = obj.objectType;
           }
 
           obj.set({
@@ -319,9 +327,10 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
     style.skuSize,
     style.brandSize,
     style.supplierSize,
-    // JSON.stringify(style.customPositions), ❌ RETIRÉ !
+
     JSON.stringify(style.colors),
     JSON.stringify(style.customTexts),
+    JSON.stringify(style.customImages),
   ]);
 
   // Cleanup au démontage

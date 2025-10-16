@@ -7,6 +7,7 @@ import {
   Printer as PrinterIcon,
   ChevronRight,
   ChevronDown,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useAccordion } from '../hooks/useAccordion';
 import LabelDimensionsConfig from './LabelDimensionsConfig';
@@ -15,6 +16,7 @@ import PrintOptionsConfig from './PrintOptionsConfig';
 import CellSelectionGrid from './CellSelectionGrid';
 import PrinterSelector from './PrinterSelector';
 import PresetManagerCompact from './PresetManagerCompact';
+import CustomImagesManager from './CustomImagesManager';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 
 const AccordionSection = ({ id, title, icon: Icon, isOpen, onToggle, info, children }) => (
@@ -109,6 +111,20 @@ const LabelsConfigSidebar = ({ exportMode }) => {
         >
           <LabelStyleConfigCompact />
         </AccordionSection>
+
+        {/* 🆕 NOUVEAU : Images personnalisées (A4 uniquement) */}
+        {(currentLayout?.supportType === 'A4' || currentLayout?.supportType === 'custom') && (
+          <AccordionSection
+            id="images"
+            title="Images personnalisées"
+            icon={ImageIcon}
+            isOpen={isOpen('images')}
+            onToggle={toggle}
+            info="Ajouter des images à l'étiquette"
+          >
+            <CustomImagesManager />
+          </AccordionSection>
+        )}
 
         {/* Options d'impression - mode print uniquement */}
         {exportMode === 'print' && (

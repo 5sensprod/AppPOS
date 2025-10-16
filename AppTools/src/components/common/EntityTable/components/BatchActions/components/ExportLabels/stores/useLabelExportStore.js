@@ -60,6 +60,8 @@ const DEFAULT_STYLE = {
     brand: '#000000',
     supplier: '#000000',
   },
+
+  customImages: [],
 };
 
 const DEFAULT_LAYOUTS = {
@@ -136,6 +138,8 @@ export const useLabelExportStore = create(
       selectedPrinter: null,
       printing: false,
       printError: null,
+      availableImages: [],
+      loadingImages: false,
 
       // ===== API UNIFIÉE =====
 
@@ -239,6 +243,100 @@ export const useLabelExportStore = create(
         get().managePresets('load');
       },
 
+      // 🖼️ Charger la bibliothèque d'images
+      loadAvailableImages: async () => {
+        set({ loadingImages: true });
+        try {
+          const presetImageService = (await import('@services/presetImageService')).default;
+          const images = await presetImageService.listImages();
+          set({ availableImages: images });
+        } catch (error) {
+          console.error('❌ Erreur chargement images:', error);
+        } finally {
+          set({ loadingImages: false });
+        }
+      },
+
+      // ➕ Ajouter une image au preset
+      addCustomImage: (imageData) =>
+        set((state) => {
+          // Vérifier que ce n'est pas en mode rouleau
+          if (state.currentLayout.supportType === 'rouleau') {
+            console.warn('⚠️ Images non disponibles en mode rouleau');
+            return {};
+          }
+
+          // 🛡️ S'assurer que customImages existe (rétrocompatibilité)
+          const existingImages = state.labelStyle.customImages || [];
+
+          return {
+            labelStyle: {
+              ...state.labelStyle,
+              customImages: [
+                ...existingImages,
+                {
+                  id: `img_${Date.now()}`,
+                  src: imageData.src,
+                  filename: imageData.filename,
+                  width: imageData.width || 50, // mm
+                  height: imageData.height || 50, // mm
+                  opacity: 1,
+                  rotation: 0,
+                  position: null, // Sera calculée automatiquement
+                },
+              ],
+            },
+          };
+        }),
+
+      // 🔄 Mettre à jour une image (CORRIGÉ)
+      updateCustomImage: (imageId, changes) =>
+        set((state) => ({
+          labelStyle: {
+            ...state.labelStyle,
+            customImages: (state.labelStyle.customImages || []).map((img) =>
+              img.id === imageId ? { ...img, ...changes } : img
+            ),
+          },
+        })),
+
+      // 🗑️ Supprimer une image du preset (CORRIGÉ)
+      removeCustomImage: (imageId) =>
+        set((state) => ({
+          labelStyle: {
+            ...state.labelStyle,
+            customImages: (state.labelStyle.customImages || []).filter((img) => img.id !== imageId),
+            customPositions: Object.fromEntries(
+              Object.entries(state.labelStyle.customPositions || {}).filter(
+                ([key]) => key !== imageId
+              )
+            ),
+          },
+        })),
+
+      // 📋 Dupliquer une image (CORRIGÉ)
+      duplicateCustomImage: (imageId) =>
+        set((state) => {
+          const imageToDuplicate = (state.labelStyle.customImages || []).find(
+            (img) => img.id === imageId
+          );
+          if (!imageToDuplicate) return {};
+
+          return {
+            labelStyle: {
+              ...state.labelStyle,
+              customImages: [
+                ...(state.labelStyle.customImages || []),
+                {
+                  ...imageToDuplicate,
+                  id: `img_${Date.now()}`,
+                  position: null, // Nouvelle position
+                },
+              ],
+            },
+          };
+        }),
+
       // 🎯 RESET UNIFIÉ
       reset: (scope = 'all') =>
         set((state) => {
@@ -250,6 +348,7 @@ export const useLabelExportStore = create(
               duplicateCount: 1,
               customPositions: state.labelStyle.customPositions || {},
               customTexts: [],
+              customImages: [],
             };
           }
           if (scope === 'all' || scope === 'layout') {
@@ -269,6 +368,10 @@ export const useLabelExportStore = create(
           }
           if (scope === 'all' || scope === 'colors') {
             updates.labelStyle = { ...state.labelStyle, colors: DEFAULT_STYLE.colors };
+          }
+
+          if (scope === 'all' || scope === 'images') {
+            updates.labelStyle = { ...state.labelStyle, customImages: [] };
           }
 
           return updates;

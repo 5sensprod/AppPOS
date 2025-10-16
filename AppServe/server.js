@@ -133,6 +133,7 @@ const userPresetRoutes = require('./routes/userPresetRoutes');
 const wordpressMenuRoutes = require('./routes/wordpress/menuRoutes');
 const userManagementRoutes = require('./routes/userManagementRoutes');
 const rolePermissionsRoutes = require('./routes/rolePermissionsRoutes');
+const presetImageRoutes = require('./routes/presetImageRoutes');
 
 // Protection des routes API avec le middleware d'authentification
 app.use('/api/categories', authMiddleware, categoryRoutes);
@@ -148,6 +149,7 @@ app.use('/api/time', timeRoutes);
 app.use('/api/backup', authMiddleware, backupRoutes);
 app.use('/api/reports', authMiddleware, require('./routes/reportsRoutes'));
 
+app.use('/api/presets/images', presetImageRoutes);
 app.use('/api/presets', userPresetRoutes);
 app.use('/api/wordpress/menu', authMiddleware, wordpressMenuRoutes);
 

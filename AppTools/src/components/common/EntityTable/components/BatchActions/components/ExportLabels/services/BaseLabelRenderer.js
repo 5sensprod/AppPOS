@@ -12,8 +12,9 @@ class BaseLabelRenderer {
       highRes: 200 / 96,
     };
 
-    // 🆕 CACHE pour les QR codes générés
+    // 🆕 CACHE
     this.qrCodeCache = new Map();
+    this.imageCache = new Map();
   }
 
   getScaleFactor(context = 'display') {
@@ -169,6 +170,21 @@ class BaseLabelRenderer {
           content = content.replace(/\{sku\}/gi, label.sku || '');
 
           await this._addCustomText(fabricCanvas, content, elements[text.id], text, fabric);
+        }
+      }
+    }
+    // 🆕 Images personnalisées
+    if (style.customImages?.length > 0) {
+      for (const imgConfig of style.customImages) {
+        if (imgConfig.src && elements[imgConfig.id]) {
+          await this._addCustomImage(
+            fabricCanvas,
+            imgConfig,
+            elements[imgConfig.id],
+            style,
+            fabric,
+            scaleFactor
+          );
         }
       }
     }
@@ -339,6 +355,34 @@ class BaseLabelRenderer {
             text: text,
           };
         }
+      });
+    }
+
+    // 🆕 Images personnalisées
+    if (style.customImages?.length > 0) {
+      style.customImages.forEach((imgConfig, index) => {
+        const imgWidth = (imgConfig.width || 50) * this.mmToPx * scaleFactor;
+        const imgHeight = (imgConfig.height || 50) * this.mmToPx * scaleFactor;
+
+        // Position par défaut : centré
+        const defaultX = (canvasWidth - imgWidth) / 2;
+        const defaultY = paddingV + index * (imgHeight + spacing);
+
+        elements[imgConfig.id] = customPositions[imgConfig.id]
+          ? {
+              x: customPositions[imgConfig.id].x * this.mmToPx * scaleFactor,
+              y: customPositions[imgConfig.id].y * this.mmToPx * scaleFactor,
+              width: imgWidth,
+              height: imgHeight,
+              centerX: customPositions[imgConfig.id].centerX * this.mmToPx * scaleFactor,
+            }
+          : {
+              x: defaultX,
+              y: defaultY,
+              width: imgWidth,
+              height: imgHeight,
+              centerX: defaultX + imgWidth / 2,
+            };
       });
     }
 
@@ -684,6 +728,135 @@ class BaseLabelRenderer {
       console.error('❌ Erreur génération QR WooCommerce:', error);
       this._addFallbackWooQR(fabricCanvas, element, label.websiteUrl, fabric, scaleFactor);
     }
+  }
+
+  async _addCustomImage(fabricCanvas, imgConfig, element, style, fabric, scaleFactor = 1) {
+    try {
+      // Charger l'image
+      const imgElement = await this._loadImage(imgConfig.src);
+
+      // Créer l'objet Fabric.Image
+      const fabricImage = new fabric.Image(imgElement, {
+        left: element.x,
+        top: element.y,
+        width: element.width,
+        height: element.height,
+        opacity: imgConfig.opacity || 1,
+        angle: imgConfig.rotation || 0,
+        selectable: true,
+        objectType: imgConfig.id, // Pour la gestion des positions
+      });
+
+      // Ajuster le scaling pour correspondre aux dimensions souhaitées
+      const scaleX = element.width / imgElement.width;
+      const scaleY = element.height / imgElement.height;
+      fabricImage.set({
+        scaleX,
+        scaleY,
+      });
+
+      fabricCanvas.add(fabricImage);
+
+      console.log(`✅ Image ajoutée: ${imgConfig.filename || imgConfig.id}`);
+    } catch (error) {
+      console.error(`❌ Erreur chargement image ${imgConfig.src}:`, error);
+
+      // Fallback : afficher un rectangle avec icône
+      this._addImagePlaceholder(fabricCanvas, element, imgConfig, fabric);
+    }
+  }
+
+  /**
+   * 🔄 Charge une image de manière asynchrone
+   */
+  async _loadImage(src) {
+    // Vérifier le cache
+    if (this.imageCache.has(src)) {
+      console.log('✅ Image depuis cache:', src);
+      return this.imageCache.get(src);
+    }
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+
+      img.onload = () => {
+        // Mettre en cache (limite: 20 images)
+        if (this.imageCache.size >= 20) {
+          const firstKey = this.imageCache.keys().next().value;
+          this.imageCache.delete(firstKey);
+        }
+        this.imageCache.set(src, img);
+        console.log('✅ Image chargée:', src);
+        resolve(img);
+      };
+
+      img.onerror = (error) => {
+        console.error('❌ Erreur chargement image:', src, error);
+        reject(error);
+      };
+
+      // ✅ Le src est déjà une URL complète venant du serveur
+      // Pas besoin de transformation
+      img.crossOrigin = 'anonymous';
+      img.src = src;
+    });
+  }
+
+  /**
+   * 🆕 Méthode helper (deprecated - le serveur retourne déjà des URLs complètes)
+   */
+  async _getFullImageUrl(src) {
+    // Le serveur retourne maintenant des URLs complètes directement
+    return src;
+  }
+  clearImageCache() {
+    console.log('🗑️ Cache images vidé');
+    this.imageCache.clear();
+  }
+
+  /**
+   * 🔲 Affiche un placeholder si l'image ne charge pas
+   */
+  _addImagePlaceholder(fabricCanvas, element, imgConfig, fabric) {
+    // Rectangle de fond
+    const rect = new fabric.Rect({
+      left: element.x,
+      top: element.y,
+      width: element.width,
+      height: element.height,
+      fill: '#f3f4f6',
+      stroke: '#9ca3af',
+      strokeWidth: 2,
+      rx: 4,
+      ry: 4,
+      selectable: false,
+    });
+    fabricCanvas.add(rect);
+
+    // Icône "image cassée"
+    const iconText = new fabric.Text('🖼️', {
+      left: element.x + element.width / 2,
+      top: element.y + element.height / 2,
+      originX: 'center',
+      originY: 'center',
+      fontSize: Math.min(element.width, element.height) * 0.3,
+      selectable: false,
+    });
+    fabricCanvas.add(iconText);
+
+    // Texte d'erreur
+    const errorText = new fabric.Text('Image\nindisponible', {
+      left: element.x + element.width / 2,
+      top: element.y + element.height * 0.7,
+      originX: 'center',
+      originY: 'center',
+      fontSize: Math.min(element.width, element.height) * 0.08,
+      fontFamily: 'Arial',
+      fill: '#6b7280',
+      textAlign: 'center',
+      selectable: false,
+    });
+    fabricCanvas.add(errorText);
   }
 
   _addFallbackQR(fabricCanvas, element, barcodeText, fabric) {
