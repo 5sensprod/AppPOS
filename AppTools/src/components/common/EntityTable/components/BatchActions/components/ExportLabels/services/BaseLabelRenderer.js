@@ -379,12 +379,23 @@ class BaseLabelRenderer {
     // 🆕 Images personnalisées
     if (style.customImages?.length > 0) {
       style.customImages.forEach((imgConfig, index) => {
-        const imgWidth = (imgConfig.width || 50) * this.mmToPx * scaleFactor;
-        const imgHeight = (imgConfig.height || 50) * this.mmToPx * scaleFactor;
+        // 🎯 Utiliser les dimensions définies dans imgConfig (en mm)
+        const imgWidthMm = imgConfig.width || 50;
+        const imgHeightMm = imgConfig.height || 50;
 
-        // Position par défaut : centré
-        const defaultX = (canvasWidth - imgWidth) / 2;
-        const defaultY = paddingV + index * (imgHeight + spacing);
+        // Convertir en pixels avec scaleFactor
+        const imgWidth = imgWidthMm * this.mmToPx * scaleFactor;
+        const imgHeight = imgHeightMm * this.mmToPx * scaleFactor;
+
+        console.log(`📐 Calcul image ${imgConfig.id}:`, {
+          configSizeMm: `${imgWidthMm}×${imgHeightMm}mm`,
+          scaleFactor,
+          finalSizePx: `${imgWidth.toFixed(0)}×${imgHeight.toFixed(0)}px`,
+        });
+
+        // Position par défaut : centrée
+        const defaultX = (canvasWidth / scaleFactor - imgWidthMm * this.mmToPx) / 2;
+        const defaultY = paddingV / scaleFactor + index * (imgHeight / scaleFactor + spacing);
 
         elements[imgConfig.id] = customPositions[imgConfig.id]
           ? {
@@ -395,11 +406,11 @@ class BaseLabelRenderer {
               centerX: customPositions[imgConfig.id].centerX * this.mmToPx * scaleFactor,
             }
           : {
-              x: defaultX,
-              y: defaultY,
+              x: defaultX * scaleFactor,
+              y: defaultY * scaleFactor,
               width: imgWidth,
               height: imgHeight,
-              centerX: defaultX + imgWidth / 2,
+              centerX: (defaultX + (imgWidthMm * this.mmToPx) / 2) * scaleFactor,
             };
       });
     }
@@ -758,75 +769,78 @@ class BaseLabelRenderer {
       console.log('📐 Image chargée:', {
         naturalWidth: imgElement.naturalWidth,
         naturalHeight: imgElement.naturalHeight,
-        targetWidth: element.width,
-        targetHeight: element.height,
+        elementWidth: element.width,
+        elementHeight: element.height,
         fitMode: imgConfig.fitMode || 'contain',
       });
 
-      // 🆕 Calculer les dimensions selon le mode de fit
+      // 🆕 Les dimensions de element sont DÉJÀ en pixels avec le scaleFactor appliqué
+      const targetWidthPx = element.width;
+      const targetHeightPx = element.height;
+
       const fitMode = imgConfig.fitMode || 'contain';
       const imageAspectRatio = imgElement.naturalWidth / imgElement.naturalHeight;
-      const targetAspectRatio = element.width / element.height;
+      const targetAspectRatio = targetWidthPx / targetHeightPx;
 
-      let scaleX, scaleY;
+      let finalWidthPx, finalHeightPx;
 
       switch (fitMode) {
         case 'cover':
           if (imageAspectRatio > targetAspectRatio) {
-            scaleY = element.height / imgElement.naturalHeight;
-            scaleX = scaleY;
+            finalHeightPx = targetHeightPx;
+            finalWidthPx = targetHeightPx * imageAspectRatio;
           } else {
-            scaleX = element.width / imgElement.naturalWidth;
-            scaleY = scaleX;
+            finalWidthPx = targetWidthPx;
+            finalHeightPx = targetWidthPx / imageAspectRatio;
           }
           break;
 
         case 'stretch':
-          scaleX = element.width / imgElement.naturalWidth;
-          scaleY = element.height / imgElement.naturalHeight;
+          finalWidthPx = targetWidthPx;
+          finalHeightPx = targetHeightPx;
           break;
 
         case 'contain':
         default:
           if (imageAspectRatio > targetAspectRatio) {
-            scaleX = element.width / imgElement.naturalWidth;
-            scaleY = scaleX;
+            finalWidthPx = targetWidthPx;
+            finalHeightPx = targetWidthPx / imageAspectRatio;
           } else {
-            scaleY = element.height / imgElement.naturalHeight;
-            scaleX = scaleY;
+            finalHeightPx = targetHeightPx;
+            finalWidthPx = targetHeightPx * imageAspectRatio;
           }
           break;
       }
 
-      // Calculer les dimensions finales EN PIXELS (pour le canvas intermédiaire)
-      const targetWidthPx = imgElement.naturalWidth * scaleX;
-      const targetHeightPx = imgElement.naturalHeight * scaleY;
+      console.log('🎯 Dimensions finales calculées:', {
+        targetPx: `${targetWidthPx.toFixed(0)}×${targetHeightPx.toFixed(0)}`,
+        finalPx: `${finalWidthPx.toFixed(0)}×${finalHeightPx.toFixed(0)}`,
+        fitMode,
+      });
 
-      // 🆕 PRÉ-REDIMENSIONNER avec un canvas intermédiaire pour un lissage optimal
+      // 🆕 PRÉ-REDIMENSIONNER avec un canvas intermédiaire
       const resizedImage = await this._resizeImageSmooth(
         imgElement,
-        Math.round(targetWidthPx),
-        Math.round(targetHeightPx)
+        Math.round(finalWidthPx),
+        Math.round(finalHeightPx)
       );
 
       // Centrer l'image dans l'espace alloué
-      const finalWidth = resizedImage.width / this.mmToPx;
-      const finalHeight = resizedImage.height / this.mmToPx;
-      const offsetX = (element.width - finalWidth) / 2;
-      const offsetY = (element.height - finalHeight) / 2;
+      const offsetX = (targetWidthPx - finalWidthPx) / 2;
+      const offsetY = (targetHeightPx - finalHeightPx) / 2;
 
-      console.log('✅ Image redimensionnée:', {
-        originalSize: `${imgElement.naturalWidth}×${imgElement.naturalHeight}`,
-        resizedSize: `${resizedImage.width}×${resizedImage.height}`,
-        finalSizeMm: `${finalWidth.toFixed(1)}×${finalHeight.toFixed(1)}mm`,
+      console.log('✅ Image redimensionnée et positionnée:', {
+        resizedSize: `${resizedImage.width}×${resizedImage.height}px`,
+        offset: `${offsetX.toFixed(1)}, ${offsetY.toFixed(1)}`,
+        finalPosition: `${element.x + offsetX}, ${element.y + offsetY}`,
       });
 
       // 🎨 Créer l'objet Fabric.Image avec l'image pré-redimensionnée
       const fabricImage = new fabric.Image(resizedImage, {
         left: element.x + offsetX,
         top: element.y + offsetY,
-        scaleX: scaleFactor, // ✅ Plus de redimensionnement Fabric, juste le scaleFactor
-        scaleY: scaleFactor,
+        scaleX: 1, // ✅ Pas de scaling supplémentaire, on a déjà la bonne taille
+        scaleY: 1,
         opacity: imgConfig.opacity || 1,
         angle: imgConfig.rotation || 0,
         selectable: true,
@@ -849,13 +863,68 @@ class BaseLabelRenderer {
 
       fabricCanvas.add(fabricImage);
 
-      console.log(`✅ Image ajoutée: ${imgConfig.filename || imgConfig.id} (mode: ${fitMode})`);
+      console.log(`✅ Image ajoutée au canvas: ${imgConfig.filename || imgConfig.id}`);
     } catch (error) {
       console.error(`❌ Erreur chargement image ${imgConfig.src}:`, error);
       this._addImagePlaceholder(fabricCanvas, element, imgConfig, fabric);
     }
   }
 
+  /**
+   * 🆕 Redimensionne une image avec un lissage optimal (downsampling progressif)
+   */
+  async _resizeImageSmooth(img, targetWidth, targetHeight) {
+    // Si l'image est déjà petite, pas besoin de redimensionner
+    if (img.naturalWidth <= targetWidth * 2 && img.naturalHeight <= targetHeight * 2) {
+      return img;
+    }
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let currentWidth = img.naturalWidth;
+    let currentHeight = img.naturalHeight;
+    let currentImg = img;
+
+    // Downsampling progressif par étapes de 50%
+    while (currentWidth > targetWidth * 2 || currentHeight > targetHeight * 2) {
+      currentWidth = Math.floor(currentWidth / 2);
+      currentHeight = Math.floor(currentHeight / 2);
+
+      canvas.width = currentWidth;
+      canvas.height = currentHeight;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.clearRect(0, 0, currentWidth, currentHeight);
+      ctx.drawImage(currentImg, 0, 0, currentWidth, currentHeight);
+
+      currentImg = await this._canvasToImage(canvas);
+    }
+
+    // Redimensionnement final à la taille exacte
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(currentImg, 0, 0, targetWidth, targetHeight);
+
+    return await this._canvasToImage(canvas);
+  }
+
+  /**
+   * 🆕 Convertit un canvas en Image
+   */
+  _canvasToImage(canvas) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = canvas.toDataURL('image/png');
+    });
+  }
   /**
    * 🆕 Redimensionne une image avec un lissage optimal (downsampling progressif)
    * Utilise un canvas intermédiaire pour éviter le crénelage
@@ -1140,22 +1209,45 @@ class BaseLabelRenderer {
   async _renderSingleLabelToCanvas(label, layout, style, context = 'print') {
     const tempCanvas = document.createElement('canvas');
     try {
+      console.log('🎨 Génération étiquette pour PDF:', {
+        label: label.name,
+        layoutSize: `${layout.width}×${layout.height}mm`,
+        context,
+      });
+
       const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
-        highRes: true,
+        highRes: true, // ✅ Haute résolution pour le PDF
         context: context,
       });
 
+      // 🆕 S'assurer que le canvas a les bonnes dimensions
+      const canvasWidth = fabricCanvas.width;
+      const canvasHeight = fabricCanvas.height;
+
+      console.log('📐 Dimensions canvas générées:', {
+        width: canvasWidth,
+        height: canvasHeight,
+        ratio: (canvasWidth / canvasHeight).toFixed(2),
+      });
+
+      // Générer l'image avec qualité maximale
       const imgData = fabricCanvas.toDataURL({
         format: 'png',
         quality: 1.0,
-        multiplier: 1,
+        multiplier: 1, // ✅ IMPORTANT : Ne pas sur-multiplier, on a déjà highRes
         left: 0,
         top: 0,
-        width: fabricCanvas.width,
-        height: fabricCanvas.height,
+        width: canvasWidth,
+        height: canvasHeight,
       });
 
       fabricCanvas.dispose();
+
+      console.log('✅ Image générée:', {
+        dataUrlLength: imgData.length,
+        size: `${(imgData.length / 1024).toFixed(1)}KB`,
+      });
+
       return imgData;
     } catch (error) {
       console.error(`❌ Erreur génération ${context}:`, error);
