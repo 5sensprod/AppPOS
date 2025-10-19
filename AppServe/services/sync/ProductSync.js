@@ -266,14 +266,18 @@ class ProductSyncStrategy extends SyncStrategy {
         alt: product.name,
       });
       processedIds.add(product.image.wp_id);
+      console.log(`[SYNC] 📸 Image principale ajoutée (wp_id: ${product.image.wp_id})`);
     }
 
-    // Ajouter les images de la galerie sans doublons
+    // Ajouter TOUTES les images de la galerie avec wp_id
     if (product.gallery_images?.length) {
+      let addedCount = 0;
+
       const gallery = product.gallery_images
         .filter((img) => img.wp_id && !processedIds.has(img.wp_id))
         .map((img, i) => {
           processedIds.add(img.wp_id);
+          addedCount++;
           return {
             id: parseInt(img.wp_id),
             src: img.url || img.src,
@@ -283,8 +287,10 @@ class ProductSyncStrategy extends SyncStrategy {
         });
 
       images.push(...gallery);
+      console.log(`[SYNC] 🖼️  ${addedCount} images de galerie ajoutées`);
     }
 
+    console.log(`[SYNC] 📊 Total: ${images.length} images préparées pour WooCommerce`);
     return images;
   }
 
@@ -314,28 +320,60 @@ class ProductSyncStrategy extends SyncStrategy {
   }
 
   async _syncPendingImages(product) {
-    if (!product.gallery_images?.length) return product;
-
-    const pendingImages = product.gallery_images.filter((img) => !img.wp_id && img.local_path);
-
-    if (!pendingImages.length) return product;
-
     const wpSync = new WordPressImageSync();
-    const updatedGallery = [...product.gallery_images];
+    let hasChanges = false;
 
-    // Map pour suivre les chemins d'images déjà téléversées
+    // ========================================
+    // UPLOAD DE L'IMAGE PRINCIPALE
+    // ========================================
+    let mainImage = product.image;
+
+    if (mainImage && !mainImage.wp_id && (mainImage.src || mainImage.local_path)) {
+      try {
+        const pathToUpload = mainImage.src || mainImage.local_path;
+        console.log(`[SYNC] 📤 Upload image principale vers WordPress: ${pathToUpload}`);
+
+        const wpData = await wpSync.uploadToWordPress(pathToUpload);
+
+        mainImage = {
+          ...mainImage,
+          wp_id: wpData.id,
+          url: wpData.url,
+          status: 'active',
+        };
+        hasChanges = true;
+        console.log(`[SYNC] ✅ Image principale uploadée (wp_id: ${wpData.id})`);
+      } catch (error) {
+        console.error(`[SYNC] ❌ Erreur upload image principale:`, error.message);
+      }
+    }
+
+    // ========================================
+    // UPLOAD DE TOUTE LA GALERIE
+    // ========================================
+    const updatedGallery = [...(product.gallery_images || [])];
     const processedPaths = new Map();
 
-    // Téléverser chaque image en attente
+    // Si l'image principale a un path, le marquer comme déjà traité
+    if (mainImage?.src || mainImage?.local_path) {
+      const mainPath = mainImage.src || mainImage.local_path;
+      if (mainImage.wp_id) {
+        processedPaths.set(mainPath, { wp_id: mainImage.wp_id, url: mainImage.url });
+      }
+    }
+
+    console.log(`[SYNC] 🖼️  Traitement de ${updatedGallery.length} images de galerie`);
+
     for (let i = 0; i < updatedGallery.length; i++) {
       const img = updatedGallery[i];
+
+      // Si l'image n'a pas de wp_id et a un chemin local
       if (!img.wp_id && (img.src || img.local_path)) {
         try {
-          // ✅ Utiliser src en priorité car il est stable entre environnements
           const pathToUpload = img.src || img.local_path;
 
+          // Vérifier si cette image a déjà été uploadée dans cette session
           if (processedPaths.has(pathToUpload)) {
-            // Réutiliser le résultat existant
             const existingUpload = processedPaths.get(pathToUpload);
             updatedGallery[i] = {
               ...img,
@@ -343,51 +381,43 @@ class ProductSyncStrategy extends SyncStrategy {
               url: existingUpload.url,
               status: 'active',
             };
+            console.log(
+              `[SYNC] 🔄 Image ${i} réutilisée depuis cache (wp_id: ${existingUpload.wp_id})`
+            );
           } else {
-            // Téléverser l'image
+            // Upload vers WordPress
+            console.log(`[SYNC] 📤 Upload image galerie ${i} vers WordPress: ${pathToUpload}`);
             const wpData = await wpSync.uploadToWordPress(pathToUpload);
-            updatedGallery[i] = { ...img, wp_id: wpData.id, url: wpData.url, status: 'active' };
+
+            updatedGallery[i] = {
+              ...img,
+              wp_id: wpData.id,
+              url: wpData.url,
+              status: 'active',
+            };
+
             processedPaths.set(pathToUpload, { wp_id: wpData.id, url: wpData.url });
+            hasChanges = true;
+            console.log(`[SYNC] ✅ Image ${i} uploadée (wp_id: ${wpData.id})`);
           }
         } catch (error) {
-          console.error(`Erreur upload WP pour image ${i}:`, error.message);
+          console.error(`[SYNC] ❌ Erreur upload image galerie ${i}:`, error.message);
         }
+      } else if (img.wp_id) {
+        console.log(`[SYNC] ✓ Image ${i} déjà synchronisée (wp_id: ${img.wp_id})`);
       }
     }
 
-    // Mettre à jour l'image principale si nécessaire
-    let mainImage = product.image;
-    if (mainImage && !mainImage.wp_id && mainImage.local_path) {
-      try {
-        // Vérifier si cette image a déjà été téléversée
-        if (processedPaths.has(mainImage.local_path)) {
-          const existingUpload = processedPaths.get(mainImage.local_path);
-          mainImage = {
-            ...mainImage,
-            wp_id: existingUpload.wp_id,
-            url: existingUpload.url,
-            status: 'active',
-          };
-        } else {
-          // Sinon téléverser l'image
-          const wpData = await wpSync.uploadToWordPress(mainImage.local_path);
-          mainImage = {
-            ...mainImage,
-            wp_id: wpData.id,
-            url: wpData.url,
-            status: 'active',
-          };
-        }
-      } catch (error) {
-        console.error(`Erreur upload WP pour image principale:`, error);
-      }
+    // ========================================
+    // SAUVEGARDER UNIQUEMENT SI DES CHANGEMENTS ONT ÉTÉ FAITS
+    // ========================================
+    if (hasChanges) {
+      await Product.update(product._id, {
+        image: mainImage,
+        gallery_images: updatedGallery,
+      });
+      console.log(`[SYNC] 💾 Images sauvegardées en base de données`);
     }
-
-    // Sauvegarder les modifications
-    await Product.update(product._id, {
-      gallery_images: updatedGallery,
-      image: mainImage,
-    });
 
     // Recharger le produit avec les images mises à jour
     return await Product.findById(product._id);
@@ -395,47 +425,75 @@ class ProductSyncStrategy extends SyncStrategy {
 
   async _updateLocal(productId, wcData) {
     const product = await Product.findById(productId);
-    const mainImage = wcData.images?.[0];
 
-    // CORRECTION: Préserver l'image locale si WooCommerce n'a pas d'image
-    let image = product.image; // Garder l'image locale par défaut
+    // ========================================
+    // GESTION DE L'IMAGE PRINCIPALE
+    // ========================================
+    const mainImageFromWoo = wcData.images?.[0];
+    let image = product.image;
 
-    if (mainImage) {
-      // Si WooCommerce a une image, la synchroniser
+    if (mainImageFromWoo) {
       image = {
         _id: product.image?._id || uuidv4(),
-        wp_id: mainImage.id,
-        url: mainImage.src,
+        wp_id: mainImageFromWoo.id,
+        url: mainImageFromWoo.src,
         status: 'active',
-        src: product.image?.src || mainImage.src,
+        src: product.image?.src || mainImageFromWoo.src,
         local_path: product.image?.local_path || null,
         type: product.image?.type || null,
         metadata: product.image?.metadata || null,
       };
     }
-    // Sinon, garder l'image locale existante (pas de changement)
 
-    // Même logique pour la galerie
-    let gallery = product.gallery_images || []; // Préserver par défaut
+    // ========================================
+    // GESTION DE LA GALERIE (SYNCHRONISATION BIDIRECTIONNELLE)
+    // ========================================
+    let gallery = [...(product.gallery_images || [])];
 
     if (wcData.images && wcData.images.length > 0) {
-      // Seulement si WooCommerce a des images, les synchroniser
-      gallery = [];
-      const addedWpIds = new Set();
-      // ... reste du code de synchronisation
-    }
-    // Sinon, garder la galerie locale
+      // Mettre à jour les images existantes avec les données WooCommerce
+      for (const wcImg of wcData.images) {
+        const localImgIndex = gallery.findIndex(
+          (img) => img.wp_id && img.wp_id.toString() === wcImg.id.toString()
+        );
 
+        if (localImgIndex !== -1) {
+          // Mettre à jour l'image existante
+          gallery[localImgIndex] = {
+            ...gallery[localImgIndex],
+            wp_id: wcImg.id,
+            url: wcImg.src,
+            status: 'active',
+          };
+        } else if (wcImg.id.toString() !== mainImageFromWoo?.id.toString()) {
+          // Ajouter les nouvelles images de WooCommerce (sauf l'image principale)
+          gallery.push({
+            _id: uuidv4(),
+            wp_id: wcImg.id,
+            url: wcImg.src,
+            src: wcImg.src,
+            status: 'active',
+          });
+        }
+      }
+    }
+
+    // ========================================
+    // MISE À JOUR DU PRODUIT
+    // ========================================
     await Product.update(productId, {
       woo_id: wcData.id,
       website_url: wcData.permalink || null,
       last_sync: new Date(),
-      image, // ← Image préservée ou synchronisée
-      gallery_images: gallery, // ← Galerie préservée ou synchronisée
+      image,
+      gallery_images: gallery,
       pending_sync: false,
     });
-  }
 
+    console.log(`[SYNC] ✅ Produit ${productId} mis à jour localement`);
+    console.log(`[SYNC] 📸 Image principale: ${image ? 'présente' : 'absente'}`);
+    console.log(`[SYNC] 🖼️  Galerie: ${gallery.length} images synchronisées`);
+  }
   async handleFullSync(client, results = { created: 0, updated: 0, deleted: 0, errors: [] }) {
     const [local, wc] = await Promise.all([
       Product.findAll(),
