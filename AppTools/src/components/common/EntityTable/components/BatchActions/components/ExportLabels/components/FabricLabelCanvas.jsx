@@ -364,7 +364,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
     const errorHeight = isRollMode ? rollBgHeight : printableHeight;
 
     return (
-      <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
+      <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm h-[80vh]">
         <div className="mb-3 flex items-center justify-center gap-1 bg-gray-200 dark:bg-gray-600 p-2 rounded">
           <button
             onClick={handleZoomOut}
@@ -419,7 +419,7 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
+    <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm h-[80vh] w-[50vw]">
       {/* CONTRÔLES DE ZOOM */}
       <div className="mb-3 flex items-center justify-center gap-1 bg-gray-200 dark:bg-gray-600 p-2 rounded">
         <button
@@ -463,9 +463,6 @@ const FabricLabelCanvas = ({ label, layout, style, onPositionChange, onElementSe
           style={{
             width: `${isRollMode ? rollBgWidth : printableWidth}px`,
             height: `${isRollMode ? rollBgHeight : printableHeight}px`,
-            border: isRollMode ? '1px solid #e5e7eb' : 'none',
-            borderRadius: isRollMode ? '4px' : '0',
-            backgroundColor: isRollMode ? '#f9fafb' : 'transparent',
           }}
         >
           <canvas
