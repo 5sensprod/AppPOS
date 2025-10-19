@@ -12,9 +12,18 @@ class BaseLabelRenderer {
       highRes: 200 / 96,
     };
 
-    // 🆕 CACHE
+    // Cache QR codes
     this.qrCodeCache = new Map();
+
+    // Cache images sources
     this.imageCache = new Map();
+
+    // 🆕 Cache images redimensionnées (avec dimensions spécifiques)
+    this.resizedImageCache = new Map();
+  }
+
+  _getResizedImageCacheKey(src, targetWidth, targetHeight, fitMode) {
+    return `${src}-${Math.round(targetWidth)}-${Math.round(targetHeight)}-${fitMode}`;
   }
 
   getScaleFactor(context = 'display') {
@@ -223,8 +232,10 @@ class BaseLabelRenderer {
     let currentY = paddingV;
     const spacing = 8 * scaleFactor;
 
+    // 🎯 Fonction helper qui respecte les positions personnalisées
     const createElement = (type, height, customPos) => {
       if (customPos) {
+        // ✅ Retourner la position personnalisée SANS modifier currentY
         return {
           x: customPos.x * this.mmToPx * scaleFactor,
           y: customPos.y * this.mmToPx * scaleFactor,
@@ -234,6 +245,7 @@ class BaseLabelRenderer {
         };
       }
 
+      // Position par défaut en cascade
       const element = {
         x: paddingH,
         y: currentY,
@@ -242,10 +254,10 @@ class BaseLabelRenderer {
         centerX: paddingH + contentWidth / 2,
       };
 
+      // ✅ N'incrémenter currentY QUE pour les éléments sans position personnalisée
       currentY += height + spacing;
       return element;
     };
-
     // Name
     if (style.showName) {
       const height = Math.max(15, (style.nameSize || 10) * 1.2) * scaleFactor;
@@ -308,6 +320,7 @@ class BaseLabelRenderer {
               width: contentWidth,
               height: totalHeight,
               centerX: paddingH + contentWidth / 2,
+              hasCustomPosition: false,
             };
 
         elements.barcode.barcodeHeight = qrSize;
@@ -324,6 +337,7 @@ class BaseLabelRenderer {
               width: contentWidth,
               height: totalHeight,
               centerX: paddingH + contentWidth / 2,
+              hasCustomPosition: false,
             };
 
         elements.barcode.barcodeHeight = barcodeHeight;
@@ -349,6 +363,7 @@ class BaseLabelRenderer {
             width: qrSize,
             height: totalHeight,
             centerX: customPositions.wooQR.centerX * this.mmToPx * scaleFactor,
+            hasCustomPosition: true,
           }
         : {
             x: defaultX,
@@ -356,6 +371,7 @@ class BaseLabelRenderer {
             width: qrSize,
             height: totalHeight,
             centerX: defaultX + qrSize / 2,
+            hasCustomPosition: false,
           };
 
       elements.wooQR.qrSize = qrSize;
@@ -376,14 +392,12 @@ class BaseLabelRenderer {
       });
     }
 
-    // 🆕 Images personnalisées
+    // 🆕 Images personnalisées - TOUJOURS avec position par défaut intelligente
     if (style.customImages?.length > 0) {
       style.customImages.forEach((imgConfig, index) => {
-        // 🎯 Utiliser les dimensions définies dans imgConfig (en mm)
         const imgWidthMm = imgConfig.width || 50;
         const imgHeightMm = imgConfig.height || 50;
 
-        // Convertir en pixels avec scaleFactor
         const imgWidth = imgWidthMm * this.mmToPx * scaleFactor;
         const imgHeight = imgHeightMm * this.mmToPx * scaleFactor;
 
@@ -391,27 +405,33 @@ class BaseLabelRenderer {
           configSizeMm: `${imgWidthMm}×${imgHeightMm}mm`,
           scaleFactor,
           finalSizePx: `${imgWidth.toFixed(0)}×${imgHeight.toFixed(0)}px`,
+          hasCustomPosition: !!customPositions[imgConfig.id],
         });
 
-        // Position par défaut : centrée
-        const defaultX = (canvasWidth / scaleFactor - imgWidthMm * this.mmToPx) / 2;
-        const defaultY = paddingV / scaleFactor + index * (imgHeight / scaleFactor + spacing);
+        if (customPositions[imgConfig.id]) {
+          // ✅ Position personnalisée sauvegardée
+          elements[imgConfig.id] = {
+            x: customPositions[imgConfig.id].x * this.mmToPx * scaleFactor,
+            y: customPositions[imgConfig.id].y * this.mmToPx * scaleFactor,
+            width: imgWidth,
+            height: imgHeight,
+            centerX: customPositions[imgConfig.id].centerX * this.mmToPx * scaleFactor,
+            hasCustomPosition: true,
+          };
+        } else {
+          // ⚠️ Position par défaut : centrée horizontalement
+          const defaultX = (canvasWidth / scaleFactor - imgWidthMm * this.mmToPx) / 2;
+          const defaultY = paddingV / scaleFactor + index * (imgHeight / scaleFactor + spacing);
 
-        elements[imgConfig.id] = customPositions[imgConfig.id]
-          ? {
-              x: customPositions[imgConfig.id].x * this.mmToPx * scaleFactor,
-              y: customPositions[imgConfig.id].y * this.mmToPx * scaleFactor,
-              width: imgWidth,
-              height: imgHeight,
-              centerX: customPositions[imgConfig.id].centerX * this.mmToPx * scaleFactor,
-            }
-          : {
-              x: defaultX * scaleFactor,
-              y: defaultY * scaleFactor,
-              width: imgWidth,
-              height: imgHeight,
-              centerX: (defaultX + (imgWidthMm * this.mmToPx) / 2) * scaleFactor,
-            };
+          elements[imgConfig.id] = {
+            x: defaultX * scaleFactor,
+            y: defaultY * scaleFactor,
+            width: imgWidth,
+            height: imgHeight,
+            centerX: (defaultX + (imgWidthMm * this.mmToPx) / 2) * scaleFactor,
+            hasCustomPosition: false,
+          };
+        }
       });
     }
 
@@ -763,95 +783,128 @@ class BaseLabelRenderer {
 
   async _addCustomImage(fabricCanvas, imgConfig, element, style, fabric, scaleFactor = 1) {
     try {
-      // Charger l'image
-      const imgElement = await this._loadImage(imgConfig.src);
-
-      console.log('📐 Image chargée:', {
-        naturalWidth: imgElement.naturalWidth,
-        naturalHeight: imgElement.naturalHeight,
-        elementWidth: element.width,
-        elementHeight: element.height,
-        fitMode: imgConfig.fitMode || 'contain',
-      });
-
-      // 🆕 Les dimensions de element sont DÉJÀ en pixels avec le scaleFactor appliqué
       const targetWidthPx = element.width;
       const targetHeightPx = element.height;
-
       const fitMode = imgConfig.fitMode || 'contain';
-      const imageAspectRatio = imgElement.naturalWidth / imgElement.naturalHeight;
-      const targetAspectRatio = targetWidthPx / targetHeightPx;
 
-      let finalWidthPx, finalHeightPx;
-
-      switch (fitMode) {
-        case 'cover':
-          if (imageAspectRatio > targetAspectRatio) {
-            finalHeightPx = targetHeightPx;
-            finalWidthPx = targetHeightPx * imageAspectRatio;
-          } else {
-            finalWidthPx = targetWidthPx;
-            finalHeightPx = targetWidthPx / imageAspectRatio;
-          }
-          break;
-
-        case 'stretch':
-          finalWidthPx = targetWidthPx;
-          finalHeightPx = targetHeightPx;
-          break;
-
-        case 'contain':
-        default:
-          if (imageAspectRatio > targetAspectRatio) {
-            finalWidthPx = targetWidthPx;
-            finalHeightPx = targetWidthPx / imageAspectRatio;
-          } else {
-            finalHeightPx = targetHeightPx;
-            finalWidthPx = targetHeightPx * imageAspectRatio;
-          }
-          break;
-      }
-
-      console.log('🎯 Dimensions finales calculées:', {
-        targetPx: `${targetWidthPx.toFixed(0)}×${targetHeightPx.toFixed(0)}`,
-        finalPx: `${finalWidthPx.toFixed(0)}×${finalHeightPx.toFixed(0)}`,
-        fitMode,
-      });
-
-      // 🆕 PRÉ-REDIMENSIONNER avec un canvas intermédiaire
-      const resizedImage = await this._resizeImageSmooth(
-        imgElement,
-        Math.round(finalWidthPx),
-        Math.round(finalHeightPx)
+      // 🎯 Créer une clé de cache unique
+      const cacheKey = this._getResizedImageCacheKey(
+        imgConfig.src,
+        targetWidthPx,
+        targetHeightPx,
+        fitMode
       );
 
-      // Centrer l'image dans l'espace alloué
-      const offsetX = (targetWidthPx - finalWidthPx) / 2;
-      const offsetY = (targetHeightPx - finalHeightPx) / 2;
+      let fabricImage;
+      let offsetX = 0;
+      let offsetY = 0;
 
-      console.log('✅ Image redimensionnée et positionnée:', {
-        resizedSize: `${resizedImage.width}×${resizedImage.height}px`,
-        offset: `${offsetX.toFixed(1)}, ${offsetY.toFixed(1)}`,
-        finalPosition: `${element.x + offsetX}, ${element.y + offsetY}`,
-      });
+      // 🔍 Vérifier si l'image redimensionnée existe dans le cache
+      if (this.resizedImageCache.has(cacheKey)) {
+        console.log('✅ Image redimensionnée depuis cache:', cacheKey);
 
-      // 🎨 Créer l'objet Fabric.Image avec l'image pré-redimensionnée
-      const fabricImage = new fabric.Image(resizedImage, {
-        left: element.x + offsetX,
-        top: element.y + offsetY,
-        scaleX: 1, // ✅ Pas de scaling supplémentaire, on a déjà la bonne taille
-        scaleY: 1,
-        opacity: imgConfig.opacity || 1,
-        angle: imgConfig.rotation || 0,
-        selectable: true,
-        objectType: imgConfig.id,
+        const cachedData = this.resizedImageCache.get(cacheKey);
+        const cachedImgElement = cachedData.image;
+        offsetX = cachedData.offsetX;
+        offsetY = cachedData.offsetY;
 
-        // Paramètres de qualité
-        imageSmoothing: true,
-        imageSmoothingQuality: 'high',
-        strokeWidth: 0,
-      });
+        fabricImage = new fabric.Image(cachedImgElement, {
+          left: element.x + offsetX,
+          top: element.y + offsetY,
+          scaleX: 1,
+          scaleY: 1,
+          opacity: imgConfig.opacity || 1,
+          angle: imgConfig.rotation || 0,
+          selectable: true,
+          objectType: imgConfig.id,
+          imageSmoothing: true,
+          imageSmoothingQuality: 'high',
+          strokeWidth: 0,
+        });
+      } else {
+        console.log('🔄 Génération nouvelle image redimensionnée:', cacheKey);
 
+        // Charger l'image source
+        const imgElement = await this._loadImage(imgConfig.src);
+
+        const imageAspectRatio = imgElement.naturalWidth / imgElement.naturalHeight;
+        const targetAspectRatio = targetWidthPx / targetHeightPx;
+
+        let finalWidthPx, finalHeightPx;
+
+        switch (fitMode) {
+          case 'cover':
+            if (imageAspectRatio > targetAspectRatio) {
+              finalHeightPx = targetHeightPx;
+              finalWidthPx = targetHeightPx * imageAspectRatio;
+            } else {
+              finalWidthPx = targetWidthPx;
+              finalHeightPx = targetWidthPx / imageAspectRatio;
+            }
+            break;
+
+          case 'stretch':
+            finalWidthPx = targetWidthPx;
+            finalHeightPx = targetHeightPx;
+            break;
+
+          case 'contain':
+          default:
+            if (imageAspectRatio > targetAspectRatio) {
+              finalWidthPx = targetWidthPx;
+              finalHeightPx = targetWidthPx / imageAspectRatio;
+            } else {
+              finalHeightPx = targetHeightPx;
+              finalWidthPx = targetHeightPx * imageAspectRatio;
+            }
+            break;
+        }
+
+        // Redimensionner l'image
+        const resizedImage = await this._resizeImageSmooth(
+          imgElement,
+          Math.round(finalWidthPx),
+          Math.round(finalHeightPx)
+        );
+
+        // Calculer les offsets pour centrage
+        offsetX = (targetWidthPx - finalWidthPx) / 2;
+        offsetY = (targetHeightPx - finalHeightPx) / 2;
+
+        // 🗄️ Stocker dans le cache avec les offsets
+        const cacheData = {
+          image: resizedImage,
+          offsetX: offsetX,
+          offsetY: offsetY,
+          finalWidth: finalWidthPx,
+          finalHeight: finalHeightPx,
+        };
+
+        // Limiter la taille du cache (max 30 images)
+        if (this.resizedImageCache.size >= 30) {
+          const firstKey = this.resizedImageCache.keys().next().value;
+          this.resizedImageCache.delete(firstKey);
+        }
+
+        this.resizedImageCache.set(cacheKey, cacheData);
+
+        // Créer l'objet Fabric
+        fabricImage = new fabric.Image(resizedImage, {
+          left: element.x + offsetX,
+          top: element.y + offsetY,
+          scaleX: 1,
+          scaleY: 1,
+          opacity: imgConfig.opacity || 1,
+          angle: imgConfig.rotation || 0,
+          selectable: true,
+          objectType: imgConfig.id,
+          imageSmoothing: true,
+          imageSmoothingQuality: 'high',
+          strokeWidth: 0,
+        });
+      }
+
+      // Configuration finale commune
       fabricImage.set({
         paintFirst: 'fill',
         globalCompositeOperation: 'source-over',
@@ -863,57 +916,31 @@ class BaseLabelRenderer {
 
       fabricCanvas.add(fabricImage);
 
-      console.log(`✅ Image ajoutée au canvas: ${imgConfig.filename || imgConfig.id}`);
+      console.log(`✅ Image ajoutée au canvas:`, {
+        id: imgConfig.id,
+        position: { x: element.x + offsetX, y: element.y + offsetY },
+        size: { width: targetWidthPx, height: targetHeightPx },
+        offsets: { offsetX, offsetY },
+      });
     } catch (error) {
       console.error(`❌ Erreur chargement image ${imgConfig.src}:`, error);
       this._addImagePlaceholder(fabricCanvas, element, imgConfig, fabric);
     }
   }
 
-  /**
-   * 🆕 Redimensionne une image avec un lissage optimal (downsampling progressif)
-   */
-  async _resizeImageSmooth(img, targetWidth, targetHeight) {
-    // Si l'image est déjà petite, pas besoin de redimensionner
-    if (img.naturalWidth <= targetWidth * 2 && img.naturalHeight <= targetHeight * 2) {
-      return img;
-    }
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    let currentWidth = img.naturalWidth;
-    let currentHeight = img.naturalHeight;
-    let currentImg = img;
-
-    // Downsampling progressif par étapes de 50%
-    while (currentWidth > targetWidth * 2 || currentHeight > targetHeight * 2) {
-      currentWidth = Math.floor(currentWidth / 2);
-      currentHeight = Math.floor(currentHeight / 2);
-
-      canvas.width = currentWidth;
-      canvas.height = currentHeight;
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.clearRect(0, 0, currentWidth, currentHeight);
-      ctx.drawImage(currentImg, 0, 0, currentWidth, currentHeight);
-
-      currentImg = await this._canvasToImage(canvas);
-    }
-
-    // Redimensionnement final à la taille exacte
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.clearRect(0, 0, targetWidth, targetHeight);
-    ctx.drawImage(currentImg, 0, 0, targetWidth, targetHeight);
-
-    return await this._canvasToImage(canvas);
+  // 🆕 Méthode pour vider le cache d'images redimensionnées
+  clearResizedImageCache() {
+    console.log('🗑️ Cache images redimensionnées vidé');
+    this.resizedImageCache.clear();
   }
 
+  // Méthode pour vider TOUS les caches si nécessaire
+  clearAllCaches() {
+    console.log('🗑️ Tous les caches vidés');
+    this.qrCodeCache.clear();
+    this.imageCache.clear();
+    this.resizedImageCache.clear();
+  }
   /**
    * 🆕 Convertit un canvas en Image
    */
@@ -930,40 +957,33 @@ class BaseLabelRenderer {
    * Utilise un canvas intermédiaire pour éviter le crénelage
    */
   async _resizeImageSmooth(img, targetWidth, targetHeight) {
-    // Si l'image est déjà petite, pas besoin de redimensionner
-    if (img.naturalWidth <= targetWidth * 2 && img.naturalHeight <= targetHeight * 2) {
-      return img;
-    }
-
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-
-    // 🎯 TECHNIQUE : Downsampling progressif par étapes de 50%
-    // Cela produit un résultat beaucoup plus lisse qu'un redimensionnement direct
 
     let currentWidth = img.naturalWidth;
     let currentHeight = img.naturalHeight;
     let currentImg = img;
 
-    // Étape 1 : Réduire progressivement par moitiés jusqu'à approcher la cible
-    while (currentWidth > targetWidth * 2 || currentHeight > targetHeight * 2) {
-      currentWidth = Math.floor(currentWidth / 2);
-      currentHeight = Math.floor(currentHeight / 2);
+    // ↓↓↓ Cas 1 : on réduit (downscale) → étapes /2 comme avant
+    if (currentWidth > targetWidth || currentHeight > targetHeight) {
+      while (currentWidth / 2 > targetWidth || currentHeight / 2 > targetHeight) {
+        currentWidth = Math.max(targetWidth, Math.floor(currentWidth / 2));
+        currentHeight = Math.max(targetHeight, Math.floor(currentHeight / 2));
 
-      canvas.width = currentWidth;
-      canvas.height = currentHeight;
+        canvas.width = currentWidth;
+        canvas.height = currentHeight;
 
-      // Activer le lissage haute qualité
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.clearRect(0, 0, currentWidth, currentHeight);
+        ctx.drawImage(currentImg, 0, 0, currentWidth, currentHeight);
 
-      ctx.drawImage(currentImg, 0, 0, currentWidth, currentHeight);
-
-      // Créer une nouvelle image à partir du canvas
-      currentImg = await this._canvasToImage(canvas);
+        currentImg = await this._canvasToImage(canvas);
+      }
     }
 
-    // Étape 2 : Redimensionnement final à la taille exacte
+    // ↓↓↓ Étape finale (commune) : dessiner exactement à la taille cible,
+    // y compris en **UPSCALE** si l’image est plus petite que la cible.
     canvas.width = targetWidth;
     canvas.height = targetHeight;
 
@@ -1213,6 +1233,7 @@ class BaseLabelRenderer {
         label: label.name,
         layoutSize: `${layout.width}×${layout.height}mm`,
         context,
+        hasCustomPositions: !!style.customPositions,
       });
 
       const fabricCanvas = await this.renderToCanvas(tempCanvas, label, layout, style, {
@@ -1220,11 +1241,11 @@ class BaseLabelRenderer {
         context: context,
       });
 
-      // 🆕 S'assurer que le canvas a les bonnes dimensions
+      // S'assurer que le canvas a les bonnes dimensions
       const canvasWidth = fabricCanvas.width;
       const canvasHeight = fabricCanvas.height;
 
-      console.log('📐 Dimensions canvas générées:', {
+      console.log('📏 Dimensions canvas générées:', {
         width: canvasWidth,
         height: canvasHeight,
         ratio: (canvasWidth / canvasHeight).toFixed(2),

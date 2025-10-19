@@ -17,6 +17,16 @@ class A4LabelRenderer extends BaseLabelRenderer {
       const layout = labelLayout.layout || this._getDefaultLayout();
       const style = labelLayout.style || this._getDefaultStyle();
 
+      // ✅ IMPORTANT : S'assurer que customPositions est bien dans style
+      if (!style.customPositions && labelLayout.style?.customPositions) {
+        style.customPositions = labelLayout.style.customPositions;
+      }
+
+      console.log('📦 Export PDF avec positions personnalisées:', {
+        hasCustomPositions: !!style.customPositions,
+        positionsCount: style.customPositions ? Object.keys(style.customPositions).length : 0,
+      });
+
       // Validation du type de support
       if (!['A4', 'custom'].includes(layout.supportType)) {
         throw new Error('A4LabelRenderer ne supporte que les formats A4 et custom');
@@ -82,7 +92,7 @@ class A4LabelRenderer extends BaseLabelRenderer {
       const position = this._calculateLabelPosition(cellIndex, pageConfig, layout);
 
       try {
-        // Génération image étiquette
+        // ✅ Génération image étiquette avec TOUTES les propriétés de style
         const imgData = await this._renderSingleLabelToCanvas(label, layout, style, 'export');
 
         // Ajout au PDF

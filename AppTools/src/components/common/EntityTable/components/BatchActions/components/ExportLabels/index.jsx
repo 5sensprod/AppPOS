@@ -73,6 +73,22 @@ const ExportLabelsModal = ({
 
     setLoading(true);
     try {
+      // 🆕 Construire la configuration avec les positions personnalisées
+      const labelLayout = buildLabelLayout();
+
+      // ✅ S'assurer que customPositions est bien dans le style
+      if (labelStyle.customPositions && Object.keys(labelStyle.customPositions).length > 0) {
+        if (!labelLayout.style) {
+          labelLayout.style = {};
+        }
+        labelLayout.style.customPositions = labelStyle.customPositions;
+
+        console.log("📍 Positions personnalisées incluses dans l'export:", {
+          count: Object.keys(labelStyle.customPositions).length,
+          positions: labelStyle.customPositions,
+        });
+      }
+
       const exportConfig = {
         selectedItems,
         exportType: 'labels',
@@ -82,8 +98,13 @@ const ExportLabelsModal = ({
             : undefined,
         format: effectiveExportMode,
         labelData: extractLabelData(),
-        labelLayout: buildLabelLayout(),
+        labelLayout: labelLayout, // ✅ Maintenant avec customPositions
       };
+
+      console.log('🚀 Configuration export finale:', {
+        hasCustomPositions: !!exportConfig.labelLayout.style?.customPositions,
+        positionsCount: Object.keys(exportConfig.labelLayout.style?.customPositions || {}).length,
+      });
 
       await onExport(exportConfig);
       handleClose();
@@ -99,6 +120,12 @@ const ExportLabelsModal = ({
       [positionData.objectType]: positionData.position,
     };
     updateStyle({ customPositions: newPositions });
+
+    console.log('📌 Position mise à jour:', {
+      objectType: positionData.objectType,
+      position: positionData.position,
+      totalPositions: Object.keys(newPositions).length,
+    });
   };
 
   if (!isOpen) return null;
