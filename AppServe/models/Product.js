@@ -22,6 +22,9 @@ class Product extends BaseModel {
       last_sold_at: null,
       revenue_total: 0,
       type: 'simple',
+      manage_stock: false,
+      stock: 0,
+      stock_status: 'instock',
     };
   }
 

@@ -9,6 +9,7 @@ import {
   Package,
   BarChart3,
   RefreshCw,
+  ShoppingCart,
 } from 'lucide-react';
 import { useFormContext } from 'react-hook-form';
 import apiService from '../../../services/api';
@@ -217,7 +218,10 @@ const WooCommerceTab = ({
   };
 
   // Composant pour la section affichage du stock
+
   const StockDisplaySection = () => {
+    const manageStock = watch ? watch('manage_stock') : entity.manage_stock;
+
     if (!editable) {
       return (
         <div>
@@ -227,24 +231,51 @@ const WooCommerceTab = ({
               <span>Affichage du stock</span>
             </div>
           </h2>
-          <div>
+
+          <div className="mb-4">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
               <BarChart3 className="inline h-4 w-4 mr-1" />
-              Visibilité sur le site
+              Suivi des stocks
             </h3>
             {entity.manage_stock ? (
               <div className="inline-flex items-center px-3 py-2 rounded-lg border bg-green-50 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-700">
                 <CheckCircle className="h-3 w-3 mr-1" />
-                <span className="font-medium">Affiché sur le site</span>
+                <span className="font-medium">Suivi automatique activé</span>
               </div>
             ) : (
-              <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-md">
-                <span className="text-gray-500 dark:text-gray-400 italic text-sm">
-                  Masqué sur le site
-                </span>
+              <div className="inline-flex items-center px-3 py-2 rounded-lg border bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-700/30 dark:text-gray-300 dark:border-gray-600">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                <span className="font-medium">Gestion manuelle</span>
               </div>
             )}
           </div>
+
+          {!entity.manage_stock && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                <Package className="inline h-4 w-4 mr-1" />
+                Statut du stock
+              </h3>
+              {entity.stock_status === 'instock' && (
+                <div className="inline-flex items-center px-3 py-2 rounded-lg border bg-green-50 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-700">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  <span className="font-medium">En stock</span>
+                </div>
+              )}
+              {entity.stock_status === 'outofstock' && (
+                <div className="inline-flex items-center px-3 py-2 rounded-lg border bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-700">
+                  <ShoppingCart className="h-3 w-3 mr-1" />
+                  <span className="font-medium">Sur commande</span>
+                </div>
+              )}
+              {entity.stock_status === 'onbackorder' && (
+                <div className="inline-flex items-center px-3 py-2 rounded-lg border bg-orange-50 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-200 dark:border-orange-700">
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  <span className="font-medium">En réapprovisionnement</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       );
     }
@@ -257,27 +288,97 @@ const WooCommerceTab = ({
             <span>Affichage du stock</span>
           </div>
         </h2>
-        <div>
+
+        <div className="mb-6">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
             <BarChart3 className="inline h-4 w-4 mr-1" />
-            Visibilité sur le site
+            Suivi des stocks
           </h3>
-          <div className="flex items-center">
-            <label className="inline-flex items-center">
+          <div className="flex items-start">
+            <label className="inline-flex items-start cursor-pointer">
               <input
                 type="checkbox"
                 {...register('manage_stock')}
-                className="form-checkbox h-5 w-5 text-blue-600"
+                className="form-checkbox h-5 w-5 text-blue-600 mt-0.5"
               />
-              <span className="ml-2 text-gray-700 dark:text-gray-300">
-                Afficher le stock sur le site
-              </span>
+              <div className="ml-3">
+                <span className="text-gray-700 dark:text-gray-300 font-medium">
+                  Activer le suivi automatique des stocks
+                </span>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {manageStock
+                    ? 'Le stock est calculé automatiquement selon la quantité disponible'
+                    : 'Le stock est géré manuellement avec un statut fixe'}
+                </p>
+              </div>
             </label>
           </div>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Si activé, les informations de stock seront visibles sur la boutique en ligne
-          </p>
         </div>
+
+        {!manageStock && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              <Package className="inline h-4 w-4 mr-1" />
+              Statut du stock (manuel)
+            </h3>
+
+            <div className="space-y-3">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  {...register('stock_status')}
+                  value="instock"
+                  className="form-radio h-4 w-4 text-green-600"
+                />
+                <span className="ml-3 flex items-center">
+                  <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                  <span className="text-gray-700 dark:text-gray-300">En stock</span>
+                </span>
+              </label>
+
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  {...register('stock_status')}
+                  value="outofstock"
+                  className="form-radio h-4 w-4 text-yellow-600"
+                />
+                <span className="ml-3 flex items-center">
+                  <ShoppingCart className="h-4 w-4 text-yellow-600 mr-2" />
+                  <div className="flex flex-col">
+                    <span className="text-gray-700 dark:text-gray-300">Sur commande</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      (Disponible, délai de livraison plus long)
+                    </span>
+                  </div>
+                </span>
+              </label>
+
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  {...register('stock_status')}
+                  value="onbackorder"
+                  className="form-radio h-4 w-4 text-orange-600"
+                />
+                <span className="ml-3 flex items-center">
+                  <RefreshCw className="h-4 w-4 text-orange-600 mr-2" />
+                  <div className="flex flex-col">
+                    <span className="text-gray-700 dark:text-gray-300">En réapprovisionnement</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      (Disponible prochainement)
+                    </span>
+                  </div>
+                </span>
+              </label>
+            </div>
+
+            <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+              💡 Si le suivi automatique est activé et que le stock atteint 0, le produit passera
+              automatiquement en "Rupture de stock" (indisponible)
+            </p>
+          </div>
+        )}
       </div>
     );
   };

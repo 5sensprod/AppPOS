@@ -224,13 +224,11 @@ export default function useProductDetail() {
       });
 
       // Construction de category_info améliorée
-      // Compatible avec votre architecture hierarchicalCategories existante
       const buildCategoryInfo = () => {
         if (!d.categories || d.categories.length === 0) {
           return { refs: [], primary: null };
         }
 
-        // Fonction pour construire les références de catégories avec leurs chemins
         const buildCategoryRefs = (categoryIds) => {
           const refs = [];
           const processedPaths = new Set();
@@ -238,32 +236,27 @@ export default function useProductDetail() {
           categoryIds.forEach((catId) => {
             const category = categoryOptions.find((c) => c.value === catId);
             if (category) {
-              // Analyser le label pour déduire la hiérarchie (avec les tirets —)
-              const level = (category.label.match(/—/g) || []).length;
-              const cleanName = category.label.replace(/^—+\s*/, '');
+              const level = (category.label.match(/–/g) || []).length;
+              const cleanName = category.label.replace(/^–+\s*/, '');
 
-              // Construire le chemin hiérarchique en analysant la position dans categoryOptions
               let path = [cleanName];
               let pathIds = [catId];
 
               if (level > 0) {
-                // Trouver les catégories parentes en remontant dans categoryOptions
                 const currentIndex = categoryOptions.findIndex((c) => c.value === catId);
                 let parentPath = [];
                 let parentIds = [];
 
-                // Remonter pour trouver les parents (catégories avec moins de tirets)
                 for (let i = currentIndex - 1; i >= 0; i--) {
                   const potentialParent = categoryOptions[i];
-                  const parentLevel = (potentialParent.label.match(/—/g) || []).length;
+                  const parentLevel = (potentialParent.label.match(/–/g) || []).length;
 
                   if (parentLevel < level) {
-                    const cleanParentName = potentialParent.label.replace(/^—+\s*/, '');
+                    const cleanParentName = potentialParent.label.replace(/^–+\s*/, '');
                     parentPath.unshift(cleanParentName);
                     parentIds.unshift(potentialParent.value);
 
-                    // Continuer jusqu'à trouver tous les parents
-                    if (parentLevel === 0) break; // Racine atteinte
+                    if (parentLevel === 0) break;
                   }
                 }
 
@@ -271,7 +264,6 @@ export default function useProductDetail() {
                 pathIds = [...parentIds, catId];
               }
 
-              // Ajouter toutes les catégories de ce chemin aux refs (parents + enfant)
               for (let i = 0; i < path.length; i++) {
                 const pathKey = pathIds.slice(0, i + 1).join('->');
 
@@ -293,7 +285,6 @@ export default function useProductDetail() {
           });
 
           return refs.sort((a, b) => {
-            // Trier par niveau puis par nom
             if (a.level !== b.level) return a.level - b.level;
             return a.name.localeCompare(b.name);
           });
@@ -301,17 +292,14 @@ export default function useProductDetail() {
 
         const refs = buildCategoryRefs(d.categories);
 
-        // Déterminer la catégorie principale
         let primary = null;
         if (d.category_id) {
-          // Chercher la catégorie principale dans les refs
           primary = refs.find((ref) => ref.id === d.category_id);
 
           if (!primary) {
-            // Si pas trouvée, la créer à partir de categoryOptions
             const category = categoryOptions.find((c) => c.value === d.category_id);
             if (category) {
-              const cleanName = category.label.replace(/^—+\s*/, '');
+              const cleanName = category.label.replace(/^–+\s*/, '');
               primary = {
                 id: d.category_id,
                 name: cleanName,
@@ -324,7 +312,6 @@ export default function useProductDetail() {
             }
           }
         } else if (refs.length > 0) {
-          // Si pas de catégorie principale définie, prendre la première
           primary = refs[0];
           d.category_id = refs[0].id;
         }
@@ -340,7 +327,6 @@ export default function useProductDetail() {
         if (brand) {
           d.brand_ref = { id: brand._id, name: brand.name };
         } else {
-          // Si la marque n'existe plus, nettoyer
           d.brand_id = null;
           d.brand_ref = null;
         }
@@ -353,7 +339,6 @@ export default function useProductDetail() {
         if (supplier) {
           d.supplier_ref = { id: supplier._id, name: supplier.name };
         } else {
-          // Si le fournisseur n'existe plus, nettoyer
           d.supplier_id = null;
           d.supplier_ref = null;
         }
@@ -361,12 +346,33 @@ export default function useProductDetail() {
         d.supplier_ref = null;
       }
 
+      // ✅ NOUVEAU: Gestion du stock_status
+      if (d.manage_stock === false) {
+        // Si le suivi automatique est désactivé, s'assurer qu'un stock_status est défini
+        if (!d.stock_status || !['instock', 'outofstock', 'onbackorder'].includes(d.stock_status)) {
+          d.stock_status = 'instock'; // Valeur par défaut
+          console.log('⚠️ stock_status manquant ou invalide, défini à "instock"');
+        }
+      } else {
+        // Si le suivi automatique est activé, WooCommerce gèrera le stock_status
+        // On peut le laisser tel quel pour la compatibilité
+        console.log('📦 manage_stock activé, stock_status sera calculé par WooCommerce');
+      }
+
+      console.log('📦 PreprocessData - Gestion du stock:', {
+        manage_stock: d.manage_stock,
+        stock_status: d.stock_status,
+        stock: d.stock,
+      });
+
       console.log('📦 PreprocessData - Résultat final:', {
         category_id: d.category_id,
         categories: d.categories,
         category_info: d.category_info,
         brand_ref: d.brand_ref,
         supplier_ref: d.supplier_ref,
+        manage_stock: d.manage_stock,
+        stock_status: d.stock_status,
       });
 
       return d;
@@ -612,6 +618,7 @@ const defaultValues = {
   stock: 0,
   min_stock: null,
   manage_stock: false,
+  stock_status: 'instock', // ✅ NOUVEAU: Statut du stock par défaut
   status: 'draft',
   category_id: null,
   categories: [],
@@ -622,6 +629,6 @@ const defaultValues = {
   margin_rate: null,
   margin_amount: null,
   tax_rate: 20,
-  promo_rate: null, // 🆕 NOUVEAU CHAMP
+  promo_rate: null,
   promo_amount: null,
 };

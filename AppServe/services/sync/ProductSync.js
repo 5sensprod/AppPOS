@@ -26,15 +26,34 @@ class ProductSyncStrategy extends SyncStrategy {
       price: product.price.toString(),
       sale_price: (product.sale_price || '').toString(),
       status: product.status === 'published' ? 'publish' : 'draft',
-      manage_stock: product.manage_stock || false,
+
+      // Gestion du stock
+      manage_stock: product.manage_stock === true || product.manage_stock === 'yes',
       stock_quantity: product.stock || 0,
+
+      // ✅ NOUVEAU: Ajouter stock_status
+      // Si manage_stock est false, on envoie le stock_status manuel
+      // Sinon WooCommerce le calculera automatiquement
+      ...(product.manage_stock === false && product.stock_status
+        ? {
+            stock_status: this._normalizeStockStatus(product.stock_status),
+          }
+        : {}),
+
       meta_data: [...(product.meta_data || []), { key: 'brand_id', value: product.brand_id }],
       slug:
         product.slug ||
         this._generateSlug(product.name || product.designation || product.sku || ''),
     };
 
-    console.log(`[SYNC] 📂 Récupération des catégories pour le produit ${product._id}`);
+    console.log(`[SYNC] 📦 Gestion du stock: ${wcData.manage_stock ? 'ACTIVÉE' : 'DÉSACTIVÉE'}`);
+    console.log(`[SYNC] 📊 Quantité en stock: ${wcData.stock_quantity}`);
+
+    if (wcData.stock_status) {
+      console.log(`[SYNC] 🏷️  Statut du stock (manuel): ${wcData.stock_status}`);
+    }
+
+    console.log(`[SYNC] 🔂 Récupération des catégories pour le produit ${product._id}`);
     wcData.categories = await this._prepareCategoryData(product);
     console.log(`[SYNC] 📋 Catégories finales pour WooCommerce:`, wcData.categories);
 
@@ -294,6 +313,41 @@ class ProductSyncStrategy extends SyncStrategy {
     return images;
   }
 
+  _normalizeStockStatus(status) {
+    const statusMap = {
+      // Formats français
+      en_stock: 'instock',
+      'en stock': 'instock',
+      disponible: 'instock',
+
+      sur_commande: 'outofstock', // ✅ outofstock = Sur commande
+      'sur commande': 'outofstock',
+
+      reapprovisionnement: 'onbackorder', // ✅ onbackorder = En réappro
+      en_reapprovisionnement: 'onbackorder',
+      'en réapprovisionnement': 'onbackorder',
+      réappro: 'onbackorder',
+
+      // Formats WooCommerce
+      instock: 'instock',
+      outofstock: 'outofstock',
+      onbackorder: 'onbackorder',
+
+      // Alias
+      available: 'instock',
+      unavailable: 'onbackorder',
+      backorder: 'onbackorder',
+    };
+
+    const normalized = statusMap[status?.toLowerCase()] || 'instock';
+
+    if (normalized !== status) {
+      console.log(`[SYNC] 🔄 stock_status normalisé: "${status}" → "${normalized}"`);
+    }
+
+    return normalized;
+  }
+
   async syncToWooCommerce(product, client, results = { created: 0, updated: 0, errors: [] }) {
     try {
       const updatedProduct = await this._syncPendingImages(product);
@@ -426,9 +480,7 @@ class ProductSyncStrategy extends SyncStrategy {
   async _updateLocal(productId, wcData) {
     const product = await Product.findById(productId);
 
-    // ========================================
-    // GESTION DE L'IMAGE PRINCIPALE
-    // ========================================
+    // Gestion de l'image principale (code existant)
     const mainImageFromWoo = wcData.images?.[0];
     let image = product.image;
 
@@ -445,20 +497,16 @@ class ProductSyncStrategy extends SyncStrategy {
       };
     }
 
-    // ========================================
-    // GESTION DE LA GALERIE (SYNCHRONISATION BIDIRECTIONNELLE)
-    // ========================================
+    // Gestion de la galerie (code existant)
     let gallery = [...(product.gallery_images || [])];
 
     if (wcData.images && wcData.images.length > 0) {
-      // Mettre à jour les images existantes avec les données WooCommerce
       for (const wcImg of wcData.images) {
         const localImgIndex = gallery.findIndex(
           (img) => img.wp_id && img.wp_id.toString() === wcImg.id.toString()
         );
 
         if (localImgIndex !== -1) {
-          // Mettre à jour l'image existante
           gallery[localImgIndex] = {
             ...gallery[localImgIndex],
             wp_id: wcImg.id,
@@ -466,7 +514,6 @@ class ProductSyncStrategy extends SyncStrategy {
             status: 'active',
           };
         } else if (wcImg.id.toString() !== mainImageFromWoo?.id.toString()) {
-          // Ajouter les nouvelles images de WooCommerce (sauf l'image principale)
           gallery.push({
             _id: uuidv4(),
             wp_id: wcImg.id,
@@ -478,9 +525,18 @@ class ProductSyncStrategy extends SyncStrategy {
       }
     }
 
-    // ========================================
-    // MISE À JOUR DU PRODUIT
-    // ========================================
+    // Normaliser manage_stock depuis WooCommerce
+    const manageStock = wcData.manage_stock === true || wcData.manage_stock === 'yes';
+
+    // ✅ NOUVEAU: Récupérer stock_status depuis WooCommerce
+    const stockStatus = wcData.stock_status || 'instock';
+
+    console.log(
+      `[SYNC] 📦 manage_stock depuis WooCommerce: ${wcData.manage_stock} → normalisé: ${manageStock}`
+    );
+    console.log(`[SYNC] 🏷️  stock_status depuis WooCommerce: ${stockStatus}`);
+
+    // Mise à jour du produit
     await Product.update(productId, {
       woo_id: wcData.id,
       website_url: wcData.permalink || null,
@@ -488,11 +544,20 @@ class ProductSyncStrategy extends SyncStrategy {
       image,
       gallery_images: gallery,
       pending_sync: false,
+
+      // Stock management
+      manage_stock: manageStock,
+      stock: wcData.stock_quantity || 0,
+
+      // ✅ NOUVEAU: Sauvegarder stock_status
+      stock_status: stockStatus,
     });
 
     console.log(`[SYNC] ✅ Produit ${productId} mis à jour localement`);
     console.log(`[SYNC] 📸 Image principale: ${image ? 'présente' : 'absente'}`);
     console.log(`[SYNC] 🖼️  Galerie: ${gallery.length} images synchronisées`);
+    console.log(`[SYNC] 📦 Gestion stock: ${manageStock ? 'ACTIVÉE' : 'DÉSACTIVÉE'}`);
+    console.log(`[SYNC] 🏷️  Statut stock: ${stockStatus}`);
   }
   async handleFullSync(client, results = { created: 0, updated: 0, deleted: 0, errors: [] }) {
     const [local, wc] = await Promise.all([
