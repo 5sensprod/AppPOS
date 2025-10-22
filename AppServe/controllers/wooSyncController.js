@@ -546,6 +546,119 @@ class WooSyncController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  /**
+   * Désynchronise un produit - supprime toutes les données de synchronisation WooCommerce
+   */
+  async unsyncProduct(req, res) {
+    try {
+      const Product = require('../models/Product');
+      const WooCommerceClient = require('../services/base/WooCommerceClient');
+      const { id } = req.params;
+
+      if (!id) {
+        return ResponseHandler.badRequest(res, 'ID du produit requis');
+      }
+
+      // Trouver le produit local par ID
+      const product = await Product.findById(id);
+
+      if (!product) {
+        return ResponseHandler.notFound(res, `Produit avec l'ID "${id}" non trouvé`);
+      }
+
+      // Vérifier si le produit est synchronisé
+      if (!product.woo_id && !product.last_sync && !product.website_url) {
+        return ResponseHandler.badRequest(res, "Ce produit n'est pas synchronisé avec WooCommerce");
+      }
+
+      console.log(`🗑️ Désynchronisation du produit: ${product.name} (${product._id})`);
+
+      // Sauvegarder les données de sync avant suppression (pour le log)
+      const syncDataBefore = {
+        woo_id: product.woo_id || null,
+        last_sync: product.last_sync || null,
+        woo_status: product.woo_status || null,
+        pending_sync: product.pending_sync || null,
+        website_url: product.website_url || null,
+      };
+
+      // ⭐ NOUVEAU : Supprimer le produit sur WooCommerce si woo_id existe
+      let wooDeleteSuccess = false;
+      let wooDeleteError = null;
+
+      if (product.woo_id) {
+        try {
+          console.log(`🔥 Suppression du produit WooCommerce ID: ${product.woo_id}`);
+          const wooClient = new WooCommerceClient();
+
+          // Supprimer le produit sur WooCommerce (force: true pour suppression définitive)
+          await wooClient.delete(`products/${product.woo_id}`, { force: true });
+
+          wooDeleteSuccess = true;
+          console.log(`✅ Produit supprimé de WooCommerce avec succès`);
+        } catch (error) {
+          wooDeleteError = error.message;
+          console.error(`⚠️ Erreur lors de la suppression WooCommerce:`, error.message);
+
+          // Si le produit n'existe plus sur WooCommerce (404), on considère que c'est OK
+          if (error.response?.status === 404) {
+            console.log(`ℹ️ Le produit n'existe plus sur WooCommerce (déjà supprimé)`);
+            wooDeleteSuccess = true;
+          } else {
+            // Autre erreur : on continue quand même la désynchronisation locale
+            console.warn(`⚠️ Désynchronisation locale continuée malgré l'erreur WooCommerce`);
+          }
+        }
+      } else {
+        console.log(`ℹ️ Pas de woo_id, pas de suppression WooCommerce nécessaire`);
+      }
+
+      // Supprimer toutes les données de synchronisation LOCALES
+      const updateData = {
+        woo_id: null,
+        last_sync: null,
+        woo_status: null,
+        pending_sync: false,
+        website_url: null,
+        sync_errors: null,
+      };
+
+      // Mettre à jour le produit local
+      await Product.update(id, updateData);
+
+      // Notifier via WebSocket
+      if (websocketManager && websocketManager.notifyEntityUpdated) {
+        websocketManager.notifyEntityUpdated('products', id, await Product.findById(id));
+      }
+
+      console.log(`✅ Produit désynchronisé localement avec succès`);
+
+      // Message de réponse selon le succès de la suppression WooCommerce
+      let message = `Produit "${product.name}" désynchronisé avec succès`;
+
+      if (wooDeleteSuccess) {
+        message += ' et supprimé de WooCommerce';
+      } else if (wooDeleteError) {
+        message += ` (⚠️ Erreur WooCommerce: ${wooDeleteError})`;
+      }
+
+      return ResponseHandler.success(res, {
+        message: message,
+        product: {
+          _id: product._id,
+          name: product.name,
+          sku: product.sku,
+          syncDataRemoved: syncDataBefore,
+          wooCommerceDeleted: wooDeleteSuccess,
+          wooCommerceError: wooDeleteError,
+        },
+      });
+    } catch (error) {
+      console.error(`Erreur lors de la désynchronisation du produit:`, error);
+      return ResponseHandler.error(res, error);
+    }
+  }
 }
 
 const wooSyncController = new WooSyncController();
@@ -560,4 +673,5 @@ module.exports = {
   countMissingWooIds: wooSyncController.countMissingWooIds.bind(wooSyncController),
   syncMissingWooIds: wooSyncController.syncMissingWooIds.bind(wooSyncController),
   syncProductBySku: wooSyncController.syncProductBySku.bind(wooSyncController),
+  unsyncProduct: wooSyncController.unsyncProduct.bind(wooSyncController),
 };

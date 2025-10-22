@@ -11,6 +11,7 @@ const customActions = {
   UPLOAD_GALLERY_IMAGE: 'UPLOAD_GALLERY_IMAGE',
   DELETE_GALLERY_IMAGE: 'DELETE_GALLERY_IMAGE',
   SYNC_PRODUCT: 'SYNC_PRODUCT',
+  UNSYNC_PRODUCT: 'UNSYNC_PRODUCT',
   // ✅ ACTIONS POUR LE CACHE AVEC WEBSOCKET
   SET_CACHE_TIMESTAMP: 'SET_CACHE_TIMESTAMP',
   CLEAR_CACHE: 'CLEAR_CACHE',
@@ -87,6 +88,28 @@ const customReducers = {
       lastUpdated: Date.now(),
     };
   },
+
+  UNSYNC_PRODUCT: (state, action) => {
+    return {
+      ...state,
+      items: state.items.map((item) =>
+        item._id === action.payload.id
+          ? {
+              ...item,
+              woo_id: null,
+              last_sync: null,
+              woo_status: null,
+              pending_sync: false,
+              website_url: null,
+              sync_errors: null,
+            }
+          : item
+      ),
+      loading: false,
+      lastUpdated: Date.now(),
+    };
+  },
+
   // ✅ REDUCERS POUR LE CACHE
   SET_CACHE_TIMESTAMP: (state, action) => {
     return {
@@ -391,9 +414,31 @@ export function useProduct() {
     }
   };
 
+  const unsyncProduct = async (productId) => {
+    console.log(`🗑️ Désynchronisation du produit #${productId}`);
+    store.dispatch({ type: 'FETCH_START' });
+
+    try {
+      const response = await apiService.post(`/api/sync/products/${productId}/unsync`);
+      console.log(`✅ Produit désynchronisé avec succès:`, response.data);
+
+      store.dispatch({
+        type: customActions.UNSYNC_PRODUCT,
+        payload: { id: productId },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Erreur lors de la désynchronisation du produit #${productId}:`, error);
+      store.dispatch({ type: 'FETCH_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
   return {
     ...productStore,
     syncProduct,
+    unsyncProduct,
     duplicateProduct,
     // ✅ INITIALISATION WEBSOCKET SIMPLIFIÉE
     initWebSocketListeners: () => {

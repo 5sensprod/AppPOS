@@ -21,6 +21,7 @@ function ProductDetail() {
     handleDelete,
     handleCancel,
     handleSync,
+    handleUnsync,
     validationSchema,
     defaultValues,
     categoryOptions,
@@ -96,6 +97,7 @@ function ProductDetail() {
               entity={entity}
               entityType="product"
               onSync={handleSync}
+              onUnsync={handleUnsync}
               editable={editable}
               showStatus={true}
               enableTitleGeneration={true}

@@ -7,6 +7,7 @@ const wooSyncMiddleware = require('../middleware/wooSyncMiddleware');
 // Routes de produits existantes
 router.get('/products/pending', wooSyncController.getPendingSync);
 router.post('/products/:id/sync', wooSyncController.syncProduct);
+router.post('/products/:id/unsync', wooSyncController.unsyncProduct);
 router.post('/products/sync', wooSyncController.syncAllUpdatedProducts);
 router.post('/products/sync/force', wooSyncController.forceSync);
 

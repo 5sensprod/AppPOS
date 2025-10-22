@@ -14,7 +14,14 @@ export default function useProductDetail() {
   const isNew = location.pathname.endsWith('/new');
   const isEditMode = isNew || location.pathname.endsWith('/edit');
 
-  const { getProductById, createProduct, updateProduct, deleteProduct, syncProduct } = useProduct();
+  const {
+    getProductById,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    syncProduct,
+    unsyncProduct,
+  } = useProduct();
   // Obtenir les fonctions correctes du hook useProductExtras
   const productExtras = useProductExtras();
 
@@ -476,6 +483,20 @@ export default function useProductDetail() {
     }
   };
 
+  const handleUnsync = async () => {
+    try {
+      setLoading(true);
+      await unsyncProduct(paramId);
+      const updated = await getProductById(paramId);
+      setProduct(updated);
+      setSuccess('Produit désynchronisé');
+    } catch (err) {
+      setError('Erreur lors de la désynchronisation');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fonctions corrigées pour la gestion des images
   const handleUploadImage = async (entityId, file) => {
     try {
@@ -594,6 +615,7 @@ export default function useProductDetail() {
     handleDelete,
     handleCancel,
     handleSync,
+    handleUnsync,
     validationSchema: getValidationSchema(isNew),
     defaultValues,
     categoryOptions,

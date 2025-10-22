@@ -10,6 +10,7 @@ import {
   BarChart3,
   RefreshCw,
   ShoppingCart,
+  Unlink,
 } from 'lucide-react';
 import { useFormContext } from 'react-hook-form';
 import apiService from '../../../services/api';
@@ -18,6 +19,7 @@ const WooCommerceTab = ({
   entity,
   entityType,
   onSync,
+  onUnsync,
   editable = false,
   showStatus = false,
   enableTitleGeneration = true, // Nouvelle prop pour activer/désactiver la génération de titre
@@ -29,6 +31,8 @@ const WooCommerceTab = ({
   const watch = formContext?.watch;
   const setValue = formContext?.setValue;
   const getValues = formContext?.getValues;
+  const [isUnsyncLoading, setIsUnsyncLoading] = useState(false);
+  const [showUnsyncConfirm, setShowUnsyncConfirm] = useState(false);
 
   // États pour la génération de titre
   const [isTitleGenerating, setIsTitleGenerating] = useState(false);
@@ -383,6 +387,20 @@ const WooCommerceTab = ({
     );
   };
 
+  const handleUnsync = async () => {
+    if (!onUnsync || isUnsyncLoading) return;
+
+    setIsUnsyncLoading(true);
+    try {
+      await onUnsync(entity._id);
+      setShowUnsyncConfirm(false);
+    } catch (error) {
+      console.error('Erreur lors de la désynchronisation:', error);
+    } finally {
+      setIsUnsyncLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Section des informations WooCommerce */}
@@ -537,50 +555,107 @@ const WooCommerceTab = ({
 
         {entity.woo_id ? (
           <div className="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CheckCircle className="h-5 w-5 text-green-400" />
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
-                  {getEntityTypeText()} synchronisé(e) avec la boutique en ligne
-                </h3>
-                <div className="mt-2 text-sm text-green-700 dark:text-green-300">
-                  <p>ID Internet : {entity.woo_id}</p>
-                  {entity.website_url && (
-                    <p className="text-sm text-green-700 dark:text-green-300">
-                      Url :{' '}
-                      <a
-                        href={entity.website_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 duration-200 ease-in-out"
-                      >
-                        {entity.website_url}
-                      </a>
-                    </p>
-                  )}
-                  {entity.last_sync && (
-                    <p>Dernière synchronisation : {new Date(entity.last_sync).toLocaleString()}</p>
-                  )}
-                  {entity.pending_sync && (
-                    <div className="mt-2">
-                      <p className="text-yellow-600 dark:text-yellow-300">
-                        Des modifications locales sont en attente de synchronisation
-                      </p>
-                      {onSync && (
-                        <button
-                          onClick={() => onSync(entity.id)}
-                          className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-800 dark:text-blue-100 dark:hover:bg-blue-700"
+            <div className="flex items-center justify-between">
+              <div className="flex items-center flex-1">
+                <div className="flex-shrink-0">
+                  <CheckCircle className="h-5 w-5 text-green-400" />
+                </div>
+                <div className="ml-3 flex-1">
+                  <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
+                    {getEntityTypeText()} synchronisé(e) avec la boutique en ligne
+                  </h3>
+                  <div className="mt-2 text-sm text-green-700 dark:text-green-300">
+                    <p>ID Internet : {entity.woo_id}</p>
+                    {entity.website_url && (
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        Url :{' '}
+                        <a
+                          href={entity.website_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 duration-200 ease-in-out"
                         >
-                          Synchroniser les modifications
-                        </button>
-                      )}
+                          {entity.website_url}
+                        </a>
+                      </p>
+                    )}
+                    {entity.last_sync && (
+                      <p>
+                        Dernière synchronisation : {new Date(entity.last_sync).toLocaleString()}
+                      </p>
+                    )}
+                    {entity.pending_sync && (
+                      <div className="mt-2">
+                        <p className="text-yellow-600 dark:text-yellow-300">
+                          Des modifications locales sont en attente de synchronisation
+                        </p>
+                        {onSync && (
+                          <button
+                            onClick={() => onSync(entity._id)}
+                            className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-800 dark:text-blue-100 dark:hover:bg-blue-700"
+                          >
+                            Synchroniser les modifications
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ⭐ BOUTON DÉSYNCHRONISER */}
+              {onUnsync && !editable && (
+                <div className="ml-4 flex-shrink-0">
+                  {!showUnsyncConfirm ? (
+                    <button
+                      onClick={() => setShowUnsyncConfirm(true)}
+                      className="flex items-center px-3 py-2 text-sm font-medium rounded-md bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:text-red-100 dark:hover:bg-red-800 transition-colors"
+                      title="Désynchroniser ce produit"
+                    >
+                      <Unlink className="h-4 w-4 mr-1" />
+                      Désynchroniser
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600 dark:text-gray-400">Confirmer ?</span>
+                      <button
+                        onClick={handleUnsync}
+                        disabled={isUnsyncLoading}
+                        className="px-3 py-1 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isUnsyncLoading ? 'En cours...' : 'Oui'}
+                      </button>
+                      <button
+                        onClick={() => setShowUnsyncConfirm(false)}
+                        disabled={isUnsyncLoading}
+                        className="px-3 py-1 text-xs font-medium rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                      >
+                        Non
+                      </button>
                     </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
+
+            {/* ℹ️ Message d'information sur la désynchronisation */}
+            {showUnsyncConfirm && (
+              <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-md">
+                <div className="flex">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      <strong>Attention :</strong> La désynchronisation supprimera uniquement le
+                      lien avec WooCommerce dans votre base locale. Le produit restera présent sur
+                      votre boutique WooCommerce et dans votre base de données locale.
+                    </p>
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
+                      Vous pourrez le resynchroniser plus tard si nécessaire.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-lg">
@@ -596,7 +671,7 @@ const WooCommerceTab = ({
                   <p>Cet élément n'a pas encore été synchronisé avec la boutique en ligne.</p>
                   {onSync && (
                     <button
-                      onClick={() => onSync(entity.id)}
+                      onClick={() => onSync(entity._id)}
                       className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-800 dark:text-yellow-100 dark:hover:bg-yellow-700"
                     >
                       Synchroniser maintenant
