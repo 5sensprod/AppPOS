@@ -113,10 +113,11 @@ const CompactInput = ({
           max={max}
           step={step}
           placeholder={placeholder}
-          className="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
+          className={`w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700 ${unit ? 'pr-2' : ''}`}
         />
         {unit && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+          <span className="absolute right-8 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+            {' '}
             {unit}
           </span>
         )}
