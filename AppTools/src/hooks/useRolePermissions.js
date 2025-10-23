@@ -170,9 +170,12 @@ function getDefaultPermissions() {
         'sales',
         'wordpress',
         'wp-menu',
+        'tools', // ✅ AJOUTÉ
+        'labels', // ✅ AJOUTÉ
         'reports',
         'settings',
         'users-management',
+        'permissions-config',
         'lcd-config',
         'printer-config',
         'general-settings',
@@ -189,7 +192,15 @@ function getDefaultPermissions() {
       },
     },
     cashier: {
-      allowedMenus: ['cashier', 'products', 'categories', 'brands', 'sales'],
+      allowedMenus: [
+        'cashier',
+        'products',
+        'categories',
+        'brands',
+        'sales',
+        'tools', // ✅ AJOUTÉ (caissiers peuvent créer des affiches)
+        'labels', // ✅ AJOUTÉ
+      ],
       description: 'Accès à la caisse et consultation des produits',
       discountPermissions: {
         canApplyItemDiscount: true,
@@ -202,7 +213,15 @@ function getDefaultPermissions() {
       },
     },
     user: {
-      allowedMenus: ['dashboard', 'products', 'categories', 'suppliers', 'brands'],
+      allowedMenus: [
+        'dashboard',
+        'products',
+        'categories',
+        'suppliers',
+        'brands',
+        'tools', // ✅ AJOUTÉ (utilisateurs peuvent consulter)
+        'labels', // ✅ AJOUTÉ
+      ],
       description: 'Accès en lecture seule aux produits',
       discountPermissions: {
         canApplyItemDiscount: false,

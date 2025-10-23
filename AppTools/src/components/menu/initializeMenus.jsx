@@ -1,4 +1,4 @@
-// src/components/menu/initializeMenus.js - COMPLET avec WordPress + Gestion Users
+// src/components/menu/initializeMenus.js - COMPLET avec WordPress + Gestion Users + Outils
 import React from 'react';
 import { menuRegistry } from './MenuRegistry';
 import {
@@ -16,6 +16,8 @@ import {
   Globe,
   Users,
   Shield,
+  Wrench,
+  FileText,
 } from 'lucide-react';
 
 export function initializeMenus() {
@@ -81,6 +83,22 @@ export function initializeMenus() {
         icon: <Folder className="h-5 w-5" />,
         label: 'Menu Principal',
         path: '/wordpress/menu',
+      },
+    ],
+  });
+
+  // ✅ NOUVEAU : Section Outils
+  menuRegistry.addSidebarItem({
+    id: 'tools',
+    icon: <Wrench className="h-6 w-6" />,
+    label: 'Outils',
+    path: '/tools',
+    children: [
+      {
+        id: 'labels',
+        icon: <FileText className="h-5 w-5" />,
+        label: 'Affiche',
+        path: '/tools/labels',
       },
     ],
   });

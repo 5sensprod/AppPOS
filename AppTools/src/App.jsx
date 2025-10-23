@@ -28,6 +28,9 @@ import RolePermissionsEditor from './pages/RolePermissionsEditor';
 // Pages WordPress
 import WordPressMenuPage from './features/wordpress/WordPressMenuPage'; // ✅ NOUVELLE PAGE
 
+// Pages Outils
+import LabelPage from './pages/LabelPage'; // ✅ PAGE AFFICHE
+
 // Pages de configuration
 import SettingsPage from './pages/SettingsPage';
 import LCDConfigPage from './pages/LCDConfigPage';
@@ -181,6 +184,18 @@ function AppRoutes() {
             <ProtectedRoute>
               <MainLayout>
                 <ReportsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ✅ ROUTE PAGE AFFICHE */}
+        <Route
+          path="/tools/labels"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <LabelPage />
               </MainLayout>
             </ProtectedRoute>
           }
