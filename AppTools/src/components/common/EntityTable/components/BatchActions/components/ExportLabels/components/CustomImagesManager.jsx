@@ -1,6 +1,17 @@
-// CustomImagesManager.jsx - VERSION CORRIGÉE
+// CustomImagesManager.jsx - VERSION CORRIGÉE avec proportions et préservation de position
 import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, Upload, Trash2, Copy, Eye, EyeOff, Plus, X } from 'lucide-react';
+import {
+  Image as ImageIcon,
+  Upload,
+  Trash2,
+  Copy,
+  Eye,
+  EyeOff,
+  Plus,
+  X,
+  Lock,
+  Unlock,
+} from 'lucide-react';
 import { useLabelExportStore } from '../stores/useLabelExportStore';
 import presetImageService from '@services/presetImageService';
 
@@ -56,7 +67,7 @@ const CustomImagesManager = () => {
     const calculatedWidth = Math.round(canvasWidth * 0.9);
     const calculatedHeight = Math.round(canvasHeight * 0.7);
 
-    console.log('📏 Dimensions auto calculées:', { calculatedWidth, calculatedHeight });
+    console.log('📐 Dimensions auto calculées:', { calculatedWidth, calculatedHeight });
 
     return {
       width: calculatedWidth,
@@ -87,8 +98,8 @@ const CustomImagesManager = () => {
           addCustomImage({
             src: result.images[0].src,
             filename: result.images[0].filename,
-            width: autoDims.width, // ✅ Passer explicitement width
-            height: autoDims.height, // ✅ Passer explicitement height
+            width: autoDims.width,
+            height: autoDims.height,
           });
         }
       }
@@ -112,8 +123,8 @@ const CustomImagesManager = () => {
     addCustomImage({
       src: image.src,
       filename: image.filename,
-      width: autoDims.width, // ✅ Passer explicitement width
-      height: autoDims.height, // ✅ Passer explicitement height
+      width: autoDims.width,
+      height: autoDims.height,
     });
     setShowLibrary(false);
   };
@@ -255,6 +266,88 @@ const CustomImagesManager = () => {
 // Composant pour chaque image
 const ImageItem = ({ image, onUpdate, onRemove, onDuplicate }) => {
   const [expanded, setExpanded] = useState(false);
+  const [lockAspectRatio, setLockAspectRatio] = useState(true); // 🔒 Par défaut verrouillé
+
+  // 📐 Calculer le ratio d'aspect initial
+  const aspectRatio = useRef(image.width / image.height);
+
+  // 🆕 États locaux pour les dimensions (pour mise à jour immédiate des inputs)
+  const [localWidth, setLocalWidth] = useState(image.width);
+  const [localHeight, setLocalHeight] = useState(image.height);
+
+  // Synchroniser les états locaux avec les props
+  useEffect(() => {
+    setLocalWidth(image.width);
+    setLocalHeight(image.height);
+    aspectRatio.current = image.width / image.height;
+  }, [image.width, image.height]);
+
+  /**
+   * 🆕 Gestion du changement de largeur avec maintien des proportions
+   */
+  const handleWidthChange = (newWidth) => {
+    const width = parseFloat(newWidth) || 10;
+    setLocalWidth(width);
+
+    if (lockAspectRatio) {
+      // Calculer la nouvelle hauteur proportionnelle
+      const newHeight = Math.round(width / aspectRatio.current);
+      setLocalHeight(newHeight);
+
+      // ✅ Mettre à jour avec préservation de la position
+      onUpdate({
+        width,
+        height: newHeight,
+        // 🎯 CRITIQUE : Préserver la position actuelle
+        position: image.position || null,
+      });
+    } else {
+      // Mise à jour sans proportions
+      onUpdate({
+        width,
+        position: image.position || null,
+      });
+    }
+  };
+
+  /**
+   * 🆕 Gestion du changement de hauteur avec maintien des proportions
+   */
+  const handleHeightChange = (newHeight) => {
+    const height = parseFloat(newHeight) || 10;
+    setLocalHeight(height);
+
+    if (lockAspectRatio) {
+      // Calculer la nouvelle largeur proportionnelle
+      const newWidth = Math.round(height * aspectRatio.current);
+      setLocalWidth(newWidth);
+
+      // ✅ Mettre à jour avec préservation de la position
+      onUpdate({
+        width: newWidth,
+        height,
+        // 🎯 CRITIQUE : Préserver la position actuelle
+        position: image.position || null,
+      });
+    } else {
+      // Mise à jour sans proportions
+      onUpdate({
+        height,
+        position: image.position || null,
+      });
+    }
+  };
+
+  /**
+   * 🆕 Toggle du verrouillage des proportions
+   */
+  const toggleAspectRatioLock = () => {
+    setLockAspectRatio(!lockAspectRatio);
+    // Recalculer le ratio au moment du verrouillage
+    if (!lockAspectRatio) {
+      aspectRatio.current = localWidth / localHeight;
+    }
+  };
 
   return (
     <div className="border border-gray-200 dark:border-gray-600 rounded p-2 bg-white dark:bg-gray-800">
@@ -275,7 +368,8 @@ const ImageItem = ({ image, onUpdate, onRemove, onDuplicate }) => {
             {image.filename || 'Image'}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
-            {image.width}×{image.height}mm
+            {localWidth}×{localHeight}mm
+            {lockAspectRatio && <span className="ml-1">🔒</span>}
           </div>
         </div>
 
@@ -324,7 +418,12 @@ const ImageItem = ({ image, onUpdate, onRemove, onDuplicate }) => {
             </label>
             <select
               value={image.fitMode || 'contain'}
-              onChange={(e) => onUpdate({ fitMode: e.target.value })}
+              onChange={(e) =>
+                onUpdate({
+                  fitMode: e.target.value,
+                  position: image.position || null, // ✅ Préserver position
+                })
+              }
               className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
             >
               <option value="contain">Contenir (proportions préservées)</option>
@@ -339,36 +438,60 @@ const ImageItem = ({ image, onUpdate, onRemove, onDuplicate }) => {
             </div>
           </div>
 
-          {/* Dimensions */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                Largeur (mm)
-              </label>
-              <input
-                type="number"
-                value={image.width}
-                onChange={(e) => onUpdate({ width: parseFloat(e.target.value) || 10 })}
-                min={5}
-                max={200}
-                step={1}
-                className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
-              />
+          {/* 🆕 Dimensions avec verrouillage des proportions */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-gray-600 dark:text-gray-400">Dimensions (mm)</label>
+              <button
+                type="button"
+                onClick={toggleAspectRatioLock}
+                className={`p-1 rounded transition-colors ${
+                  lockAspectRatio
+                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                }`}
+                title={lockAspectRatio ? 'Proportions verrouillées' : 'Proportions libres'}
+              >
+                {lockAspectRatio ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+              </button>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                Hauteur (mm)
-              </label>
-              <input
-                type="number"
-                value={image.height}
-                onChange={(e) => onUpdate({ height: parseFloat(e.target.value) || 10 })}
-                min={5}
-                max={200}
-                step={1}
-                className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
-              />
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Largeur
+                </label>
+                <input
+                  type="number"
+                  value={localWidth}
+                  onChange={(e) => handleWidthChange(e.target.value)}
+                  min={5}
+                  max={200}
+                  step={1}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Hauteur
+                </label>
+                <input
+                  type="number"
+                  value={localHeight}
+                  onChange={(e) => handleHeightChange(e.target.value)}
+                  min={5}
+                  max={200}
+                  step={1}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 bg-white dark:bg-gray-700"
+                />
+              </div>
             </div>
+
+            {lockAspectRatio && (
+              <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                🔒 Ratio: {aspectRatio.current.toFixed(2)}
+              </div>
+            )}
           </div>
 
           {/* Opacité */}
@@ -379,7 +502,12 @@ const ImageItem = ({ image, onUpdate, onRemove, onDuplicate }) => {
             <input
               type="range"
               value={image.opacity || 1}
-              onChange={(e) => onUpdate({ opacity: parseFloat(e.target.value) })}
+              onChange={(e) =>
+                onUpdate({
+                  opacity: parseFloat(e.target.value),
+                  position: image.position || null, // ✅ Préserver position
+                })
+              }
               min={0.1}
               max={1}
               step={0.1}
@@ -395,7 +523,12 @@ const ImageItem = ({ image, onUpdate, onRemove, onDuplicate }) => {
             <input
               type="range"
               value={image.rotation || 0}
-              onChange={(e) => onUpdate({ rotation: parseInt(e.target.value) })}
+              onChange={(e) =>
+                onUpdate({
+                  rotation: parseInt(e.target.value),
+                  position: image.position || null, // ✅ Préserver position
+                })
+              }
               min={0}
               max={360}
               step={15}

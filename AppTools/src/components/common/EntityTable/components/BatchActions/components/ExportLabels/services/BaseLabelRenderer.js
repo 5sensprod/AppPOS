@@ -805,8 +805,12 @@ class BaseLabelRenderer {
 
         const cachedData = this.resizedImageCache.get(cacheKey);
         const cachedImgElement = cachedData.image;
-        offsetX = cachedData.offsetX;
-        offsetY = cachedData.offsetY;
+
+        // ✅ CORRECTION : Ne pas utiliser les offsets si position personnalisée
+        if (!element.hasCustomPosition) {
+          offsetX = cachedData.offsetX;
+          offsetY = cachedData.offsetY;
+        }
 
         fabricImage = new fabric.Image(cachedImgElement, {
           left: element.x + offsetX,
@@ -867,15 +871,21 @@ class BaseLabelRenderer {
           Math.round(finalHeightPx)
         );
 
-        // Calculer les offsets pour centrage
-        offsetX = (targetWidthPx - finalWidthPx) / 2;
-        offsetY = (targetHeightPx - finalHeightPx) / 2;
+        // Calculer les offsets pour centrage (uniquement pour positions par défaut)
+        const calculatedOffsetX = (targetWidthPx - finalWidthPx) / 2;
+        const calculatedOffsetY = (targetHeightPx - finalHeightPx) / 2;
+
+        // ✅ CORRECTION : Ne pas appliquer les offsets si position personnalisée
+        if (!element.hasCustomPosition) {
+          offsetX = calculatedOffsetX;
+          offsetY = calculatedOffsetY;
+        }
 
         // 🗄️ Stocker dans le cache avec les offsets
         const cacheData = {
           image: resizedImage,
-          offsetX: offsetX,
-          offsetY: offsetY,
+          offsetX: calculatedOffsetX, // Toujours stocker pour usage futur
+          offsetY: calculatedOffsetY,
           finalWidth: finalWidthPx,
           finalHeight: finalHeightPx,
         };
@@ -921,6 +931,7 @@ class BaseLabelRenderer {
         position: { x: element.x + offsetX, y: element.y + offsetY },
         size: { width: targetWidthPx, height: targetHeightPx },
         offsets: { offsetX, offsetY },
+        hasCustomPosition: element.hasCustomPosition,
       });
     } catch (error) {
       console.error(`❌ Erreur chargement image ${imgConfig.src}:`, error);

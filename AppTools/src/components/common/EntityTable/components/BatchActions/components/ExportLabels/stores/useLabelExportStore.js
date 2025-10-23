@@ -64,6 +64,64 @@ const DEFAULT_STYLE = {
   customImages: [],
 };
 
+// 🆕 BLANK_STYLE - Étiquette complètement vierge (TOUT désactivé)
+const BLANK_STYLE = {
+  fontSize: 12,
+  fontFamily: 'Arial',
+  showBorder: false, // ❌ Pas de bordure
+  borderWidth: 0.1,
+  borderColor: '#000000',
+  alignment: 'center',
+  showBarcode: false, // ❌ Pas de code-barres
+  barcodeHeight: 15,
+  barcodeType: 'barcode',
+  qrCodeSize: 8,
+  barcodeWidth: 60,
+  showBarcodeText: false, // ❌ Pas de texte code-barres
+  barcodeTextSize: 8,
+  showPrice: false, // ❌ Pas de prix
+  priceSize: 14,
+  priceWeight: 'bold',
+  showName: false, // ❌ Pas de nom
+  nameSize: 10,
+  priceFontFamily: 'Arial',
+  nameFontFamily: 'Arial',
+  nameWeight: 'bold',
+  duplicateCount: 1,
+  showWooQR: false, // ❌ Pas de QR WooCommerce
+  showWooQRText: false,
+  wooQRTextSize: 7,
+  wooQRText: 'Voir en ligne',
+  wooQRSize: 10,
+  customPositions: {},
+  showSku: false, // ❌ Pas de SKU
+  showBrand: false, // ❌ Pas de marque
+  showSupplier: false, // ❌ Pas de fournisseur
+  skuSize: 10,
+  brandSize: 10,
+  supplierSize: 10,
+  skuWeight: 'normal',
+  brandWeight: 'normal',
+  supplierWeight: 'normal',
+  skuFontFamily: 'Arial',
+  brandFontFamily: 'Arial',
+  supplierFontFamily: 'Arial',
+  customTexts: [], // ❌ Pas de textes personnalisés
+  colors: {
+    name: '#000000',
+    price: '#000000',
+    barcode: '#000000',
+    barcodeText: '#000000',
+    wooQR: '#000000',
+    wooQRText: '#000000',
+    border: '#000000',
+    sku: '#000000',
+    brand: '#000000',
+    supplier: '#000000',
+  },
+  customImages: [], // ❌ Pas d'images personnalisées
+};
+
 const DEFAULT_LAYOUTS = {
   A4: {
     width: 48.5,
@@ -228,18 +286,45 @@ export const useLabelExportStore = create(
       updateLayout: (field, value) =>
         set((state) => {
           const updated = { ...state.currentLayout };
+
+          // 🆕 Détection du changement de dimensions critiques
+          const isDimensionChange =
+            field === 'width' ||
+            field === 'height' ||
+            (field.includes('.') && (field.includes('width') || field.includes('height')));
+
           if (field.includes('.')) {
             const [parent, child] = field.split('.');
             updated[parent] = { ...updated[parent], [child]: parseFloat(value) || 0 };
           } else {
             updated[field] = parseFloat(value) || 0;
           }
+
+          // ✅ CORRECTION : Réinitialiser les positions si dimensions changées
+          if (isDimensionChange) {
+            console.log('🔄 Dimensions modifiées, réinitialisation des positions personnalisées');
+            return {
+              currentLayout: updated,
+              labelStyle: {
+                ...state.labelStyle,
+                customPositions: {}, // Réinitialiser toutes les positions
+              },
+            };
+          }
+
           return { currentLayout: updated };
         }),
 
       // 🎯 SUPPORT TYPE
       changeSupportType: (type) => {
-        set({ currentLayout: { ...(DEFAULT_LAYOUTS[type] || DEFAULT_LAYOUTS.rouleau) } });
+        console.log('🔄 Changement de support, réinitialisation des positions');
+        set({
+          currentLayout: { ...(DEFAULT_LAYOUTS[type] || DEFAULT_LAYOUTS.rouleau) },
+          labelStyle: {
+            ...get().labelStyle,
+            customPositions: {}, // ✅ Réinitialiser les positions
+          },
+        });
         get().managePresets('load');
       },
 
@@ -341,6 +426,22 @@ export const useLabelExportStore = create(
       reset: (scope = 'all') =>
         set((state) => {
           const updates = {};
+
+          // 🆕 BLANK - Étiquette complètement vierge (TOUS les éléments désactivés)
+          if (scope === 'blank') {
+            updates.labelStyle = {
+              ...BLANK_STYLE,
+              duplicateCount: 1,
+              customPositions: {},
+              customTexts: [],
+              customImages: [],
+            };
+            updates.currentLayout =
+              DEFAULT_LAYOUTS[state.currentLayout.supportType] || DEFAULT_LAYOUTS.A4;
+            updates.enableCellSelection = false;
+            updates.disabledCells = new Set();
+            return updates;
+          }
 
           if (scope === 'all' || scope === 'style') {
             updates.labelStyle = {
