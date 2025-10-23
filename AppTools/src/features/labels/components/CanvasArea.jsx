@@ -1,18 +1,19 @@
 import React, { useRef, useEffect, useState } from 'react';
 import KonvaCanvas from './KonvaCanvas';
 import useLabelStore from '../store/useLabelStore';
+import PropertyPanel from './PropertyPanel';
 
 const CanvasArea = ({ dataSource, selectedProduct }) => {
-  const zoom = useLabelStore((state) => state.zoom);
-  const canvasSize = useLabelStore((state) => state.canvasSize);
-  const zoomIn = useLabelStore((state) => state.zoomIn);
-  const zoomOut = useLabelStore((state) => state.zoomOut);
-  const resetZoom = useLabelStore((state) => state.resetZoom);
+  const zoom = useLabelStore((s) => s.zoom);
+  const canvasSize = useLabelStore((s) => s.canvasSize);
+  const zoomIn = useLabelStore((s) => s.zoomIn);
+  const zoomOut = useLabelStore((s) => s.zoomOut);
+  const resetZoom = useLabelStore((s) => s.resetZoom);
+  const selectedId = useLabelStore((s) => s.selectedId);
 
   const containerRef = useRef(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
-  // Le Stage prend 100% de la place dispo
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -26,30 +27,25 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
 
   return (
     <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-900 relative overflow-hidden">
-      {/* Header badge (optionnel) */}
-      {dataSource && (
-        <div className="absolute top-4 right-4 z-10 pointer-events-none">
-          <div
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg ${
-              dataSource === 'blank' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'
-            }`}
-          >
-            {dataSource === 'blank' ? '📄 Mode vierge' : '🔗 Mode données actif'}
-          </div>
-        </div>
-      )}
+      {/* Damier plein écran */}
+      <div ref={containerRef} className="flex-1 checkerboard relative">
+        {/* Stage plein écran */}
+        <KonvaCanvas
+          viewportWidth={viewport.width}
+          viewportHeight={viewport.height}
+          docWidth={canvasSize.width}
+          docHeight={canvasSize.height}
+          zoom={zoom}
+        />
 
-      {/* Zone de travail (le Stage remplit 100%) */}
-      <div className="flex-1 overflow-hidden">
-        <div ref={containerRef} className="w-full h-full checkerboard">
-          <KonvaCanvas
-            viewportWidth={viewport.width}
-            viewportHeight={viewport.height}
-            docWidth={canvasSize.width}
-            docHeight={canvasSize.height}
-            zoom={zoom}
-          />
-        </div>
+        {/* 🧰 PropertyPanel en overlay (ne pousse rien) */}
+        {selectedId && (
+          <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 z-50">
+            <div className="pointer-events-auto">
+              <PropertyPanel selectedProduct={selectedProduct} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Contrôles zoom */}
@@ -57,21 +53,18 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
         <button
           onClick={zoomOut}
           className="px-3 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded font-bold text-gray-700 dark:text-gray-300"
-          title="Zoom -"
         >
           −
         </button>
         <button
           onClick={resetZoom}
           className="px-3 py-1 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded min-w-[60px]"
-          title="Réinitialiser zoom"
         >
           {Math.round(zoom * 100)}%
         </button>
         <button
           onClick={zoomIn}
           className="px-3 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded font-bold text-gray-700 dark:text-gray-300"
-          title="Zoom +"
         >
           +
         </button>
