@@ -19,55 +19,49 @@ const KonvaCanvas = ({
 
   const stageRef = useRef(null);
   const transformerRef = useRef(null);
-  const docGroupRef = useRef(null); // le group “document” qui zoome/panne
 
-  // Position du document (Group) pour le pan
+  // Position du document (Group)
   const [docPos, setDocPos] = useState({ x: 0, y: 0 });
 
-  // Centre le document quand la taille viewport change ou quand zoom=1 (reset)
-  useEffect(() => {
+  // États de pan
+  const [panEnabled, setPanEnabled] = useState(false); // Espace enfoncée
+  const [isDragging, setIsDragging] = useState(false); // clic maintenu
+  const panLast = useRef({ x: 0, y: 0 });
+
+  // Centrer le document dans le viewport
+  const centerDocument = (scale = zoom) => {
     if (!viewportWidth || !viewportHeight) return;
-    const scale = zoom || 1;
-    const x = (viewportWidth - docWidth * scale) / 2;
-    const y = (viewportHeight - docHeight * scale) / 2;
-    // On ne recentre automatiquement que si le zoom est 1 (reset) pour ne pas surprendre l’utilisateur
-    if (scale === 1) setDocPos({ x, y });
-  }, [viewportWidth, viewportHeight, docWidth, docHeight, zoom]);
-
-  // Zoom molette autour du pointeur (sur le Group “doc”, pas le Stage)
-  const handleWheel = (e) => {
-    e.evt.preventDefault();
-    if (!stageRef.current || !docGroupRef.current) return;
-
-    const pointer = stageRef.current.getPointerPosition() || {
-      x: viewportWidth / 2,
-      y: viewportHeight / 2,
-    };
-
-    const oldScale = zoom;
-    const mousePointTo = {
-      x: (pointer.x - docPos.x) / oldScale,
-      y: (pointer.y - docPos.y) / oldScale,
-    };
-
-    const scaleBy = 1.05;
-    const dir = e.evt.deltaY > 0 ? 1 : -1;
-    const newScale = clamp(dir > 0 ? oldScale / scaleBy : oldScale * scaleBy, 0.1, 3);
-
-    const newPos = {
-      x: pointer.x - mousePointTo.x * newScale,
-      y: pointer.y - mousePointTo.y * newScale,
-    };
-
-    setZoom(newScale);
-    setDocPos(newPos);
+    setDocPos({
+      x: (viewportWidth - docWidth * scale) / 2,
+      y: (viewportHeight - docHeight * scale) / 2,
+    });
   };
 
-  // Pan avec Espace (ou clic molette)
-  const [isPanning, setIsPanning] = useState(false);
   useEffect(() => {
-    const down = (e) => e.code === 'Space' && setIsPanning(true);
-    const up = (e) => e.code === 'Space' && setIsPanning(false);
+    centerDocument();
+  }, [viewportWidth, viewportHeight, docWidth, docHeight]);
+
+  // Zoom centré sur le document
+  const handleWheel = (e) => {
+    e.evt.preventDefault();
+    const direction = e.evt.deltaY > 0 ? 1 : -1;
+    const scaleBy = 1.08;
+    const newZoom = clamp(direction > 0 ? zoom / scaleBy : zoom * scaleBy, 0.1, 3);
+    setZoom(newZoom);
+    centerDocument(newZoom);
+  };
+
+  // Gestion de la touche espace
+  useEffect(() => {
+    const down = (e) => {
+      if (e.code === 'Space') setPanEnabled(true);
+    };
+    const up = (e) => {
+      if (e.code === 'Space') {
+        setPanEnabled(false);
+        setIsDragging(false);
+      }
+    };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => {
@@ -75,14 +69,53 @@ const KonvaCanvas = ({
       window.removeEventListener('keyup', up);
     };
   }, []);
-  const onMouseDown = (e) => {
-    if (e.evt.button === 1) setIsPanning(true);
+
+  // Gestion du curseur
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const c = stage.container();
+    if (isDragging) {
+      c.style.cursor = 'grabbing';
+    } else if (panEnabled) {
+      c.style.cursor = 'grab';
+    } else {
+      c.style.cursor = 'default';
+    }
+  }, [panEnabled, isDragging]);
+
+  // Pan : clic bas (Espace ou molette)
+  const onStageMouseDown = (e) => {
+    const isMiddle = e.evt.button === 1;
+    if (panEnabled || isMiddle) {
+      setIsDragging(true);
+      const pos = stageRef.current?.getPointerPosition() || { x: 0, y: 0 };
+      panLast.current = pos;
+    }
   };
-  const onMouseUp = (e) => {
-    if (e.evt.button === 1) setIsPanning(false);
+
+  // Pan : mouvement
+  const onStageMouseMove = () => {
+    if (!isDragging) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+    const pos = stage.getPointerPosition() || { x: 0, y: 0 };
+    const dx = pos.x - panLast.current.x;
+    const dy = pos.y - panLast.current.y;
+    panLast.current = pos;
+    setDocPos((p) => ({ x: p.x + dx, y: p.y + dy }));
+  };
+
+  // Pan : relâchement du clic
+  const onStageMouseUp = () => {
+    if (isDragging) {
+      setIsDragging(false);
+    }
   };
 
   const handleSelect = (id, locked) => {
+    // Pas de sélection pendant pan
+    if (panEnabled || isDragging) return;
     if (!locked) selectElement(id);
   };
 
@@ -96,9 +129,7 @@ const KonvaCanvas = ({
     });
   };
 
-  const selectedElement = elements.find((el) => el.id === selectedId);
-
-  // Transformer robuste (évite nodes [undefined])
+  // Transformer robuste
   useEffect(() => {
     const tr = transformerRef.current;
     const stage = stageRef.current;
@@ -107,6 +138,7 @@ const KonvaCanvas = ({
       tr?.getLayer()?.batchDraw();
       return;
     }
+    const selectedElement = elements.find((el) => el.id === selectedId);
     if (!selectedElement || selectedElement.locked || selectedElement.visible === false) {
       tr.nodes([]);
       tr.getLayer()?.batchDraw();
@@ -115,9 +147,8 @@ const KonvaCanvas = ({
     const node = stage.findOne(`#${selectedId}`);
     tr.nodes(node ? [node] : []);
     tr.getLayer()?.batchDraw();
-  }, [selectedId, selectedElement, elements]);
+  }, [selectedId, elements]);
 
-  // Taille de stage = 100% du viewport
   const stageW = Math.max(1, viewportWidth);
   const stageH = Math.max(1, viewportHeight);
 
@@ -127,40 +158,35 @@ const KonvaCanvas = ({
       width={stageW}
       height={stageH}
       onWheel={handleWheel}
-      onMouseDown={onMouseDown}
-      onMouseUp={onMouseUp}
+      onMouseDown={onStageMouseDown}
+      onMouseMove={onStageMouseMove}
+      onMouseUp={onStageMouseUp}
       onClick={(e) => {
+        if (panEnabled || isDragging) return; // pas de sélection pendant pan
         if (e.target === e.target.getStage()) selectElement(null);
       }}
     >
-      {/* Group “document” : zoome et panne (draggable quand panning) */}
-      <Layer>
-        <Group
-          ref={docGroupRef}
-          x={docPos.x}
-          y={docPos.y}
-          scaleX={zoom}
-          scaleY={zoom}
-          draggable={isPanning}
-          dragBoundFunc={(pos) => pos} // libre
-        >
-          {/* Fond blanc + ombre = la preview entière */}
+      <Layer perfectDrawEnabled={false}>
+        <Group x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom}>
+          {/* Document blanc, imprimable */}
           <Rect
             x={0}
             y={0}
             width={docWidth}
             height={docHeight}
             fill="#ffffff"
-            cornerRadius={4}
-            shadowColor="rgba(0,0,0,0.25)"
-            shadowBlur={30}
-            shadowOffset={{ x: 0, y: 10 }}
-            shadowOpacity={1}
-            onMouseDown={() => selectElement(null)}
-            onTouchStart={() => selectElement(null)}
+            stroke="#d1d5db"
+            strokeWidth={1 / zoom}
+            onMouseDown={() => {
+              if (!panEnabled && !isDragging) selectElement(null);
+            }}
+            onTouchStart={() => {
+              if (!panEnabled && !isDragging) selectElement(null);
+            }}
+            listening={true}
           />
 
-          {/* Contenu */}
+          {/* Éléments */}
           {elements.map((el) => {
             if (el.visible === false) return null;
             if (el.type === 'text') {
@@ -174,7 +200,7 @@ const KonvaCanvas = ({
                   fontSize={el.fontSize}
                   fontStyle={el.bold ? 'bold' : 'normal'}
                   fill={el.color}
-                  draggable={!el.locked && !isPanning}
+                  draggable={!el.locked && !panEnabled && !isDragging}
                   onClick={() => handleSelect(el.id, el.locked)}
                   onDragEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
                   onTransformEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
@@ -189,7 +215,7 @@ const KonvaCanvas = ({
           })}
         </Group>
 
-        {/* Transformer (reste hors du Group, attaché aux nodes trouvés) */}
+        {/* Transformer */}
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
@@ -198,6 +224,8 @@ const KonvaCanvas = ({
           }}
         />
       </Layer>
+
+      <Layer listening={false} hitGraphEnabled={false} perfectDrawEnabled={false} />
     </Stage>
   );
 };

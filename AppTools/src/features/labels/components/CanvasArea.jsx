@@ -12,25 +12,21 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
   const containerRef = useRef(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
-  // Observer pour que le Stage prenne toute la place dispo
+  // Le Stage prend 100% de la place dispo
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const cr = entry.contentRect;
-        setViewport({ width: Math.floor(cr.width), height: Math.floor(cr.height) });
-      }
+      const cr = entries[0].contentRect;
+      setViewport({ width: Math.floor(cr.width), height: Math.floor(cr.height) });
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // Padding autour de la preview (optionnel)
-  const padding = 100;
-
   return (
     <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-900 relative overflow-hidden">
+      {/* Header badge (optionnel) */}
       {dataSource && (
         <div className="absolute top-4 right-4 z-10 pointer-events-none">
           <div
@@ -43,20 +39,9 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
         </div>
       )}
 
-      {/* Le Stage doit prendre 100% de l'espace disponible */}
-      <div className="flex-1 overflow-auto">
-        <div
-          ref={containerRef}
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: `${padding}px`,
-            boxSizing: 'border-box',
-          }}
-        >
+      {/* Zone de travail (le Stage remplit 100%) */}
+      <div className="flex-1 overflow-hidden">
+        <div ref={containerRef} className="w-full h-full checkerboard">
           <KonvaCanvas
             viewportWidth={viewport.width}
             viewportHeight={viewport.height}
@@ -68,7 +53,7 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
       </div>
 
       {/* Contrôles zoom */}
-      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-lg px-3 py-2 flex items-center gap-3 border border-gray-200 dark:border-gray-700 z-50">
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-lg shadow-lg px-3 py-2 flex items-center gap-3 border border-gray-200 dark:border-gray-700 z-50">
         <button
           onClick={zoomOut}
           className="px-3 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded font-bold text-gray-700 dark:text-gray-300"
@@ -79,7 +64,7 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
         <button
           onClick={resetZoom}
           className="px-3 py-1 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded min-w-[60px]"
-          title="Reset zoom"
+          title="Réinitialiser zoom"
         >
           {Math.round(zoom * 100)}%
         </button>
@@ -91,7 +76,7 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
           +
         </button>
         <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 select-none">
-          Molette pour zoomer • Espace pour panner
+          Molette : zoom • Espace : pan
         </span>
       </div>
     </div>
