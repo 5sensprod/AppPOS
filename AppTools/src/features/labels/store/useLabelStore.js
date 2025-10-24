@@ -6,6 +6,7 @@ const useLabelStore = create((set) => ({
   selectedId: null,
   dataSource: null,
   selectedProduct: null,
+  selectedProducts: [],
   zoom: 1,
   canvasSize: { width: 800, height: 600 },
 
@@ -58,9 +59,48 @@ const useLabelStore = create((set) => ({
 
   clearSelection: () => set({ selectedId: null }),
 
-  setDataSource: (source, product = null) => set({ dataSource: source, selectedProduct: product }),
+  // Gère automatiquement la sélection simple ou multiple de produits
+  setDataSource: (source, product = null) =>
+    set(() => {
+      // Mode multi-produits : product est un tableau
+      if (Array.isArray(product)) {
+        return {
+          dataSource: source,
+          selectedProducts: product,
+          selectedProduct: product.length > 0 ? product[0] : null,
+        };
+      }
 
-  clearCanvas: () => set({ elements: [], selectedId: null }),
+      // Mode simple : product est un objet
+      if (product && typeof product === 'object') {
+        return {
+          dataSource: source,
+          selectedProducts: [product],
+          selectedProduct: product,
+        };
+      }
+
+      // Mode vide : aucun produit
+      return {
+        dataSource: source,
+        selectedProducts: [],
+        selectedProduct: null,
+      };
+    }),
+
+  setSelectedProducts: (products) =>
+    set({
+      selectedProducts: Array.isArray(products) ? products : [],
+      selectedProduct: Array.isArray(products) && products.length > 0 ? products[0] : null,
+    }),
+
+  clearCanvas: () =>
+    set({
+      elements: [],
+      selectedId: null,
+      selectedProducts: [],
+      selectedProduct: null,
+    }),
 
   setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(3, zoom)) }),
 

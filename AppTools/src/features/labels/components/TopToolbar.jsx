@@ -1,11 +1,14 @@
+// src/features/labels/components/TopToolbar.jsx
 import React from 'react';
 import { Undo, Redo, Save, Download, Printer, Trash2, Plus, Package } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
 import { exportPdf } from '../utils/exportPdf';
 
-const TopToolbar = ({ dataSource, selectedProduct, onNewLabel, docNode }) => {
+const TopToolbar = ({ dataSource, onNewLabel, docNode }) => {
   const zoom = useLabelStore((s) => s.zoom);
   const canvasSize = useLabelStore((s) => s.canvasSize);
+  const selectedProduct = useLabelStore((s) => s.selectedProduct);
+  const selectedProducts = useLabelStore((s) => s.selectedProducts);
 
   const handleExportPdf = () => {
     if (!docNode) {
@@ -13,15 +16,19 @@ const TopToolbar = ({ dataSource, selectedProduct, onNewLabel, docNode }) => {
       return;
     }
 
-    // Compense le scale appliqué au Group (zoom)
     const safeZoom = Math.max(zoom || 1, 0.001);
     exportPdf(docNode, {
       width: canvasSize.width,
       height: canvasSize.height,
       fileName: 'document.pdf',
-      pixelRatio: Math.max(1, 2 / safeZoom), // qualité 2x, indépendante du zoom
+      pixelRatio: Math.max(1, 2 / safeZoom),
     });
   };
+
+  const isMultiProduct = Array.isArray(selectedProducts) && selectedProducts.length > 1;
+  const displayProduct =
+    selectedProduct ||
+    (Array.isArray(selectedProducts) && selectedProducts.length > 0 ? selectedProducts[0] : null);
 
   return (
     <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
@@ -39,7 +46,7 @@ const TopToolbar = ({ dataSource, selectedProduct, onNewLabel, docNode }) => {
           <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
             <Undo className="h-5 w-5" />
           </button>
-          <button className="p-2 hover:bg-gray-100 dark:hover_bg-gray-700 rounded">
+          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
             <Redo className="h-5 w-5" />
           </button>
           <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
@@ -50,15 +57,27 @@ const TopToolbar = ({ dataSource, selectedProduct, onNewLabel, docNode }) => {
 
         {/* Titre / Info produit */}
         <div className="flex items-center gap-3 min-w-0">
-          {selectedProduct ? (
+          {isMultiProduct ? (
+            <div className="flex items-center gap-3 px-4 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+              <Package className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Multi-produits
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  {selectedProducts.length} produits sélectionnés
+                </div>
+              </div>
+            </div>
+          ) : displayProduct ? (
             <div className="flex items-center gap-3 px-4 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
               <Package className="h-5 w-5 text-green-600 dark:text-green-400" />
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                  {selectedProduct.name}
+                  {displayProduct.name}
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  {selectedProduct.sku} • {selectedProduct.price.toLocaleString('fr-FR')}€
+                  {displayProduct.sku} • {displayProduct.price?.toLocaleString('fr-FR') || '0'}€
                 </div>
               </div>
             </div>

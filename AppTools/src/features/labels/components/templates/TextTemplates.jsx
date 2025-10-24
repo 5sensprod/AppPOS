@@ -3,7 +3,11 @@ import React from 'react';
 import useLabelStore from '../../store/useLabelStore';
 
 const TextTemplates = ({ dataSource, selectedProduct }) => {
-  const { addElement, elements } = useLabelStore();
+  const { addElement, elements, selectedProducts } = useLabelStore();
+
+  // En mode données, utilise selectedProduct (prop) ou le premier de selectedProducts
+  const displayProduct =
+    selectedProduct || (selectedProducts.length > 0 ? selectedProducts[0] : null);
 
   const templates = [
     { id: 'heading', label: 'Titre', preview: 'Titre Principal', fontSize: 32, bold: true },
@@ -22,10 +26,10 @@ const TextTemplates = ({ dataSource, selectedProduct }) => {
   ];
 
   const handleAddText = (template) => {
-    // En mode données, on prend le premier champ par défaut (name)
-    const text = dataSource === 'data' && selectedProduct ? selectedProduct.name : template.preview;
+    // En mode données, on prend le premier produit de la liste
+    const text = dataSource === 'data' && displayProduct ? displayProduct.name : template.preview;
 
-    const dataBinding = dataSource === 'data' && selectedProduct ? 'name' : null;
+    const dataBinding = dataSource === 'data' && displayProduct ? 'name' : null;
 
     addElement({
       type: 'text',
@@ -44,14 +48,17 @@ const TextTemplates = ({ dataSource, selectedProduct }) => {
       <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
         {dataSource === 'blank'
           ? 'Cliquez pour ajouter du texte'
-          : 'Ajoutez un champ (modifiable ensuite)'}
+          : displayProduct
+            ? `Ajoutez un champ (basé sur : ${displayProduct.name})`
+            : 'Sélectionnez un ou plusieurs produits'}
       </div>
 
       {templates.map((template) => (
         <button
           key={template.id}
           onClick={() => handleAddText(template)}
-          className="w-full p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all text-left"
+          disabled={dataSource === 'data' && !displayProduct}
+          className="w-full p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{template.label}</div>
           <div
@@ -66,7 +73,7 @@ const TextTemplates = ({ dataSource, selectedProduct }) => {
         </button>
       ))}
 
-      {dataSource === 'data' && !selectedProduct && (
+      {dataSource === 'data' && !displayProduct && (
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           <p className="text-sm">Aucun produit sélectionné</p>
         </div>

@@ -10,7 +10,7 @@ const KonvaCanvas = ({
   docWidth = 800,
   docHeight = 600,
   zoom = 1,
-  onDocNode, // ⬅️ pour l’export PDF
+  onDocNode, // ⬅️ pour l'export PDF
 }) => {
   const elements = useLabelStore((state) => state.elements);
   const selectedId = useLabelStore((state) => state.selectedId);
@@ -185,24 +185,6 @@ const KonvaCanvas = ({
       </Layer>
       <Layer perfectDrawEnabled={false}>
         <Group ref={docGroupRef} x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom}>
-          {/* Page blanche imprimable */}
-          {/* <Rect
-            x={0}
-            y={0}
-            width={docWidth}
-            height={docHeight}
-            fill="#ffffff"
-            stroke="#d1d5db"
-            strokeWidth={1 / zoom}
-            onMouseDown={() => {
-              if (!panEnabled && !isDragging) selectElement(null);
-            }}
-            onTouchStart={() => {
-              if (!panEnabled && !isDragging) selectElement(null);
-            }}
-            listening={true}
-          /> */}
-
           {/* Éléments */}
           {elements.map((el) => {
             if (el.visible === false) return null;
@@ -225,6 +207,7 @@ const KonvaCanvas = ({
                   scaleY={el.scaleY || 1}
                   rotation={el.rotation || 0}
                   opacity={el.locked ? 0.7 : 1}
+                  dataBinding={el.dataBinding} // ✅ Ajout du dataBinding dans les attrs
                 />
               );
             }
@@ -242,7 +225,7 @@ const KonvaCanvas = ({
         />
       </Layer>
 
-      {/* Layer d’UI non cliquable (hors export) */}
+      {/* Layer d'UI non cliquable (hors export) */}
       <Layer listening={false} hitGraphEnabled={false} perfectDrawEnabled={false} />
     </Stage>
   );
