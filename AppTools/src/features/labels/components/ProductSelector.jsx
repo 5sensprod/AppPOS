@@ -1,92 +1,110 @@
 // src/features/labels/components/ProductSelector.jsx
-import React, { useState } from 'react';
-import { Search, X, Package, Check } from 'lucide-react';
+// Version connectée à ton store produits + recherche client productSearchProcessor
+// - Utilise useProductDataStore() (cache + websocket)
+// - Recherche locale via productSearchProcessor (cohérente avec ProductTable)
+// - Multi-sélection conservée, pagination simple
 
-// Mockup de produits
-const MOCK_PRODUCTS = [
-  {
-    _id: 'QXYOVtdCdrNZf2xC',
-    name: 'Zimmermann Studio S4/120',
-    sku: 'HZ-S4NR',
-    price: 6990,
-    brand_ref: { name: 'ZIMMERMANN' },
-    image: {
-      url: 'https://axemusique.shop/wp-content/uploads/2025/09/photos-1743068250547-464492440-1.jpg',
-    },
-    stock: 1,
-  },
-  {
-    _id: 'ABC123DEF456',
-    name: 'Yamaha U1 Silent',
-    sku: 'YMH-U1S',
-    price: 8490,
-    brand_ref: { name: 'YAMAHA' },
-    image: { url: 'https://via.placeholder.com/150' },
-    stock: 2,
-  },
-  {
-    _id: 'XYZ789GHI012',
-    name: 'Kawai K-200',
-    sku: 'KWI-K200',
-    price: 7590,
-    brand_ref: { name: 'KAWAI' },
-    image: { url: 'https://via.placeholder.com/150' },
-    stock: 1,
-  },
-  {
-    _id: 'DEF456GHI789',
-    name: 'Steinway Model M',
-    sku: 'STW-M170',
-    price: 28900,
-    brand_ref: { name: 'STEINWAY' },
-    image: { url: 'https://via.placeholder.com/150' },
-    stock: 1,
-  },
-  {
-    _id: 'GHI789JKL012',
-    name: 'Bösendorfer 130',
-    sku: 'BOS-130',
-    price: 22500,
-    brand_ref: { name: 'BÖSENDORFER' },
-    image: { url: 'https://via.placeholder.com/150' },
-    stock: 1,
-  },
-];
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { Search, X, Package, Check, Loader2 } from 'lucide-react';
+import { useProductDataStore } from '@/features/products/stores/productStore';
+import { productSearchProcessor } from '../../../utils/productSearchProcessor';
+
+const PAGE_SIZE = 20; // même logique que dans ta table si besoin
 
 const ProductSelector = ({ onSelect, onClose, multiSelect = false, selectedProducts = [] }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selected, setSelected] = useState(selectedProducts);
+  const {
+    products, // liste mise en cache + live via WS
+    loading,
+    error,
+    fetchProducts,
+    initWebSocket,
+    isCacheValid,
+  } = useProductDataStore();
 
-  const filteredProducts = MOCK_PRODUCTS.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.sku.toLowerCase().includes(searchTerm.toLowerCase())
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selected, setSelected] = useState(Array.isArray(selectedProducts) ? selectedProducts : []);
+  const [page, setPage] = useState(1);
+
+  // --- Débounce du champ de recherche ---
+  const [debouncedTerm, setDebouncedTerm] = useState('');
+  const debounceTimer = useRef(null);
+  useEffect(() => {
+    window.clearTimeout(debounceTimer.current);
+    debounceTimer.current = window.setTimeout(() => {
+      setDebouncedTerm(searchTerm.trim());
+      setPage(1); // reset pagination quand le terme change
+    }, 250);
+    return () => window.clearTimeout(debounceTimer.current);
+  }, [searchTerm]);
+
+  // --- Init data + websocket ---
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        initWebSocket?.(); // optionnel, no-op si déjà branché
+        if (!isCacheValid?.() || (products?.length ?? 0) === 0) {
+          await fetchProducts();
+        }
+      } catch (e) {
+        // laisser l'UI afficher error si store l'expose
+        console.error('[ProductSelector] init error', e);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- Recherche locale avec le même processor que ProductTable ---
+  const searchFields = useMemo(() => ['name', 'sku', 'designation'], []);
+  const filtered = useMemo(() => {
+    const list = Array.isArray(products) ? products : [];
+    return productSearchProcessor(list, debouncedTerm, searchFields);
+  }, [products, debouncedTerm, searchFields]);
+
+  // --- Pagination client ---
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pagedItems = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
+  // --- Sélection ---
+  const isSelected = useCallback(
+    (productId) => selected.some((p) => p._id === productId),
+    [selected]
   );
 
-  const isSelected = (productId) => selected.some((p) => p._id === productId);
+  const toggleSelect = useCallback(
+    (product) => {
+      if (!multiSelect) {
+        onSelect?.(product);
+        return;
+      }
+      setSelected((prev) =>
+        isSelected(product._id) ? prev.filter((p) => p._id !== product._id) : [...prev, product]
+      );
+    },
+    [multiSelect, onSelect, isSelected]
+  );
 
-  const handleProductClick = (product) => {
-    if (!multiSelect) {
-      onSelect(product);
-      return;
-    }
+  const handleValidate = useCallback(() => {
+    if (multiSelect) onSelect?.(selected);
+  }, [multiSelect, onSelect, selected]);
 
-    // Mode multi-sélection
-    if (isSelected(product._id)) {
-      setSelected(selected.filter((p) => p._id !== product._id));
-    } else {
-      setSelected([...selected, product]);
-    }
-  };
-
-  const handleValidate = () => {
-    if (multiSelect) {
-      onSelect(selected);
-    }
+  // --- Accessibilité clavier ---
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') onClose?.();
+    if (!multiSelect && e.key === 'Enter' && pagedItems.length === 1) onSelect?.(pagedItems[0]);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onKeyDown={onKeyDown}
+    >
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-3xl w-full mx-4 max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
@@ -112,84 +130,89 @@ const ProductSelector = ({ onSelect, onClose, multiSelect = false, selectedProdu
         {/* Search */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Rechercher par nom ou SKU..."
+              placeholder="Rechercher par nom, SKU, marque, catégorie, code-barres..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
             />
+            {loading && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-gray-400" />
+            )}
           </div>
+          {error && (
+            <div className="mt-2 text-sm text-red-600 dark:text-red-400">{String(error)}</div>
+          )}
         </div>
 
         {/* Products List */}
         <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-2">
-            {filteredProducts.length === 0 ? (
+            {!loading && filtered.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
                 <p>Aucun produit trouvé</p>
               </div>
             ) : (
-              filteredProducts.map((product) => {
-                const selected = isSelected(product._id);
+              pagedItems.map((product) => {
+                const checked = isSelected(product._id);
+                const brandName =
+                  product.brand_ref?.name || product.brand?.name || product.brand_name || '';
+                const imageUrl = product.image?.url || product.image_url || null;
                 return (
                   <button
                     key={product._id}
-                    onClick={() => handleProductClick(product)}
+                    onClick={() => toggleSelect(product)}
                     className={`w-full p-4 border rounded-lg transition-all text-left relative ${
-                      selected
+                      checked
                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                         : 'border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10'
                     }`}
                   >
                     <div className="flex items-center gap-4">
-                      {/* Checkbox si multi-select */}
                       {multiSelect && (
                         <div
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                            selected
-                              ? 'bg-blue-500 border-blue-500'
-                              : 'border-gray-300 dark:border-gray-600'
-                          }`}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${checked ? 'bg-blue-500 border-blue-500' : 'border-gray-300 dark:border-gray-600'}`}
                         >
-                          {selected && <Check className="h-3 w-3 text-white" />}
+                          {checked && <Check className="h-3 w-3 text-white" />}
                         </div>
                       )}
 
-                      {/* Image */}
                       <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded overflow-hidden flex-shrink-0">
-                        <img
-                          src={product.image?.url}
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML =
-                              '<div class="w-full h-full flex items-center justify-center"><svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
-                          }}
-                        />
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : null}
                       </div>
 
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                          {product.name}
+                          {product.name || product.designation || product.sku}
                         </h3>
                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                          <span>{product.sku}</span>
-                          <span>•</span>
-                          <span>{product.brand_ref.name}</span>
+                          {product.sku && <span>{product.sku}</span>}
+                          {product.sku && brandName && <span>•</span>}
+                          {brandName && <span>{brandName}</span>}
                         </div>
                       </div>
 
-                      {/* Prix et stock */}
                       <div className="text-right">
-                        <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                          {product.price.toLocaleString('fr-FR')}€
+                        {product.price != null && (
+                          <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                            {Number(product.price).toLocaleString('fr-FR')}€
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500">
+                          Stock: {product.stock ?? product.qty ?? 0}
                         </div>
-                        <div className="text-xs text-gray-500">Stock: {product.stock}</div>
                       </div>
                     </div>
                   </button>
@@ -199,7 +222,33 @@ const ProductSelector = ({ onSelect, onClose, multiSelect = false, selectedProdu
           </div>
         </div>
 
-        {/* Footer avec bouton Valider en mode multi */}
+        {/* Pagination */}
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm">
+          <div className="text-gray-600 dark:text-gray-400">
+            {filtered.length} résultat{filtered.length > 1 ? 's' : ''}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="px-2 py-1 border rounded disabled:opacity-50"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Précédent
+            </button>
+            <span>
+              {page} / {pageCount}
+            </span>
+            <button
+              className="px-2 py-1 border rounded disabled:opacity-50"
+              disabled={page >= pageCount}
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+            >
+              Suivant
+            </button>
+          </div>
+        </div>
+
+        {/* Footer validation multi-sélection */}
         {multiSelect && (
           <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
             <button
