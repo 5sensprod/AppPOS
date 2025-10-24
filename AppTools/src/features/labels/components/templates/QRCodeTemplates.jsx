@@ -2,21 +2,43 @@
 import React from 'react';
 import useLabelStore from '../../store/useLabelStore';
 
+/**
+ * Détermine le meilleur champ à binder en priorité
+ * Ordre : website_url > barcode > sku
+ */
+const defaultBindingFor = (product) => {
+  if (!product) return null;
+
+  const barcode = product?.meta_data?.find?.((m) => m.key === 'barcode')?.value;
+
+  if (product.website_url) return 'website_url';
+  if (barcode) return 'barcode';
+  if (product.sku) return 'sku';
+
+  return null;
+};
+
+/**
+ * Récupère la valeur par défaut du QR
+ */
+const defaultQRValue = (product) => {
+  if (!product) return 'https://example.com';
+
+  const barcode = product?.meta_data?.find?.((m) => m.key === 'barcode')?.value;
+  return product.website_url || barcode || product.sku || product._id || 'https://example.com';
+};
+
 const QRCodeTemplates = ({ dataSource, selectedProduct }) => {
   const { addElement, elements, selectedProducts } = useLabelStore();
 
   const displayProduct =
     selectedProduct || (selectedProducts.length > 0 ? selectedProducts[0] : null);
 
-  const defaultQR = () => {
-    if (dataSource === 'data' && displayProduct) {
-      return displayProduct.website_url || displayProduct.sku || displayProduct._id || '';
-    }
-    return 'https://example.com';
-    // tu peux mettre '' si tu préfères un QR vide
-  };
-
   const handleAdd = () => {
+    // ✅ Définir le binding dès la création si en mode données
+    const binding =
+      dataSource === 'data' && displayProduct ? defaultBindingFor(displayProduct) : null;
+
     addElement({
       type: 'qrcode',
       id: undefined, // sera injecté par le store
@@ -25,11 +47,10 @@ const QRCodeTemplates = ({ dataSource, selectedProduct }) => {
       size: 160,
       color: '#000000',
       bgColor: '#FFFFFF00',
-      qrValue: defaultQR(),
+      qrValue: defaultQRValue(displayProduct), // valeur visible immédiate
+      dataBinding: binding, // 👈 clé pour l'export/PropertyPanel
       visible: true,
       locked: false,
-      // si tu veux binder d’office en mode data :
-      // dataBinding: displayProduct ? (displayProduct.website_url ? 'website_url' : 'sku') : null,
     });
   };
 
@@ -51,7 +72,13 @@ const QRCodeTemplates = ({ dataSource, selectedProduct }) => {
         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">QR Code</div>
         <div className="text-sm">Ajouter un QR Code au canvas</div>
         <div className="text-[11px] text-gray-400 mt-1">
-          Valeur par défaut : {defaultQR() || '—'}
+          {dataSource === 'data' && displayProduct ? (
+            <>
+              Lié au champ : <strong>{defaultBindingFor(displayProduct)}</strong>
+            </>
+          ) : (
+            <>Valeur par défaut : {defaultQRValue(displayProduct) || '—'}</>
+          )}
         </div>
       </button>
     </div>

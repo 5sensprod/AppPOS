@@ -11,7 +11,7 @@ import {
   Type as TypeIcon,
   Image as ImageIcon,
   Shapes as ShapesIcon,
-  QrCode as QrCodeIcon, // 👈 ajout
+  QrCode as QrCodeIcon,
 } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
 
@@ -23,7 +23,7 @@ const iconForType = (type) => {
       return ImageIcon;
     case 'shape':
       return ShapesIcon;
-    case 'qrcode': // 👈 ajout
+    case 'qrcode':
       return QrCodeIcon;
     default:
       return TypeIcon;
@@ -74,12 +74,22 @@ const LayersPanel = () => {
         const isVisible = el.visible !== false;
         const Icon = iconForType(el.type);
 
-        // Nom base (texte custom par type + fallback)
+        // ✨ Nom base amélioré avec affichage du binding
         let baseName = el.type.charAt(0).toUpperCase() + el.type.slice(1);
+
         if (el.type === 'text') {
-          baseName = el.text?.split('(')[0]?.trim() || 'Texte';
+          if (el.dataBinding) {
+            baseName = `Texte (${el.dataBinding})`;
+          } else {
+            baseName = el.text?.split('(')[0]?.trim() || 'Texte';
+          }
         } else if (el.type === 'qrcode') {
-          baseName = el.qrValue ? `QR: ${el.qrValue}` : 'QR Code';
+          // ✅ Afficher le champ lié plutôt que la valeur tronquée
+          if (el.dataBinding) {
+            baseName = `QR (${el.dataBinding})`;
+          } else {
+            baseName = el.qrValue ? `QR: ${el.qrValue}` : 'QR Code';
+          }
         }
 
         const name25 = cut(baseName, 25);

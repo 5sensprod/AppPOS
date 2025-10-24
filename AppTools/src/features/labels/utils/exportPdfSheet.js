@@ -98,10 +98,16 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true
     return el; // autres types
   });
 }
+
 /**
  * Crée un dataURL PNG d'un document Konva pour un set d'éléments
  * (Stage/Layer sont créés, utilisés et détruits dans cet helper)
  * -> Supporte: text, qrcode
+ *
+ * ✨ AMÉLIORATION QUALITÉ QR :
+ * - QR générés à 4x la taille finale (scale * 4)
+ * - Marge augmentée pour éviter le clipping
+ * - ErrorCorrectionLevel 'H' pour meilleure lecture
  */
 async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRatio) {
   const container = document.createElement('div');
@@ -141,7 +147,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       });
     }
 
-    // QRCODE
+    // QRCODE - HAUTE RÉSOLUTION
     if (el?.type === 'qrcode') {
       const size = (el.size ?? 160) * scale;
       const color = el.color ?? '#000000';
@@ -149,12 +155,21 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       const qrValue = el.qrValue ?? '';
 
       try {
+        // ✨ AMÉLIORATION : Générer le QR à 4x la résolution
+        // pour une qualité parfaite même à l'impression
+        const qrResolution = Math.max(512, Math.floor(size * 4));
+
         const dataURL = await QRCodeLib.toDataURL(qrValue, {
-          width: Math.max(8, Math.floor(size)), // largeur en px (évitons 0)
-          margin: 1,
+          width: qrResolution, // 🔥 4x plus grand
+          margin: 2, // 🔥 Marge augmentée pour éviter le clipping
           color: { dark: color, light: bgColor },
-          errorCorrectionLevel: 'M',
+          errorCorrectionLevel: 'H', // 🔥 Niveau maximal de correction d'erreur
+          type: 'image/png',
+          rendererOpts: {
+            quality: 1.0, // Qualité maximale
+          },
         });
+
         const imageObj = await loadImageFromDataURL(dataURL);
 
         return new Konva.Image({
@@ -183,7 +198,9 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
   nodes.filter(Boolean).forEach((node) => layer.add(node));
 
   layer.draw();
-  const dataURL = stage.toDataURL({ pixelRatio });
+
+  // ✨ AMÉLIORATION : pixelRatio augmenté pour une meilleure qualité globale
+  const dataURL = stage.toDataURL({ pixelRatio: Math.max(pixelRatio, 3) });
 
   // Cleanup
   stage.destroy();
@@ -195,6 +212,10 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
  * Export PDF en planche.
  * - Si `products` est fourni, chaque cellule affiche un produit différent (dans l'ordre).
  * - Possibilité de surcharger les éléments via `elementsOverride`; sinon on lit le store.
+ *
+ * ✨ AMÉLIORATION QUALITÉ :
+ * - pixelRatio par défaut augmenté à 3
+ * - QR codes générés en haute résolution
  */
 export async function exportPdfSheet(
   _docNode,
@@ -208,7 +229,7 @@ export async function exportPdfSheet(
     margin = 10,
     spacing = 5,
     fileName = 'planche.pdf',
-    pixelRatio = 2,
+    pixelRatio = 3, // 🔥 Augmenté de 2 à 3
     products = null,
     elementsOverride = null,
   } = {}

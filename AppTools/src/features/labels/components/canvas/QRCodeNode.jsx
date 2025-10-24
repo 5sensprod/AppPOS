@@ -1,9 +1,21 @@
 // AppTools/src/features/labels/components/canvas/QRCodeNode.jsx
-import React, { useEffect, useState } from 'react';
-import { Image as KonvaImage } from 'react-konva';
+import React, { useEffect, useState, useRef } from 'react';
+import { Group, Image as KonvaImage } from 'react-konva';
 import QRCode from 'qrcode';
-import useImage from 'use-image';
 
+/**
+ * QRCodeNode - Composant Konva pour afficher un QR code
+ *
+ * FIX DU BUG TRANSFORMER :
+ * - On retourne TOUJOURS un Group (jamais null)
+ * - On met à jour l'image en interne sans démonter le node
+ * - Le Transformer garde sa référence stable
+ *
+ * ✨ AMÉLIORATION QUALITÉ :
+ * - QR générés à 2x la taille d'affichage pour netteté maximale
+ * - ErrorCorrectionLevel 'H' pour meilleure lecture
+ * - Marge augmentée pour éviter le clipping
+ */
 const QRCodeNode = ({
   id,
   x = 0,
@@ -21,39 +33,65 @@ const QRCodeNode = ({
   rotation = 0,
   opacity = 1,
 }) => {
-  const [dataUrl, setDataUrl] = useState(null);
-  const [img] = useImage(dataUrl, 'anonymous');
+  const [imageObj, setImageObj] = useState(null);
+  const imageRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+
+    const generateQR = async () => {
       try {
-        const url = await QRCode.toDataURL(qrValue || '', {
-          width: size,
-          margin: 1,
+        // ✨ AMÉLIORATION : Générer à 2x la résolution pour l'affichage
+        // Encore plus net à l'écran et prêt pour l'export
+        const displayResolution = Math.max(256, Math.floor(size * 2));
+
+        const dataUrl = await QRCode.toDataURL(qrValue || 'https://example.com', {
+          width: displayResolution, // 🔥 2x plus grand
+          margin: 2, // 🔥 Marge augmentée
           color: { dark: color, light: bgColor },
-          errorCorrectionLevel: 'M',
+          errorCorrectionLevel: 'H', // 🔥 Correction maximale
+          type: 'image/png',
+          rendererOpts: {
+            quality: 1.0, // Qualité maximale
+          },
         });
-        if (mounted) setDataUrl(url);
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        img.onload = () => {
+          if (mounted) {
+            setImageObj(img);
+            // Force re-render du node Konva
+            if (imageRef.current) {
+              imageRef.current.getLayer()?.batchDraw();
+            }
+          }
+        };
+
+        img.onerror = (e) => {
+          console.error('QR image loading failed', e);
+        };
+
+        img.src = dataUrl;
       } catch (e) {
         console.error('QR generation failed', e);
       }
-    })();
+    };
+
+    generateQR();
+
     return () => {
       mounted = false;
     };
   }, [qrValue, size, color, bgColor]);
 
-  if (!img) return null;
-
+  // ✅ TOUJOURS retourner un Group, même si l'image n'est pas encore chargée
   return (
-    <KonvaImage
+    <Group
       id={id}
       x={x}
       y={y}
-      image={img}
-      width={size}
-      height={size}
       draggable={draggable}
       onClick={onClick}
       onTap={onClick}
@@ -63,7 +101,9 @@ const QRCodeNode = ({
       scaleY={scaleY}
       rotation={rotation}
       opacity={opacity}
-    />
+    >
+      {imageObj && <KonvaImage ref={imageRef} image={imageObj} width={size} height={size} />}
+    </Group>
   );
 };
 

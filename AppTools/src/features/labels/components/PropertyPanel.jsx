@@ -49,9 +49,8 @@ const PropertyPanel = ({ selectedProduct }) => {
     updateElement(selectedId, { qrValue: value });
   };
 
-  const handleQRSizeChange = (value) => {
-    const size = Math.max(64, Math.min(1024, Number(value) || 160));
-    updateElement(selectedId, { size });
+  const handleUnbind = () => {
+    updateElement(selectedId, { dataBinding: null });
   };
 
   return (
@@ -82,22 +81,10 @@ const PropertyPanel = ({ selectedProduct }) => {
                 onChange={(e) => handleQRValueChange(e.target.value)}
                 placeholder="Texte, URL, SKU, code-barres..."
                 className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-[260px]"
+                disabled={!!selectedElement.dataBinding}
               />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                Taille:
-              </span>
-              <input
-                type="number"
-                min={64}
-                max={1024}
-                value={selectedElement.size ?? 160}
-                onChange={(e) => handleQRSizeChange(e.target.value)}
-                className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-              <span className="text-xs text-gray-500">px</span>
-            </div>
+            {/* ❌ RETIRÉ : Input de taille - modifier via le canvas */}
           </>
         )}
 
@@ -112,7 +99,7 @@ const PropertyPanel = ({ selectedProduct }) => {
               <select
                 value={selectedElement.dataBinding}
                 onChange={(e) => handleFieldChange(e.target.value)}
-                className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white max-w-[240px]"
+                className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white max-w-[200px]"
               >
                 {dataFields.map((field) => (
                   <option key={field.key} value={field.key}>
@@ -120,6 +107,13 @@ const PropertyPanel = ({ selectedProduct }) => {
                   </option>
                 ))}
               </select>
+              <button
+                onClick={handleUnbind}
+                className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                title="Utiliser une valeur fixe"
+              >
+                Délier
+              </button>
             </div>
           </>
         )}
