@@ -38,6 +38,22 @@ function loadImageFromDataURL(dataURL) {
 }
 
 /**
+ * 🆕 Helper pour charger une image depuis une URL
+ */
+function loadImageFromURL(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = (err) => {
+      console.error('❌ Erreur chargement image:', url, err);
+      reject(err);
+    };
+    img.src = url;
+  });
+}
+
+/**
  * Remplace le texte + valeur QR des éléments liés à un produit (non destructif)
  * - Text: met à jour `text`
  * - QRCode: met à jour `qrValue`
@@ -95,19 +111,25 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true
       return el;
     }
 
-    return el; // autres types
+    // IMAGE - Pas de modification pour les images communes
+    // (les images produit seront gérées plus tard)
+    return el;
   });
 }
 
 /**
  * Crée un dataURL PNG d'un document Konva pour un set d'éléments
  * (Stage/Layer sont créés, utilisés et détruits dans cet helper)
- * -> Supporte: text, qrcode
+ * -> Supporte: text, qrcode, image
  *
  * ✨ AMÉLIORATION QUALITÉ QR :
  * - QR générés à 4x la taille finale (scale * 4)
  * - Marge augmentée pour éviter le clipping
  * - ErrorCorrectionLevel 'H' pour meilleure lecture
+ *
+ * ✅ SUPPORT IMAGES :
+ * - Images communes chargées et rendues
+ * - Préservation des proportions
  */
 async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRatio) {
   const container = document.createElement('div');
@@ -127,7 +149,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
     })
   );
 
-  // Construction des nodes (async pour QR)
+  // Construction des nodes (async pour QR et Images)
   const nodePromises = (elements || []).map(async (el) => {
     if (el?.visible === false) return null;
 
@@ -189,7 +211,39 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       }
     }
 
-    // TODO: images / shapes si nécessaire
+    // 🖼️ IMAGE - NOUVEAU SUPPORT
+    if (el?.type === 'image') {
+      const width = (el.width ?? 160) * scale;
+      const height = (el.height ?? 160) * scale;
+      const src = el.src ?? '';
+
+      if (!src) {
+        console.warn('⚠️ Image sans src:', el);
+        return null;
+      }
+
+      try {
+        const imageObj = await loadImageFromURL(src);
+
+        return new Konva.Image({
+          x: (el.x ?? 0) * scale,
+          y: (el.y ?? 0) * scale,
+          image: imageObj,
+          width: width,
+          height: height,
+          rotation: el.rotation ?? 0,
+          scaleX: el.scaleX ?? 1,
+          scaleY: el.scaleY ?? 1,
+          opacity: el.opacity ?? 1,
+          listening: false,
+        });
+      } catch (err) {
+        console.error('❌ Image loading failed in exportPdfSheet:', src, err);
+        return null;
+      }
+    }
+
+    // TODO: shapes si nécessaire
     return null;
   });
 
@@ -216,6 +270,10 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
  * ✨ AMÉLIORATION QUALITÉ :
  * - pixelRatio par défaut augmenté à 3
  * - QR codes générés en haute résolution
+ *
+ * ✅ SUPPORT IMAGES :
+ * - Images communes présentes sur toutes les cellules
+ * - (Images produit à implémenter plus tard)
  */
 export async function exportPdfSheet(
   _docNode,
@@ -266,6 +324,8 @@ export async function exportPdfSheet(
     ? elementsOverride
     : (useLabelStore.getState()?.elements ?? []);
 
+  console.log('📦 Éléments à exporter:', baseElements);
+
   // Mise en cache d'une cellule blanche
   let blankCellDataURL = null;
   const getBlankCell = async () => {
@@ -288,10 +348,12 @@ export async function exportPdfSheet(
       const product = products[i];
       // 👇 forcer le remplissage des QR sans dataBinding
       const updated = updateElementsWithProduct(baseElements, product, true);
+      console.log(`📝 Cellule ${i} avec produit:`, product.name);
       dataURL = await createDocumentImage(updated, docWidth, docHeight, scale, pixelRatio);
     } else if (hasProducts && i >= products.length) {
       dataURL = await getBlankCell();
     } else {
+      console.log(`📝 Cellule ${i} sans produit (éléments de base)`);
       dataURL = await createDocumentImage(baseElements, docWidth, docHeight, scale, pixelRatio);
     }
 
@@ -309,5 +371,6 @@ export async function exportPdfSheet(
     );
   }
 
+  console.log('✅ PDF généré:', fileName);
   pdf.save(fileName);
 }

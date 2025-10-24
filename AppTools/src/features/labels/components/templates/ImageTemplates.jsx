@@ -27,22 +27,61 @@ const ImageTemplates = () => {
   };
 
   /**
-   * Ajouter une image au canvas
+   * 🆕 Charger l'image pour obtenir ses dimensions naturelles
    */
-  const handleAddImage = (image) => {
+  const loadImageDimensions = (src) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        resolve({
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight,
+          aspectRatio: img.naturalWidth / img.naturalHeight,
+        });
+      };
+      img.onerror = () => {
+        // Fallback si l'image ne charge pas
+        resolve({
+          naturalWidth: 160,
+          naturalHeight: 160,
+          aspectRatio: 1,
+        });
+      };
+      img.src = src;
+    });
+  };
+
+  /**
+   * ✅ Ajouter une image au canvas en préservant ses proportions
+   */
+  const handleAddImage = async (image) => {
+    // Charger les dimensions naturelles de l'image
+    const { naturalWidth, naturalHeight, aspectRatio } = await loadImageDimensions(image.src);
+
+    console.log('📐 Dimensions naturelles:', { naturalWidth, naturalHeight, aspectRatio });
+
+    // Définir une taille de base (ex: largeur de 160px)
+    const baseWidth = 160;
+    const calculatedHeight = Math.round(baseWidth / aspectRatio);
+
+    console.log('✅ Dimensions calculées:', { width: baseWidth, height: calculatedHeight });
+
     addElement({
       type: 'image',
       id: undefined,
       x: 50,
       y: 50 + elements.length * 30,
-      width: 160,
-      height: 160,
+      width: baseWidth,
+      height: calculatedHeight, // 🔥 Hauteur calculée pour préserver le ratio
       src: image.src,
       filename: image.filename,
       opacity: 1,
       rotation: 0,
       visible: true,
       locked: false,
+      // 🆕 Stocker le ratio original pour référence future
+      aspectRatio: aspectRatio,
     });
   };
 
@@ -64,7 +103,9 @@ const ImageTemplates = () => {
           <ImageIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
           <div className="text-xs text-blue-800 dark:text-blue-200">
             <div className="font-medium mb-1">Bibliothèque d'images</div>
-            <div>Cliquez sur une image pour l'ajouter au canvas</div>
+            <div>
+              Cliquez sur une image pour l'ajouter au canvas. Les proportions sont préservées.
+            </div>
           </div>
         </div>
       </div>

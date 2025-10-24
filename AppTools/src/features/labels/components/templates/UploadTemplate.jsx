@@ -2,12 +2,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Image as ImageIcon, Trash2, Loader2, AlertCircle, X } from 'lucide-react';
 import presetImageService from '@services/presetImageService';
+import useLabelStore from '../../store/useLabelStore';
 
 /**
  * UploadTemplate - Composant d'upload et gestion des images
  * Réutilise la logique de presetImageService
+ *
+ * ✅ AMÉLIORATION : Ajout automatique au canvas avec proportions préservées
  */
 const UploadTemplate = ({ onImageSelected }) => {
+  const { addElement, elements } = useLabelStore();
   const [availableImages, setAvailableImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -40,6 +44,68 @@ const UploadTemplate = ({ onImageSelected }) => {
   };
 
   /**
+   * 🆕 Charger l'image pour obtenir ses dimensions naturelles
+   */
+  const loadImageDimensions = (src) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        resolve({
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight,
+          aspectRatio: img.naturalWidth / img.naturalHeight,
+        });
+      };
+      img.onerror = () => {
+        // Fallback si l'image ne charge pas
+        resolve({
+          naturalWidth: 160,
+          naturalHeight: 160,
+          aspectRatio: 1,
+        });
+      };
+      img.src = src;
+    });
+  };
+
+  /**
+   * ✅ Ajouter une image au canvas en préservant ses proportions
+   */
+  const addImageToCanvas = async (image) => {
+    // Charger les dimensions naturelles de l'image
+    const { naturalWidth, naturalHeight, aspectRatio } = await loadImageDimensions(image.src);
+
+    console.log('📐 Upload - Dimensions naturelles:', { naturalWidth, naturalHeight, aspectRatio });
+
+    // Définir une taille de base (ex: largeur de 160px)
+    const baseWidth = 160;
+    const calculatedHeight = Math.round(baseWidth / aspectRatio);
+
+    console.log('✅ Upload - Dimensions calculées:', {
+      width: baseWidth,
+      height: calculatedHeight,
+    });
+
+    addElement({
+      type: 'image',
+      id: undefined,
+      x: 50,
+      y: 50 + elements.length * 30,
+      width: baseWidth,
+      height: calculatedHeight, // 🔥 Hauteur calculée pour préserver le ratio
+      src: image.src,
+      filename: image.filename,
+      opacity: 1,
+      rotation: 0,
+      visible: true,
+      locked: false,
+      // 🆕 Stocker le ratio original pour référence future
+      aspectRatio: aspectRatio,
+    });
+  };
+
+  /**
    * Gérer l'upload de fichiers
    */
   const handleFileSelect = async (e) => {
@@ -57,14 +123,18 @@ const UploadTemplate = ({ onImageSelected }) => {
         // Recharger la bibliothèque
         await loadImages();
 
-        // Sélectionner automatiquement la première image uploadée
+        // Ajouter automatiquement la première image uploadée au canvas
         const firstImage = result.images[0];
+        await addImageToCanvas(firstImage);
+
+        // Callback externe si fourni
         if (onImageSelected) {
           onImageSelected({
             src: firstImage.src,
             filename: firstImage.filename,
           });
         }
+
         setSelectedImageId(firstImage.filename);
       }
     } catch (err) {
@@ -100,10 +170,15 @@ const UploadTemplate = ({ onImageSelected }) => {
   };
 
   /**
-   * Sélectionner une image
+   * ✅ Sélectionner et ajouter une image au canvas
    */
-  const handleImageClick = (image) => {
+  const handleImageClick = async (image) => {
     setSelectedImageId(image.filename);
+
+    // Ajouter au canvas avec proportions préservées
+    await addImageToCanvas(image);
+
+    // Callback externe si fourni
     if (onImageSelected) {
       onImageSelected({
         src: image.src,
@@ -141,6 +216,9 @@ const UploadTemplate = ({ onImageSelected }) => {
                 <Upload className="h-8 w-8 text-gray-400" />
                 <span className="text-sm font-medium">Importer une image</span>
                 <span className="text-xs text-gray-500">PNG, JPG jusqu'à 10MB</span>
+                <span className="text-xs text-blue-600 dark:text-blue-400">
+                  🎯 Ajout automatique au canvas
+                </span>
               </>
             )}
           </div>
