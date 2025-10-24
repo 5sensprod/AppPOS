@@ -16,6 +16,7 @@ const PropertyPanel = ({ selectedProduct }) => {
   const isQRCode = selectedElement.type === 'qrcode';
   const isText = selectedElement.type === 'text';
   const isImage = selectedElement.type === 'image';
+  const isBarcode = selectedElement.type === 'barcode';
 
   const dataFields = selectedProduct
     ? [
@@ -47,6 +48,11 @@ const PropertyPanel = ({ selectedProduct }) => {
 
     if (isQRCode) {
       updateElement(selectedId, { dataBinding: field.key, qrValue: field.value });
+      return;
+    }
+
+    if (isBarcode) {
+      updateElement(selectedId, { dataBinding: field.key, barcodeValue: field.value });
       return;
     }
   };
@@ -97,6 +103,13 @@ const PropertyPanel = ({ selectedProduct }) => {
     }
   };
 
+  const handleBarcodeColorChange = (value) => {
+    updateElement(selectedId, { lineColor: value });
+  };
+  const handleBarcodeBgChange = (value) => {
+    updateElement(selectedId, { background: value });
+  };
+
   /**
    * 🆕 Opacité pour les images
    */
@@ -140,6 +153,39 @@ const PropertyPanel = ({ selectedProduct }) => {
           </>
         )}
 
+        {/* 🏷️ Spécifique Code-barres */}
+        {isBarcode && (
+          <>
+            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+
+            {/* Couleur des barres */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                Couleur:
+              </span>
+              <input
+                type="color"
+                value={selectedElement.lineColor || '#000000'}
+                onChange={(e) => handleBarcodeColorChange(e.target.value)}
+                className="w-10 h-8 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
+              />
+            </div>
+
+            {/* Fond */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                Fond:
+              </span>
+              <input
+                type="color"
+                value={selectedElement.background || '#FFFFFF'}
+                onChange={(e) => handleBarcodeBgChange(e.target.value)}
+                className="w-10 h-8 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
+              />
+            </div>
+          </>
+        )}
+
         {/* 🖼️ Spécifique Image */}
         {isImage && (
           <>
@@ -175,20 +221,22 @@ const PropertyPanel = ({ selectedProduct }) => {
               <>
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
                 <button
-                  onClick={handleQRBinding}
+                  onClick={handleImageBinding}
                   className={`px-3 py-1 text-sm rounded flex items-center gap-2 transition-colors ${
                     selectedElement.dataBinding
                       ? 'bg-blue-500 hover:bg-blue-600 text-white'
                       : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
                   }`}
                   title={
-                    selectedElement.dataBinding ? 'QR Code lié au produit' : 'Lier le QR au produit'
+                    selectedElement.dataBinding
+                      ? 'Image liée au produit'
+                      : "Lier à l'image du produit"
                   }
                 >
                   {selectedElement.dataBinding ? (
                     <>
                       <Link className="h-4 w-4" />
-                      Lié
+                      Liée
                     </>
                   ) : (
                     <>
@@ -206,7 +254,7 @@ const PropertyPanel = ({ selectedProduct }) => {
         {dataSource === 'data' &&
           selectedProduct &&
           selectedElement.dataBinding &&
-          (isText || isQRCode) && (
+          (isText || isQRCode || isBarcode) && (
             <>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
               <div className="flex items-center gap-2 min-w-0">

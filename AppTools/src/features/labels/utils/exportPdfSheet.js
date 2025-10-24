@@ -1,8 +1,8 @@
-// src/utils/exportPdfSheet.js
+// AppTools/src/features/labels/utils/exportPdfSheet.js
 import jsPDF from 'jspdf';
 import Konva from 'konva';
 import QRCodeLib from 'qrcode';
-import JsBarcode from 'jsbarcode'; // 🆕 Import JsBarcode
+import JsBarcode from 'jsbarcode';
 import useLabelStore from '../store/useLabelStore';
 
 /**
@@ -39,7 +39,7 @@ function loadImageFromDataURL(dataURL) {
 }
 
 /**
- * 🆕 Helper pour charger une image depuis une URL
+ * Helper pour charger une image depuis une URL
  */
 function loadImageFromURL(url) {
   return new Promise((resolve, reject) => {
@@ -55,12 +55,13 @@ function loadImageFromURL(url) {
 }
 
 /**
- * Remplace le texte + valeur QR/Barcode des éléments liés à un produit (non destructif)
+ * Remplace les valeurs des éléments liés à un produit (non destructif)
  * - Text: met à jour `text`
- * - QRCode: met à jour `qrValue`
+ * - QRCode: met à jour `qrValue` (avec fallback si non lié selon fillQrWhenNoBinding)
  * - Barcode: met à jour `barcodeValue`
+ * - Image: si dataBinding === 'product_image', remplace `src` par l'image produit
  */
-function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true) {
+function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = false) {
   if (!product) return elements;
 
   const pick = (key) => {
@@ -93,7 +94,7 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true
     return product.website_url || barcode || product.sku || product._id || '';
   };
 
-  return elements.map((el) => {
+  return (elements || []).map((el) => {
     // TEXT
     if (el?.type === 'text') {
       if (!el.dataBinding) return el;
@@ -102,27 +103,64 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true
 
     // QRCODE
     if (el?.type === 'qrcode') {
-      // 1) Si binding explicite, on respecte absolument
+      // 1) Binding explicite
       if (el.dataBinding) {
         return { ...el, qrValue: pick(el.dataBinding) };
       }
-      // 2) Sinon, on remplit automatiquement par produit (option)
+      // 2) Remplissage automatique selon option
       if (fillQrWhenNoBinding) {
         return { ...el, qrValue: fallbackQR() };
       }
       return el;
     }
 
-    // 🆕 BARCODE
+    // 📊 BARCODE
     if (el?.type === 'barcode') {
       if (el.dataBinding) {
         return { ...el, barcodeValue: pick(el.dataBinding) };
       }
+      return el; // commun si non lié
+    }
+
+    // 🖼️ IMAGE - Gestion des images produit
+    if (el?.type === 'image') {
+      // Image principale liée au produit
+      if (el.dataBinding === 'product_image') {
+        // Conventions courantes
+        const productImageUrl =
+          product?.src ||
+          product?.image?.src ||
+          product?.image_url ||
+          (Array.isArray(product?.images) && product.images[0]
+            ? typeof product.images[0] === 'string'
+              ? product.images[0]
+              : product.images[0]?.src || product.images[0]?.url
+            : null);
+
+        if (productImageUrl && productImageUrl !== el.src) {
+          return { ...el, src: productImageUrl };
+        }
+        return el;
+      }
+
+      // Galerie : product_gallery_0, product_gallery_1, ...
+      if (el.dataBinding?.startsWith?.('product_gallery_')) {
+        const index = Number.parseInt(el.dataBinding.split('_')[2], 10);
+        const galleryImage = product?.gallery_images?.[index];
+        const gallerySrc =
+          (typeof galleryImage === 'string'
+            ? galleryImage
+            : galleryImage?.src || galleryImage?.url) || null;
+        if (gallerySrc && gallerySrc !== el.src) {
+          return { ...el, src: gallerySrc };
+        }
+        return el;
+      }
+
+      // Image commune (pas de binding)
       return el;
     }
 
-    // IMAGE - Pas de modification pour les images communes
-    // (les images produit seront gérées plus tard)
     return el;
   });
 }
@@ -132,14 +170,13 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true
  * (Stage/Layer sont créés, utilisés et détruits dans cet helper)
  * -> Supporte: text, qrcode, barcode, image
  *
- * ✨ AMÉLIORATION QUALITÉ QR :
- * - QR générés à 4x la taille finale (scale * 4)
- * - Marge augmentée pour éviter le clipping
- * - ErrorCorrectionLevel 'H' pour meilleure lecture
+ * ✨ QR haute qualité :
+ * - Générés à 4x la taille finale
+ * - Marge augmentée
+ * - ErrorCorrectionLevel 'H'
  *
- * ✨ AMÉLIORATION QUALITÉ BARCODE :
- * - Codes-barres générés à haute résolution
- * - Scaling intelligent selon la taille de la cellule
+ * ✨ BARCODE haute qualité :
+ * - Génération sur canvas à échelle x3
  */
 async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRatio) {
   const container = document.createElement('div');
@@ -187,19 +224,14 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       const qrValue = el.qrValue ?? '';
 
       try {
-        // ✨ AMÉLIORATION : Générer le QR à 4x la résolution
-        // pour une qualité parfaite même à l'impression
         const qrResolution = Math.max(512, Math.floor(size * 4));
-
         const dataURL = await QRCodeLib.toDataURL(qrValue, {
-          width: qrResolution, // 🔥 4x plus grand
-          margin: 2, // 🔥 Marge augmentée pour éviter le clipping
+          width: qrResolution,
+          margin: 2,
           color: { dark: color, light: bgColor },
-          errorCorrectionLevel: 'H', // 🔥 Niveau maximal de correction d'erreur
+          errorCorrectionLevel: 'H',
           type: 'image/png',
-          rendererOpts: {
-            quality: 1.0, // Qualité maximale
-          },
+          rendererOpts: { quality: 1.0 },
         });
 
         const imageObj = await loadImageFromDataURL(dataURL);
@@ -234,47 +266,42 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       }
 
       try {
-        // 🔥 AMÉLIORATION QUALITÉ : Générer à 3x la résolution
         const barcodeScale = 3;
         const canvasWidth = Math.floor(width * barcodeScale);
         const canvasHeight = Math.floor(height * barcodeScale);
 
-        // Créer un canvas haute résolution pour JsBarcode
         const canvas = document.createElement('canvas');
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
 
-        // Calculer les dimensions pour JsBarcode
         const textHeight = el.displayValue ? (el.fontSize ?? 14) * scale * barcodeScale : 0;
         const barsHeight =
           canvasHeight - textHeight - (el.textMargin ?? 2) * scale * barcodeScale * 2;
 
         JsBarcode(canvas, barcodeValue, {
-          format: format,
-          width: 2 * barcodeScale, // 🔥 Largeur des barres augmentée
-          height: Math.max(20, barsHeight), // 🔥 Hauteur optimale
+          format,
+          width: 2 * barcodeScale,
+          height: Math.max(20, barsHeight),
           displayValue: el.displayValue ?? true,
-          fontSize: (el.fontSize ?? 14) * scale * barcodeScale, // 🔥 Police haute résolution
+          fontSize: (el.fontSize ?? 14) * scale * barcodeScale,
           textMargin: (el.textMargin ?? 2) * scale * barcodeScale,
           margin: (el.margin ?? 10) * scale * barcodeScale,
           background: el.background ?? '#FFFFFF',
           lineColor: el.lineColor ?? '#000000',
           valid: (valid) => {
-            if (!valid) {
-              console.warn('⚠️ Code-barres invalide:', barcodeValue, 'format:', format);
-            }
+            if (!valid) console.warn('⚠️ Code-barres invalide:', barcodeValue, 'format:', format);
           },
         });
 
-        const dataURL = canvas.toDataURL('image/png', 1.0); // 🔥 Qualité max
+        const dataURL = canvas.toDataURL('image/png', 1.0);
         const imageObj = await loadImageFromDataURL(dataURL);
 
         return new Konva.Image({
           x: (el.x ?? 0) * scale,
           y: (el.y ?? 0) * scale,
           image: imageObj,
-          width: width,
-          height: height,
+          width,
+          height,
           rotation: el.rotation ?? 0,
           scaleX: el.scaleX ?? 1,
           scaleY: el.scaleY ?? 1,
@@ -304,8 +331,8 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
           x: (el.x ?? 0) * scale,
           y: (el.y ?? 0) * scale,
           image: imageObj,
-          width: width,
-          height: height,
+          width,
+          height,
           rotation: el.rotation ?? 0,
           scaleX: el.scaleX ?? 1,
           scaleY: el.scaleY ?? 1,
@@ -328,7 +355,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
 
   layer.draw();
 
-  // ✨ AMÉLIORATION : pixelRatio augmenté pour une meilleure qualité globale
+  // PixelRatio augmenté pour une meilleure qualité globale
   const dataURL = stage.toDataURL({ pixelRatio: Math.max(pixelRatio, 3) });
 
   // Cleanup
@@ -342,14 +369,10 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
  * - Si `products` est fourni, chaque cellule affiche un produit différent (dans l'ordre).
  * - Possibilité de surcharger les éléments via `elementsOverride`; sinon on lit le store.
  *
- * ✨ AMÉLIORATION QUALITÉ :
- * - pixelRatio par défaut augmenté à 3
- * - QR codes générés en haute résolution
- * - Codes-barres générés en haute résolution
- *
- * ✅ SUPPORT COMPLET :
- * - Images communes présentes sur toutes les cellules
- * - Codes-barres liés aux produits
+ * ✅ SUPPORT :
+ * - Images communes et images liées au produit
+ * - QR codes (communs ou variables selon option)
+ * - Codes-barres (communs ou liés)
  */
 export async function exportPdfSheet(
   _docNode,
@@ -363,11 +386,11 @@ export async function exportPdfSheet(
     margin = 10,
     spacing = 5,
     fileName = 'planche.pdf',
-    pixelRatio = 3,
+    pixelRatio = 3, // qualité élevée par défaut
     products = null,
     elementsOverride = null,
-    // 🆕 QR non lié : true => varie par produit (fallback), false => commun
-    qrPerProductWhenUnbound = true,
+    // QR non lié : false => commun (valeur du design), true => fallback par produit
+    qrPerProductWhenUnbound = false,
   } = {}
 ) {
   if (!sheetWidth || !sheetHeight || !docWidth || !docHeight) return;
@@ -402,8 +425,6 @@ export async function exportPdfSheet(
     ? elementsOverride
     : (useLabelStore.getState()?.elements ?? []);
 
-  console.log('📦 Éléments à exporter:', baseElements);
-
   // Mise en cache d'une cellule blanche
   let blankCellDataURL = null;
   const getBlankCell = async () => {
@@ -424,15 +445,13 @@ export async function exportPdfSheet(
     let dataURL;
     if (hasProducts && i < products.length) {
       const product = products[i];
-      // 👇 forcer le remplissage des QR sans dataBinding
       const updated = updateElementsWithProduct(baseElements, product, qrPerProductWhenUnbound);
-      console.log(`📝 Cellule ${i} avec produit:`, product.name);
       dataURL = await createDocumentImage(updated, docWidth, docHeight, scale, pixelRatio);
     } else if (hasProducts && i >= products.length) {
       dataURL = await getBlankCell();
     } else {
-      console.log(`📝 Cellule ${i} sans produit (éléments de base)`);
-      dataURL = await createDocumentImage(baseElements, docWidth, docHeight, scale, pixelRatio);
+      const updated = updateElementsWithProduct(baseElements, null, false);
+      dataURL = await createDocumentImage(updated, docWidth, docHeight, scale, pixelRatio);
     }
 
     pdf.addImage(dataURL, 'PNG', x, y, finalDocWidth, finalDocHeight);
@@ -449,6 +468,5 @@ export async function exportPdfSheet(
     );
   }
 
-  console.log('✅ PDF généré:', fileName);
   pdf.save(fileName);
 }
