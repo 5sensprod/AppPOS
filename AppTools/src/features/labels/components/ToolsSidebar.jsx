@@ -9,6 +9,7 @@ import {
   Layers,
   Maximize2,
   ArrowLeft,
+  Grid3x3,
 } from 'lucide-react';
 import TextTemplates from './templates/TextTemplates';
 import ImageTemplates from './templates/ImageTemplates';
@@ -16,8 +17,9 @@ import ShapeTemplates from './templates/ShapeTemplates';
 import TableTemplates from './templates/TableTemplates';
 import LayersPanel from './templates/LayersPanel';
 import FormatPanel from './templates/FormatPanel';
+import SheetPanel from './templates/SheetPanel';
 
-const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProduct }) => {
+const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProduct, docNode }) => {
   const [selectedTool, setSelectedTool] = useState(null);
 
   const tools = [
@@ -27,6 +29,7 @@ const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProdu
     { id: 'table', label: 'Tableau', icon: Table2, component: TableTemplates },
     { id: 'layers', label: 'Calques', icon: Layers, component: LayersPanel },
     { id: 'format', label: 'Format', icon: Maximize2, component: FormatPanel },
+    { id: 'sheet', label: 'Planche', icon: Grid3x3, component: SheetPanel },
   ];
 
   const handleToolClick = (toolId) => {
@@ -105,7 +108,11 @@ const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProdu
             {/* Templates */}
             <div className="flex-1 overflow-y-auto">
               {SelectedComponent && (
-                <SelectedComponent dataSource={dataSource} selectedProduct={selectedProduct} />
+                <SelectedComponent
+                  dataSource={dataSource}
+                  selectedProduct={selectedProduct}
+                  docNode={docNode}
+                />
               )}
             </div>
           </>

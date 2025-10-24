@@ -68,6 +68,7 @@ const LabelPage = () => {
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           dataSource={dataSource}
           selectedProduct={selectedProduct}
+          docNode={docNode}
         />
 
         <CanvasArea
