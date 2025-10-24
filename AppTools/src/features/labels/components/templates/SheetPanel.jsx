@@ -85,6 +85,7 @@ const SheetPanel = ({ docNode }) => {
       spacing,
       fileName: `planche-${cols}x${rows}.pdf`,
       products: isMultiProduct ? selectedProducts : null,
+      qrPerProductWhenUnbound: false,
     });
   }, [
     docNode,

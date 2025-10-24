@@ -59,6 +59,31 @@ const PropertyPanel = ({ selectedProduct }) => {
     updateElement(selectedId, { dataBinding: null });
   };
 
+  const getDefaultQRBindingKey = () => {
+    const pref = ['website_url', 'barcode', 'sku'];
+    for (const key of pref) {
+      const f = dataFields.find((d) => d.key === key);
+      if (f && f.value) return key;
+    }
+    return null;
+  };
+
+  /** 🆕 Lier/Délier un QR au produit (toggle comme l'image) */
+  const handleQRBinding = () => {
+    if (!selectedProduct) return;
+    if (selectedElement.dataBinding) {
+      // Délier
+      updateElement(selectedId, { dataBinding: null });
+      return;
+    }
+    // Lier
+    const key = getDefaultQRBindingKey();
+    const field = key ? dataFields.find((d) => d.key === key) : null;
+    if (field) {
+      updateElement(selectedId, { dataBinding: key, qrValue: field.value });
+    }
+  };
+
   /**
    * 🆕 Lier/Délier une image au produit
    */
@@ -150,22 +175,20 @@ const PropertyPanel = ({ selectedProduct }) => {
               <>
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
                 <button
-                  onClick={handleImageBinding}
+                  onClick={handleQRBinding}
                   className={`px-3 py-1 text-sm rounded flex items-center gap-2 transition-colors ${
                     selectedElement.dataBinding
                       ? 'bg-blue-500 hover:bg-blue-600 text-white'
                       : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
                   }`}
                   title={
-                    selectedElement.dataBinding
-                      ? 'Image liée au produit'
-                      : "Lier à l'image du produit"
+                    selectedElement.dataBinding ? 'QR Code lié au produit' : 'Lier le QR au produit'
                   }
                 >
                   {selectedElement.dataBinding ? (
                     <>
                       <Link className="h-4 w-4" />
-                      Liée
+                      Lié
                     </>
                   ) : (
                     <>

@@ -363,9 +363,11 @@ export async function exportPdfSheet(
     margin = 10,
     spacing = 5,
     fileName = 'planche.pdf',
-    pixelRatio = 3, // 🔥 Augmenté de 2 à 3
+    pixelRatio = 3,
     products = null,
     elementsOverride = null,
+    // 🆕 QR non lié : true => varie par produit (fallback), false => commun
+    qrPerProductWhenUnbound = true,
   } = {}
 ) {
   if (!sheetWidth || !sheetHeight || !docWidth || !docHeight) return;
@@ -423,7 +425,7 @@ export async function exportPdfSheet(
     if (hasProducts && i < products.length) {
       const product = products[i];
       // 👇 forcer le remplissage des QR sans dataBinding
-      const updated = updateElementsWithProduct(baseElements, product, true);
+      const updated = updateElementsWithProduct(baseElements, product, qrPerProductWhenUnbound);
       console.log(`📝 Cellule ${i} avec produit:`, product.name);
       dataURL = await createDocumentImage(updated, docWidth, docHeight, scale, pixelRatio);
     } else if (hasProducts && i >= products.length) {
