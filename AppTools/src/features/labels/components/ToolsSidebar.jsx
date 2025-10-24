@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   Grid3x3,
   QrCode,
+  Upload,
 } from 'lucide-react';
 
 import TextTemplates from './templates/TextTemplates';
@@ -20,24 +21,33 @@ import TableTemplates from './templates/TableTemplates';
 import LayersPanel from './templates/LayersPanel';
 import FormatPanel from './templates/FormatPanel';
 import SheetPanel from './templates/SheetPanel';
-import QRCodeTemplates from './templates/QRCodeTemplates'; // <- nouveau
+import QRCodeTemplates from './templates/QRCodeTemplates';
+import UploadTemplate from './templates/UploadTemplate'; // 👈 Nouveau
 
 const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProduct, docNode }) => {
   const [selectedTool, setSelectedTool] = useState(null);
 
   const tools = [
     { id: 'text', label: 'Texte', icon: Type, component: TextTemplates },
-    { id: 'image', label: 'Image', icon: ImageIcon, component: ImageTemplates },
+    { id: 'upload', label: 'Upload', icon: Upload, component: UploadTemplate }, // 👈 Nouveau (avant Image)
+    { id: 'image', label: 'Images', icon: ImageIcon, component: ImageTemplates },
     { id: 'shape', label: 'Forme', icon: Shapes, component: ShapeTemplates },
     { id: 'table', label: 'Tableau', icon: Table2, component: TableTemplates },
+    { id: 'qrcode', label: 'QR Code', icon: QrCode, component: QRCodeTemplates },
     { id: 'layers', label: 'Calques', icon: Layers, component: LayersPanel },
     { id: 'format', label: 'Format', icon: Maximize2, component: FormatPanel },
     { id: 'sheet', label: 'Planche', icon: Grid3x3, component: SheetPanel },
-    { id: 'qrcode', label: 'QR Code', icon: QrCode, component: QRCodeTemplates }, // <- nouveau
   ];
 
   const handleToolClick = (toolId) => {
     setSelectedTool(toolId === selectedTool ? null : toolId);
+  };
+
+  // Callback pour gérer la sélection d'image depuis UploadTemplate
+  const handleImageSelected = (imageData) => {
+    console.log('🖼️ Image sélectionnée depuis Upload:', imageData);
+    // On peut automatiquement switcher vers ImageTemplates si besoin
+    // ou déclencher une action dans le store
   };
 
   // Mode icônes uniquement
@@ -116,6 +126,7 @@ const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProdu
                   dataSource={dataSource}
                   selectedProduct={selectedProduct}
                   docNode={docNode}
+                  onImageSelected={selectedTool === 'upload' ? handleImageSelected : undefined}
                 />
               )}
             </div>

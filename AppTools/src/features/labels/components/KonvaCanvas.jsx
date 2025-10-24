@@ -3,6 +3,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Stage, Layer, Group, Rect, Text, Transformer } from 'react-konva';
 import useLabelStore from '../store/useLabelStore';
 import QRCodeNode from './canvas/QRCodeNode';
+import ImageNode from './canvas/ImageNode'; // 👈 Nouveau
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -12,7 +13,7 @@ const KonvaCanvas = ({
   docWidth = 800,
   docHeight = 600,
   zoom = 1,
-  onDocNode, // ⬅️ pour l'export PDF
+  onDocNode,
 }) => {
   const elements = useLabelStore((state) => state.elements);
   const selectedId = useLabelStore((state) => state.selectedId);
@@ -27,7 +28,7 @@ const KonvaCanvas = ({
   // Remonte le node "document" vers le parent pour export PDF
   useEffect(() => {
     if (onDocNode) onDocNode(docGroupRef.current || null);
-  }, [onDocNode, zoom]); // notifie aussi si le scale change
+  }, [onDocNode, zoom]);
 
   // Position du document (Group)
   const [docPos, setDocPos] = useState({ x: 0, y: 0 });
@@ -53,7 +54,7 @@ const KonvaCanvas = ({
     centerDocument();
   }, [viewportWidth, viewportHeight, docWidth, docHeight, centerDocument]);
 
-  // Zoom (simple)
+  // Zoom
   const handleWheel = useCallback(
     (e) => {
       e.evt.preventDefault();
@@ -66,7 +67,7 @@ const KonvaCanvas = ({
     [zoom, setZoom, centerDocument]
   );
 
-  // Espace = pan (évite scroll de page)
+  // Espace = pan
   useEffect(() => {
     const down = (e) => {
       if (e.code === 'Space') {
@@ -228,7 +229,6 @@ const KonvaCanvas = ({
                   scaleY={el.scaleY || 1}
                   rotation={el.rotation || 0}
                   opacity={el.locked ? 0.7 : 1}
-                  dataBinding={el.dataBinding}
                 />
               );
             }
@@ -253,6 +253,29 @@ const KonvaCanvas = ({
                   scaleY={el.scaleY || 1}
                   rotation={el.rotation || 0}
                   opacity={el.locked ? 0.7 : 1}
+                />
+              );
+            }
+
+            // 👇 IMAGE - NOUVEAU
+            if (el.type === 'image') {
+              return (
+                <ImageNode
+                  key={el.id}
+                  id={el.id}
+                  x={el.x}
+                  y={el.y}
+                  width={el.width ?? 160}
+                  height={el.height ?? 160}
+                  src={el.src ?? ''}
+                  draggable={!el.locked && !panEnabled && !isDragging}
+                  onClick={() => handleSelect(el.id, el.locked)}
+                  onDragEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
+                  onTransformEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
+                  scaleX={el.scaleX || 1}
+                  scaleY={el.scaleY || 1}
+                  rotation={el.rotation || 0}
+                  opacity={el.opacity ?? 1}
                 />
               );
             }
