@@ -117,20 +117,6 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true
   });
 }
 
-/**
- * Crée un dataURL PNG d'un document Konva pour un set d'éléments
- * (Stage/Layer sont créés, utilisés et détruits dans cet helper)
- * -> Supporte: text, qrcode, image
- *
- * ✨ AMÉLIORATION QUALITÉ QR :
- * - QR générés à 4x la taille finale (scale * 4)
- * - Marge augmentée pour éviter le clipping
- * - ErrorCorrectionLevel 'H' pour meilleure lecture
- *
- * ✅ SUPPORT IMAGES :
- * - Images communes chargées et rendues
- * - Préservation des proportions
- */
 async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRatio) {
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, width: docWidth * scale, height: docHeight * scale });
@@ -262,19 +248,6 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
   return dataURL;
 }
 
-/**
- * Export PDF en planche.
- * - Si `products` est fourni, chaque cellule affiche un produit différent (dans l'ordre).
- * - Possibilité de surcharger les éléments via `elementsOverride`; sinon on lit le store.
- *
- * ✨ AMÉLIORATION QUALITÉ :
- * - pixelRatio par défaut augmenté à 3
- * - QR codes générés en haute résolution
- *
- * ✅ SUPPORT IMAGES :
- * - Images communes présentes sur toutes les cellules
- * - (Images produit à implémenter plus tard)
- */
 export async function exportPdfSheet(
   _docNode,
   {
