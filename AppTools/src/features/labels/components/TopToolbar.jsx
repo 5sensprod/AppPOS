@@ -1,5 +1,4 @@
-// src/features/labels/components/TopToolbar.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Undo, Redo, Save, Download, Printer, Trash2, Plus, Package } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
 import { exportPdf } from '../utils/exportPdf';
@@ -10,12 +9,36 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode }) => {
   const selectedProduct = useLabelStore((s) => s.selectedProduct);
   const selectedProducts = useLabelStore((s) => s.selectedProducts);
 
+  const undo = useLabelStore((s) => s.undo);
+  const redo = useLabelStore((s) => s.redo);
+  const canUndo = useLabelStore((s) => s.canUndo);
+  const canRedo = useLabelStore((s) => s.canRedo);
+
+  // Raccourcis clavier: Ctrl/Cmd+Z (undo), Ctrl+Shift+Z ou Ctrl+Y (redo)
+  useEffect(() => {
+    const onKey = (e) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (!ctrl) return;
+      // Undo
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) undo();
+      }
+      // Redo
+      if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        if (canRedo) redo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canUndo, canRedo, undo, redo]);
+
   const handleExportPdf = () => {
     if (!docNode) {
       console.warn('Aucun document à exporter');
       return;
     }
-
     const safeZoom = Math.max(zoom || 1, 0.001);
     exportPdf(docNode, {
       width: canvasSize.width,
@@ -43,12 +66,27 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode }) => {
             <span>Nouveau</span>
           </button>
           <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+
+          {/* Undo */}
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40"
+            title="Annuler (Ctrl/Cmd+Z)"
+          >
             <Undo className="h-5 w-5" />
           </button>
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+
+          {/* Redo */}
+          <button
+            onClick={redo}
+            disabled={!canRedo}
+            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40"
+            title="Rétablir (Ctrl+Shift+Z / Ctrl+Y)"
+          >
             <Redo className="h-5 w-5" />
           </button>
+
           <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
           <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-red-500">
             <Trash2 className="h-5 w-5" />

@@ -95,19 +95,17 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = fals
   };
 
   return (elements || []).map((el) => {
-    // TEXT
+    // 📝 TEXT
     if (el?.type === 'text') {
       if (!el.dataBinding) return el;
       return { ...el, text: pick(el.dataBinding) };
     }
 
-    // QRCODE
+    // 🔲 QRCODE
     if (el?.type === 'qrcode') {
-      // 1) Binding explicite
       if (el.dataBinding) {
         return { ...el, qrValue: pick(el.dataBinding) };
       }
-      // 2) Remplissage automatique selon option
       if (fillQrWhenNoBinding) {
         return { ...el, qrValue: fallbackQR() };
       }
@@ -119,45 +117,36 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = fals
       if (el.dataBinding) {
         return { ...el, barcodeValue: pick(el.dataBinding) };
       }
-      return el; // commun si non lié
+      return el;
     }
 
-    // 🖼️ IMAGE - Gestion des images produit
+    // 🖼️ IMAGE — logique allégée (uniquement product.src)
     if (el?.type === 'image') {
       // Image principale liée au produit
       if (el.dataBinding === 'product_image') {
-        // Conventions courantes
-        const productImageUrl =
-          product?.src ||
-          product?.image?.src ||
-          product?.image_url ||
-          (Array.isArray(product?.images) && product.images[0]
-            ? typeof product.images[0] === 'string'
-              ? product.images[0]
-              : product.images[0]?.src || product.images[0]?.url
-            : null);
-
+        const productImageUrl = product?.src || null;
         if (productImageUrl && productImageUrl !== el.src) {
           return { ...el, src: productImageUrl };
         }
         return el;
       }
 
-      // Galerie : product_gallery_0, product_gallery_1, ...
+      // Galerie : product_gallery_0, product_gallery_1, etc.
       if (el.dataBinding?.startsWith?.('product_gallery_')) {
         const index = Number.parseInt(el.dataBinding.split('_')[2], 10);
-        const galleryImage = product?.gallery_images?.[index];
+        const galleryImage = Array.isArray(product?.gallery_images)
+          ? product.gallery_images[index]
+          : undefined;
         const gallerySrc =
-          (typeof galleryImage === 'string'
-            ? galleryImage
-            : galleryImage?.src || galleryImage?.url) || null;
+          typeof galleryImage === 'string' ? galleryImage : galleryImage?.src || null;
+
         if (gallerySrc && gallerySrc !== el.src) {
           return { ...el, src: gallerySrc };
         }
         return el;
       }
 
-      // Image commune (pas de binding)
+      // Image commune
       return el;
     }
 
