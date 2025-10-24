@@ -11,6 +11,7 @@ import {
   Type as TypeIcon,
   Image as ImageIcon,
   Shapes as ShapesIcon,
+  QrCode as QrCodeIcon, // 👈 ajout
 } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
 
@@ -22,6 +23,8 @@ const iconForType = (type) => {
       return ImageIcon;
     case 'shape':
       return ShapesIcon;
+    case 'qrcode': // 👈 ajout
+      return QrCodeIcon;
     default:
       return TypeIcon;
   }
@@ -71,14 +74,16 @@ const LayersPanel = () => {
         const isVisible = el.visible !== false;
         const Icon = iconForType(el.type);
 
-        // Nom base (on retire les suffixes de type "(brand)" / "(price)" etc.)
-        const baseName =
-          el.type === 'text'
-            ? el.text?.split('(')[0]?.trim() || 'Texte'
-            : el.type.charAt(0).toUpperCase() + el.type.slice(1);
+        // Nom base (texte custom par type + fallback)
+        let baseName = el.type.charAt(0).toUpperCase() + el.type.slice(1);
+        if (el.type === 'text') {
+          baseName = el.text?.split('(')[0]?.trim() || 'Texte';
+        } else if (el.type === 'qrcode') {
+          baseName = el.qrValue ? `QR: ${el.qrValue}` : 'QR Code';
+        }
 
-        const name25 = cut(baseName, 8); // défaut
-        const name12 = cut(baseName, 8); // au survol
+        const name25 = cut(baseName, 25);
+        const name12 = cut(baseName, 12);
 
         return (
           <div
@@ -101,22 +106,20 @@ const LayersPanel = () => {
               <GripVertical className="h-4 w-4 text-gray-400 cursor-grab active:cursor-grabbing shrink-0" />
             )}
 
-            {/* Icône + label (25 par défaut, 12 au survol) */}
+            {/* Icône + label */}
             <div className="flex-1 min-w-0 flex items-center gap-2">
               <Icon className="h-4 w-4 shrink-0" />
               <span className="relative min-w-0">
-                {/* défaut : jusqu'à 25 caractères */}
                 <span className="block text-sm group-hover:hidden" title={baseName}>
                   {name25}
                 </span>
-                {/* hover : réduit à 12 + truncate CSS pour sécurité */}
                 <span className="hidden group-hover:block text-sm truncate" title={baseName}>
                   {name12}
                 </span>
               </span>
             </div>
 
-            {/* Actions à droite (apparaissent au survol) */}
+            {/* Actions à droite */}
             <div className="absolute right-2 inset-y-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={(e) => {

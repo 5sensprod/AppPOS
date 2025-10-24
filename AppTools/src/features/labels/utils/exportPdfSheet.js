@@ -1,6 +1,7 @@
 // src/utils/exportPdfSheet.js
 import jsPDF from 'jspdf';
 import Konva from 'konva';
+import QRCodeLib from 'qrcode';
 import useLabelStore from '../store/useLabelStore';
 
 /**
@@ -24,39 +25,83 @@ const computeOffsets = ({ cellWidth, cellHeight, finalDocWidth, finalDocHeight }
 });
 
 /**
- * Remplace le texte des éléments liés à un produit (non destructif)
+ * Mini helper pour charger un dataURL en Image HTML (pour Konva.Image)
  */
-function updateElementsWithProduct(elements, product) {
-  if (!product) return elements;
-  return elements.map((el) => {
-    if (!el?.dataBinding) return el;
-    let newText = el.text;
-    switch (el.dataBinding) {
-      case 'name':
-        newText = product.name ?? '';
-        break;
-      case 'price':
-        newText = product.price != null ? `${product.price}€` : '';
-        break;
-      case 'brand':
-        newText = product.brand_ref?.name ?? '';
-        break;
-      case 'sku':
-        newText = product.sku ?? '';
-        break;
-      case 'stock':
-        newText = product.stock != null ? `Stock: ${product.stock}` : '';
-        break;
-      default:
-        break;
-    }
-    return { ...el, text: newText };
+function loadImageFromDataURL(dataURL) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataURL;
   });
 }
 
 /**
+ * Remplace le texte + valeur QR des éléments liés à un produit (non destructif)
+ * - Text: met à jour `text`
+ * - QRCode: met à jour `qrValue`
+ */
+function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true) {
+  if (!product) return elements;
+
+  const pick = (key) => {
+    switch (key) {
+      case 'name':
+        return product.name ?? '';
+      case 'price':
+        return product.price != null ? `${product.price}€` : '';
+      case 'brand':
+        return product.brand_ref?.name ?? '';
+      case 'sku':
+        return product.sku ?? '';
+      case 'stock':
+        return product.stock != null ? `Stock: ${product.stock}` : '';
+      case 'supplier':
+        return product.supplier_ref?.name ?? '';
+      case 'website_url':
+        return product.website_url ?? '';
+      case 'barcode': {
+        const meta = product?.meta_data?.find?.((m) => m.key === 'barcode');
+        return meta?.value ?? '';
+      }
+      default:
+        return '';
+    }
+  };
+
+  const fallbackQR = () => {
+    const barcode = product?.meta_data?.find?.((m) => m.key === 'barcode')?.value;
+    return product.website_url || barcode || product.sku || product._id || '';
+  };
+
+  return elements.map((el) => {
+    // TEXT
+    if (el?.type === 'text') {
+      if (!el.dataBinding) return el;
+      return { ...el, text: pick(el.dataBinding) };
+    }
+
+    // QRCODE
+    if (el?.type === 'qrcode') {
+      // 1) Si binding explicite, on respecte absolument
+      if (el.dataBinding) {
+        return { ...el, qrValue: pick(el.dataBinding) };
+      }
+      // 2) Sinon, on remplit automatiquement par produit (option)
+      if (fillQrWhenNoBinding) {
+        return { ...el, qrValue: fallbackQR() };
+      }
+      return el;
+    }
+
+    return el; // autres types
+  });
+}
+/**
  * Crée un dataURL PNG d'un document Konva pour un set d'éléments
  * (Stage/Layer sont créés, utilisés et détruits dans cet helper)
+ * -> Supporte: text, qrcode
  */
 async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRatio) {
   const container = document.createElement('div');
@@ -72,32 +117,75 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       width: docWidth * scale,
       height: docHeight * scale,
       fill: '#ffffff',
+      listening: false,
     })
   );
 
-  // Éléments
-  for (const el of elements) {
-    if (el?.visible === false) continue;
+  // Construction des nodes (async pour QR)
+  const nodePromises = (elements || []).map(async (el) => {
+    if (el?.visible === false) return null;
+
+    // TEXT
     if (el?.type === 'text') {
-      layer.add(
-        new Konva.Text({
+      return new Konva.Text({
+        x: (el.x ?? 0) * scale,
+        y: (el.y ?? 0) * scale,
+        text: el.text ?? '',
+        fontSize: (el.fontSize ?? 12) * scale,
+        fontStyle: el.bold ? 'bold' : 'normal',
+        fill: el.color ?? '#000000',
+        scaleX: el.scaleX ?? 1,
+        scaleY: el.scaleY ?? 1,
+        rotation: el.rotation ?? 0,
+        listening: false,
+      });
+    }
+
+    // QRCODE
+    if (el?.type === 'qrcode') {
+      const size = (el.size ?? 160) * scale;
+      const color = el.color ?? '#000000';
+      const bgColor = el.bgColor ?? '#FFFFFF';
+      const qrValue = el.qrValue ?? '';
+
+      try {
+        const dataURL = await QRCodeLib.toDataURL(qrValue, {
+          width: Math.max(8, Math.floor(size)), // largeur en px (évitons 0)
+          margin: 1,
+          color: { dark: color, light: bgColor },
+          errorCorrectionLevel: 'M',
+        });
+        const imageObj = await loadImageFromDataURL(dataURL);
+
+        return new Konva.Image({
           x: (el.x ?? 0) * scale,
           y: (el.y ?? 0) * scale,
-          text: el.text ?? '',
-          fontSize: (el.fontSize ?? 12) * scale,
-          fontStyle: el.bold ? 'bold' : 'normal',
-          fill: el.color ?? '#000000',
+          image: imageObj,
+          width: size,
+          height: size,
+          rotation: el.rotation ?? 0,
           scaleX: el.scaleX ?? 1,
           scaleY: el.scaleY ?? 1,
-          rotation: el.rotation ?? 0,
-        })
-      );
+          listening: false,
+        });
+      } catch (err) {
+        console.error('QR generation failed in exportPdfSheet:', err);
+        return null;
+      }
     }
-    // TODO: gérer images, shapes, codes-barres, etc.
-  }
+
+    // TODO: images / shapes si nécessaire
+    return null;
+  });
+
+  // Attendre la création de tous les nodes
+  const nodes = await Promise.all(nodePromises);
+  nodes.filter(Boolean).forEach((node) => layer.add(node));
 
   layer.draw();
   const dataURL = stage.toDataURL({ pixelRatio });
+
+  // Cleanup
   stage.destroy();
   container.remove();
   return dataURL;
@@ -109,7 +197,6 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
  * - Possibilité de surcharger les éléments via `elementsOverride`; sinon on lit le store.
  */
 export async function exportPdfSheet(
-  // docNode n'est pas utilisé aujourd'hui mais conservé pour compat API
   _docNode,
   {
     sheetWidth,
@@ -123,7 +210,7 @@ export async function exportPdfSheet(
     fileName = 'planche.pdf',
     pixelRatio = 2,
     products = null,
-    elementsOverride = null, // << optionnel : passer un tableau d'éléments pour éviter la dépendance au store
+    elementsOverride = null,
   } = {}
 ) {
   if (!sheetWidth || !sheetHeight || !docWidth || !docHeight) return;
@@ -158,7 +245,7 @@ export async function exportPdfSheet(
     ? elementsOverride
     : (useLabelStore.getState()?.elements ?? []);
 
-  // Mise en cache d'une cellule blanche (évite de recréer un stage)
+  // Mise en cache d'une cellule blanche
   let blankCellDataURL = null;
   const getBlankCell = async () => {
     if (blankCellDataURL) return blankCellDataURL;
@@ -178,7 +265,8 @@ export async function exportPdfSheet(
     let dataURL;
     if (hasProducts && i < products.length) {
       const product = products[i];
-      const updated = updateElementsWithProduct(baseElements, product);
+      // 👇 forcer le remplissage des QR sans dataBinding
+      const updated = updateElementsWithProduct(baseElements, product, true);
       dataURL = await createDocumentImage(updated, docWidth, docHeight, scale, pixelRatio);
     } else if (hasProducts && i >= products.length) {
       dataURL = await getBlankCell();
@@ -188,7 +276,7 @@ export async function exportPdfSheet(
 
     pdf.addImage(dataURL, 'PNG', x, y, finalDocWidth, finalDocHeight);
 
-    // Cadre pointillé de la cellule (découpe visuelle légère)
+    // Cadre pointillé de la cellule (repère)
     pdf.setDrawColor(200, 200, 200);
     pdf.setLineDash([2, 2]);
     pdf.setLineWidth(0.5);

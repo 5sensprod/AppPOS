@@ -3,14 +3,16 @@ import React, { useState } from 'react';
 import {
   ChevronLeft,
   Type,
-  Image,
+  Image as ImageIcon,
   Shapes,
   Table2,
   Layers,
   Maximize2,
   ArrowLeft,
   Grid3x3,
+  QrCode,
 } from 'lucide-react';
+
 import TextTemplates from './templates/TextTemplates';
 import ImageTemplates from './templates/ImageTemplates';
 import ShapeTemplates from './templates/ShapeTemplates';
@@ -18,18 +20,20 @@ import TableTemplates from './templates/TableTemplates';
 import LayersPanel from './templates/LayersPanel';
 import FormatPanel from './templates/FormatPanel';
 import SheetPanel from './templates/SheetPanel';
+import QRCodeTemplates from './templates/QRCodeTemplates'; // <- nouveau
 
 const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProduct, docNode }) => {
   const [selectedTool, setSelectedTool] = useState(null);
 
   const tools = [
     { id: 'text', label: 'Texte', icon: Type, component: TextTemplates },
-    { id: 'image', label: 'Image', icon: Image, component: ImageTemplates },
+    { id: 'image', label: 'Image', icon: ImageIcon, component: ImageTemplates },
     { id: 'shape', label: 'Forme', icon: Shapes, component: ShapeTemplates },
     { id: 'table', label: 'Tableau', icon: Table2, component: TableTemplates },
     { id: 'layers', label: 'Calques', icon: Layers, component: LayersPanel },
     { id: 'format', label: 'Format', icon: Maximize2, component: FormatPanel },
     { id: 'sheet', label: 'Planche', icon: Grid3x3, component: SheetPanel },
+    { id: 'qrcode', label: 'QR Code', icon: QrCode, component: QRCodeTemplates }, // <- nouveau
   ];
 
   const handleToolClick = (toolId) => {

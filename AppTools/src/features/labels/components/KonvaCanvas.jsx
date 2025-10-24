@@ -1,6 +1,8 @@
+// src/features/labels/components/KonvaCanvas.jsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Stage, Layer, Group, Rect, Text, Transformer } from 'react-konva';
 import useLabelStore from '../store/useLabelStore';
+import QRCodeNode from './canvas/QRCodeNode';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -184,10 +186,7 @@ const KonvaCanvas = ({
         if (e.target === e.target.getStage()) selectElement(null);
       }}
     >
-      {/*
-        ✅ Fix warning Konva: `hitGraphEnabled` est déprécié.
-        Utiliser uniquement `listening={false}` pour rendre le layer non interactif.
-      */}
+      {/* Fond document */}
       <Layer listening={false} perfectDrawEnabled={false}>
         <Group x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom} listening={false}>
           <Rect
@@ -203,11 +202,13 @@ const KonvaCanvas = ({
         </Group>
       </Layer>
 
+      {/* Éléments */}
       <Layer perfectDrawEnabled={false}>
         <Group ref={docGroupRef} x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom}>
-          {/* Éléments */}
           {elements.map((el) => {
             if (el.visible === false) return null;
+
+            // TEXT
             if (el.type === 'text') {
               return (
                 <Text
@@ -231,11 +232,36 @@ const KonvaCanvas = ({
                 />
               );
             }
+
+            // QRCODE
+            if (el.type === 'qrcode') {
+              return (
+                <QRCodeNode
+                  key={el.id}
+                  id={el.id}
+                  x={el.x}
+                  y={el.y}
+                  size={el.size ?? 160}
+                  color={el.color ?? '#000000'}
+                  bgColor={el.bgColor ?? '#FFFFFF00'}
+                  qrValue={el.qrValue ?? ''}
+                  draggable={!el.locked && !panEnabled && !isDragging}
+                  onClick={() => handleSelect(el.id, el.locked)}
+                  onDragEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
+                  onTransformEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
+                  scaleX={el.scaleX || 1}
+                  scaleY={el.scaleY || 1}
+                  rotation={el.rotation || 0}
+                  opacity={el.locked ? 0.7 : 1}
+                />
+              );
+            }
+
             return null;
           })}
         </Group>
 
-        {/* Transformer (hors export) */}
+        {/* Transformer */}
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
