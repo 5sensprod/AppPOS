@@ -19,6 +19,7 @@ const PropertyPanel = ({ selectedProduct }) => {
         { key: 'brand', label: 'Marque', value: selectedProduct.brand_ref?.name },
         { key: 'sku', label: 'Référence', value: selectedProduct.sku },
         { key: 'stock', label: 'Stock', value: `Stock: ${selectedProduct.stock}` },
+        { key: 'supplier', label: 'Fournisseur', value: selectedProduct.supplier_ref?.name ?? '' },
       ]
     : [];
 
@@ -60,7 +61,7 @@ const PropertyPanel = ({ selectedProduct }) => {
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                Champ:
+                Champ :
               </span>
               <select
                 value={selectedElement.dataBinding}
