@@ -3,7 +3,8 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Stage, Layer, Group, Rect, Text, Transformer } from 'react-konva';
 import useLabelStore from '../store/useLabelStore';
 import QRCodeNode from './canvas/QRCodeNode';
-import ImageNode from './canvas/ImageNode'; // 👈 Nouveau
+import ImageNode from './canvas/ImageNode';
+import BarcodeNode from './canvas/BarcodeNode';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -276,6 +277,35 @@ const KonvaCanvas = ({
                   scaleY={el.scaleY || 1}
                   rotation={el.rotation || 0}
                   opacity={el.opacity ?? 1}
+                />
+              );
+            }
+            // BARCODE
+            if (el.type === 'barcode') {
+              return (
+                <BarcodeNode
+                  key={el.id}
+                  id={el.id}
+                  x={el.x}
+                  y={el.y}
+                  width={el.width ?? 200}
+                  height={el.height ?? 80}
+                  barcodeValue={el.barcodeValue ?? ''}
+                  format={el.format ?? 'CODE128'}
+                  displayValue={el.displayValue ?? true}
+                  fontSize={el.fontSize ?? 14}
+                  textMargin={el.textMargin ?? 2}
+                  margin={el.margin ?? 10}
+                  background={el.background ?? '#FFFFFF'}
+                  lineColor={el.lineColor ?? '#000000'}
+                  draggable={!el.locked && !panEnabled && !isDragging}
+                  onClick={() => handleSelect(el.id, el.locked)}
+                  onDragEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
+                  onTransformEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
+                  scaleX={el.scaleX || 1}
+                  scaleY={el.scaleY || 1}
+                  rotation={el.rotation || 0}
+                  opacity={el.locked ? 0.7 : 1}
                 />
               );
             }

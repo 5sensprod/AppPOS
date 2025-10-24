@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   Shapes as ShapesIcon,
   QrCode as QrCodeIcon,
+  Barcode,
 } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
 
@@ -25,6 +26,8 @@ const iconForType = (type) => {
       return ShapesIcon;
     case 'qrcode':
       return QrCodeIcon;
+    case 'barcode':
+      return Barcode;
     default:
       return TypeIcon;
   }

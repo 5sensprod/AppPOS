@@ -2,6 +2,7 @@
 import jsPDF from 'jspdf';
 import Konva from 'konva';
 import QRCodeLib from 'qrcode';
+import JsBarcode from 'jsbarcode'; // 🆕 Import JsBarcode
 import useLabelStore from '../store/useLabelStore';
 
 /**
@@ -54,9 +55,10 @@ function loadImageFromURL(url) {
 }
 
 /**
- * Remplace le texte + valeur QR des éléments liés à un produit (non destructif)
+ * Remplace le texte + valeur QR/Barcode des éléments liés à un produit (non destructif)
  * - Text: met à jour `text`
  * - QRCode: met à jour `qrValue`
+ * - Barcode: met à jour `barcodeValue`
  */
 function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true) {
   if (!product) return elements;
@@ -111,32 +113,16 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true
       return el;
     }
 
-    // 🖼️ IMAGE - Gestion des images produit
-    if (el?.type === 'image') {
-      // Si l'image est liée au produit
-      if (el.dataBinding === 'product_image') {
-        const productImageUrl = product?.image?.src || product?.image_url || null;
-        if (productImageUrl) {
-          return { ...el, src: productImageUrl };
-        }
-        // Pas d'image produit disponible, garder l'image par défaut
-        return el;
+    // 🆕 BARCODE
+    if (el?.type === 'barcode') {
+      if (el.dataBinding) {
+        return { ...el, barcodeValue: pick(el.dataBinding) };
       }
-
-      // Support futur pour la galerie
-      if (el.dataBinding?.startsWith('product_gallery_')) {
-        const index = parseInt(el.dataBinding.split('_')[2]);
-        const galleryImage = product?.gallery_images?.[index];
-        if (galleryImage?.src) {
-          return { ...el, src: galleryImage.src };
-        }
-        return el;
-      }
-
-      // Image commune (pas de binding) → pas de modification
       return el;
     }
 
+    // IMAGE - Pas de modification pour les images communes
+    // (les images produit seront gérées plus tard)
     return el;
   });
 }
@@ -144,16 +130,16 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = true
 /**
  * Crée un dataURL PNG d'un document Konva pour un set d'éléments
  * (Stage/Layer sont créés, utilisés et détruits dans cet helper)
- * -> Supporte: text, qrcode, image
+ * -> Supporte: text, qrcode, barcode, image
  *
  * ✨ AMÉLIORATION QUALITÉ QR :
  * - QR générés à 4x la taille finale (scale * 4)
  * - Marge augmentée pour éviter le clipping
  * - ErrorCorrectionLevel 'H' pour meilleure lecture
  *
- * ✅ SUPPORT IMAGES :
- * - Images communes chargées et rendues
- * - Préservation des proportions
+ * ✨ AMÉLIORATION QUALITÉ BARCODE :
+ * - Codes-barres générés à haute résolution
+ * - Scaling intelligent selon la taille de la cellule
  */
 async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRatio) {
   const container = document.createElement('div');
@@ -173,7 +159,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
     })
   );
 
-  // Construction des nodes (async pour QR et Images)
+  // Construction des nodes (async pour QR, Barcode et Images)
   const nodePromises = (elements || []).map(async (el) => {
     if (el?.visible === false) return null;
 
@@ -235,7 +221,72 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       }
     }
 
-    // 🖼️ IMAGE - NOUVEAU SUPPORT
+    // 📊 BARCODE - HAUTE RÉSOLUTION
+    if (el?.type === 'barcode') {
+      const width = (el.width ?? 200) * scale;
+      const height = (el.height ?? 80) * scale;
+      const barcodeValue = el.barcodeValue ?? '';
+      const format = el.format ?? 'CODE128';
+
+      if (!barcodeValue) {
+        console.warn('⚠️ Code-barres sans valeur:', el);
+        return null;
+      }
+
+      try {
+        // 🔥 AMÉLIORATION QUALITÉ : Générer à 3x la résolution
+        const barcodeScale = 3;
+        const canvasWidth = Math.floor(width * barcodeScale);
+        const canvasHeight = Math.floor(height * barcodeScale);
+
+        // Créer un canvas haute résolution pour JsBarcode
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+
+        // Calculer les dimensions pour JsBarcode
+        const textHeight = el.displayValue ? (el.fontSize ?? 14) * scale * barcodeScale : 0;
+        const barsHeight =
+          canvasHeight - textHeight - (el.textMargin ?? 2) * scale * barcodeScale * 2;
+
+        JsBarcode(canvas, barcodeValue, {
+          format: format,
+          width: 2 * barcodeScale, // 🔥 Largeur des barres augmentée
+          height: Math.max(20, barsHeight), // 🔥 Hauteur optimale
+          displayValue: el.displayValue ?? true,
+          fontSize: (el.fontSize ?? 14) * scale * barcodeScale, // 🔥 Police haute résolution
+          textMargin: (el.textMargin ?? 2) * scale * barcodeScale,
+          margin: (el.margin ?? 10) * scale * barcodeScale,
+          background: el.background ?? '#FFFFFF',
+          lineColor: el.lineColor ?? '#000000',
+          valid: (valid) => {
+            if (!valid) {
+              console.warn('⚠️ Code-barres invalide:', barcodeValue, 'format:', format);
+            }
+          },
+        });
+
+        const dataURL = canvas.toDataURL('image/png', 1.0); // 🔥 Qualité max
+        const imageObj = await loadImageFromDataURL(dataURL);
+
+        return new Konva.Image({
+          x: (el.x ?? 0) * scale,
+          y: (el.y ?? 0) * scale,
+          image: imageObj,
+          width: width,
+          height: height,
+          rotation: el.rotation ?? 0,
+          scaleX: el.scaleX ?? 1,
+          scaleY: el.scaleY ?? 1,
+          listening: false,
+        });
+      } catch (err) {
+        console.error('❌ Code-barres generation failed:', barcodeValue, err);
+        return null;
+      }
+    }
+
+    // 🖼️ IMAGE
     if (el?.type === 'image') {
       const width = (el.width ?? 160) * scale;
       const height = (el.height ?? 160) * scale;
@@ -294,10 +345,11 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
  * ✨ AMÉLIORATION QUALITÉ :
  * - pixelRatio par défaut augmenté à 3
  * - QR codes générés en haute résolution
+ * - Codes-barres générés en haute résolution
  *
- * ✅ SUPPORT IMAGES :
+ * ✅ SUPPORT COMPLET :
  * - Images communes présentes sur toutes les cellules
- * - (Images produit à implémenter plus tard)
+ * - Codes-barres liés aux produits
  */
 export async function exportPdfSheet(
   _docNode,

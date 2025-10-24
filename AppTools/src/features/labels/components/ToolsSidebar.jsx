@@ -12,6 +12,7 @@ import {
   Grid3x3,
   QrCode,
   Upload,
+  Barcode,
 } from 'lucide-react';
 
 import TextTemplates from './templates/TextTemplates';
@@ -22,7 +23,8 @@ import LayersPanel from './templates/LayersPanel';
 import FormatPanel from './templates/FormatPanel';
 import SheetPanel from './templates/SheetPanel';
 import QRCodeTemplates from './templates/QRCodeTemplates';
-import UploadTemplate from './templates/UploadTemplate'; // 👈 Nouveau
+import UploadTemplate from './templates/UploadTemplate';
+import BarcodeTemplates from './templates/BarcodeTemplates';
 
 const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProduct, docNode }) => {
   const [selectedTool, setSelectedTool] = useState(null);
@@ -34,6 +36,7 @@ const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProdu
     { id: 'shape', label: 'Forme', icon: Shapes, component: ShapeTemplates },
     { id: 'table', label: 'Tableau', icon: Table2, component: TableTemplates },
     { id: 'qrcode', label: 'QR Code', icon: QrCode, component: QRCodeTemplates },
+    { id: 'barcode', label: 'Code-barres', icon: Barcode, component: BarcodeTemplates },
     { id: 'layers', label: 'Calques', icon: Layers, component: LayersPanel },
     { id: 'format', label: 'Format', icon: Maximize2, component: FormatPanel },
     { id: 'sheet', label: 'Planche', icon: Grid3x3, component: SheetPanel },
