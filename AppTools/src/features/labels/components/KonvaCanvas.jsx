@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Stage, Layer, Group, Rect, Text, Transformer } from 'react-konva';
 import useLabelStore from '../store/useLabelStore';
 
@@ -36,27 +36,33 @@ const KonvaCanvas = ({
   const panLast = useRef({ x: 0, y: 0 });
 
   // Centrer le document dans le viewport
-  const centerDocument = (scale = zoom) => {
-    if (!viewportWidth || !viewportHeight) return;
-    setDocPos({
-      x: (viewportWidth - docWidth * scale) / 2,
-      y: (viewportHeight - docHeight * scale) / 2,
-    });
-  };
+  const centerDocument = useCallback(
+    (scale = zoom) => {
+      if (!viewportWidth || !viewportHeight) return;
+      setDocPos({
+        x: (viewportWidth - docWidth * scale) / 2,
+        y: (viewportHeight - docHeight * scale) / 2,
+      });
+    },
+    [viewportWidth, viewportHeight, docWidth, docHeight, zoom]
+  );
 
   useEffect(() => {
     centerDocument();
-  }, [viewportWidth, viewportHeight, docWidth, docHeight]);
+  }, [viewportWidth, viewportHeight, docWidth, docHeight, centerDocument]);
 
   // Zoom (simple)
-  const handleWheel = (e) => {
-    e.evt.preventDefault();
-    const direction = e.evt.deltaY > 0 ? 1 : -1;
-    const scaleBy = 1.08;
-    const newZoom = clamp(direction > 0 ? zoom / scaleBy : zoom * scaleBy, 0.1, 3);
-    setZoom(newZoom);
-    centerDocument(newZoom);
-  };
+  const handleWheel = useCallback(
+    (e) => {
+      e.evt.preventDefault();
+      const direction = e.evt.deltaY > 0 ? 1 : -1;
+      const scaleBy = 1.08;
+      const newZoom = clamp(direction > 0 ? zoom / scaleBy : zoom * scaleBy, 0.1, 3);
+      setZoom(newZoom);
+      centerDocument(newZoom);
+    },
+    [zoom, setZoom, centerDocument]
+  );
 
   // Espace = pan (évite scroll de page)
   useEffect(() => {
@@ -91,17 +97,20 @@ const KonvaCanvas = ({
   }, [panEnabled, isDragging]);
 
   // Pan : MouseDown
-  const onStageMouseDown = (e) => {
-    const isMiddle = e.evt.button === 1;
-    if (panEnabled || isMiddle) {
-      setIsDragging(true);
-      const pos = stageRef.current?.getPointerPosition() || { x: 0, y: 0 };
-      panLast.current = pos;
-    }
-  };
+  const onStageMouseDown = useCallback(
+    (e) => {
+      const isMiddle = e.evt.button === 1;
+      if (panEnabled || isMiddle) {
+        setIsDragging(true);
+        const pos = stageRef.current?.getPointerPosition() || { x: 0, y: 0 };
+        panLast.current = pos;
+      }
+    },
+    [panEnabled]
+  );
 
   // Pan : Move
-  const onStageMouseMove = () => {
+  const onStageMouseMove = useCallback(() => {
     if (!isDragging) return;
     const stage = stageRef.current;
     if (!stage) return;
@@ -110,27 +119,33 @@ const KonvaCanvas = ({
     const dy = pos.y - panLast.current.y;
     panLast.current = pos;
     setDocPos((p) => ({ x: p.x + dx, y: p.y + dy }));
-  };
+  }, [isDragging]);
 
   // Pan : Up
-  const onStageMouseUp = () => {
+  const onStageMouseUp = useCallback(() => {
     if (isDragging) setIsDragging(false);
-  };
+  }, [isDragging]);
 
-  const handleSelect = (id, locked) => {
-    if (panEnabled || isDragging) return;
-    if (!locked) selectElement(id);
-  };
+  const handleSelect = useCallback(
+    (id, locked) => {
+      if (panEnabled || isDragging) return;
+      if (!locked) selectElement(id);
+    },
+    [panEnabled, isDragging, selectElement]
+  );
 
-  const handleTransform = (id, node) => {
-    updateElement(id, {
-      x: node.x(),
-      y: node.y(),
-      scaleX: node.scaleX(),
-      scaleY: node.scaleY(),
-      rotation: node.rotation(),
-    });
-  };
+  const handleTransform = useCallback(
+    (id, node) => {
+      updateElement(id, {
+        x: node.x(),
+        y: node.y(),
+        scaleX: node.scaleX(),
+        scaleY: node.scaleY(),
+        rotation: node.rotation(),
+      });
+    },
+    [updateElement]
+  );
 
   // Transformer
   useEffect(() => {
@@ -169,8 +184,12 @@ const KonvaCanvas = ({
         if (e.target === e.target.getStage()) selectElement(null);
       }}
     >
-      <Layer listening={false} hitGraphEnabled={false} perfectDrawEnabled={false}>
-        <Group x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom}>
+      {/*
+        ✅ Fix warning Konva: `hitGraphEnabled` est déprécié.
+        Utiliser uniquement `listening={false}` pour rendre le layer non interactif.
+      */}
+      <Layer listening={false} perfectDrawEnabled={false}>
+        <Group x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom} listening={false}>
           <Rect
             x={0}
             y={0}
@@ -183,6 +202,7 @@ const KonvaCanvas = ({
           />
         </Group>
       </Layer>
+
       <Layer perfectDrawEnabled={false}>
         <Group ref={docGroupRef} x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom}>
           {/* Éléments */}
@@ -207,7 +227,7 @@ const KonvaCanvas = ({
                   scaleY={el.scaleY || 1}
                   rotation={el.rotation || 0}
                   opacity={el.locked ? 0.7 : 1}
-                  dataBinding={el.dataBinding} // ✅ Ajout du dataBinding dans les attrs
+                  dataBinding={el.dataBinding}
                 />
               );
             }
@@ -226,7 +246,7 @@ const KonvaCanvas = ({
       </Layer>
 
       {/* Layer d'UI non cliquable (hors export) */}
-      <Layer listening={false} hitGraphEnabled={false} perfectDrawEnabled={false} />
+      <Layer listening={false} perfectDrawEnabled={false} />
     </Stage>
   );
 };
