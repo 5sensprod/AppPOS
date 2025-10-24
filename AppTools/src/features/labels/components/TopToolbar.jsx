@@ -1,9 +1,28 @@
 import React from 'react';
 import { Undo, Redo, Save, Download, Printer, Trash2, Plus, Package } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
+import { exportPdf } from '../utils/exportPdf';
 
-const TopToolbar = ({ dataSource, selectedProduct, onNewLabel }) => {
-  // on n'a plus besoin de selectedId ici
+const TopToolbar = ({ dataSource, selectedProduct, onNewLabel, docNode }) => {
+  const zoom = useLabelStore((s) => s.zoom);
+  const canvasSize = useLabelStore((s) => s.canvasSize);
+
+  const handleExportPdf = () => {
+    if (!docNode) {
+      console.warn('Aucun document à exporter');
+      return;
+    }
+
+    // Compense le scale appliqué au Group (zoom)
+    const safeZoom = Math.max(zoom || 1, 0.001);
+    exportPdf(docNode, {
+      width: canvasSize.width,
+      height: canvasSize.height,
+      fileName: 'document.pdf',
+      pixelRatio: Math.max(1, 2 / safeZoom), // qualité 2x, indépendante du zoom
+    });
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
       <div className="flex items-center justify-between">
@@ -56,7 +75,12 @@ const TopToolbar = ({ dataSource, selectedProduct, onNewLabel }) => {
             <Save className="h-4 w-4" />
             <span>Enregistrer</span>
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded">
+          <button
+            onClick={handleExportPdf}
+            disabled={!docNode}
+            className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!docNode ? 'Document non disponible' : 'Exporter en PDF'}
+          >
             <Download className="h-4 w-4" />
             <span>Exporter</span>
           </button>

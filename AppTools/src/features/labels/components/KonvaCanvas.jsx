@@ -10,6 +10,7 @@ const KonvaCanvas = ({
   docWidth = 800,
   docHeight = 600,
   zoom = 1,
+  onDocNode, // ⬅️ pour l’export PDF
 }) => {
   const elements = useLabelStore((state) => state.elements);
   const selectedId = useLabelStore((state) => state.selectedId);
@@ -19,13 +20,19 @@ const KonvaCanvas = ({
 
   const stageRef = useRef(null);
   const transformerRef = useRef(null);
+  const docGroupRef = useRef(null);
+
+  // Remonte le node "document" vers le parent pour export PDF
+  useEffect(() => {
+    if (onDocNode) onDocNode(docGroupRef.current || null);
+  }, [onDocNode, zoom]); // notifie aussi si le scale change
 
   // Position du document (Group)
   const [docPos, setDocPos] = useState({ x: 0, y: 0 });
 
   // États de pan
-  const [panEnabled, setPanEnabled] = useState(false); // Espace enfoncée
-  const [isDragging, setIsDragging] = useState(false); // clic maintenu
+  const [panEnabled, setPanEnabled] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const panLast = useRef({ x: 0, y: 0 });
 
   // Centrer le document dans le viewport
@@ -41,7 +48,7 @@ const KonvaCanvas = ({
     centerDocument();
   }, [viewportWidth, viewportHeight, docWidth, docHeight]);
 
-  // Zoom centré sur le document
+  // Zoom (simple)
   const handleWheel = (e) => {
     e.evt.preventDefault();
     const direction = e.evt.deltaY > 0 ? 1 : -1;
@@ -51,10 +58,13 @@ const KonvaCanvas = ({
     centerDocument(newZoom);
   };
 
-  // Gestion de la touche espace
+  // Espace = pan (évite scroll de page)
   useEffect(() => {
     const down = (e) => {
-      if (e.code === 'Space') setPanEnabled(true);
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setPanEnabled(true);
+      }
     };
     const up = (e) => {
       if (e.code === 'Space') {
@@ -62,7 +72,7 @@ const KonvaCanvas = ({
         setIsDragging(false);
       }
     };
-    window.addEventListener('keydown', down);
+    window.addEventListener('keydown', down, { passive: false });
     window.addEventListener('keyup', up);
     return () => {
       window.removeEventListener('keydown', down);
@@ -70,21 +80,17 @@ const KonvaCanvas = ({
     };
   }, []);
 
-  // Gestion du curseur
+  // Curseur
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
     const c = stage.container();
-    if (isDragging) {
-      c.style.cursor = 'grabbing';
-    } else if (panEnabled) {
-      c.style.cursor = 'grab';
-    } else {
-      c.style.cursor = 'default';
-    }
+    if (isDragging) c.style.cursor = 'grabbing';
+    else if (panEnabled) c.style.cursor = 'grab';
+    else c.style.cursor = 'default';
   }, [panEnabled, isDragging]);
 
-  // Pan : clic bas (Espace ou molette)
+  // Pan : MouseDown
   const onStageMouseDown = (e) => {
     const isMiddle = e.evt.button === 1;
     if (panEnabled || isMiddle) {
@@ -94,7 +100,7 @@ const KonvaCanvas = ({
     }
   };
 
-  // Pan : mouvement
+  // Pan : Move
   const onStageMouseMove = () => {
     if (!isDragging) return;
     const stage = stageRef.current;
@@ -106,15 +112,12 @@ const KonvaCanvas = ({
     setDocPos((p) => ({ x: p.x + dx, y: p.y + dy }));
   };
 
-  // Pan : relâchement du clic
+  // Pan : Up
   const onStageMouseUp = () => {
-    if (isDragging) {
-      setIsDragging(false);
-    }
+    if (isDragging) setIsDragging(false);
   };
 
   const handleSelect = (id, locked) => {
-    // Pas de sélection pendant pan
     if (panEnabled || isDragging) return;
     if (!locked) selectElement(id);
   };
@@ -129,7 +132,7 @@ const KonvaCanvas = ({
     });
   };
 
-  // Transformer robuste
+  // Transformer
   useEffect(() => {
     const tr = transformerRef.current;
     const stage = stageRef.current;
@@ -162,14 +165,28 @@ const KonvaCanvas = ({
       onMouseMove={onStageMouseMove}
       onMouseUp={onStageMouseUp}
       onClick={(e) => {
-        if (panEnabled || isDragging) return; // pas de sélection pendant pan
+        if (panEnabled || isDragging) return;
         if (e.target === e.target.getStage()) selectElement(null);
       }}
     >
-      <Layer perfectDrawEnabled={false}>
+      <Layer listening={false} hitGraphEnabled={false} perfectDrawEnabled={false}>
         <Group x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom}>
-          {/* Document blanc, imprimable */}
           <Rect
+            x={0}
+            y={0}
+            width={docWidth}
+            height={docHeight}
+            fill="#ffffff"
+            stroke="#d1d5db"
+            strokeWidth={1 / zoom}
+            listening={false}
+          />
+        </Group>
+      </Layer>
+      <Layer perfectDrawEnabled={false}>
+        <Group ref={docGroupRef} x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom}>
+          {/* Page blanche imprimable */}
+          {/* <Rect
             x={0}
             y={0}
             width={docWidth}
@@ -184,7 +201,7 @@ const KonvaCanvas = ({
               if (!panEnabled && !isDragging) selectElement(null);
             }}
             listening={true}
-          />
+          /> */}
 
           {/* Éléments */}
           {elements.map((el) => {
@@ -215,7 +232,7 @@ const KonvaCanvas = ({
           })}
         </Group>
 
-        {/* Transformer */}
+        {/* Transformer (hors export) */}
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
@@ -225,6 +242,7 @@ const KonvaCanvas = ({
         />
       </Layer>
 
+      {/* Layer d’UI non cliquable (hors export) */}
       <Layer listening={false} hitGraphEnabled={false} perfectDrawEnabled={false} />
     </Stage>
   );

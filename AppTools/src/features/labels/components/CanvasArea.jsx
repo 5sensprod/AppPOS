@@ -3,7 +3,7 @@ import KonvaCanvas from './KonvaCanvas';
 import useLabelStore from '../store/useLabelStore';
 import PropertyPanel from './PropertyPanel';
 
-const CanvasArea = ({ dataSource, selectedProduct }) => {
+const CanvasArea = ({ dataSource, selectedProduct, onDocNodeReady }) => {
   const zoom = useLabelStore((s) => s.zoom);
   const canvasSize = useLabelStore((s) => s.canvasSize);
   const zoomIn = useLabelStore((s) => s.zoomIn);
@@ -25,6 +25,11 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
     return () => ro.disconnect();
   }, []);
 
+  // Remonte le docNode vers le parent (LabelPage)
+  const handleDocNodeReady = (node) => {
+    if (onDocNodeReady) onDocNodeReady(node);
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-900 relative overflow-hidden">
       {/* Damier plein écran */}
@@ -36,9 +41,10 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
           docWidth={canvasSize.width}
           docHeight={canvasSize.height}
           zoom={zoom}
+          onDocNode={handleDocNodeReady}
         />
 
-        {/* 🧰 PropertyPanel en overlay (ne pousse rien) */}
+        {/* 🧰 PropertyPanel en overlay */}
         {selectedId && (
           <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 z-50">
             <div className="pointer-events-auto">
@@ -48,7 +54,7 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
         )}
       </div>
 
-      {/* Contrôles zoom */}
+      {/* Contrôles zoom uniquement */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-lg shadow-lg px-3 py-2 flex items-center gap-3 border border-gray-200 dark:border-gray-700 z-50">
         <button
           onClick={zoomOut}
@@ -68,6 +74,7 @@ const CanvasArea = ({ dataSource, selectedProduct }) => {
         >
           +
         </button>
+
         <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 select-none">
           Molette : zoom • Espace : pan
         </span>

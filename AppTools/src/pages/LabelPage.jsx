@@ -12,6 +12,9 @@ const LabelPage = () => {
   const [showDataSourceSelector, setShowDataSourceSelector] = useState(true);
   const [showProductSelector, setShowProductSelector] = useState(false);
 
+  // État pour stocker le docNode du canvas
+  const [docNode, setDocNode] = useState(null);
+
   const { dataSource, selectedProduct, setDataSource, clearCanvas } = useLabelStore();
 
   const handleDataSourceSelect = (source) => {
@@ -56,6 +59,7 @@ const LabelPage = () => {
         dataSource={dataSource}
         selectedProduct={selectedProduct}
         onNewLabel={handleNewLabel}
+        docNode={docNode}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -66,7 +70,11 @@ const LabelPage = () => {
           selectedProduct={selectedProduct}
         />
 
-        <CanvasArea dataSource={dataSource} selectedProduct={selectedProduct} />
+        <CanvasArea
+          dataSource={dataSource}
+          selectedProduct={selectedProduct}
+          onDocNodeReady={setDocNode}
+        />
       </div>
     </div>
   );
