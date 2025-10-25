@@ -22,8 +22,16 @@ const useLabelStore = create((set, get) => ({
   // --- verrou : le canvas suit la taille d'une cellule de planche
   lockCanvasToSheetCell: false,
 
-  // --- méta planche (pour que FormatPanel sache si on est en A4, etc.)
-  // id ex: 'a4-portrait' | 'a4-landscape' | ...
+  // --- réglages de planche (PERSISTENT tant que l'app tourne)
+  sheetSettings: {
+    selectedSheetId: 'a4-portrait', // 'a4-portrait' | 'a4-landscape'
+    rows: 2,
+    cols: 2,
+    margin: 10, // en pt (affiché en mm si A4)
+    spacing: 5, // en pt (affiché en mm si A4)
+  },
+
+  // --- méta planche (pour conversions mm & synchronisation UI)
   sheetMeta: {
     id: null,
     widthPt: null,
@@ -33,7 +41,7 @@ const useLabelStore = create((set, get) => ({
     margin: null,
     spacing: null,
   },
-  // taille de cellule en points (utile pour conversion mm dans FormatPanel)
+  // taille de cellule en points (utile pour conversion mm)
   cellPt: { width: null, height: null },
 
   // --- historique
@@ -229,6 +237,16 @@ const useLabelStore = create((set, get) => ({
     }),
 
   setCellPt: (w, h) => set({ cellPt: { width: w ?? null, height: h ?? null } }),
+
+  // --- setters pour sheetSettings (persistants)
+  setSheetSettings(partial) {
+    const prev = get().sheetSettings;
+    set({ sheetSettings: { ...prev, ...(partial || {}) } });
+  },
+  setSelectedSheetId(id) {
+    const prev = get().sheetSettings;
+    set({ sheetSettings: { ...prev, selectedSheetId: id } });
+  },
 }));
 
 export default useLabelStore;

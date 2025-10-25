@@ -1,5 +1,5 @@
 // src/features/labels/components/templates/SheetPanel.jsx
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useMemo, useCallback, useEffect } from 'react';
 import { Grid3x3, Download, Package } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
 import { exportPdfSheet } from '../../utils/exportPdfSheet';
@@ -34,30 +34,36 @@ const toMm = (pt, digits = 1) => {
 };
 
 const SheetPanel = ({ docNode }) => {
-  // Sélecteurs du store
+  // ----- store
   const canvasSize = useLabelStore((state) => state.canvasSize);
   const dataSource = useLabelStore((state) => state.dataSource);
   const selectedProducts = useLabelStore((state) => state.selectedProducts ?? []);
+
+  const sheetSettings = useLabelStore((s) => s.sheetSettings);
+  const setSheetSettings = useLabelStore((s) => s.setSheetSettings);
+  const setSelectedSheetId = useLabelStore((s) => s.setSelectedSheetId);
+
   const setCanvasSize = useLabelStore((s) => s.setCanvasSize);
   const lockCanvasToSheetCell = useLabelStore((s) => s.lockCanvasToSheetCell);
   const setLockCanvasToSheetCell = useLabelStore((s) => s.setLockCanvasToSheetCell);
   const setSheetMeta = useLabelStore((s) => s.setSheetMeta);
   const setCellPt = useLabelStore((s) => s.setCellPt);
 
-  // États UI
-  const [selectedSheet, setSelectedSheet] = useState(SHEET_FORMATS[0]);
-  const [rows, setRows] = useState(2);
-  const [cols, setCols] = useState(2);
-  const [margin, setMargin] = useState(10);
-  const [spacing, setSpacing] = useState(5);
+  // ----- dérivés depuis le store
+  const selectedSheet =
+    SHEET_FORMATS.find((f) => f.id === sheetSettings.selectedSheetId) || SHEET_FORMATS[0];
 
-  // Dérivés
+  const rows = sheetSettings.rows;
+  const cols = sheetSettings.cols;
+  const margin = sheetSettings.margin;
+  const spacing = sheetSettings.spacing;
+
   const productCount = Array.isArray(selectedProducts) ? selectedProducts.length : 0;
   const isMultiProduct = dataSource === 'data' && productCount > 1;
   const totalCells = rows * cols;
   const isA4 = selectedSheet.id.startsWith('a4-');
 
-  // Calcul automatique des dimensions de cellule (en points)
+  // ----- calculs
   const cellSize = useMemo(() => {
     const availableWidth = selectedSheet.width - 2 * margin - (cols - 1) * spacing;
     const availableHeight = selectedSheet.height - 2 * margin - (rows - 1) * spacing;
@@ -67,7 +73,13 @@ const SheetPanel = ({ docNode }) => {
     };
   }, [selectedSheet, rows, cols, margin, spacing]);
 
-  // Informer le store (FormatPanel en a besoin pour afficher en mm en mode planche A4)
+  const scale = useMemo(() => {
+    const scaleX = cellSize.width / canvasSize.width;
+    const scaleY = cellSize.height / canvasSize.height;
+    return Math.min(scaleX, scaleY, 1);
+  }, [cellSize, canvasSize]);
+
+  // informer le store (FormatPanel & mm)
   useEffect(() => {
     setSheetMeta({
       id: selectedSheet.id,
@@ -91,14 +103,7 @@ const SheetPanel = ({ docNode }) => {
     setCellPt,
   ]);
 
-  // Calcul du scaling pour adapter le document à la cellule (borné à 1)
-  const scale = useMemo(() => {
-    const scaleX = cellSize.width / canvasSize.width;
-    const scaleY = cellSize.height / canvasSize.height;
-    return Math.min(scaleX, scaleY, 1);
-  }, [cellSize, canvasSize]);
-
-  // Auto-sync: si activé, le canvas prend automatiquement la taille d'une cellule
+  // auto-sync canvas = cellule
   useEffect(() => {
     if (!lockCanvasToSheetCell) return;
     const w = Math.max(1, cellSize.width);
@@ -115,17 +120,22 @@ const SheetPanel = ({ docNode }) => {
     setCanvasSize,
   ]);
 
-  // Adapter la grille au nombre de produits (distribution "carrée")
+  // ----- handlers
+  const handleSetSheet = useCallback(
+    (format) => {
+      setSelectedSheetId(format.id);
+    },
+    [setSelectedSheetId]
+  );
+
   const handleAdaptGrid = useCallback(() => {
     if (productCount <= 1) return;
     const root = Math.sqrt(productCount);
     const nextRows = Math.ceil(root);
     const nextCols = Math.ceil(productCount / nextRows);
-    setRows(nextRows);
-    setCols(nextCols);
-  }, [productCount]);
+    setSheetSettings({ rows: nextRows, cols: nextCols });
+  }, [productCount, setSheetSettings]);
 
-  // Export PDF (silencieux si docNode manquant)
   const handleExport = useCallback(() => {
     if (!docNode) return;
     exportPdfSheet(docNode, {
@@ -139,7 +149,6 @@ const SheetPanel = ({ docNode }) => {
       spacing,
       fileName: `planche-${cols}x${rows}.pdf`,
       products: isMultiProduct ? selectedProducts : null,
-      // QR non lié = commun par défaut
       qrPerProductWhenUnbound: false,
     });
   }, [
@@ -154,7 +163,7 @@ const SheetPanel = ({ docNode }) => {
     selectedProducts,
   ]);
 
-  // Styles du preview (mémoisés)
+  // ----- UI
   const previewStyle = useMemo(
     () => ({
       width: '200px',
@@ -204,7 +213,7 @@ const SheetPanel = ({ docNode }) => {
           {SHEET_FORMATS.map((format) => (
             <button
               key={format.id}
-              onClick={() => setSelectedSheet(format)}
+              onClick={() => handleSetSheet(format)}
               className={`p-3 border rounded-lg transition-all ${
                 selectedSheet.id === format.id
                   ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
@@ -213,8 +222,7 @@ const SheetPanel = ({ docNode }) => {
             >
               <div className="text-sm font-medium">{format.label}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                {/* Affichage mm si A4 */}
-                {isA4 ? (
+                {format.id.startsWith('a4-') ? (
                   <>
                     {toMm(format.width, 0)} × {toMm(format.height, 0)} mm
                   </>
@@ -238,10 +246,7 @@ const SheetPanel = ({ docNode }) => {
           {GRID_PRESETS.map((preset) => (
             <button
               key={preset.label}
-              onClick={() => {
-                setRows(preset.rows);
-                setCols(preset.cols);
-              }}
+              onClick={() => setSheetSettings({ rows: preset.rows, cols: preset.cols })}
               className={`p-2 border rounded text-sm font-medium transition-all ${
                 rows === preset.rows && cols === preset.cols
                   ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
@@ -263,7 +268,9 @@ const SheetPanel = ({ docNode }) => {
             <input
               type="number"
               value={rows}
-              onChange={(e) => setRows(clampInt(e.target.value, { min: 1, max: 10 }))}
+              onChange={(e) =>
+                setSheetSettings({ rows: clampInt(e.target.value, { min: 1, max: 10 }) })
+              }
               min="1"
               max="10"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
@@ -274,7 +281,9 @@ const SheetPanel = ({ docNode }) => {
             <input
               type="number"
               value={cols}
-              onChange={(e) => setCols(clampInt(e.target.value, { min: 1, max: 10 }))}
+              onChange={(e) =>
+                setSheetSettings({ cols: clampInt(e.target.value, { min: 1, max: 10 }) })
+              }
               min="1"
               max="10"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
@@ -287,7 +296,9 @@ const SheetPanel = ({ docNode }) => {
             <input
               type="number"
               value={margin}
-              onChange={(e) => setMargin(clampInt(e.target.value, { min: 0, max: 50 }))}
+              onChange={(e) =>
+                setSheetSettings({ margin: clampInt(e.target.value, { min: 0, max: 50 }) })
+              }
               min="0"
               max="50"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
@@ -300,14 +311,15 @@ const SheetPanel = ({ docNode }) => {
             <input
               type="number"
               value={spacing}
-              onChange={(e) => setSpacing(clampInt(e.target.value, { min: 0, max: 50 }))}
+              onChange={(e) =>
+                setSheetSettings({ spacing: clampInt(e.target.value, { min: 0, max: 50 }) })
+              }
               min="0"
               max="50"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
             />
           </div>
         </div>
-        {/* NB: on stocke toujours en points; ici on ne change que l'affichage */}
         {isA4 && (
           <div className="text-[11px] text-gray-500">
             * Les valeurs saisies restent en points (pt). Affichage converti en millimètres pour
