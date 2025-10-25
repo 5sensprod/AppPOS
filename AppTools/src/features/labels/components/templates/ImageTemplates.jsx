@@ -157,7 +157,7 @@ const ImageTemplates = ({ selectedProduct }) => {
   // 🖼️ Mode : Images Produit
   if (showMode === 'product' && selectedProduct) {
     return (
-      <div className="p-4 space-y-4">
+      <div className="p-3 space-y-4">
         {/* Header avec bouton retour */}
         <div className="flex items-center justify-between">
           <button
@@ -196,7 +196,7 @@ const ImageTemplates = ({ selectedProduct }) => {
               <p className="text-sm text-gray-500">Aucune image pour ce produit</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               {productImages.map((image) => (
                 <button
                   key={image.id}
@@ -253,7 +253,7 @@ const ImageTemplates = ({ selectedProduct }) => {
 
   // 📚 Mode : Bibliothèque d'images
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-3 space-y-4">
       {/* Info */}
       <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
         <div className="flex items-start gap-2">
@@ -314,7 +314,7 @@ const ImageTemplates = ({ selectedProduct }) => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {availableImages.map((image) => (
               <button
                 key={image.filename}

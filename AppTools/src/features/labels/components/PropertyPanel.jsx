@@ -1,9 +1,9 @@
 // src/features/labels/components/PropertyPanel.jsx
 import React from 'react';
-import { X, Palette, Link, Unlink } from 'lucide-react';
+import { X, Palette, Link, Unlink, Sparkles } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
 
-const PropertyPanel = ({ selectedProduct }) => {
+const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
   const elements = useLabelStore((s) => s.elements);
   const selectedId = useLabelStore((s) => s.selectedId);
   const updateElement = useLabelStore((s) => s.updateElement);
@@ -117,125 +117,9 @@ const PropertyPanel = ({ selectedProduct }) => {
     updateElement(selectedId, { opacity: parseFloat(value) });
   };
 
-  // ===================== OMBRES (communes à tous les types) =====================
-  const toggleShadow = (enabled) => updateElement(selectedId, { shadowEnabled: enabled });
-  const changeShadowColor = (value) => updateElement(selectedId, { shadowColor: value });
-  const changeShadowOpacity = (value) =>
-    updateElement(selectedId, { shadowOpacity: parseFloat(value) });
-  const changeShadowBlur = (value) => updateElement(selectedId, { shadowBlur: parseFloat(value) });
-  const changeShadowOffsetX = (value) =>
-    updateElement(selectedId, { shadowOffsetX: parseFloat(value) });
-  const changeShadowOffsetY = (value) =>
-    updateElement(selectedId, { shadowOffsetY: parseFloat(value) });
-
-  const applyShadowToAll = () => {
-    const {
-      shadowEnabled = false,
-      shadowColor = '#000000',
-      shadowOpacity = 0.4,
-      shadowBlur = 8,
-      shadowOffsetX = 2,
-      shadowOffsetY = 2,
-    } = selectedElement || {};
-    elements.forEach((el) =>
-      updateElement(el.id, {
-        shadowEnabled,
-        shadowColor,
-        shadowOpacity,
-        shadowBlur,
-        shadowOffsetX,
-        shadowOffsetY,
-      })
-    );
-  };
-  // ==============================================================================
-
   return (
     <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
       <div className="flex items-center gap-4 px-3 py-2 max-w-4xl w-[min(90vw,800px)]">
-        {/* 🟣 Ombres – commun à tous */}
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input
-              type="checkbox"
-              checked={!!selectedElement.shadowEnabled}
-              onChange={(e) => toggleShadow(e.target.checked)}
-            />
-            Ombre
-          </label>
-
-          <input
-            type="color"
-            value={selectedElement.shadowColor ?? '#000000'}
-            onChange={(e) => changeShadowColor(e.target.value)}
-            className="w-10 h-8 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
-            disabled={!selectedElement.shadowEnabled}
-            title="Couleur"
-          />
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Opacité</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={selectedElement.shadowOpacity ?? 0.4}
-              onChange={(e) => changeShadowOpacity(e.target.value)}
-              className="w-24"
-              disabled={!selectedElement.shadowEnabled}
-            />
-            <span className="text-xs text-gray-500 w-8">
-              {Math.round((selectedElement.shadowOpacity ?? 0.4) * 100)}%
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Flou</span>
-            <input
-              type="range"
-              min={0}
-              max={40}
-              step={1}
-              value={selectedElement.shadowBlur ?? 8}
-              onChange={(e) => changeShadowBlur(e.target.value)}
-              className="w-24"
-              disabled={!selectedElement.shadowEnabled}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Offset X</span>
-            <input
-              type="number"
-              value={selectedElement.shadowOffsetX ?? 2}
-              onChange={(e) => changeShadowOffsetX(e.target.value)}
-              className="w-16 px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700"
-              disabled={!selectedElement.shadowEnabled}
-            />
-            <span className="text-xs text-gray-500">Y</span>
-            <input
-              type="number"
-              value={selectedElement.shadowOffsetY ?? 2}
-              onChange={(e) => changeShadowOffsetY(e.target.value)}
-              className="w-16 px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700"
-              disabled={!selectedElement.shadowEnabled}
-            />
-          </div>
-
-          <button
-            onClick={applyShadowToAll}
-            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-            disabled={!selectedElement.shadowEnabled}
-            title="Appliquer l'ombre à tous les éléments"
-          >
-            Appliquer à tous
-          </button>
-        </div>
-
-        {/* Séparateur */}
-        <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
-
         {/* Color Picker - Uniquement pour Text et QRCode */}
         {(isText || isQRCode) && (
           <div className="flex items-center gap-2">
@@ -399,10 +283,22 @@ const PropertyPanel = ({ selectedProduct }) => {
             </>
           )}
 
+        {/* Bouton Effets */}
+        {onOpenEffects && (
+          <button
+            onClick={onOpenEffects}
+            className="ml-auto px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors flex items-center gap-2 shrink-0"
+            title="Ouvrir le panneau Effets"
+          >
+            <Sparkles className="h-4 w-4" />
+            Effets
+          </button>
+        )}
+
         {/* Fermer */}
         <button
           onClick={clearSelection}
-          className="ml-auto p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded shrink-0"
+          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded shrink-0"
           title="Fermer"
         >
           <X className="h-4 w-4" />

@@ -13,6 +13,7 @@ import {
   QrCode,
   Upload,
   Barcode,
+  Sparkles,
 } from 'lucide-react';
 
 import TextTemplates from './templates/TextTemplates';
@@ -25,25 +26,47 @@ import SheetPanel from './templates/SheetPanel';
 import QRCodeTemplates from './templates/QRCodeTemplates';
 import UploadTemplate from './templates/UploadTemplate';
 import BarcodeTemplates from './templates/BarcodeTemplates';
+import EffectsTemplates from './templates/EffectsTemplates';
 
-const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProduct, docNode }) => {
-  const [selectedTool, setSelectedTool] = useState(null);
+const ToolsSidebar = ({
+  isCollapsed,
+  onToggleCollapse,
+  dataSource,
+  selectedProduct,
+  docNode,
+  selectedTool: externalSelectedTool, // 🆕 Outil sélectionné depuis l'extérieur (optionnel)
+  onToolChange, // 🆕 Callback pour notifier le parent (optionnel)
+}) => {
+  const [internalSelectedTool, setInternalSelectedTool] = useState(null);
+
+  // Utiliser selectedTool externe s'il est fourni, sinon utiliser l'état interne
+  const selectedTool =
+    externalSelectedTool !== undefined ? externalSelectedTool : internalSelectedTool;
 
   const tools = [
     { id: 'text', label: 'Texte', icon: Type, component: TextTemplates },
-    { id: 'upload', label: 'Upload', icon: Upload, component: UploadTemplate }, // 👈 Nouveau (avant Image)
+    { id: 'upload', label: 'Upload', icon: Upload, component: UploadTemplate },
     { id: 'image', label: 'Images', icon: ImageIcon, component: ImageTemplates },
     { id: 'shape', label: 'Forme', icon: Shapes, component: ShapeTemplates },
     { id: 'table', label: 'Tableau', icon: Table2, component: TableTemplates },
     { id: 'qrcode', label: 'QR Code', icon: QrCode, component: QRCodeTemplates },
     { id: 'barcode', label: 'Code-barres', icon: Barcode, component: BarcodeTemplates },
+    { id: 'effects', label: 'Effets', icon: Sparkles, component: EffectsTemplates },
     { id: 'layers', label: 'Calques', icon: Layers, component: LayersPanel },
     { id: 'format', label: 'Format', icon: Maximize2, component: FormatPanel },
     { id: 'sheet', label: 'Planche', icon: Grid3x3, component: SheetPanel },
   ];
 
   const handleToolClick = (toolId) => {
-    setSelectedTool(toolId === selectedTool ? null : toolId);
+    const newTool = toolId === selectedTool ? null : toolId;
+
+    // Si un callback est fourni, l'appeler (mode contrôlé)
+    if (onToolChange) {
+      onToolChange(newTool);
+    } else {
+      // Sinon, gérer l'état en interne (mode non contrôlé)
+      setInternalSelectedTool(newTool);
+    }
   };
 
   // Callback pour gérer la sélection d'image depuis UploadTemplate
@@ -62,7 +85,7 @@ const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProdu
             key={tool.id}
             onClick={() => {
               onToggleCollapse();
-              setSelectedTool(tool.id);
+              handleToolClick(tool.id);
             }}
             className="p-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
             title={tool.label}
@@ -78,7 +101,7 @@ const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProdu
   const SelectedComponent = tools.find((t) => t.id === selectedTool)?.component;
 
   return (
-    <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex">
+    <div className="w-[400px] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex overflow-hidden">
       {/* Barre d'icônes */}
       <div className="w-16 border-r border-gray-200 dark:border-gray-700 flex flex-col items-center py-4 gap-2">
         {tools.map((tool) => (
@@ -98,14 +121,14 @@ const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProdu
       </div>
 
       {/* Zone de templates */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-x-hidden">
         {selectedTool ? (
           <>
             {/* Header */}
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setSelectedTool(null)}
+                  onClick={() => handleToolClick(null)}
                   className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -123,7 +146,7 @@ const ToolsSidebar = ({ isCollapsed, onToggleCollapse, dataSource, selectedProdu
             </div>
 
             {/* Templates */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">
               {SelectedComponent && (
                 <SelectedComponent
                   dataSource={dataSource}

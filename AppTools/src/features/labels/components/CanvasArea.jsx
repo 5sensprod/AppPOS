@@ -4,7 +4,7 @@ import KonvaCanvas from './KonvaCanvas';
 import useLabelStore from '../store/useLabelStore';
 import PropertyPanel from './PropertyPanel';
 
-const CanvasArea = ({ dataSource, selectedProduct, onDocNodeReady }) => {
+const CanvasArea = ({ dataSource, selectedProduct, onDocNodeReady, onOpenEffects }) => {
   const zoom = useLabelStore((s) => s.zoom);
   const canvasSize = useLabelStore((s) => s.canvasSize);
   const zoomIn = useLabelStore((s) => s.zoomIn);
@@ -19,10 +19,12 @@ const CanvasArea = ({ dataSource, selectedProduct, onDocNodeReady }) => {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+
     const ro = new ResizeObserver((entries) => {
       const cr = entries[0].contentRect;
       setViewport({ width: Math.floor(cr.width), height: Math.floor(cr.height) });
     });
+
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -57,7 +59,10 @@ const CanvasArea = ({ dataSource, selectedProduct, onDocNodeReady }) => {
         {selectedId && (
           <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 z-50">
             <div className="pointer-events-auto">
-              <PropertyPanel selectedProduct={selectedProduct} />
+              <PropertyPanel
+                selectedProduct={selectedProduct}
+                onOpenEffects={onOpenEffects} // 🆕 Passer la fonction
+              />
             </div>
           </div>
         )}
@@ -83,7 +88,6 @@ const CanvasArea = ({ dataSource, selectedProduct, onDocNodeReady }) => {
         >
           +
         </button>
-
         <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 select-none">
           Molette : zoom • Espace : pan
         </span>

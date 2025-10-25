@@ -8,6 +8,7 @@ import ProductSelector from '../features/labels/components/ProductSelector';
 import useLabelStore from '../features/labels/store/useLabelStore';
 
 const LabelPage = () => {
+  // 🔴 SUPPRIMÉ : const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showDataSourceSelector, setShowDataSourceSelector] = useState(true);
   const [showProductSelector, setShowProductSelector] = useState(false);
@@ -15,6 +16,9 @@ const LabelPage = () => {
 
   // État pour stocker le docNode du canvas
   const [docNode, setDocNode] = useState(null);
+
+  // 🆕 État pour l'outil sélectionné dans la sidebar
+  const [selectedTool, setSelectedTool] = useState(null);
 
   const {
     dataSource,
@@ -24,6 +28,14 @@ const LabelPage = () => {
     setSelectedProducts,
     clearCanvas,
   } = useLabelStore();
+
+  // ✅ CORRIGÉ : Utiliser isSidebarCollapsed au lieu de sidebarCollapsed
+  const handleOpenEffects = () => {
+    if (isSidebarCollapsed) {
+      setIsSidebarCollapsed(false);
+    }
+    setSelectedTool('effects');
+  };
 
   const handleDataSourceSelect = (source) => {
     setDataSource(source, null);
@@ -88,6 +100,8 @@ const LabelPage = () => {
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           dataSource={dataSource}
           selectedProduct={displayProduct}
+          selectedTool={selectedTool}
+          onToolChange={setSelectedTool}
           docNode={docNode}
         />
 
@@ -95,6 +109,7 @@ const LabelPage = () => {
           dataSource={dataSource}
           selectedProduct={displayProduct}
           onDocNodeReady={setDocNode}
+          onOpenEffects={handleOpenEffects}
         />
       </div>
     </div>
