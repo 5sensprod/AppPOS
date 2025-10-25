@@ -2,66 +2,45 @@
 
 /**
  * Calcule les bounds d'un élément à partir du node Konva si disponible
- * Sinon, fait une estimation
+ * Inspiré de Polotno SDK pour plus de précision
  */
 export const getElementBounds = (element, konvaNode = null) => {
-  const scaleX = element.scaleX || 1;
-  const scaleY = element.scaleY || 1;
   const x = element.x || 0;
   const y = element.y || 0;
 
-  // 🔥 Si on a le node Konva, utiliser ses vraies dimensions
+  // 🔥 Si on a le node Konva, TOUJOURS l'utiliser (méthode Polotno)
   if (konvaNode) {
     try {
-      // Pour les Group (QRCode, Barcode), on doit calculer différemment
-      const isGroup = konvaNode.getClassName?.() === 'Group';
+      // ✅ getClientRect avec skipTransform: false pour avoir les vraies dimensions
+      const box = konvaNode.getClientRect({
+        skipTransform: false, // Prendre en compte toutes les transformations
+        skipStroke: false,
+        skipShadow: true, // Ignorer l'ombre pour le snap
+        relativeTo: konvaNode.getParent(),
+      });
 
-      if (isGroup) {
-        // Pour un Group, utiliser les dimensions des enfants
-        const children = konvaNode.getChildren();
-        if (children.length > 0) {
-          // Prendre le premier enfant (l'image)
-          const child = children[0];
-          const childWidth = child.width() * (element.scaleX || 1);
-          const childHeight = child.height() * (element.scaleY || 1);
-
-          return {
-            x,
-            y,
-            width: childWidth,
-            height: childHeight,
-            centerX: x + childWidth / 2,
-            centerY: y + childHeight / 2,
-            right: x + childWidth,
-            bottom: y + childHeight,
-          };
-        }
-      } else {
-        // Pour les nodes simples (Text, Image), utiliser getClientRect
-        const box = konvaNode.getClientRect({
-          skipTransform: true,
-          skipStroke: false,
-          relativeTo: konvaNode.getParent(),
-        });
-
-        return {
-          x,
-          y,
-          width: box.width,
-          height: box.height,
-          centerX: x + box.width / 2,
-          centerY: y + box.height / 2,
-          right: x + box.width,
-          bottom: y + box.height,
-        };
-      }
+      // 🎯 Retourner les bounds EXACTES du node
+      return {
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+        centerX: box.x + box.width / 2,
+        centerY: box.y + box.height / 2,
+        right: box.x + box.width,
+        bottom: box.y + box.height,
+      };
     } catch (err) {
-      console.warn('Erreur getClientRect:', err);
-      // Fallback sur l'estimation si erreur
+      console.warn('Erreur getClientRect pour', element.id, err);
+      // Fallback sur l'estimation
     }
   }
 
-  // Estimation manuelle si pas de node ou si erreur
+  // 🆘 Fallback : estimation manuelle si pas de node
+  const scaleX = element.scaleX || 1;
+  const scaleY = element.scaleY || 1;
+  const rotation = element.rotation || 0;
+
   let width = 0;
   let height = 0;
 
@@ -69,7 +48,6 @@ export const getElementBounds = (element, konvaNode = null) => {
     case 'text': {
       const fontSize = element.fontSize || 16;
       const text = element.text || '';
-      // Ratio moyen : ~0.55 pour la plupart des polices
       width = text.length * fontSize * 0.55;
       height = fontSize;
       break;
@@ -91,27 +69,47 @@ export const getElementBounds = (element, konvaNode = null) => {
       height = 100;
   }
 
+  // Appliquer les scales
+  width *= scaleX;
+  height *= scaleY;
+
+  // Gérer la rotation (si nécessaire)
+  if (rotation !== 0) {
+    const rad = (rotation * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    const rotatedWidth = width * cos + height * sin;
+    const rotatedHeight = width * sin + height * cos;
+
+    return {
+      x,
+      y,
+      width: rotatedWidth,
+      height: rotatedHeight,
+      centerX: x + rotatedWidth / 2,
+      centerY: y + rotatedHeight / 2,
+      right: x + rotatedWidth,
+      bottom: y + rotatedHeight,
+    };
+  }
+
   return {
     x,
     y,
-    width: width * scaleX,
-    height: height * scaleY,
-    centerX: x + (width * scaleX) / 2,
-    centerY: y + (height * scaleY) / 2,
-    right: x + width * scaleX,
-    bottom: y + height * scaleY,
+    width,
+    height,
+    centerX: x + width / 2,
+    centerY: y + height / 2,
+    right: x + width,
+    bottom: y + height,
   };
 };
 
 /**
- * Génère les guides d'alignement entre l'élément déplacé et les autres
- * @param {object} movingElement - L'élément en cours de déplacement
- * @param {object} movingNode - Le node Konva en mouvement (pour vraies dimensions)
- * @param {array} otherElements - Tous les autres éléments
- * @param {object} canvasSize - { width, height } du canvas
- * @param {number} snapThreshold - Distance de snap en pixels (défaut: 5)
- * @param {Function} findNodeById - Fonction pour trouver un node Konva par ID
- * @returns {object} { guides: [], snapX: null, snapY: null }
+ * Génère les guides d'alignement (approche Polotno/Figma)
+ * - Snap uniquement entre éléments + centre du canvas
+ * - Guides uniquement si distance < threshold
+ * - Priorité aux alignements les plus proches
  */
 export const calculateSnapGuides = (
   movingElement,
@@ -123,12 +121,14 @@ export const calculateSnapGuides = (
 ) => {
   if (!movingElement) return { guides: [], snapX: null, snapY: null };
 
+  // 🎯 Récupérer les bounds de l'élément en mouvement
   const movingBounds = getElementBounds(movingElement, movingNode);
+
   const guides = [];
   let snapX = null;
   let snapY = null;
-  let minDistX = Infinity;
-  let minDistY = Infinity;
+  let minDistX = snapThreshold;
+  let minDistY = snapThreshold;
 
   // Points de référence pour l'élément en mouvement
   const movingPoints = {
@@ -140,39 +140,57 @@ export const calculateSnapGuides = (
     bottom: movingBounds.bottom,
   };
 
-  // 🎯 Ajouter le centre du canvas comme référence PRIORITAIRE
+  // 🆕 Références du canvas : centre + bords
   const canvasCenterRef = {
-    x: canvasSize.width / 2,
-    y: canvasSize.height / 2,
-    width: 0,
-    height: 0,
     type: 'canvas-center',
-    // Points d'alignement du centre
     centerX: canvasSize.width / 2,
     centerY: canvasSize.height / 2,
   };
 
-  // Ajouter les bords du canvas comme références
-  const canvasReferences = [
-    { x: 0, y: 0, width: canvasSize.width, height: canvasSize.height, type: 'canvas' },
-    canvasCenterRef, // 🆕 Centre du canvas
-  ];
+  const canvasEdgesRef = {
+    type: 'canvas-edges',
+    left: 0,
+    right: canvasSize.width,
+    top: 0,
+    bottom: canvasSize.height,
+    centerX: canvasSize.width / 2,
+    centerY: canvasSize.height / 2,
+  };
 
-  const allReferences = [...otherElements, ...canvasReferences];
+  // ✅ Snap avec : autres éléments + centre canvas + bords canvas
+  const allReferences = [...otherElements, canvasCenterRef, canvasEdgesRef];
 
   allReferences.forEach((ref) => {
-    // 🔥 Essayer de trouver le node Konva de la référence pour plus de précision
-    const refNode = findNodeById && ref.id ? findNodeById(ref.id) : null;
-    const refBounds = getElementBounds(ref, refNode);
+    let refPoints;
 
-    const refPoints = {
-      left: refBounds.x,
-      centerX: refBounds.centerX,
-      right: refBounds.right,
-      top: refBounds.y,
-      centerY: refBounds.centerY,
-      bottom: refBounds.bottom,
-    };
+    if (ref.type === 'canvas-center') {
+      // Pour le centre du canvas : uniquement le point central
+      refPoints = {
+        centerX: ref.centerX,
+        centerY: ref.centerY,
+      };
+    } else if (ref.type === 'canvas-edges') {
+      // Pour les bords du canvas : tous les points sauf le centre (déjà géré par canvas-center)
+      refPoints = {
+        left: ref.left,
+        right: ref.right,
+        top: ref.top,
+        bottom: ref.bottom,
+      };
+    } else {
+      // Pour les autres éléments : tous les points d'alignement
+      const refNode = findNodeById && ref.id ? findNodeById(ref.id) : null;
+      const refBounds = getElementBounds(ref, refNode);
+
+      refPoints = {
+        left: refBounds.x,
+        centerX: refBounds.centerX,
+        right: refBounds.right,
+        top: refBounds.y,
+        centerY: refBounds.centerY,
+        bottom: refBounds.bottom,
+      };
+    }
 
     // Vérifier alignement horizontal (X)
     Object.entries(movingPoints).forEach(([movingKey, movingVal]) => {
@@ -183,11 +201,17 @@ export const calculateSnapGuides = (
 
         const dist = Math.abs(movingVal - refVal);
 
-        if (dist < snapThreshold && dist < minDistX) {
+        // 🎯 Uniquement si c'est le plus proche ET en dessous du threshold
+        if (dist <= minDistX) {
           minDistX = dist;
-          snapX = refVal - (movingVal - movingBounds.x); // Ajuster la position X
+          snapX = refVal - (movingVal - movingBounds.x);
 
-          // Créer le guide vertical qui traverse tout le canvas
+          // Supprimer les anciens guides X et ajouter le nouveau
+          const existingIndex = guides.findIndex((g) => g.type === 'vertical');
+          if (existingIndex >= 0) {
+            guides.splice(existingIndex, 1);
+          }
+
           guides.push({
             type: 'vertical',
             x: refVal,
@@ -207,11 +231,17 @@ export const calculateSnapGuides = (
 
         const dist = Math.abs(movingVal - refVal);
 
-        if (dist < snapThreshold && dist < minDistY) {
+        // 🎯 Uniquement si c'est le plus proche ET en dessous du threshold
+        if (dist <= minDistY) {
           minDistY = dist;
-          snapY = refVal - (movingVal - movingBounds.y); // Ajuster la position Y
+          snapY = refVal - (movingVal - movingBounds.y);
 
-          // Créer le guide horizontal qui traverse tout le canvas
+          // Supprimer les anciens guides Y et ajouter le nouveau
+          const existingIndex = guides.findIndex((g) => g.type === 'horizontal');
+          if (existingIndex >= 0) {
+            guides.splice(existingIndex, 1);
+          }
+
           guides.push({
             type: 'horizontal',
             y: refVal,
@@ -223,18 +253,8 @@ export const calculateSnapGuides = (
     });
   });
 
-  // Éliminer les guides en double
-  const uniqueGuides = guides.reduce((acc, guide) => {
-    const key = guide.type === 'vertical' ? `v-${guide.x.toFixed(1)}` : `h-${guide.y.toFixed(1)}`;
-
-    if (!acc.has(key)) {
-      acc.set(key, guide);
-    }
-    return acc;
-  }, new Map());
-
   return {
-    guides: Array.from(uniqueGuides.values()),
+    guides, // Déjà dédupliqués par le remplacement ci-dessus
     snapX: minDistX < snapThreshold ? snapX : null,
     snapY: minDistY < snapThreshold ? snapY : null,
   };
