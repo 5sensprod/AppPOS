@@ -28,6 +28,8 @@ const BarcodeNode = ({
   lineColor = '#000000',
   draggable = false,
   onClick,
+  onDragStart, // 🆕 Ajouté pour les guides
+  onDragMove, // 🆕 Ajouté pour les guides
   onDragEnd,
   onTransformEnd,
   scaleX = 1,
@@ -118,6 +120,8 @@ const BarcodeNode = ({
       draggable={draggable}
       onClick={onClick}
       onTap={onClick}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       onTransformEnd={onTransformEnd}
       scaleX={scaleX}

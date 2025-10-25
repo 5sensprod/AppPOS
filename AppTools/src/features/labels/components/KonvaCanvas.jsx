@@ -7,11 +7,12 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
-import { Stage, Layer, Group, Rect, Text, Transformer } from 'react-konva';
+import { Stage, Layer, Group, Rect, Text, Transformer, Line } from 'react-konva';
 import useLabelStore from '../store/useLabelStore';
 import QRCodeNode from './canvas/QRCodeNode';
 import ImageNode from './canvas/ImageNode';
 import BarcodeNode from './canvas/BarcodeNode';
+import { calculateSnapGuides } from '../utils/snapGuides.utils';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -25,12 +26,13 @@ const KonvaCanvas = forwardRef(
     const selectElement = useLabelStore((state) => state.selectElement);
     const updateElement = useLabelStore((state) => state.updateElement);
     const setZoom = useLabelStore((state) => state.setZoom);
+    const canvasSize = useLabelStore((state) => state.canvasSize);
 
     const stageRef = useRef(null);
     const transformerRef = useRef(null);
     const docGroupRef = useRef(null);
 
-    // 🆕 Exposer la ref du Stage au parent
+    // Exposer la ref du Stage au parent
     useImperativeHandle(ref, () => stageRef.current, []);
 
     // Remonte le node "document" vers le parent pour export PDF
@@ -40,6 +42,15 @@ const KonvaCanvas = forwardRef(
 
     // Position du document (Group)
     const [docPos, setDocPos] = useState({ x: 0, y: 0 });
+
+    // 🆕 Guides d'alignement
+    const [snapGuides, setSnapGuides] = useState([]);
+    const [isDraggingElement, setIsDraggingElement] = useState(false);
+
+    // 🆕 Helper pour trouver un node par ID
+    const findNodeById = useCallback((id) => {
+      return stageRef.current?.findOne(`#${id}`);
+    }, []);
 
     // États de pan
     const [panEnabled, setPanEnabled] = useState(false);
@@ -145,6 +156,57 @@ const KonvaCanvas = forwardRef(
       [panEnabled, isDragging, selectElement]
     );
 
+    // 🆕 Gestion du drag avec guides d'alignement
+    const handleDragMove = useCallback(
+      (id, node) => {
+        const movingElement = elements.find((el) => el.id === id);
+        if (!movingElement) return;
+
+        // Créer un élément temporaire avec la nouvelle position
+        const tempElement = {
+          ...movingElement,
+          x: node.x(),
+          y: node.y(),
+        };
+
+        // Calculer les guides par rapport aux autres éléments
+        const otherElements = elements.filter((el) => el.id !== id && el.visible !== false);
+
+        // 🔥 Passer le node Konva et la fonction de recherche pour plus de précision
+        const { guides, snapX, snapY } = calculateSnapGuides(
+          tempElement,
+          node, // Le node Konva en mouvement
+          otherElements,
+          { width: docWidth, height: docHeight },
+          5, // Seuil fixe
+          findNodeById // Fonction pour trouver les autres nodes
+        );
+
+        setSnapGuides(guides);
+
+        // Appliquer le snap si nécessaire
+        if (snapX !== null) node.x(snapX);
+        if (snapY !== null) node.y(snapY);
+      },
+      [elements, docWidth, docHeight, findNodeById]
+    );
+
+    const handleDragStart = useCallback(() => {
+      setIsDraggingElement(true);
+    }, []);
+
+    const handleDragEnd = useCallback(
+      (id, node) => {
+        setIsDraggingElement(false);
+        setSnapGuides([]);
+        updateElement(id, {
+          x: node.x(),
+          y: node.y(),
+        });
+      },
+      [updateElement]
+    );
+
     const handleTransform = useCallback(
       (id, node) => {
         updateElement(id, {
@@ -217,85 +279,73 @@ const KonvaCanvas = forwardRef(
             {elements.map((el) => {
               if (el.visible === false) return null;
 
+              // Séparer key des autres props pour éviter le warning
+              const { type, id, x, y, locked, scaleX, scaleY, rotation, ...rest } = el;
+
+              const commonProps = {
+                id,
+                x,
+                y,
+                draggable: !locked && !panEnabled && !isDragging,
+                onClick: () => handleSelect(id, locked),
+                onDragStart: handleDragStart,
+                onDragMove: (e) => !locked && handleDragMove(id, e.target),
+                onDragEnd: (e) => !locked && handleDragEnd(id, e.target),
+                onTransformEnd: (e) => !locked && handleTransform(id, e.target),
+                scaleX: scaleX || 1,
+                scaleY: scaleY || 1,
+                rotation: rotation || 0,
+                opacity: locked ? 0.7 : 1,
+              };
+
               // TEXT
-              if (el.type === 'text') {
+              if (type === 'text') {
                 return (
                   <Text
-                    key={el.id}
-                    id={el.id}
-                    x={el.x}
-                    y={el.y}
+                    key={id}
+                    {...commonProps}
                     text={el.text}
                     fontSize={el.fontSize}
                     fontStyle={el.bold ? 'bold' : 'normal'}
                     fill={el.color}
-                    draggable={!el.locked && !panEnabled && !isDragging}
-                    onClick={() => handleSelect(el.id, el.locked)}
-                    onDragEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
-                    onTransformEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
-                    scaleX={el.scaleX || 1}
-                    scaleY={el.scaleY || 1}
-                    rotation={el.rotation || 0}
-                    opacity={el.locked ? 0.7 : 1}
                   />
                 );
               }
 
               // QRCODE
-              if (el.type === 'qrcode') {
+              if (type === 'qrcode') {
                 return (
                   <QRCodeNode
-                    key={el.id}
-                    id={el.id}
-                    x={el.x}
-                    y={el.y}
+                    key={id}
+                    {...commonProps}
                     size={el.size ?? 160}
                     color={el.color ?? '#000000'}
                     bgColor={el.bgColor ?? '#FFFFFF00'}
                     qrValue={el.qrValue ?? ''}
-                    draggable={!el.locked && !panEnabled && !isDragging}
-                    onClick={() => handleSelect(el.id, el.locked)}
-                    onDragEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
-                    onTransformEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
-                    scaleX={el.scaleX || 1}
-                    scaleY={el.scaleY || 1}
-                    rotation={el.rotation || 0}
-                    opacity={el.locked ? 0.7 : 1}
                   />
                 );
               }
 
               // IMAGE
-              if (el.type === 'image') {
+              if (type === 'image') {
                 return (
                   <ImageNode
-                    key={el.id}
-                    id={el.id}
-                    x={el.x}
-                    y={el.y}
+                    key={id}
+                    {...commonProps}
                     width={el.width ?? 160}
                     height={el.height ?? 160}
                     src={el.src ?? ''}
-                    draggable={!el.locked && !panEnabled && !isDragging}
-                    onClick={() => handleSelect(el.id, el.locked)}
-                    onDragEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
-                    onTransformEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
-                    scaleX={el.scaleX || 1}
-                    scaleY={el.scaleY || 1}
-                    rotation={el.rotation || 0}
                     opacity={el.opacity ?? 1}
                   />
                 );
               }
 
               // BARCODE
-              if (el.type === 'barcode') {
+              if (type === 'barcode') {
                 return (
                   <BarcodeNode
-                    key={el.id}
-                    id={el.id}
-                    x={el.x}
-                    y={el.y}
+                    key={id}
+                    {...commonProps}
                     width={el.width ?? 200}
                     height={el.height ?? 80}
                     barcodeValue={el.barcodeValue ?? ''}
@@ -306,20 +356,42 @@ const KonvaCanvas = forwardRef(
                     margin={el.margin ?? 10}
                     background={el.background ?? '#FFFFFF'}
                     lineColor={el.lineColor ?? '#000000'}
-                    draggable={!el.locked && !panEnabled && !isDragging}
-                    onClick={() => handleSelect(el.id, el.locked)}
-                    onDragEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
-                    onTransformEnd={(e) => !el.locked && handleTransform(el.id, e.target)}
-                    scaleX={el.scaleX || 1}
-                    scaleY={el.scaleY || 1}
-                    rotation={el.rotation || 0}
-                    opacity={el.locked ? 0.7 : 1}
                   />
                 );
               }
 
               return null;
             })}
+
+            {/* 🆕 Guides d'alignement */}
+            {isDraggingElement &&
+              snapGuides.map((guide, i) => {
+                if (guide.type === 'vertical') {
+                  return (
+                    <Line
+                      key={`guide-v-${i}`}
+                      points={[guide.x, guide.y1, guide.x, guide.y2]}
+                      stroke="#FF00FF"
+                      strokeWidth={1 / zoom}
+                      dash={[4 / zoom, 4 / zoom]}
+                      listening={false}
+                    />
+                  );
+                }
+                if (guide.type === 'horizontal') {
+                  return (
+                    <Line
+                      key={`guide-h-${i}`}
+                      points={[guide.x1, guide.y, guide.x2, guide.y]}
+                      stroke="#FF00FF"
+                      strokeWidth={1 / zoom}
+                      dash={[4 / zoom, 4 / zoom]}
+                      listening={false}
+                    />
+                  );
+                }
+                return null;
+              })}
           </Group>
 
           {/* Transformer */}

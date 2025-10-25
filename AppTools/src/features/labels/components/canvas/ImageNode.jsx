@@ -16,6 +16,8 @@ const ImageNode = ({
   src = '',
   draggable = false,
   onClick,
+  onDragStart, // 🆕 Ajouté pour les guides
+  onDragMove, // 🆕 Ajouté pour les guides
   onDragEnd,
   onTransformEnd,
   scaleX = 1,
@@ -41,6 +43,8 @@ const ImageNode = ({
       draggable={draggable}
       onClick={onClick}
       onTap={onClick}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       onTransformEnd={onTransformEnd}
       scaleX={scaleX}
