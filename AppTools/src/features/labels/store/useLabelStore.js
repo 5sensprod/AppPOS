@@ -112,10 +112,19 @@ const useLabelStore = create((set, get) => ({
   addElement: (element) =>
     set((state) => {
       state._pushHistory(snapshotOf(state));
+
+      // 🆕 Générer un ID vraiment unique
+      const uniqueId = element.id || `el-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
       return {
         elements: [
           ...state.elements,
-          { ...element, id: `el-${Date.now()}`, visible: true, locked: false },
+          {
+            ...element,
+            id: uniqueId, // 🆕 Utiliser l'ID unique
+            visible: true,
+            locked: false,
+          },
         ],
       };
     }),
