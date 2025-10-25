@@ -38,6 +38,7 @@ const KonvaCanvas = forwardRef(
     }, [onDocNode, zoom]);
 
     const [docPos, setDocPos] = useState({ x: 0, y: 0 });
+    const [isInitialized, setIsInitialized] = useState(false); // 🆕 Flag pour initialisation unique
 
     const [snapGuides, setSnapGuides] = useState([]);
     const [isDraggingElement, setIsDraggingElement] = useState(false);
@@ -51,6 +52,7 @@ const KonvaCanvas = forwardRef(
     const [isDragging, setIsDragging] = useState(false);
     const panLast = useRef({ x: 0, y: 0 });
 
+    // 🆕 Fonction de centrage initiale uniquement
     const centerDocument = useCallback(
       (scale = zoom) => {
         if (!viewportWidth || !viewportHeight) return;
@@ -62,20 +64,51 @@ const KonvaCanvas = forwardRef(
       [viewportWidth, viewportHeight, docWidth, docHeight, zoom]
     );
 
+    // 🆕 Centrage UNIQUEMENT au premier rendu
     useEffect(() => {
-      centerDocument();
-    }, [viewportWidth, viewportHeight, docWidth, docHeight, centerDocument]);
+      if (!isInitialized && viewportWidth > 0 && viewportHeight > 0) {
+        centerDocument();
+        setIsInitialized(true);
+      }
+    }, [viewportWidth, viewportHeight, isInitialized, centerDocument]);
 
+    // 🆕 Fonction pour recenter manuellement (à exposer si besoin)
+    const recenterDocument = useCallback(() => {
+      centerDocument(zoom);
+    }, [centerDocument, zoom]);
+
+    // 🆕 Gestion du zoom SANS recentrage automatique
     const handleWheel = useCallback(
       (e) => {
         e.evt.preventDefault();
+        const stage = stageRef.current;
+        if (!stage) return;
+
         const direction = e.evt.deltaY > 0 ? 1 : -1;
         const scaleBy = 1.08;
-        const newZoom = clamp(direction > 0 ? zoom / scaleBy : zoom * scaleBy, 0.1, 3);
+        const oldZoom = zoom;
+        const newZoom = clamp(direction > 0 ? oldZoom / scaleBy : oldZoom * scaleBy, 0.1, 3);
+
+        // 🎯 Zoom centré sur la position du curseur
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+
+        // Calculer le point sous le curseur avant le zoom
+        const mousePointTo = {
+          x: (pointer.x - docPos.x) / oldZoom,
+          y: (pointer.y - docPos.y) / oldZoom,
+        };
+
+        // Calculer la nouvelle position pour garder le point sous le curseur
+        const newPos = {
+          x: pointer.x - mousePointTo.x * newZoom,
+          y: pointer.y - mousePointTo.y * newZoom,
+        };
+
         setZoom(newZoom);
-        centerDocument(newZoom);
+        setDocPos(newPos);
       },
-      [zoom, setZoom, centerDocument]
+      [zoom, setZoom, docPos]
     );
 
     useEffect(() => {
@@ -230,7 +263,7 @@ const KonvaCanvas = forwardRef(
       shadowOffsetY: el.shadowOffsetY ?? 2,
     });
 
-    // Transformer: toujours cibler l’élément par son id
+    // Transformer: toujours cibler l'élément par son id
     useEffect(() => {
       const tr = transformerRef.current;
       const stage = stageRef.current;
@@ -292,7 +325,7 @@ const KonvaCanvas = forwardRef(
               const { type, id, x, y, locked, scaleX, scaleY, rotation } = el;
 
               const commonProps = {
-                id, // IMPORTANT: id sur le nœud racine du composant
+                id,
                 x,
                 y,
                 draggable: !locked && !panEnabled && !isDragging,
@@ -306,7 +339,7 @@ const KonvaCanvas = forwardRef(
                 scaleY: scaleY || 1,
                 rotation: rotation || 0,
                 opacity: locked ? 0.7 : 1,
-                ...shadowPropsFrom(el), // << props d'ombre
+                ...shadowPropsFrom(el),
               };
 
               if (type === 'text') {
