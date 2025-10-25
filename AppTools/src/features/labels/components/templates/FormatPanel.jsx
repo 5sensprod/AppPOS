@@ -6,6 +6,7 @@ import useLabelStore from '../../store/useLabelStore';
 const FormatPanel = () => {
   const canvasSize = useLabelStore((state) => state.canvasSize);
   const setCanvasSize = useLabelStore((state) => state.setCanvasSize);
+  const lockCanvasToSheetCell = useLabelStore((s) => s.lockCanvasToSheetCell);
 
   const [customWidth, setCustomWidth] = useState(canvasSize.width);
   const [customHeight, setCustomHeight] = useState(canvasSize.height);
@@ -26,12 +27,14 @@ const FormatPanel = () => {
   ];
 
   const handleFormatSelect = (width, height) => {
+    if (lockCanvasToSheetCell) return; // désactivé si piloté par la planche
     setCanvasSize(width, height);
     setCustomWidth(width);
     setCustomHeight(height);
   };
 
   const handleCustomSize = () => {
+    if (lockCanvasToSheetCell) return; // désactivé si piloté par la planche
     if (customWidth > 0 && customHeight > 0) {
       setCanvasSize(customWidth, customHeight);
     }
@@ -39,6 +42,14 @@ const FormatPanel = () => {
 
   return (
     <div className="p-4 space-y-4">
+      {lockCanvasToSheetCell && (
+        <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-700 text-xs text-indigo-900 dark:text-indigo-200">
+          Le format du canvas est actuellement <strong>piloté par la planche</strong> (taille d’une
+          cellule). Désactivez cette option dans l’onglet <em>Planche</em> pour modifier librement
+          le format.
+        </div>
+      )}
+
       {/* Taille actuelle */}
       <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
         <div className="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-300">
@@ -62,8 +73,13 @@ const FormatPanel = () => {
               className={`p-3 border rounded-lg text-left transition-all ${
                 canvasSize.width === format.width && canvasSize.height === format.height
                   ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/10'
+                  : `border-gray-200 dark:border-gray-700 ${
+                      lockCanvasToSheetCell
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/10'
+                    }`
               }`}
+              disabled={lockCanvasToSheetCell}
             >
               <div className="text-sm font-medium">{format.label}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -89,6 +105,7 @@ const FormatPanel = () => {
               min="100"
               max="5000"
               className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              disabled={lockCanvasToSheetCell}
             />
             <span className="text-gray-500">×</span>
             <input
@@ -99,11 +116,17 @@ const FormatPanel = () => {
               min="100"
               max="5000"
               className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              disabled={lockCanvasToSheetCell}
             />
           </div>
           <button
             onClick={handleCustomSize}
-            className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+            className={`w-full px-4 py-2 text-white rounded transition-colors ${
+              lockCanvasToSheetCell
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+            disabled={lockCanvasToSheetCell}
           >
             Appliquer
           </button>

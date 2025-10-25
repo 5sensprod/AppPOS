@@ -1,7 +1,9 @@
+// src/features/labels/store/useLabelStore.js
 import { create } from 'zustand';
 
 const HISTORY_LIMIT = 100;
 
+// 👉 Ce qu'on versionne dans l'historique (léger & suffisant pour Undo/Redo UI)
 const snapshotOf = (state) => ({
   elements: state.elements,
   selectedId: state.selectedId,
@@ -17,6 +19,9 @@ const useLabelStore = create((set, get) => ({
   zoom: 1,
   canvasSize: { width: 800, height: 600 },
 
+  // --- verrou : le canvas suit la taille d'une cellule de planche
+  lockCanvasToSheetCell: false,
+
   // --- historique
   historyPast: [],
   historyFuture: [],
@@ -27,7 +32,12 @@ const useLabelStore = create((set, get) => ({
   _pushHistory(prev) {
     const past = get().historyPast;
     const nextPast = [...past, prev].slice(-HISTORY_LIMIT);
-    set({ historyPast: nextPast, historyFuture: [], canUndo: nextPast.length > 0, canRedo: false });
+    set({
+      historyPast: nextPast,
+      historyFuture: [],
+      canUndo: nextPast.length > 0,
+      canRedo: false,
+    });
   },
 
   _afterUndoRedo({ elements, selectedId, historyPast, historyFuture }) {
@@ -133,14 +143,13 @@ const useLabelStore = create((set, get) => ({
       return { elements: newElements };
     }),
 
+  // --- sélection
   selectElement: (id) => set({ selectedId: id }),
-
   clearSelection: () => set({ selectedId: null }),
 
-  // Gère automatiquement la sélection simple ou multiple de produits
+  // --- data (ne pollue pas l'historique des éléments)
   setDataSource: (source, product = null) =>
     set((state) => {
-      // changer de source ne doit pas polluer l'historique des éléments
       if (Array.isArray(product)) {
         return {
           dataSource: source,
@@ -179,15 +188,17 @@ const useLabelStore = create((set, get) => ({
       };
     }),
 
+  // --- zoom & canvas
   setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(3, zoom)) }),
-
   zoomIn: () => set((state) => ({ zoom: Math.min(3, state.zoom + 0.1) })),
-
   zoomOut: () => set((state) => ({ zoom: Math.max(0.1, state.zoom - 0.1) })),
-
   resetZoom: () => set({ zoom: 1 }),
 
+  // NB: changer la taille du canvas ne touche pas l'historique des éléments
   setCanvasSize: (width, height) => set({ canvasSize: { width, height } }),
+
+  // --- verrou “canvas = taille de cellule”
+  setLockCanvasToSheetCell: (lock) => set({ lockCanvasToSheetCell: !!lock }),
 }));
 
 export default useLabelStore;

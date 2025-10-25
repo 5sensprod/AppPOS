@@ -31,6 +31,9 @@ const SheetPanel = ({ docNode }) => {
   const canvasSize = useLabelStore((state) => state.canvasSize);
   const dataSource = useLabelStore((state) => state.dataSource);
   const selectedProducts = useLabelStore((state) => state.selectedProducts ?? []);
+  const setCanvasSize = useLabelStore((s) => s.setCanvasSize);
+  const lockCanvasToSheetCell = useLabelStore((s) => s.lockCanvasToSheetCell);
+  const setLockCanvasToSheetCell = useLabelStore((s) => s.setLockCanvasToSheetCell);
 
   // États UI
   const [selectedSheet, setSelectedSheet] = useState(SHEET_FORMATS[0]);
@@ -61,6 +64,23 @@ const SheetPanel = ({ docNode }) => {
     return Math.min(scaleX, scaleY, 1);
   }, [cellSize, canvasSize]);
 
+  // 🆕 Auto-sync: si activé, le canvas prend automatiquement la taille d'une cellule
+  useEffect(() => {
+    if (!lockCanvasToSheetCell) return;
+    const w = Math.max(1, cellSize.width);
+    const h = Math.max(1, cellSize.height);
+    if (canvasSize.width !== w || canvasSize.height !== h) {
+      setCanvasSize(w, h);
+    }
+  }, [
+    lockCanvasToSheetCell,
+    cellSize.width,
+    cellSize.height,
+    canvasSize.width,
+    canvasSize.height,
+    setCanvasSize,
+  ]);
+
   // Adapter la grille au nombre de produits (distribution "carrée")
   const handleAdaptGrid = useCallback(() => {
     if (productCount <= 1) return;
@@ -85,6 +105,7 @@ const SheetPanel = ({ docNode }) => {
       spacing,
       fileName: `planche-${cols}x${rows}.pdf`,
       products: isMultiProduct ? selectedProducts : null,
+      // QR non lié = commun par défaut
       qrPerProductWhenUnbound: false,
     });
   }, [
@@ -115,6 +136,31 @@ const SheetPanel = ({ docNode }) => {
 
   return (
     <div className="p-4 space-y-4">
+      {/* 🆕 Mode design sur cellule */}
+      <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-700 flex items-center justify-between">
+        <div className="text-sm text-indigo-900 dark:text-indigo-200">
+          <div className="font-medium">Canvas = taille d’une cellule</div>
+          <div className="text-xs opacity-80">
+            Quand activé, le canvas suit automatiquement les dimensions de chaque cellule de la
+            planche.
+          </div>
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={!!lockCanvasToSheetCell}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setLockCanvasToSheetCell(next);
+              if (next) {
+                setCanvasSize(Math.max(1, cellSize.width), Math.max(1, cellSize.height));
+              }
+            }}
+          />
+          <span>Activer</span>
+        </label>
+      </div>
+
       {/* Info produits multiples */}
       {isMultiProduct && (
         <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
@@ -292,6 +338,19 @@ const SheetPanel = ({ docNode }) => {
             Total : {totalCells} cellule{totalCells > 1 ? 's' : ''}
             {isMultiProduct && ` (${Math.min(productCount, totalCells)} produits affichés)`}
           </div>
+
+          {!lockCanvasToSheetCell && (
+            <div className="pt-2">
+              <button
+                onClick={() =>
+                  setCanvasSize(Math.max(1, cellSize.width), Math.max(1, cellSize.height))
+                }
+                className="px-2 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                Appliquer une fois la taille de cellule au canvas
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
