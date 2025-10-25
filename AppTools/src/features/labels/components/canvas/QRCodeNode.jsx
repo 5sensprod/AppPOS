@@ -29,6 +29,7 @@ const QRCodeNode = ({
   onDragStart, // 🆕 Ajouté pour les guides
   onDragMove, // 🆕 Ajouté pour les guides
   onDragEnd,
+  onTransform, // 🆕 Ajouté pour les guides pendant resize
   onTransformEnd,
   scaleX = 1,
   scaleY = 1,
@@ -100,6 +101,7 @@ const QRCodeNode = ({
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
+      onTransform={onTransform}
       onTransformEnd={onTransformEnd}
       scaleX={scaleX}
       scaleY={scaleY}

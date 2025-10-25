@@ -46,6 +46,7 @@ const KonvaCanvas = forwardRef(
     // 🆕 Guides d'alignement
     const [snapGuides, setSnapGuides] = useState([]);
     const [isDraggingElement, setIsDraggingElement] = useState(false);
+    const [isTransforming, setIsTransforming] = useState(false); // 🆕 Pour le resize
 
     // 🆕 Helper pour trouver un node par ID
     const findNodeById = useCallback((id) => {
@@ -207,6 +208,56 @@ const KonvaCanvas = forwardRef(
       [updateElement]
     );
 
+    // 🆕 Pendant la transformation (resize/rotate) - affiche les guides
+    const handleTransforming = useCallback(
+      (id, node) => {
+        setIsTransforming(true); // 🆕 Active l'état
+
+        const movingElement = elements.find((el) => el.id === id);
+        if (!movingElement) return;
+
+        // Créer un élément temporaire avec la nouvelle position/taille
+        const tempElement = {
+          ...movingElement,
+          x: node.x(),
+          y: node.y(),
+          scaleX: node.scaleX(),
+          scaleY: node.scaleY(),
+          rotation: node.rotation(),
+        };
+
+        // Calculer les guides
+        const otherElements = elements.filter((el) => el.id !== id && el.visible !== false);
+        const { guides } = calculateSnapGuides(
+          tempElement,
+          node,
+          otherElements,
+          { width: docWidth, height: docHeight },
+          5,
+          findNodeById
+        );
+
+        setSnapGuides(guides);
+      },
+      [elements, docWidth, docHeight, findNodeById]
+    );
+
+    // À la fin de la transformation - sauvegarde et cache les guides
+    const handleTransformEnd = useCallback(
+      (id, node) => {
+        setIsTransforming(false); // 🆕 Désactive l'état
+        setSnapGuides([]); // Cache les guides
+        updateElement(id, {
+          x: node.x(),
+          y: node.y(),
+          scaleX: node.scaleX(),
+          scaleY: node.scaleY(),
+          rotation: node.rotation(),
+        });
+      },
+      [updateElement]
+    );
+
     const handleTransform = useCallback(
       (id, node) => {
         updateElement(id, {
@@ -291,7 +342,8 @@ const KonvaCanvas = forwardRef(
                 onDragStart: handleDragStart,
                 onDragMove: (e) => !locked && handleDragMove(id, e.target),
                 onDragEnd: (e) => !locked && handleDragEnd(id, e.target),
-                onTransformEnd: (e) => !locked && handleTransform(id, e.target),
+                onTransform: (e) => !locked && handleTransforming(id, e.target), // 🆕 Pendant la transformation
+                onTransformEnd: (e) => !locked && handleTransformEnd(id, e.target), // À la fin
                 scaleX: scaleX || 1,
                 scaleY: scaleY || 1,
                 rotation: rotation || 0,
@@ -364,7 +416,7 @@ const KonvaCanvas = forwardRef(
             })}
 
             {/* 🆕 Guides d'alignement */}
-            {isDraggingElement &&
+            {(isDraggingElement || isTransforming) &&
               snapGuides.map((guide, i) => {
                 if (guide.type === 'vertical') {
                   return (
