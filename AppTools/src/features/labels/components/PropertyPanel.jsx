@@ -1,13 +1,12 @@
 // src/features/labels/components/PropertyPanel.jsx
 import React from 'react';
-import { X, Palette, Link, Unlink, Sparkles } from 'lucide-react';
+import { Palette, Link, Unlink, Sparkles } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
 
 const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
   const elements = useLabelStore((s) => s.elements);
   const selectedId = useLabelStore((s) => s.selectedId);
   const updateElement = useLabelStore((s) => s.updateElement);
-  const clearSelection = useLabelStore((s) => s.clearSelection);
   const dataSource = useLabelStore((s) => s.dataSource);
 
   const selectedElement = elements.find((el) => el.id === selectedId);
@@ -118,17 +117,18 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
   };
 
   return (
-    <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-      <div className="flex items-center gap-4 px-3 py-2 max-w-4xl w-[min(90vw,800px)]">
+    <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+      <div className="flex items-center gap-4 px-4 py-2.5">
         {/* Color Picker - Uniquement pour Text et QRCode */}
         {(isText || isQRCode) && (
           <div className="flex items-center gap-2">
-            <Palette className="h-4 w-4 text-gray-500" />
+            <Palette className="h-4 w-4 text-gray-500 dark:text-gray-400" />
             <input
               type="color"
               value={selectedElement.color || '#000000'}
               onChange={(e) => handleColorChange(e.target.value)}
               className="w-10 h-8 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
+              title="Couleur"
             />
           </div>
         )}
@@ -145,8 +145,8 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
                 type="text"
                 value={selectedElement.qrValue || ''}
                 onChange={(e) => handleQRValueChange(e.target.value)}
-                placeholder="Texte, URL, SKU, code-barres..."
-                className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-[260px]"
+                placeholder="Texte, URL, SKU..."
+                className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-[220px]"
                 disabled={!!selectedElement.dataBinding}
               />
             </div>
@@ -203,12 +203,12 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
                 onChange={(e) => handleOpacityChange(e.target.value)}
                 className="w-24"
               />
-              <span className="text-xs text-gray-500 w-8">
+              <span className="text-xs text-gray-500 dark:text-gray-400 w-8">
                 {Math.round((selectedElement.opacity ?? 1) * 100)}%
               </span>
             </div>
 
-            {/* Dimensions (lecture seule - modifier via canvas) */}
+            {/* Dimensions */}
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -222,7 +222,7 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
                 <button
                   onClick={handleImageBinding}
-                  className={`px-3 py-1 text-sm rounded flex items-center gap-2 transition-colors ${
+                  className={`px-3 py-1.5 text-sm rounded-lg flex items-center gap-2 transition-colors ${
                     selectedElement.dataBinding
                       ? 'bg-blue-500 hover:bg-blue-600 text-white'
                       : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
@@ -241,7 +241,7 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
                   ) : (
                     <>
                       <Unlink className="h-4 w-4" />
-                      Lier au produit
+                      Lier
                     </>
                   )}
                 </button>
@@ -264,7 +264,7 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
                 <select
                   value={selectedElement.dataBinding}
                   onChange={(e) => handleFieldChange(e.target.value)}
-                  className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white max-w-[200px]"
+                  className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white max-w-[180px]"
                 >
                   {dataFields.map((field) => (
                     <option key={field.key} value={field.key}>
@@ -274,7 +274,7 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
                 </select>
                 <button
                   onClick={handleUnbind}
-                  className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   title="Utiliser une valeur fixe"
                 >
                   Délier
@@ -283,26 +283,20 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
             </>
           )}
 
-        {/* Bouton Effets */}
+        {/* Bouton Effets - Toujours à droite */}
         {onOpenEffects && (
-          <button
-            onClick={onOpenEffects}
-            className="ml-auto px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors flex items-center gap-2 shrink-0"
-            title="Ouvrir le panneau Effets"
-          >
-            <Sparkles className="h-4 w-4" />
-            Effets
-          </button>
+          <>
+            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 ml-auto" />
+            <button
+              onClick={onOpenEffects}
+              className="px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors flex items-center gap-2 shrink-0"
+              title="Ouvrir le panneau Effets"
+            >
+              <Sparkles className="h-4 w-4" />
+              Effets
+            </button>
+          </>
         )}
-
-        {/* Fermer */}
-        <button
-          onClick={clearSelection}
-          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded shrink-0"
-          title="Fermer"
-        >
-          <X className="h-4 w-4" />
-        </button>
       </div>
     </div>
   );

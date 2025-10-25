@@ -14,6 +14,7 @@ import {
   Upload,
   Barcode,
   Sparkles,
+  FolderOpen, // 🆕
 } from 'lucide-react';
 
 import TextTemplates from './templates/TextTemplates';
@@ -27,6 +28,7 @@ import QRCodeTemplates from './templates/QRCodeTemplates';
 import UploadTemplate from './templates/UploadTemplate';
 import BarcodeTemplates from './templates/BarcodeTemplates';
 import EffectsTemplates from './templates/EffectsTemplates';
+import TemplateManager from './templates/TemplateManager'; // 🆕
 
 const ToolsSidebar = ({
   isCollapsed,
@@ -34,12 +36,12 @@ const ToolsSidebar = ({
   dataSource,
   selectedProduct,
   docNode,
-  selectedTool: externalSelectedTool, // 🆕 Outil sélectionné depuis l'extérieur (optionnel)
-  onToolChange, // 🆕 Callback pour notifier le parent (optionnel)
+  selectedTool: externalSelectedTool,
+  onToolChange,
+  stageRef, // 🆕 Pour TemplateManager
 }) => {
   const [internalSelectedTool, setInternalSelectedTool] = useState(null);
 
-  // Utiliser selectedTool externe s'il est fourni, sinon utiliser l'état interne
   const selectedTool =
     externalSelectedTool !== undefined ? externalSelectedTool : internalSelectedTool;
 
@@ -52,6 +54,7 @@ const ToolsSidebar = ({
     { id: 'qrcode', label: 'QR Code', icon: QrCode, component: QRCodeTemplates },
     { id: 'barcode', label: 'Code-barres', icon: Barcode, component: BarcodeTemplates },
     { id: 'effects', label: 'Effets', icon: Sparkles, component: EffectsTemplates },
+    { id: 'templates', label: 'Templates', icon: FolderOpen, component: TemplateManager }, // 🆕
     { id: 'layers', label: 'Calques', icon: Layers, component: LayersPanel },
     { id: 'format', label: 'Format', icon: Maximize2, component: FormatPanel },
     { id: 'sheet', label: 'Planche', icon: Grid3x3, component: SheetPanel },
@@ -60,20 +63,15 @@ const ToolsSidebar = ({
   const handleToolClick = (toolId) => {
     const newTool = toolId === selectedTool ? null : toolId;
 
-    // Si un callback est fourni, l'appeler (mode contrôlé)
     if (onToolChange) {
       onToolChange(newTool);
     } else {
-      // Sinon, gérer l'état en interne (mode non contrôlé)
       setInternalSelectedTool(newTool);
     }
   };
 
-  // Callback pour gérer la sélection d'image depuis UploadTemplate
   const handleImageSelected = (imageData) => {
     console.log('🖼️ Image sélectionnée depuis Upload:', imageData);
-    // On peut automatiquement switcher vers ImageTemplates si besoin
-    // ou déclencher une action dans le store
   };
 
   // Mode icônes uniquement
@@ -148,12 +146,19 @@ const ToolsSidebar = ({
             {/* Templates */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
               {SelectedComponent && (
-                <SelectedComponent
-                  dataSource={dataSource}
-                  selectedProduct={selectedProduct}
-                  docNode={docNode}
-                  onImageSelected={selectedTool === 'upload' ? handleImageSelected : undefined}
-                />
+                <>
+                  {selectedTool === 'templates' ? (
+                    // 🆕 TemplateManager en mode sidebar (sans modal)
+                    <TemplateManager stageRef={stageRef} onClose={() => handleToolClick(null)} />
+                  ) : (
+                    <SelectedComponent
+                      dataSource={dataSource}
+                      selectedProduct={selectedProduct}
+                      docNode={docNode}
+                      onImageSelected={selectedTool === 'upload' ? handleImageSelected : undefined}
+                    />
+                  )}
+                </>
               )}
             </div>
           </>

@@ -43,6 +43,7 @@ const KonvaCanvas = forwardRef(
     const [snapGuides, setSnapGuides] = useState([]);
     const [isDraggingElement, setIsDraggingElement] = useState(false);
     const [isTransforming, setIsTransforming] = useState(false);
+    const [rotationAngle, setRotationAngle] = useState(null); // 🆕 Angle affiché pendant la rotation
 
     const findNodeById = useCallback((id) => {
       return stageRef.current?.findOne(`#${id}`);
@@ -214,6 +215,36 @@ const KonvaCanvas = forwardRef(
         const movingElement = elements.find((el) => el.id === id);
         if (!movingElement) return;
 
+        // 🎯 Arrondir la rotation à 1° (sauf si proche de 90° multiples)
+        let rotation = node.rotation();
+        const snapAngles = [0, 90, 180, 270, 360, -90, -180, -270];
+        const snapTolerance = 5;
+
+        // Vérifier si proche d'un angle de snap (90°)
+        let snapped = false;
+        for (const snapAngle of snapAngles) {
+          if (Math.abs(rotation - snapAngle) < snapTolerance) {
+            rotation = snapAngle;
+            snapped = true;
+            break;
+          }
+        }
+
+        // Si pas snappé à 90°, arrondir à 1°
+        if (!snapped) {
+          rotation = Math.round(rotation);
+        }
+
+        // Normaliser entre -180 et 180
+        if (rotation > 180) rotation -= 360;
+        if (rotation < -180) rotation += 360;
+
+        // Appliquer la rotation arrondie
+        node.rotation(rotation);
+
+        // 🆕 Afficher l'angle pendant la rotation
+        setRotationAngle(rotation);
+
         const tempElement = {
           ...movingElement,
           x: node.x(),
@@ -242,12 +273,22 @@ const KonvaCanvas = forwardRef(
       (id, node) => {
         setIsTransforming(false);
         setSnapGuides([]);
+        setRotationAngle(null); // 🆕 Cacher l'indicateur d'angle
+
+        // 🎯 Arrondir la rotation finale à 1°
+        let rotation = node.rotation();
+        rotation = Math.round(rotation);
+
+        // Normaliser entre -180 et 180
+        if (rotation > 180) rotation -= 360;
+        if (rotation < -180) rotation += 360;
+
         updateElement(id, {
           x: node.x(),
           y: node.y(),
           scaleX: node.scaleX(),
           scaleY: node.scaleY(),
-          rotation: node.rotation(),
+          rotation,
         });
       },
       [updateElement]
@@ -439,7 +480,64 @@ const KonvaCanvas = forwardRef(
               if (newBox.width < 5 || newBox.height < 5) return oldBox;
               return newBox;
             }}
+            // 🎯 Rotation snap : angles tous les 1° + snap fort à 0°, 90°, 180°, 270°
+            rotationSnaps={[0, 90, 180, 270]}
+            rotationSnapTolerance={5} // Tolérance en degrés pour le snap à 90°
+            // 🆕 Arrondir la rotation à 1° pendant la transformation
+            rotateAnchorOffset={30}
+            enabledAnchors={[
+              'top-left',
+              'top-center',
+              'top-right',
+              'middle-right',
+              'middle-left',
+              'bottom-left',
+              'bottom-center',
+              'bottom-right',
+            ]}
           />
+
+          {/* 🎯 Indicateur d'angle de rotation (style Figma/Polotno) */}
+          {rotationAngle !== null && selectedId && (
+            <Group>
+              {(() => {
+                const selectedNode = stageRef.current?.findOne(`#${selectedId}`);
+                if (!selectedNode) return null;
+
+                const box = selectedNode.getClientRect();
+                const centerX = box.x + box.width / 2;
+                const centerY = box.y + box.y / 2 - 40; // Au-dessus de l'élément
+
+                return (
+                  <Group x={centerX} y={centerY}>
+                    <Rect
+                      x={-30}
+                      y={-12}
+                      width={60}
+                      height={24}
+                      fill="#000000"
+                      opacity={0.8}
+                      cornerRadius={4}
+                      listening={false}
+                    />
+                    <Text
+                      x={-30}
+                      y={-12}
+                      width={60}
+                      height={24}
+                      text={`${Math.round(rotationAngle)}°`}
+                      fontSize={14}
+                      fontFamily="sans-serif"
+                      fill="#FFFFFF"
+                      align="center"
+                      verticalAlign="middle"
+                      listening={false}
+                    />
+                  </Group>
+                );
+              })()}
+            </Group>
+          )}
         </Layer>
 
         <Layer listening={false} perfectDrawEnabled={false} />
