@@ -26,39 +26,31 @@ const KonvaCanvas = forwardRef(
     const selectElement = useLabelStore((state) => state.selectElement);
     const updateElement = useLabelStore((state) => state.updateElement);
     const setZoom = useLabelStore((state) => state.setZoom);
-    const canvasSize = useLabelStore((state) => state.canvasSize);
 
     const stageRef = useRef(null);
     const transformerRef = useRef(null);
     const docGroupRef = useRef(null);
 
-    // Exposer la ref du Stage au parent
     useImperativeHandle(ref, () => stageRef.current, []);
 
-    // Remonte le node "document" vers le parent pour export PDF
     useEffect(() => {
       if (onDocNode) onDocNode(docGroupRef.current || null);
     }, [onDocNode, zoom]);
 
-    // Position du document (Group)
     const [docPos, setDocPos] = useState({ x: 0, y: 0 });
 
-    // 🆕 Guides d'alignement
     const [snapGuides, setSnapGuides] = useState([]);
     const [isDraggingElement, setIsDraggingElement] = useState(false);
-    const [isTransforming, setIsTransforming] = useState(false); // 🆕 Pour le resize
+    const [isTransforming, setIsTransforming] = useState(false);
 
-    // 🆕 Helper pour trouver un node par ID
     const findNodeById = useCallback((id) => {
       return stageRef.current?.findOne(`#${id}`);
     }, []);
 
-    // États de pan
     const [panEnabled, setPanEnabled] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const panLast = useRef({ x: 0, y: 0 });
 
-    // Centrer le document dans le viewport
     const centerDocument = useCallback(
       (scale = zoom) => {
         if (!viewportWidth || !viewportHeight) return;
@@ -74,7 +66,6 @@ const KonvaCanvas = forwardRef(
       centerDocument();
     }, [viewportWidth, viewportHeight, docWidth, docHeight, centerDocument]);
 
-    // Zoom
     const handleWheel = useCallback(
       (e) => {
         e.evt.preventDefault();
@@ -87,7 +78,6 @@ const KonvaCanvas = forwardRef(
       [zoom, setZoom, centerDocument]
     );
 
-    // Espace = pan
     useEffect(() => {
       const down = (e) => {
         if (e.code === 'Space') {
@@ -95,11 +85,9 @@ const KonvaCanvas = forwardRef(
           setPanEnabled(true);
         }
       };
-      const up = (e) => {
-        if (e.code === 'Space') {
-          setPanEnabled(false);
-          setIsDragging(false);
-        }
+      const up = () => {
+        setPanEnabled(false);
+        setIsDragging(false);
       };
       window.addEventListener('keydown', down, { passive: false });
       window.addEventListener('keyup', up);
@@ -109,7 +97,6 @@ const KonvaCanvas = forwardRef(
       };
     }, []);
 
-    // Curseur
     useEffect(() => {
       const stage = stageRef.current;
       if (!stage) return;
@@ -119,7 +106,6 @@ const KonvaCanvas = forwardRef(
       else c.style.cursor = 'default';
     }, [panEnabled, isDragging]);
 
-    // Pan : MouseDown
     const onStageMouseDown = useCallback(
       (e) => {
         const isMiddle = e.evt.button === 1;
@@ -132,7 +118,6 @@ const KonvaCanvas = forwardRef(
       [panEnabled]
     );
 
-    // Pan : Move
     const onStageMouseMove = useCallback(() => {
       if (!isDragging) return;
       const stage = stageRef.current;
@@ -144,7 +129,6 @@ const KonvaCanvas = forwardRef(
       setDocPos((p) => ({ x: p.x + dx, y: p.y + dy }));
     }, [isDragging]);
 
-    // Pan : Up
     const onStageMouseUp = useCallback(() => {
       if (isDragging) setIsDragging(false);
     }, [isDragging]);
@@ -157,66 +141,46 @@ const KonvaCanvas = forwardRef(
       [panEnabled, isDragging, selectElement]
     );
 
-    // 🆕 Gestion du drag avec guides d'alignement
     const handleDragMove = useCallback(
       (id, node) => {
         const movingElement = elements.find((el) => el.id === id);
         if (!movingElement) return;
 
-        // Créer un élément temporaire avec la nouvelle position
-        const tempElement = {
-          ...movingElement,
-          x: node.x(),
-          y: node.y(),
-        };
-
-        // Calculer les guides par rapport aux autres éléments
+        const tempElement = { ...movingElement, x: node.x(), y: node.y() };
         const otherElements = elements.filter((el) => el.id !== id && el.visible !== false);
 
-        // 🔥 Passer le node Konva et la fonction de recherche pour plus de précision
         const { guides, snapX, snapY } = calculateSnapGuides(
           tempElement,
-          node, // Le node Konva en mouvement
+          node,
           otherElements,
           { width: docWidth, height: docHeight },
-          5, // Seuil fixe
-          findNodeById // Fonction pour trouver les autres nodes
+          5,
+          findNodeById
         );
 
         setSnapGuides(guides);
-
-        // Appliquer le snap si nécessaire
         if (snapX !== null) node.x(snapX);
         if (snapY !== null) node.y(snapY);
       },
       [elements, docWidth, docHeight, findNodeById]
     );
 
-    const handleDragStart = useCallback(() => {
-      setIsDraggingElement(true);
-    }, []);
-
+    const handleDragStart = useCallback(() => setIsDraggingElement(true), []);
     const handleDragEnd = useCallback(
       (id, node) => {
         setIsDraggingElement(false);
         setSnapGuides([]);
-        updateElement(id, {
-          x: node.x(),
-          y: node.y(),
-        });
+        updateElement(id, { x: node.x(), y: node.y() });
       },
       [updateElement]
     );
 
-    // 🆕 Pendant la transformation (resize/rotate) - affiche les guides
     const handleTransforming = useCallback(
       (id, node) => {
-        setIsTransforming(true); // 🆕 Active l'état
-
+        setIsTransforming(true);
         const movingElement = elements.find((el) => el.id === id);
         if (!movingElement) return;
 
-        // Créer un élément temporaire avec la nouvelle position/taille
         const tempElement = {
           ...movingElement,
           x: node.x(),
@@ -226,7 +190,6 @@ const KonvaCanvas = forwardRef(
           rotation: node.rotation(),
         };
 
-        // Calculer les guides
         const otherElements = elements.filter((el) => el.id !== id && el.visible !== false);
         const { guides } = calculateSnapGuides(
           tempElement,
@@ -242,11 +205,10 @@ const KonvaCanvas = forwardRef(
       [elements, docWidth, docHeight, findNodeById]
     );
 
-    // À la fin de la transformation - sauvegarde et cache les guides
     const handleTransformEnd = useCallback(
       (id, node) => {
-        setIsTransforming(false); // 🆕 Désactive l'état
-        setSnapGuides([]); // Cache les guides
+        setIsTransforming(false);
+        setSnapGuides([]);
         updateElement(id, {
           x: node.x(),
           y: node.y(),
@@ -258,20 +220,17 @@ const KonvaCanvas = forwardRef(
       [updateElement]
     );
 
-    const handleTransform = useCallback(
-      (id, node) => {
-        updateElement(id, {
-          x: node.x(),
-          y: node.y(),
-          scaleX: node.scaleX(),
-          scaleY: node.scaleY(),
-          rotation: node.rotation(),
-        });
-      },
-      [updateElement]
-    );
+    // Ombres: helper (valeurs par défaut)
+    const shadowPropsFrom = (el) => ({
+      shadowEnabled: el.shadowEnabled ?? false,
+      shadowColor: el.shadowColor ?? '#000000',
+      shadowOpacity: el.shadowOpacity ?? 0.4,
+      shadowBlur: el.shadowBlur ?? 8,
+      shadowOffsetX: el.shadowOffsetX ?? 2,
+      shadowOffsetY: el.shadowOffsetY ?? 2,
+    });
 
-    // Transformer
+    // Transformer: toujours cibler l’élément par son id
     useEffect(() => {
       const tr = transformerRef.current;
       const stage = stageRef.current;
@@ -330,11 +289,10 @@ const KonvaCanvas = forwardRef(
             {elements.map((el) => {
               if (el.visible === false) return null;
 
-              // Séparer key des autres props pour éviter le warning
-              const { type, id, x, y, locked, scaleX, scaleY, rotation, ...rest } = el;
+              const { type, id, x, y, locked, scaleX, scaleY, rotation } = el;
 
               const commonProps = {
-                id,
+                id, // IMPORTANT: id sur le nœud racine du composant
                 x,
                 y,
                 draggable: !locked && !panEnabled && !isDragging,
@@ -342,15 +300,15 @@ const KonvaCanvas = forwardRef(
                 onDragStart: handleDragStart,
                 onDragMove: (e) => !locked && handleDragMove(id, e.target),
                 onDragEnd: (e) => !locked && handleDragEnd(id, e.target),
-                onTransform: (e) => !locked && handleTransforming(id, e.target), // 🆕 Pendant la transformation
-                onTransformEnd: (e) => !locked && handleTransformEnd(id, e.target), // À la fin
+                onTransform: (e) => !locked && handleTransforming(id, e.target),
+                onTransformEnd: (e) => !locked && handleTransformEnd(id, e.target),
                 scaleX: scaleX || 1,
                 scaleY: scaleY || 1,
                 rotation: rotation || 0,
                 opacity: locked ? 0.7 : 1,
+                ...shadowPropsFrom(el), // << props d'ombre
               };
 
-              // TEXT
               if (type === 'text') {
                 return (
                   <Text
@@ -364,7 +322,6 @@ const KonvaCanvas = forwardRef(
                 );
               }
 
-              // QRCODE
               if (type === 'qrcode') {
                 return (
                   <QRCodeNode
@@ -378,7 +335,6 @@ const KonvaCanvas = forwardRef(
                 );
               }
 
-              // IMAGE
               if (type === 'image') {
                 return (
                   <ImageNode
@@ -392,7 +348,6 @@ const KonvaCanvas = forwardRef(
                 );
               }
 
-              // BARCODE
               if (type === 'barcode') {
                 return (
                   <BarcodeNode
@@ -415,7 +370,6 @@ const KonvaCanvas = forwardRef(
               return null;
             })}
 
-            {/* 🆕 Guides d'alignement */}
             {(isDraggingElement || isTransforming) &&
               snapGuides.map((guide, i) => {
                 if (guide.type === 'vertical') {
@@ -446,7 +400,6 @@ const KonvaCanvas = forwardRef(
               })}
           </Group>
 
-          {/* Transformer */}
           <Transformer
             ref={transformerRef}
             boundBoxFunc={(oldBox, newBox) => {
@@ -456,7 +409,6 @@ const KonvaCanvas = forwardRef(
           />
         </Layer>
 
-        {/* Layer d'UI non cliquable (hors export) */}
         <Layer listening={false} perfectDrawEnabled={false} />
       </Stage>
     );

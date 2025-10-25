@@ -56,10 +56,6 @@ function loadImageFromURL(url) {
 
 /**
  * Remplace les valeurs des éléments liés à un produit (non destructif)
- * - Text: met à jour `text`
- * - QRCode: met à jour `qrValue` (avec fallback si non lié selon fillQrWhenNoBinding)
- * - Barcode: met à jour `barcodeValue`
- * - Image: si dataBinding === 'product_image', remplace `src` par l'image produit
  */
 function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = false) {
   if (!product) return elements;
@@ -122,7 +118,6 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = fals
 
     // 🖼️ IMAGE — logique allégée (uniquement product.src)
     if (el?.type === 'image') {
-      // Image principale liée au produit
       if (el.dataBinding === 'product_image') {
         const productImageUrl = product?.src || null;
         if (productImageUrl && productImageUrl !== el.src) {
@@ -130,8 +125,6 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = fals
         }
         return el;
       }
-
-      // Galerie : product_gallery_0, product_gallery_1, etc.
       if (el.dataBinding?.startsWith?.('product_gallery_')) {
         const index = Number.parseInt(el.dataBinding.split('_')[2], 10);
         const galleryImage = Array.isArray(product?.gallery_images)
@@ -145,8 +138,6 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = fals
         }
         return el;
       }
-
-      // Image commune
       return el;
     }
 
@@ -154,18 +145,23 @@ function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = fals
   });
 }
 
+/** 🔵 Helper centralisé : props d’ombre Konva à partir d’un élément */
+function shadowProps(el) {
+  // On met toujours les props pour être explicite ; shadowEnabled pilote l'affichage
+  return {
+    shadowEnabled: !!el?.shadowEnabled,
+    shadowColor: el?.shadowColor ?? '#000000',
+    shadowOpacity: el?.shadowOpacity ?? 0.4,
+    shadowBlur: el?.shadowBlur ?? 8,
+    shadowOffsetX: el?.shadowOffsetX ?? 2,
+    shadowOffsetY: el?.shadowOffsetY ?? 2,
+  };
+}
+
 /**
  * Crée un dataURL PNG d'un document Konva pour un set d'éléments
- * (Stage/Layer sont créés, utilisés et détruits dans cet helper)
  * -> Supporte: text, qrcode, barcode, image
- *
- * ✨ QR haute qualité :
- * - Générés à 4x la taille finale
- * - Marge augmentée
- * - ErrorCorrectionLevel 'H'
- *
- * ✨ BARCODE haute qualité :
- * - Génération sur canvas à échelle x3
+ * -> Ajout: application des ombres sur chaque node qui dessine
  */
 async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRatio) {
   const container = document.createElement('div');
@@ -189,7 +185,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
   const nodePromises = (elements || []).map(async (el) => {
     if (el?.visible === false) return null;
 
-    // TEXT
+    // 📝 TEXT (ombre appliquée directement sur le Text)
     if (el?.type === 'text') {
       return new Konva.Text({
         x: (el.x ?? 0) * scale,
@@ -202,10 +198,11 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
         scaleY: el.scaleY ?? 1,
         rotation: el.rotation ?? 0,
         listening: false,
+        ...shadowProps(el),
       });
     }
 
-    // QRCODE - HAUTE RÉSOLUTION
+    // 🔲 QRCODE (rendu en Konva.Image) + ombre sur l'image
     if (el?.type === 'qrcode') {
       const size = (el.size ?? 160) * scale;
       const color = el.color ?? '#000000';
@@ -214,7 +211,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
 
       try {
         const qrResolution = Math.max(512, Math.floor(size * 4));
-        const dataURL = await QRCodeLib.toDataURL(qrValue, {
+        const dataURL = await QRCodeLib.toDataURL(qrValue || ' ', {
           width: qrResolution,
           margin: 2,
           color: { dark: color, light: bgColor },
@@ -235,6 +232,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
           scaleX: el.scaleX ?? 1,
           scaleY: el.scaleY ?? 1,
           listening: false,
+          ...shadowProps(el),
         });
       } catch (err) {
         console.error('QR generation failed in exportPdfSheet:', err);
@@ -242,7 +240,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       }
     }
 
-    // 📊 BARCODE - HAUTE RÉSOLUTION
+    // 📊 BARCODE (Konva.Image) + ombre sur l'image
     if (el?.type === 'barcode') {
       const width = (el.width ?? 200) * scale;
       const height = (el.height ?? 80) * scale;
@@ -295,6 +293,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
           scaleX: el.scaleX ?? 1,
           scaleY: el.scaleY ?? 1,
           listening: false,
+          ...shadowProps(el),
         });
       } catch (err) {
         console.error('❌ Code-barres generation failed:', barcodeValue, err);
@@ -302,7 +301,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       }
     }
 
-    // 🖼️ IMAGE
+    // 🖼️ IMAGE (Konva.Image) + ombre
     if (el?.type === 'image') {
       const width = (el.width ?? 160) * scale;
       const height = (el.height ?? 160) * scale;
@@ -327,6 +326,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
           scaleY: el.scaleY ?? 1,
           opacity: el.opacity ?? 1,
           listening: false,
+          ...shadowProps(el),
         });
       } catch (err) {
         console.error('❌ Image loading failed in exportPdfSheet:', src, err);
@@ -355,13 +355,6 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
 
 /**
  * Export PDF en planche.
- * - Si `products` est fourni, chaque cellule affiche un produit différent (dans l'ordre).
- * - Possibilité de surcharger les éléments via `elementsOverride`; sinon on lit le store.
- *
- * ✅ SUPPORT :
- * - Images communes et images liées au produit
- * - QR codes (communs ou variables selon option)
- * - Codes-barres (communs ou liés)
  */
 export async function exportPdfSheet(
   _docNode,
@@ -378,7 +371,6 @@ export async function exportPdfSheet(
     pixelRatio = 3, // qualité élevée par défaut
     products = null,
     elementsOverride = null,
-    // QR non lié : false => commun (valeur du design), true => fallback par produit
     qrPerProductWhenUnbound = false,
   } = {}
 ) {

@@ -5,17 +5,13 @@ import JsBarcode from 'jsbarcode';
 
 /**
  * BarcodeNode - Composant Konva pour afficher un code-barres
- * Utilise JsBarcode pour générer le code-barres en SVG puis le convertit en image
- *
- * FIX DU BUG TRANSFORMER :
- * - Utilise un Group stable qui reste toujours monté
- * - L'image se met à jour en interne sans démonter le node
- * - Le Transformer garde sa référence stable
+ * - L'ID + handlers restent sur le Group (pour le Transformer)
+ * - L'ombre est appliquée sur le KonvaImage interne (car le Group ne dessine pas)
  */
 const BarcodeNode = ({
   id,
-  x = 0,
-  y = 0,
+  x,
+  y,
   width = 200,
   height = 80,
   barcodeValue = '',
@@ -26,43 +22,40 @@ const BarcodeNode = ({
   margin = 10,
   background = '#FFFFFF',
   lineColor = '#000000',
-  draggable = false,
-  onClick,
-  onDragStart, // 🆕 Ajouté pour les guides
-  onDragMove, // 🆕 Ajouté pour les guides
-  onDragEnd,
-  onTransform, // 🆕 Ajouté pour les guides pendant resize
-  onTransformEnd,
-  scaleX = 1,
-  scaleY = 1,
-  rotation = 0,
-  opacity = 1,
+  ...rest
 }) => {
   const [imageObj, setImageObj] = useState(null);
   const imageRef = useRef(null);
+
+  // --- extraire les props d'ombre pour les passer au KonvaImage ---
+  const {
+    shadowEnabled,
+    shadowColor,
+    shadowOpacity,
+    shadowBlur,
+    shadowOffsetX,
+    shadowOffsetY,
+    ...groupRest
+  } = rest;
 
   useEffect(() => {
     let mounted = true;
 
     const generateBarcode = () => {
       try {
-        // Créer un canvas temporaire pour JsBarcode
         const canvas = document.createElement('canvas');
-
-        // Valeur par défaut si vide
         const value = barcodeValue || '000000000000';
 
-        // Générer le code-barres avec JsBarcode
         JsBarcode(canvas, value, {
-          format: format,
-          width: 2, // Largeur des barres
-          height: height - (displayValue ? fontSize + textMargin * 2 : 0), // Hauteur des barres
-          displayValue: displayValue,
-          fontSize: fontSize,
-          textMargin: textMargin,
-          margin: margin,
-          background: background,
-          lineColor: lineColor,
+          format,
+          width: 2,
+          height: height - (displayValue ? fontSize + textMargin * 2 : 0),
+          displayValue,
+          fontSize,
+          textMargin,
+          margin,
+          background,
+          lineColor,
           valid: (valid) => {
             if (!valid) {
               console.warn('⚠️ Code-barres invalide:', value, 'format:', format);
@@ -70,24 +63,17 @@ const BarcodeNode = ({
           },
         });
 
-        // Convertir le canvas en Image
         const img = new Image();
         img.crossOrigin = 'anonymous';
-
         img.onload = () => {
           if (mounted) {
             setImageObj(img);
-            // Force re-render du node Konva
-            if (imageRef.current) {
-              imageRef.current.getLayer()?.batchDraw();
-            }
+            imageRef.current?.getLayer()?.batchDraw();
           }
         };
-
         img.onerror = (e) => {
           console.error('❌ Erreur chargement image code-barres:', e);
         };
-
         img.src = canvas.toDataURL('image/png');
       } catch (err) {
         console.error('❌ Erreur génération code-barres:', err);
@@ -95,7 +81,6 @@ const BarcodeNode = ({
     };
 
     generateBarcode();
-
     return () => {
       mounted = false;
     };
@@ -112,26 +97,23 @@ const BarcodeNode = ({
     lineColor,
   ]);
 
-  // ✅ TOUJOURS retourner un Group, même si l'image n'est pas encore chargée
   return (
-    <Group
-      id={id}
-      x={x}
-      y={y}
-      draggable={draggable}
-      onClick={onClick}
-      onTap={onClick}
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      onTransform={onTransform}
-      onTransformEnd={onTransformEnd}
-      scaleX={scaleX}
-      scaleY={scaleY}
-      rotation={rotation}
-      opacity={opacity}
-    >
-      {imageObj && <KonvaImage ref={imageRef} image={imageObj} width={width} height={height} />}
+    <Group id={id} x={x} y={y} {...groupRest}>
+      {imageObj && (
+        <KonvaImage
+          ref={imageRef}
+          image={imageObj}
+          width={width}
+          height={height}
+          // 🟣 Ombres sur l'image (pas sur le Group)
+          shadowEnabled={shadowEnabled}
+          shadowColor={shadowColor}
+          shadowOpacity={shadowOpacity}
+          shadowBlur={shadowBlur}
+          shadowOffsetX={shadowOffsetX}
+          shadowOffsetY={shadowOffsetY}
+        />
+      )}
     </Group>
   );
 };
