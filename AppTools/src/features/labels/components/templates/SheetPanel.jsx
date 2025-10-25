@@ -1,5 +1,5 @@
 // src/features/labels/components/templates/SheetPanel.jsx
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Grid3x3, Download, Package } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
 import { exportPdfSheet } from '../../utils/exportPdfSheet';
@@ -26,14 +26,23 @@ const clampInt = (value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_
   return Math.max(min, Math.min(max, n));
 };
 
+// Convertisseur points -> mm
+const PT_TO_MM = 25.4 / 72;
+const toMm = (pt, digits = 1) => {
+  if (pt == null) return '';
+  return (pt * PT_TO_MM).toFixed(digits);
+};
+
 const SheetPanel = ({ docNode }) => {
-  // Sélecteurs du store (avec fallback sûr)
+  // Sélecteurs du store
   const canvasSize = useLabelStore((state) => state.canvasSize);
   const dataSource = useLabelStore((state) => state.dataSource);
   const selectedProducts = useLabelStore((state) => state.selectedProducts ?? []);
   const setCanvasSize = useLabelStore((s) => s.setCanvasSize);
   const lockCanvasToSheetCell = useLabelStore((s) => s.lockCanvasToSheetCell);
   const setLockCanvasToSheetCell = useLabelStore((s) => s.setLockCanvasToSheetCell);
+  const setSheetMeta = useLabelStore((s) => s.setSheetMeta);
+  const setCellPt = useLabelStore((s) => s.setCellPt);
 
   // États UI
   const [selectedSheet, setSelectedSheet] = useState(SHEET_FORMATS[0]);
@@ -46,8 +55,9 @@ const SheetPanel = ({ docNode }) => {
   const productCount = Array.isArray(selectedProducts) ? selectedProducts.length : 0;
   const isMultiProduct = dataSource === 'data' && productCount > 1;
   const totalCells = rows * cols;
+  const isA4 = selectedSheet.id.startsWith('a4-');
 
-  // Calcul automatique des dimensions de cellule
+  // Calcul automatique des dimensions de cellule (en points)
   const cellSize = useMemo(() => {
     const availableWidth = selectedSheet.width - 2 * margin - (cols - 1) * spacing;
     const availableHeight = selectedSheet.height - 2 * margin - (rows - 1) * spacing;
@@ -57,6 +67,30 @@ const SheetPanel = ({ docNode }) => {
     };
   }, [selectedSheet, rows, cols, margin, spacing]);
 
+  // Informer le store (FormatPanel en a besoin pour afficher en mm en mode planche A4)
+  useEffect(() => {
+    setSheetMeta({
+      id: selectedSheet.id,
+      widthPt: selectedSheet.width,
+      heightPt: selectedSheet.height,
+      rows,
+      cols,
+      margin,
+      spacing,
+    });
+    setCellPt(cellSize.width, cellSize.height);
+  }, [
+    selectedSheet,
+    rows,
+    cols,
+    margin,
+    spacing,
+    cellSize.width,
+    cellSize.height,
+    setSheetMeta,
+    setCellPt,
+  ]);
+
   // Calcul du scaling pour adapter le document à la cellule (borné à 1)
   const scale = useMemo(() => {
     const scaleX = cellSize.width / canvasSize.width;
@@ -64,7 +98,7 @@ const SheetPanel = ({ docNode }) => {
     return Math.min(scaleX, scaleY, 1);
   }, [cellSize, canvasSize]);
 
-  // 🆕 Auto-sync: si activé, le canvas prend automatiquement la taille d'une cellule
+  // Auto-sync: si activé, le canvas prend automatiquement la taille d'une cellule
   useEffect(() => {
     if (!lockCanvasToSheetCell) return;
     const w = Math.max(1, cellSize.width);
@@ -136,7 +170,7 @@ const SheetPanel = ({ docNode }) => {
 
   return (
     <div className="p-4 space-y-4">
-      {/* 🆕 Mode design sur cellule */}
+      {/* Mode design sur cellule */}
       <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-700 flex items-center justify-between">
         <div className="text-sm text-indigo-900 dark:text-indigo-200">
           <div className="font-medium">Canvas = taille d’une cellule</div>
@@ -161,34 +195,6 @@ const SheetPanel = ({ docNode }) => {
         </label>
       </div>
 
-      {/* Info produits multiples */}
-      {isMultiProduct && (
-        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-          <div className="flex items-start gap-2">
-            <Package className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-medium text-green-800 dark:text-green-300 mb-1">
-                Mode multi-produits
-              </div>
-              <div className="text-sm text-green-700 dark:text-green-400">
-                {productCount} produits sélectionnés
-              </div>
-              {productCount > totalCells && (
-                <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                  ⚠️ {productCount - totalCells} produit(s) ne seront pas affichés
-                </div>
-              )}
-              <button
-                onClick={handleAdaptGrid}
-                className="mt-2 text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded"
-              >
-                Adapter la grille ({productCount} cellules)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Format de planche */}
       <div>
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -207,7 +213,16 @@ const SheetPanel = ({ docNode }) => {
             >
               <div className="text-sm font-medium">{format.label}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                {format.width} × {format.height} pt
+                {/* Affichage mm si A4 */}
+                {isA4 ? (
+                  <>
+                    {toMm(format.width, 0)} × {toMm(format.height, 0)} mm
+                  </>
+                ) : (
+                  <>
+                    {format.width} × {format.height} pt
+                  </>
+                )}
               </div>
             </button>
           ))}
@@ -239,7 +254,7 @@ const SheetPanel = ({ docNode }) => {
         </div>
       </div>
 
-      {/* Configuration manuelle */}
+      {/* Configuration manuelle (marges/espacements en mm si A4) */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Configuration</h3>
         <div className="grid grid-cols-2 gap-3">
@@ -267,7 +282,7 @@ const SheetPanel = ({ docNode }) => {
           </div>
           <div>
             <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">
-              Marge (pt)
+              Marge ({isA4 ? 'mm' : 'pt'})
             </label>
             <input
               type="number"
@@ -280,7 +295,7 @@ const SheetPanel = ({ docNode }) => {
           </div>
           <div>
             <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">
-              Espacement (pt)
+              Espacement ({isA4 ? 'mm' : 'pt'})
             </label>
             <input
               type="number"
@@ -292,6 +307,13 @@ const SheetPanel = ({ docNode }) => {
             />
           </div>
         </div>
+        {/* NB: on stocke toujours en points; ici on ne change que l'affichage */}
+        {isA4 && (
+          <div className="text-[11px] text-gray-500">
+            * Les valeurs saisies restent en points (pt). Affichage converti en millimètres pour
+            votre confort.
+          </div>
+        )}
       </div>
 
       {/* Preview de la grille */}
@@ -322,11 +344,20 @@ const SheetPanel = ({ docNode }) => {
         </div>
       </div>
 
-      {/* Info cellule */}
+      {/* Info cellule (mm si A4) */}
       <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700">
         <div className="text-xs space-y-1">
           <div className="font-medium text-amber-900 dark:text-amber-300">
-            Taille de cellule : {cellSize.width} × {cellSize.height} pt
+            Taille de cellule :{' '}
+            {isA4 ? (
+              <>
+                {toMm(cellSize.width, 0)} × {toMm(cellSize.height, 0)} mm
+              </>
+            ) : (
+              <>
+                {cellSize.width} × {cellSize.height} pt
+              </>
+            )}
           </div>
           <div className="text-amber-700 dark:text-amber-400">
             Document : {canvasSize.width} × {canvasSize.height} px

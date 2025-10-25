@@ -3,10 +3,19 @@ import React, { useState } from 'react';
 import { Maximize2 } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
 
+// Convertisseur points -> mm
+const PT_TO_MM = 25.4 / 72;
+const toMm = (pt, digits = 0) => {
+  if (pt == null) return '';
+  return (pt * PT_TO_MM).toFixed(digits);
+};
+
 const FormatPanel = () => {
   const canvasSize = useLabelStore((state) => state.canvasSize);
   const setCanvasSize = useLabelStore((state) => state.setCanvasSize);
   const lockCanvasToSheetCell = useLabelStore((s) => s.lockCanvasToSheetCell);
+  const sheetMeta = useLabelStore((s) => s.sheetMeta);
+  const cellPt = useLabelStore((s) => s.cellPt);
 
   const [customWidth, setCustomWidth] = useState(canvasSize.width);
   const [customHeight, setCustomHeight] = useState(canvasSize.height);
@@ -40,6 +49,13 @@ const FormatPanel = () => {
     }
   };
 
+  // Afficher en mm uniquement si on est en planche A4 ET canvas verrouillé
+  const isA4PlancheMode = !!lockCanvasToSheetCell && (sheetMeta?.id || '').startsWith('a4-');
+  const cellInfo =
+    isA4PlancheMode && cellPt?.width && cellPt?.height
+      ? `${toMm(cellPt.width, 0)} × ${toMm(cellPt.height, 0)} mm (cellule)`
+      : `${canvasSize.width} × ${canvasSize.height} px`;
+
   return (
     <div className="p-4 space-y-4">
       {lockCanvasToSheetCell && (
@@ -54,10 +70,13 @@ const FormatPanel = () => {
       <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
         <div className="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-300">
           <Maximize2 className="h-4 w-4" />
-          <span className="font-medium">
-            Taille actuelle : {canvasSize.width} × {canvasSize.height} px
-          </span>
+          <span className="font-medium">Taille actuelle : {cellInfo}</span>
         </div>
+        {isA4PlancheMode && (
+          <div className="mt-1 text-[11px] text-blue-700 dark:text-blue-300">
+            * Unités affichées en millimètres (conversion à partir des points).
+          </div>
+        )}
       </div>
 
       {/* Formats prédéfinis */}
@@ -83,7 +102,15 @@ const FormatPanel = () => {
             >
               <div className="text-sm font-medium">{format.label}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                {format.width} × {format.height}
+                {isA4PlancheMode && format.id.startsWith('a4-') ? (
+                  <>
+                    {toMm(format.width, 0)} × {toMm(format.height, 0)} mm
+                  </>
+                ) : (
+                  <>
+                    {format.width} × {format.height} pt
+                  </>
+                )}
               </div>
             </button>
           ))}

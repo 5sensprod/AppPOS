@@ -22,6 +22,20 @@ const useLabelStore = create((set, get) => ({
   // --- verrou : le canvas suit la taille d'une cellule de planche
   lockCanvasToSheetCell: false,
 
+  // --- méta planche (pour que FormatPanel sache si on est en A4, etc.)
+  // id ex: 'a4-portrait' | 'a4-landscape' | ...
+  sheetMeta: {
+    id: null,
+    widthPt: null,
+    heightPt: null,
+    rows: null,
+    cols: null,
+    margin: null,
+    spacing: null,
+  },
+  // taille de cellule en points (utile pour conversion mm dans FormatPanel)
+  cellPt: { width: null, height: null },
+
   // --- historique
   historyPast: [],
   historyFuture: [],
@@ -199,6 +213,22 @@ const useLabelStore = create((set, get) => ({
 
   // --- verrou “canvas = taille de cellule”
   setLockCanvasToSheetCell: (lock) => set({ lockCanvasToSheetCell: !!lock }),
+
+  // --- méta planche & taille de cellule (pour unités mm dans les panneaux)
+  setSheetMeta: (meta) =>
+    set({
+      sheetMeta: {
+        id: meta?.id ?? null,
+        widthPt: meta?.widthPt ?? null,
+        heightPt: meta?.heightPt ?? null,
+        rows: meta?.rows ?? null,
+        cols: meta?.cols ?? null,
+        margin: meta?.margin ?? null,
+        spacing: meta?.spacing ?? null,
+      },
+    }),
+
+  setCellPt: (w, h) => set({ cellPt: { width: w ?? null, height: h ?? null } }),
 }));
 
 export default useLabelStore;
