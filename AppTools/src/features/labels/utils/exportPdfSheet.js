@@ -4,6 +4,12 @@ import Konva from 'konva';
 import QRCodeLib from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import useLabelStore from '../store/useLabelStore';
+import {
+  resolvePropForElement,
+  getProductField,
+  resolveTemplate,
+  formatPriceEUR,
+} from '../utils/dataBinding';
 
 /**
  * Utilitaires purs (réutilisables/testables)
@@ -39,7 +45,7 @@ function loadImageFromDataURL(dataURL) {
 }
 
 /**
- * Helper pour charger une image depuis une URL
+ * Helper pour charger une image depuis une URL/SRC
  */
 function loadImageFromURL(url) {
   return new Promise((resolve, reject) => {
@@ -56,89 +62,80 @@ function loadImageFromURL(url) {
 
 /**
  * Remplace les valeurs des éléments liés à un produit (non destructif)
+ * ⚠️ Aligné avec la logique du canvas (dataBinding + templates)
+ * - Images: support 'product_image_src'/'product_image', 'image.src', 'product_gallery_N'
+ * - Text: prix formaté "€" (comme à l'écran)
  */
 function updateElementsWithProduct(elements, product, fillQrWhenNoBinding = false) {
   if (!product) return elements;
-
-  const pick = (key) => {
-    switch (key) {
-      case 'name':
-        return product.name ?? '';
-      case 'price':
-        return product.price != null ? `${product.price}€` : '';
-      case 'brand':
-        return product.brand_ref?.name ?? '';
-      case 'sku':
-        return product.sku ?? '';
-      case 'stock':
-        return product.stock != null ? `Stock: ${product.stock}` : '';
-      case 'supplier':
-        return product.supplier_ref?.name ?? '';
-      case 'website_url':
-        return product.website_url ?? '';
-      case 'barcode': {
-        const meta = product?.meta_data?.find?.((m) => m.key === 'barcode');
-        return meta?.value ?? '';
-      }
-      default:
-        return '';
-    }
-  };
 
   const fallbackQR = () => {
     const barcode = product?.meta_data?.find?.((m) => m.key === 'barcode')?.value;
     return product.website_url || barcode || product.sku || product._id || '';
   };
 
+  const gallerySrcAt = (idx) => {
+    const gi = Array.isArray(product?.gallery_images) ? product.gallery_images[idx] : undefined;
+    return (typeof gi === 'string' ? gi : gi?.src) || '';
+  };
+
   return (elements || []).map((el) => {
-    // 📝 TEXT
+    if (el?.visible === false) return el;
+
+    // 📝 TEXT — binding + templates, avec prix formaté (comme le canvas)
     if (el?.type === 'text') {
-      if (!el.dataBinding) return el;
-      return { ...el, text: pick(el.dataBinding) };
+      const nextText = el.dataBinding
+        ? // dataBinding: 'price' => ajouter "€"
+          el.dataBinding === 'price'
+          ? formatPriceEUR(getProductField(product, 'price'))
+          : String(getProductField(product, el.dataBinding) ?? '')
+        : // templating éventuel dans el.text
+          resolveTemplate(el.text ?? '', product, { type: 'text' });
+      return { ...el, text: nextText };
     }
 
-    // 🔲 QRCODE
+    // 🔲 QRCODE — binding brut (pas de €), sinon templating, sinon fallback
     if (el?.type === 'qrcode') {
-      if (el.dataBinding) {
-        return { ...el, qrValue: pick(el.dataBinding) };
-      }
-      if (fillQrWhenNoBinding) {
-        return { ...el, qrValue: fallbackQR() };
-      }
-      return el;
+      let nextQr =
+        el.dataBinding != null
+          ? String(getProductField(product, el.dataBinding) ?? '')
+          : resolveTemplate(el.qrValue ?? '', product, { type: 'qrcode' });
+      if (!nextQr && fillQrWhenNoBinding) nextQr = fallbackQR();
+      return { ...el, qrValue: nextQr };
     }
 
-    // 📊 BARCODE
+    // 📊 BARCODE — binding brut (pas de €), sinon templating
     if (el?.type === 'barcode') {
-      if (el.dataBinding) {
-        return { ...el, barcodeValue: pick(el.dataBinding) };
-      }
-      return el;
+      const nextBc =
+        el.dataBinding != null
+          ? String(getProductField(product, el.dataBinding) ?? '')
+          : resolveTemplate(el.barcodeValue ?? '', product, { type: 'barcode' });
+      return { ...el, barcodeValue: nextBc };
     }
 
-    // 🖼️ IMAGE — logique allégée (uniquement product.src)
+    // 🖼️ IMAGE — support dataBinding & templates (SRC prioritaire)
     if (el?.type === 'image') {
-      if (el.dataBinding === 'product_image') {
-        const productImageUrl = product?.src || null;
-        if (productImageUrl && productImageUrl !== el.src) {
-          return { ...el, src: productImageUrl };
-        }
-        return el;
-      }
-      if (el.dataBinding?.startsWith?.('product_gallery_')) {
-        const index = Number.parseInt(el.dataBinding.split('_')[2], 10);
-        const galleryImage = Array.isArray(product?.gallery_images)
-          ? product.gallery_images[index]
-          : undefined;
-        const gallerySrc =
-          typeof galleryImage === 'string' ? galleryImage : galleryImage?.src || null;
+      let nextSrc = '';
 
-        if (gallerySrc && gallerySrc !== el.src) {
-          return { ...el, src: gallerySrc };
+      if (el.dataBinding) {
+        // aliases standards
+        if (el.dataBinding === 'product_image' || el.dataBinding === 'product_image_src') {
+          nextSrc = String(getProductField(product, 'product_image_src') ?? '');
+        } else if (el.dataBinding === 'image.src' || el.dataBinding === 'image_src') {
+          nextSrc = String(getProductField(product, 'image.src') ?? '');
+        } else if (el.dataBinding.startsWith?.('product_gallery_')) {
+          const idx = Number.parseInt(el.dataBinding.split('_')[2], 10);
+          nextSrc = gallerySrcAt(Number.isFinite(idx) ? idx : 0);
+        } else {
+          // binding libre (ex. 'image.somewhere.src')
+          nextSrc = String(getProductField(product, el.dataBinding) ?? '');
         }
-        return el;
+      } else {
+        // templating dans el.src (ex. "{{image.src}}")
+        nextSrc = String(resolveTemplate(el.src ?? '', product, { type: 'image' }) ?? '');
       }
-      return el;
+
+      return nextSrc && nextSrc !== el.src ? { ...el, src: nextSrc } : el;
     }
 
     return el;
@@ -185,7 +182,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
   const nodePromises = (elements || []).map(async (el) => {
     if (el?.visible === false) return null;
 
-    // 📝 TEXT (ombre appliquée directement sur le Text)
+    // 📝 TEXT
     if (el?.type === 'text') {
       return new Konva.Text({
         x: (el.x ?? 0) * scale,
@@ -202,7 +199,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       });
     }
 
-    // 🔲 QRCODE (rendu en Konva.Image) + ombre sur l'image
+    // 🔲 QRCODE (Konva.Image)
     if (el?.type === 'qrcode') {
       const size = (el.size ?? 160) * scale;
       const color = el.color ?? '#000000';
@@ -240,7 +237,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       }
     }
 
-    // 📊 BARCODE (Konva.Image) + ombre sur l'image
+    // 📊 BARCODE (Konva.Image)
     if (el?.type === 'barcode') {
       const width = (el.width ?? 200) * scale;
       const height = (el.height ?? 80) * scale;
@@ -301,7 +298,7 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
       }
     }
 
-    // 🖼️ IMAGE (Konva.Image) + ombre
+    // 🖼️ IMAGE (Konva.Image)
     if (el?.type === 'image') {
       const width = (el.width ?? 160) * scale;
       const height = (el.height ?? 160) * scale;
@@ -437,7 +434,7 @@ export async function exportPdfSheet(
 
     pdf.addImage(dataURL, 'PNG', x, y, finalDocWidth, finalDocHeight);
 
-    // Cadre pointillé de la cellule (repère)
+    // Cadre pointillé de la cellule (repère visuel)
     pdf.setDrawColor(200, 200, 200);
     pdf.setLineDash([2, 2]);
     pdf.setLineWidth(0.5);
