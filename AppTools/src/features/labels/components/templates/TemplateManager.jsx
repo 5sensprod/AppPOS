@@ -7,7 +7,6 @@ import {
   Download,
   Upload,
   Copy,
-  Eye,
   Edit2,
   Search,
   Grid3x3,
@@ -19,6 +18,10 @@ import {
 } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
 import templateService from '@services/templateService';
+
+// ✅ Ajouts : toasts + confirm (versions utilisateur existantes)
+import { useActionToasts } from '../../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
+import { useConfirmModal } from '../../../../components/hooks/useConfirmModal';
 
 const TemplateManager = ({ stageRef, onClose }) => {
   const [templates, setTemplates] = useState([]);
@@ -37,13 +40,16 @@ const TemplateManager = ({ stageRef, onClose }) => {
   const dataSource = useLabelStore((s) => s.dataSource);
 
   // Actions du store
-  const setElements = useLabelStore((s) => s.addElement);
   const setCanvasSize = useLabelStore((s) => s.setCanvasSize);
   const setSheetSettings = useLabelStore((s) => s.setSheetSettings);
   const setLockCanvasToSheetCell = useLabelStore((s) => s.setLockCanvasToSheetCell);
   const clearCanvas = useLabelStore((s) => s.clearCanvas);
 
   const fileInputRef = useRef(null);
+
+  // ✅ Toaster & Confirm (tes hooks)
+  const { success, error } = useActionToasts();
+  const { confirm, ConfirmModal } = useConfirmModal();
 
   // Catégories disponibles
   const categories = [
@@ -55,6 +61,7 @@ const TemplateManager = ({ stageRef, onClose }) => {
 
   useEffect(() => {
     loadTemplates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -65,8 +72,9 @@ const TemplateManager = ({ stageRef, onClose }) => {
     try {
       const allTemplates = await templateService.listTemplates();
       setTemplates(allTemplates);
-    } catch (error) {
-      console.error('❌ Erreur chargement templates:', error);
+    } catch (err) {
+      console.error('❌ Erreur chargement templates:', err);
+      error('Impossible de charger les templates', { title: 'Erreur' });
     } finally {
       setLoading(false);
     }
@@ -98,10 +106,10 @@ const TemplateManager = ({ stageRef, onClose }) => {
 
       await loadTemplates();
       setShowSaveModal(false);
-      alert('✅ Template sauvegardé !');
-    } catch (error) {
-      console.error('❌ Erreur sauvegarde:', error);
-      alert('❌ Erreur lors de la sauvegarde');
+      success('Template sauvegardé ✅', { title: 'Succès' });
+    } catch (err) {
+      console.error('❌ Erreur sauvegarde:', err);
+      error('Erreur lors de la sauvegarde ❌', { title: 'Erreur' });
     }
   };
 
@@ -110,11 +118,15 @@ const TemplateManager = ({ stageRef, onClose }) => {
    */
   const handleLoadTemplate = async (template) => {
     try {
-      if (
-        elements.length > 0 &&
-        !window.confirm('Charger ce template écrasera votre travail actuel. Continuer ?')
-      ) {
-        return;
+      if (elements.length > 0) {
+        const ok = await confirm({
+          title: 'Charger le template ?',
+          message: 'Charger ce template écrasera votre travail actuel.',
+          confirmText: 'Charger',
+          cancelText: 'Annuler',
+          variant: 'primary',
+        });
+        if (!ok) return;
       }
 
       // Vider le canvas
@@ -139,12 +151,12 @@ const TemplateManager = ({ stageRef, onClose }) => {
           useLabelStore.getState().addElement(el);
         });
 
-        alert('✅ Template chargé !');
+        success('Template chargé ✅', { title: 'Succès' });
         if (onClose) onClose();
       }, 100);
-    } catch (error) {
-      console.error('❌ Erreur chargement template:', error);
-      alert('❌ Erreur lors du chargement');
+    } catch (err) {
+      console.error('❌ Erreur chargement template:', err);
+      error('Erreur lors du chargement ❌', { title: 'Erreur' });
     }
   };
 
@@ -152,15 +164,22 @@ const TemplateManager = ({ stageRef, onClose }) => {
    * 🗑️ Supprime un template
    */
   const handleDeleteTemplate = async (id, name) => {
-    if (!window.confirm(`Supprimer le template "${name}" ?`)) return;
+    const ok = await confirm({
+      title: 'Supprimer le template ?',
+      message: `Cette action est irréversible.\nTemplate : "${name}"`,
+      confirmText: 'Supprimer',
+      cancelText: 'Annuler',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await templateService.deleteTemplate(id);
       await loadTemplates();
-      alert('✅ Template supprimé');
-    } catch (error) {
-      console.error('❌ Erreur suppression:', error);
-      alert('❌ Erreur lors de la suppression');
+      success('Template supprimé ✅', { title: 'Succès' });
+    } catch (err) {
+      console.error('❌ Erreur suppression:', err);
+      error('Erreur lors de la suppression ❌', { title: 'Erreur' });
     }
   };
 
@@ -171,10 +190,10 @@ const TemplateManager = ({ stageRef, onClose }) => {
     try {
       await templateService.duplicateTemplate(id);
       await loadTemplates();
-      alert('✅ Template dupliqué');
-    } catch (error) {
-      console.error('❌ Erreur duplication:', error);
-      alert('❌ Erreur lors de la duplication');
+      success('Template dupliqué ✅', { title: 'Succès' });
+    } catch (err) {
+      console.error('❌ Erreur duplication:', err);
+      error('Erreur lors de la duplication ❌', { title: 'Erreur' });
     }
   };
 
@@ -184,9 +203,10 @@ const TemplateManager = ({ stageRef, onClose }) => {
   const handleExportTemplate = async (id) => {
     try {
       await templateService.exportTemplate(id);
-    } catch (error) {
-      console.error('❌ Erreur export:', error);
-      alert("❌ Erreur lors de l'export");
+      success('Export démarré', { title: 'Info' });
+    } catch (err) {
+      console.error('❌ Erreur export:', err);
+      error("Erreur lors de l'export ❌", { title: 'Erreur' });
     }
   };
 
@@ -200,10 +220,10 @@ const TemplateManager = ({ stageRef, onClose }) => {
     try {
       await templateService.importTemplate(file);
       await loadTemplates();
-      alert('✅ Template importé');
-    } catch (error) {
-      console.error('❌ Erreur import:', error);
-      alert("❌ Erreur lors de l'import");
+      success('Template importé ✅', { title: 'Succès' });
+    } catch (err) {
+      console.error('❌ Erreur import:', err);
+      error("Erreur lors de l'import ❌", { title: 'Erreur' });
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -374,13 +394,22 @@ const TemplateManager = ({ stageRef, onClose }) => {
         <EditTemplateModal
           template={editingTemplate}
           onSave={async (updates) => {
-            await templateService.updateTemplate(editingTemplate.id, updates);
-            await loadTemplates();
-            setEditingTemplate(null);
+            try {
+              await templateService.updateTemplate(editingTemplate.id, updates);
+              await loadTemplates();
+              setEditingTemplate(null);
+              success('Template mis à jour ✅', { title: 'Succès' });
+            } catch (err) {
+              console.error('❌ Erreur update:', err);
+              error('Erreur lors de la mise à jour ❌', { title: 'Erreur' });
+            }
           }}
           onClose={() => setEditingTemplate(null)}
         />
       )}
+
+      {/* ✅ Modal de confirmation (pilotée par useConfirmModal) */}
+      <ConfirmModal />
     </div>
   );
 };
@@ -542,13 +571,15 @@ const SaveTemplateModal = ({ onSave, onClose }) => {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('custom');
   const [tags, setTags] = useState('');
+  const [errorName, setErrorName] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      alert('Le nom est obligatoire');
+      setErrorName('Le nom est obligatoire');
       return;
     }
+    setErrorName('');
 
     onSave({
       name: name.trim(),
@@ -575,9 +606,12 @@ const SaveTemplateModal = ({ onSave, onClose }) => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Mon super template"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                className={`w-full px-3 py-2 border rounded bg-white dark:bg-gray-700 ${
+                  errorName ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                }`}
                 required
               />
+              {errorName && <p className="mt-1 text-xs text-red-600">{errorName}</p>}
             </div>
 
             <div>
@@ -647,13 +681,15 @@ const EditTemplateModal = ({ template, onSave, onClose }) => {
   const [description, setDescription] = useState(template.description || '');
   const [category, setCategory] = useState(template.category);
   const [tags, setTags] = useState((template.tags || []).join(', '));
+  const [errorName, setErrorName] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      alert('Le nom est obligatoire');
+      setErrorName('Le nom est obligatoire');
       return;
     }
+    setErrorName('');
 
     onSave({
       name: name.trim(),
@@ -679,9 +715,12 @@ const EditTemplateModal = ({ template, onSave, onClose }) => {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                className={`w-full px-3 py-2 border rounded bg-white dark:bg-gray-700 ${
+                  errorName ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                }`}
                 required
               />
+              {errorName && <p className="mt-1 text-xs text-red-600">{errorName}</p>}
             </div>
 
             <div>
