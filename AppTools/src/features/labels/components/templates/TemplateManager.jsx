@@ -1,22 +1,10 @@
 // src/features/labels/components/templates/TemplateManager.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Save,
-  FolderOpen,
-  Trash2,
-  Download,
-  Upload,
-  Copy,
-  Edit2,
-  Search,
-  X,
-  Clock,
-  Tag,
-  Loader2,
-} from 'lucide-react';
+import { Save, FolderOpen, Upload, Edit2, Search, X, Tag, Loader2, Package } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
 import templateService from '@services/templateService';
 import TemplateGrid from '../ui/TemplateGrid';
+import ProductSelector from '../ProductSelector'; // 🆕 Import ProductSelector
 
 // ✅ Ajouts : toasts + confirm (versions utilisateur existantes)
 import { useActionToasts } from '../../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
@@ -30,6 +18,10 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
 
+  // 🆕 États pour la sélection de produits
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState(null);
+
   // Données du store
   const elements = useLabelStore((s) => s.elements);
   const canvasSize = useLabelStore((s) => s.canvasSize);
@@ -42,6 +34,8 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
   const setSheetSettings = useLabelStore((s) => s.setSheetSettings);
   const setLockCanvasToSheetCell = useLabelStore((s) => s.setLockCanvasToSheetCell);
   const clearCanvas = useLabelStore((s) => s.clearCanvas);
+  const setDataSource = useLabelStore((s) => s.setDataSource); // 🆕
+  const setSelectedProducts = useLabelStore((s) => s.setSelectedProducts); // 🆕
 
   const fileInputRef = useRef(null);
 
@@ -76,6 +70,27 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * 🎯 Détecte si un template nécessite une sélection de produits
+   */
+  const requiresProductSelection = (template) => {
+    // Un template de planche en mode "data" nécessite une sélection
+    return (
+      template.dataSource === 'data' &&
+      template.sheetSettings &&
+      template.sheetSettings.rows > 0 &&
+      template.sheetSettings.cols > 0
+    );
+  };
+
+  /**
+   * 📊 Calcule le nombre max de produits pour un template
+   */
+  const getMaxProducts = (template) => {
+    if (!template.sheetSettings) return 1;
+    return template.sheetSettings.rows * template.sheetSettings.cols;
   };
 
   /**
@@ -122,10 +137,11 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
   };
 
   /**
-   * 📂 Charge un template
+   * 📂 Charge un template (avec gestion de la sélection produits)
    */
   const handleLoadTemplate = async (template) => {
     try {
+      // Vérifier si le canvas actuel contient des éléments
       if (elements.length > 0) {
         const ok = await confirm({
           title: 'Charger le template ?',
@@ -137,35 +153,97 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
         if (!ok) return;
       }
 
-      // Vider le canvas
-      clearCanvas();
+      // 🆕 Vérifier si le template nécessite une sélection de produits
+      if (requiresProductSelection(template)) {
+        const maxProducts = getMaxProducts(template);
 
-      // Attendre un peu pour que le clear soit effectif
-      setTimeout(() => {
-        // Restaurer la taille du canvas
-        setCanvasSize(template.canvasSize.width, template.canvasSize.height);
-
-        // Restaurer les paramètres de planche
-        if (template.sheetSettings) {
-          setSheetSettings(template.sheetSettings);
-        }
-        if (template.lockCanvasToSheetCell !== undefined) {
-          setLockCanvasToSheetCell(template.lockCanvasToSheetCell);
-        }
-
-        // Restaurer les éléments
-        template.elements.forEach((el) => {
-          // Utiliser addElement du store pour chaque élément
-          useLabelStore.getState().addElement(el);
+        // Informer l'utilisateur
+        const proceedWithSelection = await confirm({
+          title: 'Sélection de produits requise',
+          message: `Ce template est une planche de ${template.sheetSettings.rows}×${template.sheetSettings.cols} cellules.\n\nVous pouvez sélectionner jusqu'à ${maxProducts} produit${maxProducts > 1 ? 's' : ''} pour remplir les cellules.`,
+          confirmText: 'Sélectionner les produits',
+          cancelText: 'Annuler',
+          variant: 'primary',
         });
 
-        success('Template chargé ✅', { title: 'Succès' });
-        if (onClose) onClose();
-      }, 100);
+        if (!proceedWithSelection) return;
+
+        // Ouvrir le sélecteur de produits
+        setPendingTemplate(template);
+        setShowProductSelector(true);
+        return;
+      }
+
+      // Si pas besoin de sélection, charger directement
+      await applyTemplate(template, null);
     } catch (err) {
       console.error('❌ Erreur chargement template:', err);
       error('Erreur lors du chargement ❌', { title: 'Erreur' });
     }
+  };
+
+  /**
+   * 🎨 Applique le template avec les produits sélectionnés (si applicable)
+   */
+  const applyTemplate = async (template, selectedProducts = null) => {
+    try {
+      // Vider le canvas
+      clearCanvas();
+
+      // Attendre un peu pour que le clear soit effectif
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Restaurer la taille du canvas
+      setCanvasSize(template.canvasSize.width, template.canvasSize.height);
+
+      // Restaurer les paramètres de planche
+      if (template.sheetSettings) {
+        setSheetSettings(template.sheetSettings);
+      }
+      if (template.lockCanvasToSheetCell !== undefined) {
+        setLockCanvasToSheetCell(template.lockCanvasToSheetCell);
+      }
+
+      // 🆕 Restaurer le dataSource et les produits sélectionnés
+      if (template.dataSource) {
+        setDataSource(template.dataSource);
+      }
+      if (selectedProducts && selectedProducts.length > 0) {
+        setSelectedProducts(selectedProducts);
+      }
+
+      // Restaurer les éléments
+      template.elements.forEach((el) => {
+        // Utiliser addElement du store pour chaque élément
+        useLabelStore.getState().addElement(el);
+      });
+
+      success('Template chargé ✅', { title: 'Succès' });
+      if (onClose) onClose();
+    } catch (err) {
+      console.error('❌ Erreur application template:', err);
+      error("Erreur lors de l'application ❌", { title: 'Erreur' });
+    }
+  };
+
+  /**
+   * 🎯 Callback quand des produits sont sélectionnés
+   */
+  const handleProductsSelected = async (selectedProducts) => {
+    setShowProductSelector(false);
+
+    if (!pendingTemplate) return;
+
+    const maxProducts = getMaxProducts(pendingTemplate);
+
+    // Limiter au nombre de cellules disponibles
+    const productsToUse = selectedProducts.slice(0, maxProducts);
+
+    // Appliquer le template avec les produits
+    await applyTemplate(pendingTemplate, productsToUse);
+
+    // Reset
+    setPendingTemplate(null);
   };
 
   /**
@@ -249,120 +327,118 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
     // Filtre par recherche
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return (
-        template.name.toLowerCase().includes(query) ||
-        template.description?.toLowerCase().includes(query) ||
-        template.tags?.some((tag) => tag.toLowerCase().includes(query))
-      );
+      const matchName = template.name?.toLowerCase().includes(query);
+      const matchDescription = template.description?.toLowerCase().includes(query);
+      const matchTags = template.tags?.some((tag) => tag.toLowerCase().includes(query));
+
+      return matchName || matchDescription || matchTags;
     }
 
     return true;
   });
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-900">
+    <div className="h-full flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Mes Templates</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <h2 className="text-lg font-semibold">Mes Templates</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              Sauvegarder
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg text-sm transition-colors"
+            >
+              <Upload className="h-4 w-4" />
+              Importer
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImportTemplate}
+              className="hidden"
+            />
+          </div>
         </div>
 
-        {/* Actions rapides */}
-        <div className="flex items-center gap-2 flex-wrap mb-4">
-          <button
-            onClick={() => setShowSaveModal(true)}
-            className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
-          >
-            <Save className="h-4 w-4" />
-            Sauvegarder actuel
-          </button>
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 rounded text-sm"
-          >
-            <Upload className="h-4 w-4" />
-            Importer
-          </button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImportTemplate}
-            className="hidden"
-          />
-        </div>
-
-        {/* Recherche */}
+        {/* Search */}
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
+            placeholder="Rechercher un template..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher un template..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
-        {/* Catégories */}
+        {/* Categories */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2">
-          {categories.map((cat) => {
-            const Icon = cat.icon;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded whitespace-nowrap text-sm ${
-                  selectedCategory === cat.id
-                    ? 'bg-blue-500 text-white'
-                    : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {cat.label}
-              </button>
-            );
-          })}
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                selectedCategory === cat.id
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              <cat.icon className="h-3.5 w-3.5" />
+              {cat.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Liste des templates avec TemplateGrid */}
-      <div className="flex-1 overflow-y-auto overflow-x-visible" style={{ overflowX: 'visible' }}>
+      {/* Templates Grid */}
+      <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>
         ) : filteredTemplates.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg m-4">
-            <FolderOpen className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">
-              {templates.length === 0
-                ? 'Aucun template sauvegardé'
-                : 'Aucun template trouvé avec ces filtres'}
+          <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+            <FolderOpen className="h-12 w-12 mb-2 opacity-50" />
+            <p className="text-sm">
+              {searchQuery || selectedCategory !== 'all'
+                ? 'Aucun template trouvé'
+                : 'Aucun template sauvegardé'}
             </p>
-            <button
-              onClick={() => setShowSaveModal(true)}
-              className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
-            >
-              Créer mon premier template
-            </button>
           </div>
         ) : (
           <TemplateGrid
-            templates={filteredTemplates}
+            templates={filteredTemplates.map((template) => ({
+              ...template,
+              // 🆕 Badge pour templates multi-produits
+              badge: requiresProductSelection(template) ? (
+                <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-green-500 text-white text-xs rounded-full">
+                  <Package className="h-3 w-3" />
+                  {getMaxProducts(template)}
+                </div>
+              ) : null,
+            }))}
             onLoad={handleLoadTemplate}
+            onDelete={handleDeleteTemplate}
             onEdit={setEditingTemplate}
             onDuplicate={handleDuplicateTemplate}
             onExport={handleExportTemplate}
-            onDelete={handleDeleteTemplate}
           />
         )}
       </div>
@@ -376,9 +452,9 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
       {editingTemplate && (
         <EditTemplateModal
           template={editingTemplate}
-          onSave={async (updates) => {
+          onSave={async (metadata) => {
             try {
-              await templateService.updateTemplate(editingTemplate.id, updates);
+              await templateService.updateTemplate(editingTemplate.id, metadata);
               await loadTemplates();
               setEditingTemplate(null);
               success('Template mis à jour ✅', { title: 'Succès' });
@@ -388,6 +464,19 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
             }
           }}
           onClose={() => setEditingTemplate(null)}
+        />
+      )}
+
+      {/* 🆕 Modal de sélection de produits */}
+      {showProductSelector && pendingTemplate && (
+        <ProductSelector
+          multiSelect={true}
+          selectedProducts={[]}
+          onSelect={handleProductsSelected}
+          onClose={() => {
+            setShowProductSelector(false);
+            setPendingTemplate(null);
+          }}
         />
       )}
 
