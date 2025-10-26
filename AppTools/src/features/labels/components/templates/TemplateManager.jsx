@@ -418,68 +418,75 @@ const TemplateManager = ({ stageRef, onClose }) => {
  * 🃏 Carte de template
  */
 const TemplateCard = ({ template, viewMode, onLoad, onDelete, onDuplicate, onExport, onEdit }) => {
+  const actionBtn =
+    'p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0';
+
+  // handler commun (clic + clavier)
+  const activate = (e) => {
+    // éviter de déclencher si on clique un bouton d’action
+    if (e.target.closest('[data-action]')) return;
+    onLoad();
+  };
+  const onKey = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onLoad();
+    }
+  };
+
   if (viewMode === 'list') {
     return (
-      <div className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-400 transition-all">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={activate}
+        onKeyDown={onKey}
+        className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-0"
+        title={`Ouvrir ${template.name}`}
+      >
         {/* Thumbnail */}
         {template.thumbnail ? (
           <img
             src={template.thumbnail}
-            alt={template.name}
-            className="w-20 h-14 object-cover rounded border border-gray-200"
+            alt=""
+            className="w-16 h-12 object-cover rounded border border-gray-200 dark:border-gray-700 shrink-0"
           />
         ) : (
-          <div className="w-20 h-14 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 flex items-center justify-center">
-            <FolderOpen className="h-6 w-6 text-gray-400" />
+          <div className="w-16 h-12 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center shrink-0">
+            <FolderOpen className="h-5 w-5 text-gray-400" />
           </div>
         )}
 
-        {/* Info */}
+        {/* Infos (truncate) */}
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
             {template.name}
           </div>
-          <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
-            <Clock className="h-3 w-3" />
-            {new Date(template.updatedAt).toLocaleDateString('fr-FR')}
+          <div className="text-xs text-gray-500 flex items-center gap-2 mt-1 whitespace-nowrap overflow-hidden">
+            <Clock className="h-3 w-3 shrink-0" />
+            <span className="truncate">
+              {new Date(template.updatedAt).toLocaleDateString('fr-FR')}
+            </span>
             <span className="text-gray-400">•</span>
-            <span>{template.elements?.length || 0} éléments</span>
+            <span className="truncate">{template.elements?.length || 0} éléments</span>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={onLoad}
-            className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900 rounded text-blue-600"
-            title="Charger"
-          >
-            <FolderOpen className="h-4 w-4" />
-          </button>
-          <button
-            onClick={onEdit}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-            title="Éditer"
-          >
+        {/* Actions (icônes uniquement) */}
+        <div className="flex items-center gap-1 ml-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <button data-action onClick={onEdit} className={actionBtn} title="Éditer">
             <Edit2 className="h-4 w-4" />
           </button>
-          <button
-            onClick={onDuplicate}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-            title="Dupliquer"
-          >
+          <button data-action onClick={onDuplicate} className={actionBtn} title="Dupliquer">
             <Copy className="h-4 w-4" />
           </button>
-          <button
-            onClick={onExport}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-            title="Exporter"
-          >
+          <button data-action onClick={onExport} className={actionBtn} title="Exporter">
             <Download className="h-4 w-4" />
           </button>
           <button
+            data-action
             onClick={onDelete}
-            className="p-2 hover:bg-red-100 dark:hover:bg-red-900 rounded text-red-600"
+            className={`${actionBtn} text-red-600 hover:bg-red-50 dark:hover:bg-red-900/40`}
             title="Supprimer"
           >
             <Trash2 className="h-4 w-4" />
@@ -489,73 +496,71 @@ const TemplateCard = ({ template, viewMode, onLoad, onDelete, onDuplicate, onExp
     );
   }
 
-  // Mode grille
+  // --- MODE GRILLE (card compacte, pas d’overlay, actions en bas uniquement) ---
   return (
-    <div className="group border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:border-blue-400 hover:shadow-lg transition-all">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={activate}
+      onKeyDown={onKey}
+      className="group border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
+      title={`Ouvrir ${template.name}`}
+    >
       {/* Preview */}
-      <div className="aspect-video bg-gray-100 dark:bg-gray-800 relative">
+      <div
+        className="relative w-full overflow-hidden rounded-t-lg bg-white"
+        style={{ aspectRatio: '16 / 9' }} // ou '1 / 1' si tu préfères carré
+      >
         {template.thumbnail ? (
           <img
             src={template.thumbnail}
-            alt={template.name}
-            className="w-full h-full object-cover"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover object-center"
+            draggable={false}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <FolderOpen className="h-12 w-12 text-gray-300" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <FolderOpen className="h-10 w-10 text-gray-300" />
           </div>
         )}
-
-        {/* Overlay actions */}
-        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-          <button
-            onClick={onLoad}
-            className="p-2 bg-white rounded-full shadow-lg hover:bg-blue-50"
-            title="Charger"
-          >
-            <FolderOpen className="h-5 w-5 text-blue-600" />
-          </button>
-          <button
-            onClick={onEdit}
-            className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"
-            title="Éditer"
-          >
-            <Edit2 className="h-5 w-5 text-gray-600" />
-          </button>
-        </div>
       </div>
 
-      {/* Info */}
-      <div className="p-3">
-        <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
+      {/* Infos + actions */}
+      <div className="p-3 min-w-0">
+        <div
+          className="font-medium text-sm text-gray-900 dark:text-white truncate"
+          title={template.name}
+        >
           {template.name}
         </div>
-        <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
-          <Clock className="h-3 w-3" />
-          {new Date(template.updatedAt).toLocaleDateString('fr-FR')}
+        <div className="text-xs text-gray-500 mt-1 flex items-center gap-2 whitespace-nowrap overflow-hidden">
+          <Clock className="h-3 w-3 shrink-0" />
+          <span className="truncate">
+            {new Date(template.updatedAt).toLocaleDateString('fr-FR')}
+          </span>
         </div>
 
-        {/* Actions secondaires */}
-        <div className="flex items-center gap-1 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={onDuplicate}
-            className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-          >
-            <Copy className="h-3 w-3" />
-            Dupliquer
+        {/* Barre d’actions compacte (icônes seulement) */}
+        <div
+          className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-center gap-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button data-action onClick={onEdit} className={actionBtn} title="Éditer">
+            <Edit2 className="h-4 w-4" />
+          </button>
+          <button data-action onClick={onDuplicate} className={actionBtn} title="Dupliquer">
+            <Copy className="h-4 w-4" />
+          </button>
+          <button data-action onClick={onExport} className={actionBtn} title="Exporter">
+            <Download className="h-4 w-4" />
           </button>
           <button
-            onClick={onExport}
-            className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-          >
-            <Download className="h-3 w-3" />
-            Exporter
-          </button>
-          <button
+            data-action
             onClick={onDelete}
-            className="p-1 text-xs hover:bg-red-100 dark:hover:bg-red-900 rounded text-red-600"
+            className={`${actionBtn} text-red-600 hover:bg-red-50 dark:hover:bg-red-900/40`}
+            title="Supprimer"
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
       </div>
