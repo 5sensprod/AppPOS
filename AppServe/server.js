@@ -134,6 +134,7 @@ const wordpressMenuRoutes = require('./routes/wordpress/menuRoutes');
 const userManagementRoutes = require('./routes/userManagementRoutes');
 const rolePermissionsRoutes = require('./routes/rolePermissionsRoutes');
 const presetImageRoutes = require('./routes/presetImageRoutes');
+const templateRoutes = require('./routes/templateRoutes');
 
 // Protection des routes API avec le middleware d'authentification
 app.use('/api/categories', authMiddleware, categoryRoutes);
@@ -157,6 +158,7 @@ const dataCopyRoutes = require('./routes/dataCopyRoutes');
 app.use('/api/data-copy', authMiddleware, dataCopyRoutes);
 
 app.use('/api/users', userManagementRoutes);
+app.use('/api/templates', templateRoutes);
 
 app.use('/api/role-permissions', rolePermissionsRoutes);
 

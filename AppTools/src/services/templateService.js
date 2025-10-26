@@ -1,18 +1,53 @@
-// src/services/templateService.js
+// AppTools/src/services/templateService.hybrid.js
 import Konva from 'konva';
+import templateApiService from './templateApiService';
 
 /**
- * Service de gestion des templates d'étiquettes
- * Utilise IndexedDB pour le stockage local
- * Structure extensible vers API backend
+ * 🎨 Service HYBRIDE de gestion des templates
+ * Combine IndexedDB (local) et API (cloud)
+ *
+ * Modes de fonctionnement :
+ * - 'local': IndexedDB uniquement (par défaut si hors ligne)
+ * - 'api': API uniquement
+ * - 'hybrid': Les deux (recommandé)
  */
-
 class TemplateService {
   constructor() {
     this.dbName = 'LabelTemplatesDB';
     this.dbVersion = 1;
     this.storeName = 'templates';
     this.db = null;
+
+    // 🆕 Mode de stockage
+    this.storageMode = 'hybrid'; // 'local' | 'api' | 'hybrid'
+
+    // 🆕 Préférence de l'utilisateur (récupérée du localStorage)
+    this.userPreference = this.loadUserPreference();
+  }
+
+  /**
+   * 💾 Charge la préférence utilisateur
+   */
+  loadUserPreference() {
+    try {
+      const pref = localStorage.getItem('templateStoragePreference');
+      return pref || 'hybrid';
+    } catch {
+      return 'hybrid';
+    }
+  }
+
+  /**
+   * 💾 Sauvegarde la préférence utilisateur
+   */
+  setUserPreference(mode) {
+    try {
+      this.userPreference = mode;
+      localStorage.setItem('templateStoragePreference', mode);
+      console.log('✅ [TEMPLATES] Préférence sauvegardée:', mode);
+    } catch (error) {
+      console.error('❌ [TEMPLATES] Erreur sauvegarde préférence:', error);
+    }
   }
 
   /**
@@ -25,97 +60,71 @@ class TemplateService {
       const request = indexedDB.open(this.dbName, this.dbVersion);
 
       request.onerror = () => {
-        console.error('❌ Erreur ouverture IndexedDB:', request.error);
+        console.error('❌ [TEMPLATES-LOCAL] Erreur ouverture IndexedDB:', request.error);
         reject(request.error);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('✅ IndexedDB initialisée');
+        console.log('✅ [TEMPLATES-LOCAL] IndexedDB initialisée');
         resolve(this.db);
       };
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
 
-        // Créer le store si nécessaire
         if (!db.objectStoreNames.contains(this.storeName)) {
           const objectStore = db.createObjectStore(this.storeName, {
             keyPath: 'id',
             autoIncrement: false,
           });
 
-          // Index pour recherche par nom
           objectStore.createIndex('name', 'name', { unique: false });
           objectStore.createIndex('createdAt', 'createdAt', { unique: false });
           objectStore.createIndex('category', 'category', { unique: false });
+          objectStore.createIndex('source', 'source', { unique: false }); // 🆕 'local' | 'api'
 
-          console.log('✅ Object store créé');
+          console.log('✅ [TEMPLATES-LOCAL] Object store créé');
         }
       };
     });
   }
 
   /**
-   * 💾 Sauvegarde un template
-   * @param {Object} templateData - Données du template depuis le store Zustand
-   * @param {Object} metadata - Métadonnées (nom, description, catégorie, etc.)
+   * 📋 Liste TOUS les templates (local + API)
    */
-  async saveTemplate(templateData, metadata = {}) {
+  async listTemplates(filters = {}) {
+    const mode = this.userPreference;
+
     try {
-      await this.initDB();
+      if (mode === 'api') {
+        // API uniquement
+        return await templateApiService.listTemplates(filters);
+      }
 
-      const template = {
-        id: metadata.id || `template-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        name: metadata.name || `Template ${new Date().toLocaleDateString('fr-FR')}`,
-        description: metadata.description || '',
-        category: metadata.category || 'custom',
-        thumbnail: metadata.thumbnail || null, // Base64 ou URL de preview
+      if (mode === 'local') {
+        // Local uniquement
+        return await this.listFromIndexedDB(filters);
+      }
 
-        // ✅ Données du canvas (depuis useLabelStore)
-        elements: templateData.elements || [],
-        canvasSize: templateData.canvasSize || { width: 800, height: 600 },
+      // Mode hybride : fusionner les deux sources
+      const [localTemplates, apiTemplates] = await Promise.all([
+        this.listFromIndexedDB(filters),
+        templateApiService.listTemplates(filters).catch(() => []),
+      ]);
 
-        // ✅ Configuration planche (si applicable)
-        sheetSettings: templateData.sheetSettings || null,
-        lockCanvasToSheetCell: templateData.lockCanvasToSheetCell || false,
-
-        // ✅ Métadonnées de source
-        dataSource: templateData.dataSource || 'blank',
-
-        // ✅ Timestamps
-        createdAt: metadata.createdAt || Date.now(),
-        updatedAt: Date.now(),
-
-        // ✅ Tags pour filtrage
-        tags: metadata.tags || [],
-      };
-
-      const transaction = this.db.transaction([this.storeName], 'readwrite');
-      const store = transaction.objectStore(this.storeName);
-      const request = store.put(template);
-
-      return new Promise((resolve, reject) => {
-        request.onsuccess = () => {
-          console.log('✅ Template sauvegardé:', template.id);
-          resolve(template);
-        };
-        request.onerror = () => {
-          console.error('❌ Erreur sauvegarde template:', request.error);
-          reject(request.error);
-        };
-      });
+      return this.mergeTemplates(localTemplates, apiTemplates);
     } catch (error) {
-      console.error('❌ Erreur saveTemplate:', error);
-      throw error;
+      console.error('❌ [TEMPLATES] Erreur listTemplates:', error);
+      // Fallback sur local en cas d'erreur
+      return await this.listFromIndexedDB(filters);
     }
   }
 
   /**
-   * 📋 Récupère tous les templates
-   * @param {Object} filters - Filtres optionnels (category, tags)
+   * 📋 Liste les templates depuis IndexedDB
    */
-  async listTemplates(filters = {}) {
+  async listFromIndexedDB(filters = {}) {
     try {
       await this.initDB();
 
@@ -140,18 +149,135 @@ class TemplateService {
           // Trier par date de modification (plus récent en premier)
           templates.sort((a, b) => b.updatedAt - a.updatedAt);
 
-          console.log(`✅ ${templates.length} template(s) récupéré(s)`);
+          console.log(`✅ [TEMPLATES-LOCAL] ${templates.length} template(s) récupéré(s)`);
           resolve(templates);
         };
 
         request.onerror = () => {
-          console.error('❌ Erreur listTemplates:', request.error);
+          console.error('❌ [TEMPLATES-LOCAL] Erreur listFromIndexedDB:', request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('❌ Erreur listTemplates:', error);
+      console.error('❌ [TEMPLATES-LOCAL] Erreur listFromIndexedDB:', error);
       return [];
+    }
+  }
+
+  /**
+   * 🔄 Fusionne les templates locaux et API
+   * Évite les doublons, donne priorité à l'API si même ID
+   */
+  mergeTemplates(localTemplates, apiTemplates) {
+    const merged = new Map();
+
+    // Ajouter les templates locaux
+    localTemplates.forEach((template) => {
+      merged.set(template.id || template._id, {
+        ...template,
+        source: 'local',
+      });
+    });
+
+    // Ajouter/remplacer par les templates API
+    apiTemplates.forEach((template) => {
+      const id = template._id || template.id;
+      merged.set(id, {
+        ...template,
+        id: id, // Normaliser l'ID
+        source: 'api',
+      });
+    });
+
+    return Array.from(merged.values());
+  }
+
+  /**
+   * 💾 Sauvegarde un template
+   */
+  async saveTemplate(templateData, metadata = {}) {
+    const mode = this.userPreference;
+
+    try {
+      const template = {
+        id: metadata.id || `template-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: metadata.name || `Template ${new Date().toLocaleDateString('fr-FR')}`,
+        description: metadata.description || '',
+        category: metadata.category || 'custom',
+        thumbnail: metadata.thumbnail || null,
+
+        // Données du canvas
+        elements: templateData.elements || [],
+        canvasSize: templateData.canvasSize || { width: 800, height: 600 },
+        sheetSettings: templateData.sheetSettings || null,
+        lockCanvasToSheetCell: templateData.lockCanvasToSheetCell || false,
+        dataSource: templateData.dataSource || 'blank',
+
+        // Timestamps
+        createdAt: metadata.createdAt || Date.now(),
+        updatedAt: Date.now(),
+        tags: metadata.tags || [],
+
+        // Source
+        source: mode === 'local' ? 'local' : 'api',
+      };
+
+      if (mode === 'api' || mode === 'hybrid') {
+        // Sauvegarder via API
+        try {
+          const apiTemplate = await templateApiService.saveTemplate(templateData, metadata);
+          console.log("✅ [TEMPLATES-API] Template sauvegardé dans l'API");
+
+          // Si mode hybride, sauvegarder aussi localement
+          if (mode === 'hybrid') {
+            await this.saveToIndexedDB({ ...template, _id: apiTemplate._id });
+          }
+
+          return apiTemplate;
+        } catch (error) {
+          console.error('❌ [TEMPLATES-API] Erreur sauvegarde API:', error);
+
+          // Fallback sur local si API échoue
+          if (mode === 'hybrid') {
+            console.warn('⚠️ [TEMPLATES] Fallback sur sauvegarde locale');
+            return await this.saveToIndexedDB(template);
+          }
+          throw error;
+        }
+      }
+
+      // Mode local uniquement
+      return await this.saveToIndexedDB(template);
+    } catch (error) {
+      console.error('❌ [TEMPLATES] Erreur saveTemplate:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 💾 Sauvegarde dans IndexedDB
+   */
+  async saveToIndexedDB(template) {
+    try {
+      await this.initDB();
+
+      const transaction = this.db.transaction([this.storeName], 'readwrite');
+      const store = transaction.objectStore(this.storeName);
+      const request = store.put(template);
+
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => {
+          console.log('✅ [TEMPLATES-LOCAL] Template sauvegardé localement:', template.id);
+          resolve(template);
+        };
+        request.onerror = () => {
+          console.error('❌ [TEMPLATES-LOCAL] Erreur sauvegarde:', request.error);
+          reject(request.error);
+        };
+      });
+    } catch (error) {
+      console.error('❌ [TEMPLATES-LOCAL] Erreur saveToIndexedDB:', error);
+      throw error;
     }
   }
 
@@ -159,6 +285,36 @@ class TemplateService {
    * 🔍 Récupère un template par son ID
    */
   async getTemplate(id) {
+    const mode = this.userPreference;
+
+    try {
+      if (mode === 'api') {
+        return await templateApiService.getTemplate(id);
+      }
+
+      if (mode === 'local') {
+        return await this.getFromIndexedDB(id);
+      }
+
+      // Mode hybride : essayer l'API d'abord, puis local
+      try {
+        const apiTemplate = await templateApiService.getTemplate(id);
+        if (apiTemplate) return apiTemplate;
+      } catch (error) {
+        console.warn('⚠️ [TEMPLATES] API inaccessible, tentative locale');
+      }
+
+      return await this.getFromIndexedDB(id);
+    } catch (error) {
+      console.error('❌ [TEMPLATES] Erreur getTemplate:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 🔍 Récupère depuis IndexedDB
+   */
+  async getFromIndexedDB(id) {
     try {
       await this.initDB();
 
@@ -170,21 +326,21 @@ class TemplateService {
         request.onsuccess = () => {
           const template = request.result;
           if (template) {
-            console.log('✅ Template récupéré:', id);
+            console.log('✅ [TEMPLATES-LOCAL] Template récupéré localement:', id);
             resolve(template);
           } else {
-            console.warn('⚠️ Template non trouvé:', id);
+            console.warn('⚠️ [TEMPLATES-LOCAL] Template non trouvé:', id);
             resolve(null);
           }
         };
 
         request.onerror = () => {
-          console.error('❌ Erreur getTemplate:', request.error);
+          console.error('❌ [TEMPLATES-LOCAL] Erreur getFromIndexedDB:', request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('❌ Erreur getTemplate:', error);
+      console.error('❌ [TEMPLATES-LOCAL] Erreur getFromIndexedDB:', error);
       return null;
     }
   }
@@ -193,6 +349,33 @@ class TemplateService {
    * 🗑️ Supprime un template
    */
   async deleteTemplate(id) {
+    const mode = this.userPreference;
+
+    try {
+      if (mode === 'api' || mode === 'hybrid') {
+        try {
+          await templateApiService.deleteTemplate(id);
+          console.log("✅ [TEMPLATES-API] Template supprimé de l'API");
+        } catch (error) {
+          console.warn('⚠️ [TEMPLATES-API] Erreur suppression API:', error);
+        }
+      }
+
+      if (mode === 'local' || mode === 'hybrid') {
+        await this.deleteFromIndexedDB(id);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ [TEMPLATES] Erreur deleteTemplate:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🗑️ Supprime depuis IndexedDB
+   */
+  async deleteFromIndexedDB(id) {
     try {
       await this.initDB();
 
@@ -202,17 +385,17 @@ class TemplateService {
 
       return new Promise((resolve, reject) => {
         request.onsuccess = () => {
-          console.log('✅ Template supprimé:', id);
+          console.log('✅ [TEMPLATES-LOCAL] Template supprimé localement:', id);
           resolve(true);
         };
 
         request.onerror = () => {
-          console.error('❌ Erreur deleteTemplate:', request.error);
+          console.error('❌ [TEMPLATES-LOCAL] Erreur deleteFromIndexedDB:', request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('❌ Erreur deleteTemplate:', error);
+      console.error('❌ [TEMPLATES-LOCAL] Erreur deleteFromIndexedDB:', error);
       throw error;
     }
   }
@@ -253,116 +436,13 @@ class TemplateService {
         }
       );
     } catch (error) {
-      console.error('❌ Erreur updateTemplate:', error);
+      console.error('❌ [TEMPLATES] Erreur updateTemplate:', error);
       throw error;
     }
   }
 
   /**
-   * 📤 Exporte un template en JSON (pour partage)
-   */
-  async exportTemplate(id) {
-    try {
-      const template = await this.getTemplate(id);
-      if (!template) {
-        throw new Error(`Template ${id} non trouvé`);
-      }
-
-      const json = JSON.stringify(template, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-
-      // Télécharger le fichier
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${template.name.replace(/[^a-z0-9]/gi, '_')}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log('✅ Template exporté:', id);
-      return true;
-    } catch (error) {
-      console.error('❌ Erreur exportTemplate:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 📥 Importe un template depuis JSON
-   */
-  async importTemplate(file) {
-    try {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = async (e) => {
-          try {
-            const json = e.target.result;
-            const template = JSON.parse(json);
-
-            // Générer un nouvel ID pour éviter les conflits
-            const imported = {
-              ...template,
-              id: `template-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              name: `${template.name} (importé)`,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            };
-
-            const saved = await this.saveTemplate(
-              {
-                elements: imported.elements,
-                canvasSize: imported.canvasSize,
-                sheetSettings: imported.sheetSettings,
-                lockCanvasToSheetCell: imported.lockCanvasToSheetCell,
-                dataSource: imported.dataSource,
-              },
-              {
-                id: imported.id,
-                name: imported.name,
-                description: imported.description,
-                category: imported.category,
-                thumbnail: imported.thumbnail,
-                tags: imported.tags,
-                createdAt: imported.createdAt,
-              }
-            );
-
-            console.log('✅ Template importé:', saved.id);
-            resolve(saved);
-          } catch (error) {
-            console.error('❌ Erreur parsing JSON:', error);
-            reject(new Error('Fichier JSON invalide'));
-          }
-        };
-
-        reader.onerror = () => {
-          console.error('❌ Erreur lecture fichier');
-          reject(new Error('Erreur lecture fichier'));
-        };
-
-        reader.readAsText(file);
-      });
-    } catch (error) {
-      console.error('❌ Erreur importTemplate:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 🖼️ Génère une miniature du template (capture du canvas)
-   * ✅ Utilise la même logique que exportPdf.js :
-   * - Clone le docNode (Group "document")
-   * - Rend dans un Stage temporaire
-   * - Capture uniquement le contenu du canvas (rogne ce qui dépasse)
-   *
-   * @param {Object} stageRef - Référence au Stage Konva (pas utilisé directement)
-   * @param {Object} options - Options de génération
-   * @param {Object} options.docNode - Le Group "document" à capturer (REQUIS)
-   * @param {number} options.canvasWidth - Largeur du canvas
-   * @param {number} options.canvasHeight - Hauteur du canvas
+   * 🖼️ Génère une miniature du template (même logique qu'avant)
    */
   async generateThumbnail(stageRef, options = {}) {
     try {
@@ -376,11 +456,10 @@ class TemplateService {
       } = options;
 
       if (!docNode) {
-        console.warn('⚠️ docNode non fourni - impossible de générer le thumbnail');
+        console.warn('⚠️ [TEMPLATES] docNode non fourni - impossible de générer le thumbnail');
         return null;
       }
 
-      // 🎯 Clone propre du contenu (même logique que exportPdf.js)
       const clone = docNode.clone({
         x: 0,
         y: 0,
@@ -388,16 +467,13 @@ class TemplateService {
         scaleY: 1,
       });
 
-      // 🧹 Supprimer les transformers et guides
       clone.find('Transformer').forEach((t) => t.destroy());
       clone.find('Line').forEach((l) => {
-        // Supprimer les guides de snap (lignes magenta)
         if (l.stroke() === '#FF00FF') {
           l.destroy();
         }
       });
 
-      // 📦 Stage/Layer temporaires hors DOM (même logique que exportPdf.js)
       const container = document.createElement('div');
       const stage = new Konva.Stage({
         container,
@@ -409,14 +485,12 @@ class TemplateService {
       layer.add(clone);
       layer.draw();
 
-      // 📸 Capture haute résolution (rogne automatiquement au canvas)
       const dataURL = stage.toDataURL({
         pixelRatio: 2,
         mimeType: 'image/png',
         quality: 1.0,
       });
 
-      // 🖼️ Redimensionner en gardant les proportions
       return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
@@ -429,23 +503,18 @@ class TemplateService {
           canvas.height = scaledHeight;
 
           const ctx = canvas.getContext('2d');
-
-          // Fond blanc
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, scaledWidth, scaledHeight);
-
-          // Dessiner l'image redimensionnée
           ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
           resolve(canvas.toDataURL('image/png', quality));
 
-          // 🧹 Nettoyage
           stage.destroy();
           container.remove();
         };
 
         img.onerror = () => {
-          console.error('❌ Erreur génération thumbnail');
+          console.error('❌ [TEMPLATES] Erreur génération thumbnail');
           stage.destroy();
           container.remove();
           resolve(null);
@@ -454,7 +523,7 @@ class TemplateService {
         img.src = dataURL;
       });
     } catch (error) {
-      console.error('❌ Erreur generateThumbnail:', error);
+      console.error('❌ [TEMPLATES] Erreur generateThumbnail:', error);
       return null;
     }
   }
@@ -463,7 +532,18 @@ class TemplateService {
    * 🔄 Dupliquer un template
    */
   async duplicateTemplate(id) {
+    const mode = this.userPreference;
+
     try {
+      if (mode === 'api' || mode === 'hybrid') {
+        try {
+          return await templateApiService.duplicateTemplate(id);
+        } catch (error) {
+          console.warn('⚠️ [TEMPLATES-API] Erreur duplication API, fallback local');
+        }
+      }
+
+      // Fallback : duplication manuelle
       const template = await this.getTemplate(id);
       if (!template) {
         throw new Error(`Template ${id} non trouvé`);
@@ -496,35 +576,46 @@ class TemplateService {
         }
       );
     } catch (error) {
-      console.error('❌ Erreur duplicateTemplate:', error);
+      console.error('❌ [TEMPLATES] Erreur duplicateTemplate:', error);
       throw error;
     }
   }
 
   /**
-   * 🧹 Nettoie tous les templates (attention !)
+   * 🔄 Synchronise les templates locaux vers l'API
+   * Utile pour migrer les templates existants
    */
-  async clearAllTemplates() {
+  async syncLocalToApi() {
     try {
-      await this.initDB();
+      const localTemplates = await this.listFromIndexedDB();
+      const results = {
+        success: [],
+        errors: [],
+      };
 
-      const transaction = this.db.transaction([this.storeName], 'readwrite');
-      const store = transaction.objectStore(this.storeName);
-      const request = store.clear();
+      console.log(`🔄 [TEMPLATES] Synchronisation de ${localTemplates.length} templates...`);
 
-      return new Promise((resolve, reject) => {
-        request.onsuccess = () => {
-          console.log('✅ Tous les templates supprimés');
-          resolve(true);
-        };
+      for (const template of localTemplates) {
+        try {
+          // Ne pas sync les templates déjà dans l'API
+          if (template.source === 'api') {
+            console.log(`⏭️ [TEMPLATES] Template déjà dans l'API:`, template.name);
+            continue;
+          }
 
-        request.onerror = () => {
-          console.error('❌ Erreur clearAllTemplates:', request.error);
-          reject(request.error);
-        };
-      });
+          await templateApiService.syncLocalTemplate(template);
+          results.success.push(template.name);
+          console.log(`✅ [TEMPLATES] Synchronisé:`, template.name);
+        } catch (error) {
+          console.error(`❌ [TEMPLATES] Erreur sync ${template.name}:`, error);
+          results.errors.push({ name: template.name, error: error.message });
+        }
+      }
+
+      console.log('✅ [TEMPLATES] Synchronisation terminée:', results);
+      return results;
     } catch (error) {
-      console.error('❌ Erreur clearAllTemplates:', error);
+      console.error('❌ [TEMPLATES] Erreur syncLocalToApi:', error);
       throw error;
     }
   }
@@ -533,22 +624,62 @@ class TemplateService {
    * 📊 Statistiques des templates
    */
   async getStats() {
+    const mode = this.userPreference;
+
     try {
-      const templates = await this.listTemplates();
+      if (mode === 'api') {
+        return await templateApiService.getStats();
+      }
+
+      if (mode === 'local') {
+        return await this.getLocalStats();
+      }
+
+      // Mode hybride : combiner les stats
+      const [localStats, apiStats] = await Promise.all([
+        this.getLocalStats(),
+        templateApiService.getStats().catch(() => null),
+      ]);
+
+      if (!apiStats) return localStats;
+
+      return {
+        total: localStats.total + apiStats.total,
+        byCategory: {
+          ...localStats.byCategory,
+          ...Object.entries(apiStats.byCategory).reduce((acc, [cat, count]) => {
+            acc[cat] = (localStats.byCategory[cat] || 0) + count;
+            return acc;
+          }, {}),
+        },
+        recentCount: localStats.recentCount + (apiStats.recentCount || 0),
+        local: localStats.total,
+        api: apiStats.total,
+      };
+    } catch (error) {
+      console.error('❌ [TEMPLATES] Erreur getStats:', error);
+      return { total: 0, byCategory: {}, recentCount: 0 };
+    }
+  }
+
+  /**
+   * 📊 Statistiques locales
+   */
+  async getLocalStats() {
+    try {
+      const templates = await this.listFromIndexedDB();
 
       const stats = {
         total: templates.length,
         byCategory: {},
-        recentCount: 0, // Derniers 7 jours
+        recentCount: 0,
       };
 
       const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
       templates.forEach((template) => {
-        // Par catégorie
         stats.byCategory[template.category] = (stats.byCategory[template.category] || 0) + 1;
 
-        // Récents
         if (template.createdAt > sevenDaysAgo) {
           stats.recentCount++;
         }
@@ -556,7 +687,7 @@ class TemplateService {
 
       return stats;
     } catch (error) {
-      console.error('❌ Erreur getStats:', error);
+      console.error('❌ [TEMPLATES] Erreur getLocalStats:', error);
       return { total: 0, byCategory: {}, recentCount: 0 };
     }
   }

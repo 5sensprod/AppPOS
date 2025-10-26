@@ -189,37 +189,52 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
     try {
       // Vider le canvas
       clearCanvas();
-
-      // Attendre un peu pour que le clear soit effectif
       await new Promise((resolve) => setTimeout(resolve, 100));
 
+      // 🆕 CORRECTION : Récupérer les données selon la source
+      // - Factory templates API : template.preset_data
+      // - Templates locaux : template directement
+      const templateData = template.preset_data || template;
+
+      console.log('🎨 [APPLY TEMPLATE] Structure détectée:', {
+        hasPresetData: !!template.preset_data,
+        canvasSize: templateData.canvasSize,
+      });
+
+      // Vérifier que les données essentielles sont présentes
+      if (!templateData.canvasSize) {
+        console.error('❌ canvasSize manquant dans le template:', template);
+        throw new Error('Structure de template invalide : canvasSize manquant');
+      }
+
       // Restaurer la taille du canvas
-      setCanvasSize(template.canvasSize.width, template.canvasSize.height);
+      setCanvasSize(templateData.canvasSize.width, templateData.canvasSize.height);
 
       // Restaurer les paramètres de planche
-      if (template.sheetSettings) {
-        setSheetSettings(template.sheetSettings);
+      if (templateData.sheetSettings) {
+        setSheetSettings(templateData.sheetSettings);
       }
-      if (template.lockCanvasToSheetCell !== undefined) {
-        setLockCanvasToSheetCell(template.lockCanvasToSheetCell);
+      if (templateData.lockCanvasToSheetCell !== undefined) {
+        setLockCanvasToSheetCell(templateData.lockCanvasToSheetCell);
       }
 
-      // 🆕 Restaurer le dataSource et les produits sélectionnés
-      if (template.dataSource) {
-        setDataSource(template.dataSource);
+      // Restaurer le dataSource et les produits sélectionnés
+      if (templateData.dataSource) {
+        setDataSource(templateData.dataSource);
       }
       if (selectedProducts && selectedProducts.length > 0) {
         setSelectedProducts(selectedProducts);
       }
 
       // Restaurer les éléments
-      template.elements.forEach((el) => {
-        // Utiliser addElement du store pour chaque élément
+      const elements = templateData.elements || [];
+      console.log(`🎨 [APPLY TEMPLATE] Restauration de ${elements.length} éléments`);
+
+      elements.forEach((el) => {
         useLabelStore.getState().addElement(el);
       });
 
       success('Template chargé ✅', { title: 'Succès' });
-      if (onClose) onClose();
     } catch (err) {
       console.error('❌ Erreur application template:', err);
       error("Erreur lors de l'application ❌", { title: 'Erreur' });

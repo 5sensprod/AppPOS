@@ -1,0 +1,237 @@
+[
+  {
+    "id": "factory-blank",
+    "name": "Canvas vierge",
+    "description": "Canvas vide pour créer vos propres designs",
+    "metadata": {
+      "category": "custom",
+      "description": "Canvas vide pour créer vos propres designs",
+      "tags": ["blank", "starter"],
+      "thumbnail": null
+    },
+    "preset_data": {
+      "elements": [],
+      "canvasSize": {
+        "width": 800,
+        "height": 600
+      },
+      "sheetSettings": null,
+      "lockCanvasToSheetCell": false,
+      "dataSource": "blank"
+    }
+  },
+  {
+    "id": "factory-product-label",
+    "name": "Étiquette produit simple",
+    "description": "Template de base pour étiquette produit avec nom et prix",
+    "metadata": {
+      "category": "product",
+      "description": "Template de base pour étiquette produit avec nom et prix",
+      "tags": ["product", "price", "simple"],
+      "thumbnail": null
+    },
+    "preset_data": {
+      "elements": [
+        {
+          "type": "text",
+          "id": "el-name",
+          "x": 20,
+          "y": 20,
+          "width": 360,
+          "height": 40,
+          "text": "{{name}}",
+          "fontSize": 24,
+          "fontFamily": "Arial",
+          "fontStyle": "bold",
+          "fill": "#000000",
+          "align": "left",
+          "verticalAlign": "top",
+          "visible": true,
+          "locked": false
+        },
+        {
+          "type": "text",
+          "id": "el-price",
+          "x": 20,
+          "y": 70,
+          "width": 360,
+          "height": 50,
+          "text": "{{price}} €",
+          "fontSize": 36,
+          "fontFamily": "Arial",
+          "fontStyle": "bold",
+          "fill": "#e63946",
+          "align": "left",
+          "verticalAlign": "top",
+          "visible": true,
+          "locked": false
+        }
+      ],
+      "canvasSize": {
+        "width": 400,
+        "height": 150
+      },
+      "sheetSettings": null,
+      "lockCanvasToSheetCell": false,
+      "dataSource": "data"
+    }
+  },
+  {
+    "id": "factory-promo-label",
+    "name": "Étiquette promotion",
+    "description": "Template pour étiquettes de promotion avec prix barré",
+    "metadata": {
+      "category": "product",
+      "description": "Template pour étiquettes de promotion avec prix barré",
+      "tags": ["promo", "sale", "discount"],
+      "thumbnail": null
+    },
+    "preset_data": {
+      "elements": [
+        {
+          "type": "rect",
+          "id": "el-bg",
+          "x": 0,
+          "y": 0,
+          "width": 400,
+          "height": 200,
+          "fill": "#fff3cd",
+          "stroke": "#ffc107",
+          "strokeWidth": 3,
+          "visible": true,
+          "locked": false
+        },
+        {
+          "type": "text",
+          "id": "el-promo",
+          "x": 20,
+          "y": 20,
+          "width": 360,
+          "height": 40,
+          "text": "PROMOTION",
+          "fontSize": 28,
+          "fontFamily": "Arial",
+          "fontStyle": "bold",
+          "fill": "#d32f2f",
+          "align": "center",
+          "verticalAlign": "top",
+          "visible": true,
+          "locked": false
+        },
+        {
+          "type": "text",
+          "id": "el-name",
+          "x": 20,
+          "y": 70,
+          "width": 360,
+          "height": 30,
+          "text": "{{name}}",
+          "fontSize": 20,
+          "fontFamily": "Arial",
+          "fontStyle": "normal",
+          "fill": "#000000",
+          "align": "center",
+          "verticalAlign": "top",
+          "visible": true,
+          "locked": false
+        },
+        {
+          "type": "text",
+          "id": "el-old-price",
+          "x": 20,
+          "y": 110,
+          "width": 170,
+          "height": 40,
+          "text": "{{price}} €",
+          "fontSize": 22,
+          "fontFamily": "Arial",
+          "fontStyle": "normal",
+          "fill": "#757575",
+          "align": "right",
+          "verticalAlign": "top",
+          "textDecoration": "line-through",
+          "visible": true,
+          "locked": false
+        },
+        {
+          "type": "text",
+          "id": "el-new-price",
+          "x": 210,
+          "y": 110,
+          "width": 170,
+          "height": 50,
+          "text": "{{salePrice}} €",
+          "fontSize": 36,
+          "fontFamily": "Arial",
+          "fontStyle": "bold",
+          "fill": "#d32f2f",
+          "align": "left",
+          "verticalAlign": "top",
+          "visible": true,
+          "locked": false
+        }
+      ],
+      "canvasSize": {
+        "width": 400,
+        "height": 200
+      },
+      "sheetSettings": null,
+      "lockCanvasToSheetCell": false,
+      "dataSource": "data"
+    }
+  },
+  {
+    "id": "factory-a4-sheet-2x2",
+    "name": "Planche A4 2×2",
+    "description": "Planche A4 portrait avec grille 2 lignes × 2 colonnes",
+    "metadata": {
+      "category": "sheet",
+      "description": "Planche A4 portrait avec grille 2 lignes × 2 colonnes",
+      "tags": ["sheet", "a4", "grid", "2x2"],
+      "thumbnail": null
+    },
+    "preset_data": {
+      "elements": [],
+      "canvasSize": {
+        "width": 283,
+        "height": 396
+      },
+      "sheetSettings": {
+        "selectedSheetId": "a4-portrait",
+        "rows": 2,
+        "cols": 2,
+        "margin": 10,
+        "spacing": 5
+      },
+      "lockCanvasToSheetCell": true,
+      "dataSource": "data"
+    }
+  },
+  {
+    "id": "factory-a4-sheet-3x3",
+    "name": "Planche A4 3×3",
+    "description": "Planche A4 portrait avec grille 3 lignes × 3 colonnes",
+    "metadata": {
+      "category": "sheet",
+      "description": "Planche A4 portrait avec grille 3 lignes × 3 colonnes",
+      "tags": ["sheet", "a4", "grid", "3x3"],
+      "thumbnail": null
+    },
+    "preset_data": {
+      "elements": [],
+      "canvasSize": {
+        "width": 183,
+        "height": 256
+      },
+      "sheetSettings": {
+        "selectedSheetId": "a4-portrait",
+        "rows": 3,
+        "cols": 3,
+        "margin": 10,
+        "spacing": 5
+      },
+      "lockCanvasToSheetCell": true,
+      "dataSource": "data"
+    }
+  }
+]
