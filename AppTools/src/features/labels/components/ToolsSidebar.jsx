@@ -46,6 +46,7 @@ const ToolsSidebar = ({
     externalSelectedTool !== undefined ? externalSelectedTool : internalSelectedTool;
 
   const tools = [
+    { id: 'templates', label: 'Templates', icon: FolderOpen, component: TemplateManager }, // 🆕
     { id: 'text', label: 'Texte', icon: Type, component: TextTemplates },
     { id: 'upload', label: 'Upload', icon: Upload, component: UploadTemplate },
     { id: 'image', label: 'Images', icon: ImageIcon, component: ImageTemplates },
@@ -54,7 +55,6 @@ const ToolsSidebar = ({
     { id: 'qrcode', label: 'QR Code', icon: QrCode, component: QRCodeTemplates },
     { id: 'barcode', label: 'Code-barres', icon: Barcode, component: BarcodeTemplates },
     { id: 'effects', label: 'Effets', icon: Sparkles, component: EffectsTemplates },
-    { id: 'templates', label: 'Templates', icon: FolderOpen, component: TemplateManager }, // 🆕
     { id: 'layers', label: 'Calques', icon: Layers, component: LayersPanel },
     { id: 'format', label: 'Format', icon: Maximize2, component: FormatPanel },
     { id: 'sheet', label: 'Planche', icon: Grid3x3, component: SheetPanel },
@@ -149,7 +149,11 @@ const ToolsSidebar = ({
                 <>
                   {selectedTool === 'templates' ? (
                     // 🆕 TemplateManager en mode sidebar (sans modal)
-                    <TemplateManager stageRef={stageRef} onClose={() => handleToolClick(null)} />
+                    <TemplateManager
+                      stageRef={stageRef}
+                      docNode={docNode}
+                      onClose={() => handleToolClick(null)}
+                    />
                   ) : (
                     <SelectedComponent
                       dataSource={dataSource}

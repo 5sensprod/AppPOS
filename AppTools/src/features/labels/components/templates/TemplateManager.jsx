@@ -9,8 +9,6 @@ import {
   Copy,
   Edit2,
   Search,
-  Grid3x3,
-  List,
   X,
   Clock,
   Tag,
@@ -18,15 +16,15 @@ import {
 } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
 import templateService from '@services/templateService';
+import TemplateGrid from '../ui/TemplateGrid';
 
 // ✅ Ajouts : toasts + confirm (versions utilisateur existantes)
 import { useActionToasts } from '../../../../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
 import { useConfirmModal } from '../../../../components/hooks/useConfirmModal';
 
-const TemplateManager = ({ stageRef, onClose }) => {
+const TemplateManager = ({ stageRef, docNode, onClose }) => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -53,10 +51,10 @@ const TemplateManager = ({ stageRef, onClose }) => {
 
   // Catégories disponibles
   const categories = [
-    { id: 'all', label: 'Tous', icon: Grid3x3 },
+    { id: 'all', label: 'Tous', icon: Tag },
     { id: 'custom', label: 'Personnalisés', icon: Edit2 },
     { id: 'product', label: 'Produits', icon: Tag },
-    { id: 'sheet', label: 'Planches', icon: Grid3x3 },
+    { id: 'sheet', label: 'Planches', icon: Tag },
   ];
 
   useEffect(() => {
@@ -85,10 +83,20 @@ const TemplateManager = ({ stageRef, onClose }) => {
    */
   const handleSaveTemplate = async (metadata) => {
     try {
-      // Générer une miniature
+      // 🎯 Désélectionner tout avant de capturer (évite le transformer visible)
+      const clearSelection = useLabelStore.getState().clearSelection;
+      clearSelection();
+
+      // Attendre un peu pour que le render soit effectif
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Générer une miniature avec docNode (logique exportPdf)
       const thumbnail = await templateService.generateThumbnail(stageRef, {
-        width: 300,
-        height: 200,
+        width: 400,
+        height: 300,
+        docNode: docNode,
+        canvasWidth: canvasSize.width,
+        canvasHeight: canvasSize.height,
       });
 
       const templateData = {
@@ -163,10 +171,10 @@ const TemplateManager = ({ stageRef, onClose }) => {
   /**
    * 🗑️ Supprime un template
    */
-  const handleDeleteTemplate = async (id, name) => {
+  const handleDeleteTemplate = async (template) => {
     const ok = await confirm({
       title: 'Supprimer le template ?',
-      message: `Cette action est irréversible.\nTemplate : "${name}"`,
+      message: `Cette action est irréversible.\nTemplate : "${template.name}"`,
       confirmText: 'Supprimer',
       cancelText: 'Annuler',
       variant: 'danger',
@@ -174,7 +182,7 @@ const TemplateManager = ({ stageRef, onClose }) => {
     if (!ok) return;
 
     try {
-      await templateService.deleteTemplate(id);
+      await templateService.deleteTemplate(template.id);
       await loadTemplates();
       success('Template supprimé ✅', { title: 'Succès' });
     } catch (err) {
@@ -252,69 +260,48 @@ const TemplateManager = ({ stageRef, onClose }) => {
   });
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-900">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Mes Templates</h2>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* Actions rapides */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={() => setShowSaveModal(true)}
-          className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
-        >
-          <Save className="h-4 w-4" />
-          Sauvegarder actuel
-        </button>
-
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 rounded text-sm"
-        >
-          <Upload className="h-4 w-4" />
-          Importer
-        </button>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          onChange={handleImportTemplate}
-          className="hidden"
-        />
-
-        <div className="ml-auto flex items-center gap-2">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Mes Templates</h2>
           <button
-            onClick={() => setViewMode('grid')}
-            className={`p-2 rounded ${
-              viewMode === 'grid'
-                ? 'bg-blue-100 dark:bg-blue-900 text-blue-600'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
           >
-            <Grid3x3 className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-2 rounded ${
-              viewMode === 'list'
-                ? 'bg-blue-100 dark:bg-blue-900 text-blue-600'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-          >
-            <List className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
-      </div>
 
-      {/* Filtres */}
-      <div className="space-y-3">
+        {/* Actions rapides */}
+        <div className="flex items-center gap-2 flex-wrap mb-4">
+          <button
+            onClick={() => setShowSaveModal(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+          >
+            <Save className="h-4 w-4" />
+            Sauvegarder actuel
+          </button>
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 rounded text-sm"
+          >
+            <Upload className="h-4 w-4" />
+            Importer
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportTemplate}
+            className="hidden"
+          />
+        </div>
+
         {/* Recherche */}
-        <div className="relative">
+        <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
@@ -347,42 +334,38 @@ const TemplateManager = ({ stageRef, onClose }) => {
         </div>
       </div>
 
-      {/* Liste des templates */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
-        </div>
-      ) : filteredTemplates.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-          <FolderOpen className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">
-            {templates.length === 0
-              ? 'Aucun template sauvegardé'
-              : 'Aucun template trouvé avec ces filtres'}
-          </p>
-          <button
-            onClick={() => setShowSaveModal(true)}
-            className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
-          >
-            Créer mon premier template
-          </button>
-        </div>
-      ) : (
-        <div className={viewMode === 'grid' ? 'grid grid-cols-2 gap-4' : 'space-y-2'}>
-          {filteredTemplates.map((template) => (
-            <TemplateCard
-              key={template.id}
-              template={template}
-              viewMode={viewMode}
-              onLoad={() => handleLoadTemplate(template)}
-              onDelete={() => handleDeleteTemplate(template.id, template.name)}
-              onDuplicate={() => handleDuplicateTemplate(template.id)}
-              onExport={() => handleExportTemplate(template.id)}
-              onEdit={() => setEditingTemplate(template)}
-            />
-          ))}
-        </div>
-      )}
+      {/* Liste des templates avec TemplateGrid */}
+      <div className="flex-1 overflow-y-auto overflow-x-visible" style={{ overflowX: 'visible' }}>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
+          </div>
+        ) : filteredTemplates.length === 0 ? (
+          <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg m-4">
+            <FolderOpen className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500">
+              {templates.length === 0
+                ? 'Aucun template sauvegardé'
+                : 'Aucun template trouvé avec ces filtres'}
+            </p>
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+            >
+              Créer mon premier template
+            </button>
+          </div>
+        ) : (
+          <TemplateGrid
+            templates={filteredTemplates}
+            onLoad={handleLoadTemplate}
+            onEdit={setEditingTemplate}
+            onDuplicate={handleDuplicateTemplate}
+            onExport={handleExportTemplate}
+            onDelete={handleDeleteTemplate}
+          />
+        )}
+      </div>
 
       {/* Modal de sauvegarde */}
       {showSaveModal && (
@@ -410,160 +393,6 @@ const TemplateManager = ({ stageRef, onClose }) => {
 
       {/* ✅ Modal de confirmation (pilotée par useConfirmModal) */}
       <ConfirmModal />
-    </div>
-  );
-};
-
-/**
- * 🃏 Carte de template
- */
-const TemplateCard = ({ template, viewMode, onLoad, onDelete, onDuplicate, onExport, onEdit }) => {
-  const actionBtn =
-    'p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0';
-
-  // handler commun (clic + clavier)
-  const activate = (e) => {
-    // éviter de déclencher si on clique un bouton d’action
-    if (e.target.closest('[data-action]')) return;
-    onLoad();
-  };
-  const onKey = (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onLoad();
-    }
-  };
-
-  if (viewMode === 'list') {
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={activate}
-        onKeyDown={onKey}
-        className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-0"
-        title={`Ouvrir ${template.name}`}
-      >
-        {/* Thumbnail */}
-        {template.thumbnail ? (
-          <img
-            src={template.thumbnail}
-            alt=""
-            className="w-16 h-12 object-cover rounded border border-gray-200 dark:border-gray-700 shrink-0"
-          />
-        ) : (
-          <div className="w-16 h-12 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center shrink-0">
-            <FolderOpen className="h-5 w-5 text-gray-400" />
-          </div>
-        )}
-
-        {/* Infos (truncate) */}
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
-            {template.name}
-          </div>
-          <div className="text-xs text-gray-500 flex items-center gap-2 mt-1 whitespace-nowrap overflow-hidden">
-            <Clock className="h-3 w-3 shrink-0" />
-            <span className="truncate">
-              {new Date(template.updatedAt).toLocaleDateString('fr-FR')}
-            </span>
-            <span className="text-gray-400">•</span>
-            <span className="truncate">{template.elements?.length || 0} éléments</span>
-          </div>
-        </div>
-
-        {/* Actions (icônes uniquement) */}
-        <div className="flex items-center gap-1 ml-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <button data-action onClick={onEdit} className={actionBtn} title="Éditer">
-            <Edit2 className="h-4 w-4" />
-          </button>
-          <button data-action onClick={onDuplicate} className={actionBtn} title="Dupliquer">
-            <Copy className="h-4 w-4" />
-          </button>
-          <button data-action onClick={onExport} className={actionBtn} title="Exporter">
-            <Download className="h-4 w-4" />
-          </button>
-          <button
-            data-action
-            onClick={onDelete}
-            className={`${actionBtn} text-red-600 hover:bg-red-50 dark:hover:bg-red-900/40`}
-            title="Supprimer"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // --- MODE GRILLE (card compacte, pas d’overlay, actions en bas uniquement) ---
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={activate}
-      onKeyDown={onKey}
-      className="group border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
-      title={`Ouvrir ${template.name}`}
-    >
-      {/* Preview */}
-      <div
-        className="relative w-full overflow-hidden rounded-t-lg bg-white"
-        style={{ aspectRatio: '16 / 9' }} // ou '1 / 1' si tu préfères carré
-      >
-        {template.thumbnail ? (
-          <img
-            src={template.thumbnail}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover object-center"
-            draggable={false}
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <FolderOpen className="h-10 w-10 text-gray-300" />
-          </div>
-        )}
-      </div>
-
-      {/* Infos + actions */}
-      <div className="p-3 min-w-0">
-        <div
-          className="font-medium text-sm text-gray-900 dark:text-white truncate"
-          title={template.name}
-        >
-          {template.name}
-        </div>
-        <div className="text-xs text-gray-500 mt-1 flex items-center gap-2 whitespace-nowrap overflow-hidden">
-          <Clock className="h-3 w-3 shrink-0" />
-          <span className="truncate">
-            {new Date(template.updatedAt).toLocaleDateString('fr-FR')}
-          </span>
-        </div>
-
-        {/* Barre d’actions compacte (icônes seulement) */}
-        <div
-          className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-center gap-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button data-action onClick={onEdit} className={actionBtn} title="Éditer">
-            <Edit2 className="h-4 w-4" />
-          </button>
-          <button data-action onClick={onDuplicate} className={actionBtn} title="Dupliquer">
-            <Copy className="h-4 w-4" />
-          </button>
-          <button data-action onClick={onExport} className={actionBtn} title="Exporter">
-            <Download className="h-4 w-4" />
-          </button>
-          <button
-            data-action
-            onClick={onDelete}
-            className={`${actionBtn} text-red-600 hover:bg-red-50 dark:hover:bg-red-900/40`}
-            title="Supprimer"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

@@ -1,4 +1,5 @@
 // src/services/templateService.js
+import Konva from 'konva';
 
 /**
  * Service de gestion des templates d'étiquettes
@@ -352,51 +353,105 @@ class TemplateService {
 
   /**
    * 🖼️ Génère une miniature du template (capture du canvas)
+   * ✅ Utilise la même logique que exportPdf.js :
+   * - Clone le docNode (Group "document")
+   * - Rend dans un Stage temporaire
+   * - Capture uniquement le contenu du canvas (rogne ce qui dépasse)
+   *
+   * @param {Object} stageRef - Référence au Stage Konva (pas utilisé directement)
+   * @param {Object} options - Options de génération
+   * @param {Object} options.docNode - Le Group "document" à capturer (REQUIS)
+   * @param {number} options.canvasWidth - Largeur du canvas
+   * @param {number} options.canvasHeight - Hauteur du canvas
    */
   async generateThumbnail(stageRef, options = {}) {
     try {
-      if (!stageRef?.current) {
-        console.warn('⚠️ Stage ref non disponible');
+      const {
+        width = 400,
+        height = 300,
+        quality = 0.9,
+        docNode = null,
+        canvasWidth = 800,
+        canvasHeight = 600,
+      } = options;
+
+      if (!docNode) {
+        console.warn('⚠️ docNode non fourni - impossible de générer le thumbnail');
         return null;
       }
 
-      const { width = 300, height = 200, quality = 0.8 } = options;
-
-      // Capturer le canvas
-      const dataUrl = stageRef.current.toDataURL({
-        pixelRatio: 2,
-        mimeType: 'image/jpeg',
-        quality,
+      // 🎯 Clone propre du contenu (même logique que exportPdf.js)
+      const clone = docNode.clone({
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
       });
 
-      // Redimensionner si nécessaire
+      // 🧹 Supprimer les transformers et guides
+      clone.find('Transformer').forEach((t) => t.destroy());
+      clone.find('Line').forEach((l) => {
+        // Supprimer les guides de snap (lignes magenta)
+        if (l.stroke() === '#FF00FF') {
+          l.destroy();
+        }
+      });
+
+      // 📦 Stage/Layer temporaires hors DOM (même logique que exportPdf.js)
+      const container = document.createElement('div');
+      const stage = new Konva.Stage({
+        container,
+        width: canvasWidth,
+        height: canvasHeight,
+      });
+      const layer = new Konva.Layer();
+      stage.add(layer);
+      layer.add(clone);
+      layer.draw();
+
+      // 📸 Capture haute résolution (rogne automatiquement au canvas)
+      const dataURL = stage.toDataURL({
+        pixelRatio: 2,
+        mimeType: 'image/png',
+        quality: 1.0,
+      });
+
+      // 🖼️ Redimensionner en gardant les proportions
       return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
+          const scale = Math.min(width / canvasWidth, height / canvasHeight);
+          const scaledWidth = Math.floor(canvasWidth * scale);
+          const scaledHeight = Math.floor(canvasHeight * scale);
+
           const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
+          canvas.width = scaledWidth;
+          canvas.height = scaledHeight;
 
           const ctx = canvas.getContext('2d');
+
+          // Fond blanc
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, width, height);
+          ctx.fillRect(0, 0, scaledWidth, scaledHeight);
 
-          // Dessiner en gardant les proportions
-          const scale = Math.min(width / img.width, height / img.height);
-          const x = (width - img.width * scale) / 2;
-          const y = (height - img.height * scale) / 2;
+          // Dessiner l'image redimensionnée
+          ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
-          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+          resolve(canvas.toDataURL('image/png', quality));
 
-          resolve(canvas.toDataURL('image/jpeg', quality));
+          // 🧹 Nettoyage
+          stage.destroy();
+          container.remove();
         };
 
         img.onerror = () => {
           console.error('❌ Erreur génération thumbnail');
+          stage.destroy();
+          container.remove();
           resolve(null);
         };
 
-        img.src = dataUrl;
+        img.src = dataURL;
       });
     } catch (error) {
       console.error('❌ Erreur generateThumbnail:', error);
