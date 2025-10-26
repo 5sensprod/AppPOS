@@ -16,6 +16,7 @@ const useLabelStore = create((set, get) => ({
   dataSource: null,
   selectedProduct: null,
   selectedProducts: [],
+  currentProductIndex: 0, // 🆕 Index du produit actuellement affiché
   zoom: 1,
   canvasSize: { width: 800, height: 600 },
 
@@ -186,6 +187,7 @@ const useLabelStore = create((set, get) => ({
           dataSource: source,
           selectedProducts: product,
           selectedProduct: product.length > 0 ? product[0] : null,
+          currentProductIndex: 0, // 🆕 Réinitialiser l'index
         };
       }
       if (product && typeof product === 'object') {
@@ -193,12 +195,14 @@ const useLabelStore = create((set, get) => ({
           dataSource: source,
           selectedProducts: [product],
           selectedProduct: product,
+          currentProductIndex: 0, // 🆕 Réinitialiser l'index
         };
       }
       return {
         dataSource: source,
         selectedProducts: [],
         selectedProduct: null,
+        currentProductIndex: 0, // 🆕 Réinitialiser l'index
       };
     }),
 
@@ -206,6 +210,44 @@ const useLabelStore = create((set, get) => ({
     set({
       selectedProducts: Array.isArray(products) ? products : [],
       selectedProduct: Array.isArray(products) && products.length > 0 ? products[0] : null,
+      currentProductIndex: 0, // 🆕 Réinitialiser l'index
+    }),
+
+  // 🆕 Navigation entre produits
+  goToNextProduct: () =>
+    set((state) => {
+      const products = state.selectedProducts;
+      if (!Array.isArray(products) || products.length <= 1) return {};
+
+      const nextIndex = (state.currentProductIndex + 1) % products.length;
+      return {
+        currentProductIndex: nextIndex,
+        selectedProduct: products[nextIndex],
+      };
+    }),
+
+  goToPreviousProduct: () =>
+    set((state) => {
+      const products = state.selectedProducts;
+      if (!Array.isArray(products) || products.length <= 1) return {};
+
+      const prevIndex = (state.currentProductIndex - 1 + products.length) % products.length;
+      return {
+        currentProductIndex: prevIndex,
+        selectedProduct: products[prevIndex],
+      };
+    }),
+
+  goToProductIndex: (index) =>
+    set((state) => {
+      const products = state.selectedProducts;
+      if (!Array.isArray(products) || products.length === 0) return {};
+
+      const clampedIndex = Math.max(0, Math.min(index, products.length - 1));
+      return {
+        currentProductIndex: clampedIndex,
+        selectedProduct: products[clampedIndex],
+      };
     }),
 
   clearCanvas: () =>

@@ -1,6 +1,6 @@
 // src/features/labels/components/TopToolbar.jsx
 import React, { useEffect } from 'react';
-import { Undo, Redo, Download, Plus } from 'lucide-react';
+import { Undo, Redo, Download, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
 import { exportPdf } from '../utils/exportPdf';
 import PropertyPanel from './PropertyPanel'; // 🆕
@@ -10,6 +10,9 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEf
   const canvasSize = useLabelStore((s) => s.canvasSize);
   const selectedId = useLabelStore((s) => s.selectedId); // 🆕
   const selectedProducts = useLabelStore((s) => s.selectedProducts);
+  const currentProductIndex = useLabelStore((s) => s.currentProductIndex); // 🆕
+  const goToNextProduct = useLabelStore((s) => s.goToNextProduct); // 🆕
+  const goToPreviousProduct = useLabelStore((s) => s.goToPreviousProduct); // 🆕
 
   const undo = useLabelStore((s) => s.undo);
   const redo = useLabelStore((s) => s.redo);
@@ -95,14 +98,52 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEf
             // 🆕 PropertyPanel au centre quand un élément est sélectionné
             <PropertyPanel selectedProduct={selectedProduct} onOpenEffects={onOpenEffects} />
           ) : (
-            // Titre du document quand rien n'est sélectionné
-            <div className="text-center">
+            // Titre du document ou navigation produits quand rien n'est sélectionné
+            <div className="flex items-center gap-3">
               {isMultiProduct ? (
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Multi-produits ({selectedProducts.length} produits)
-                </div>
+                <>
+                  {/* 🆕 Flèche précédent */}
+                  <button
+                    onClick={goToPreviousProduct}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    title="Produit précédent"
+                  >
+                    <ChevronLeft className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                  </button>
+
+                  {/* 🆕 Info produit actuel */}
+                  <div className="text-center min-w-[300px]">
+                    {selectedProduct ? (
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedProduct.name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {selectedProduct.sku} •{' '}
+                          {selectedProduct.price?.toLocaleString('fr-FR') || '0'}€
+                        </div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                          Produit {currentProductIndex + 1} / {selectedProducts.length}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        Multi-produits ({selectedProducts.length} produits)
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 🆕 Flèche suivant */}
+                  <button
+                    onClick={goToNextProduct}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    title="Produit suivant"
+                  >
+                    <ChevronRight className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                  </button>
+                </>
               ) : selectedProduct ? (
-                <div>
+                <div className="text-center">
                   <div className="text-sm font-semibold text-gray-900 dark:text-white">
                     {selectedProduct.name}
                   </div>

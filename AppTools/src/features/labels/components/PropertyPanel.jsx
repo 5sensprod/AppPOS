@@ -36,27 +36,27 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
 
   const handleColorChange = (color) => updateElement(selectedId, { color });
 
+  // ✅ Ne plus “figer” la valeur : on n’écrit que dataBinding
   const handleFieldChange = (fieldKey) => {
     const field = dataFields.find((f) => f.key === fieldKey);
     if (!field) return;
 
     if (isText) {
-      updateElement(selectedId, { dataBinding: field.key, text: field.value });
+      updateElement(selectedId, { dataBinding: field.key });
       return;
     }
-
     if (isQRCode) {
-      updateElement(selectedId, { dataBinding: field.key, qrValue: field.value });
+      updateElement(selectedId, { dataBinding: field.key });
       return;
     }
-
     if (isBarcode) {
-      updateElement(selectedId, { dataBinding: field.key, barcodeValue: field.value });
+      updateElement(selectedId, { dataBinding: field.key });
       return;
     }
   };
 
   const handleQRValueChange = (value) => {
+    // Valeur fixe quand pas de binding
     updateElement(selectedId, { qrValue: value });
   };
 
@@ -73,31 +73,22 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
     return null;
   };
 
-  /** 🆕 Lier/Délier un QR au produit (toggle comme l'image) */
+  /** Lier/Délier un QR au produit (toggle) */
   const handleQRBinding = () => {
     if (!selectedProduct) return;
     if (selectedElement.dataBinding) {
-      // Délier
       updateElement(selectedId, { dataBinding: null });
       return;
     }
-    // Lier
     const key = getDefaultQRBindingKey();
-    const field = key ? dataFields.find((d) => d.key === key) : null;
-    if (field) {
-      updateElement(selectedId, { dataBinding: key, qrValue: field.value });
-    }
+    if (key) updateElement(selectedId, { dataBinding: key });
   };
 
-  /**
-   * 🆕 Lier/Délier une image au produit
-   */
+  /** Lier/Délier une image au produit */
   const handleImageBinding = () => {
     if (selectedElement.dataBinding) {
-      // Délier
       updateElement(selectedId, { dataBinding: null });
     } else {
-      // Lier à l'image principale du produit
       updateElement(selectedId, { dataBinding: 'product_image' });
     }
   };
@@ -109,9 +100,7 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
     updateElement(selectedId, { background: value });
   };
 
-  /**
-   * 🆕 Opacité pour les images
-   */
+  /** Opacité pour les images */
   const handleOpacityChange = (value) => {
     updateElement(selectedId, { opacity: parseFloat(value) });
   };
@@ -119,7 +108,6 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
   return (
     <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
       <div className="flex items-center gap-4 px-4 py-2.5">
-        {/* Color Picker - Uniquement pour Text et QRCode */}
         {(isText || isQRCode) && (
           <div className="flex items-center gap-2">
             <Palette className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -133,7 +121,6 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
           </div>
         )}
 
-        {/* Spécifique QR Code */}
         {isQRCode && (
           <>
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
@@ -153,12 +140,10 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
           </>
         )}
 
-        {/* 🏷️ Spécifique Code-barres */}
         {isBarcode && (
           <>
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
 
-            {/* Couleur des barres */}
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                 Couleur:
@@ -171,7 +156,6 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
               />
             </div>
 
-            {/* Fond */}
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                 Fond:
@@ -186,10 +170,8 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
           </>
         )}
 
-        {/* 🖼️ Spécifique Image */}
         {isImage && (
           <>
-            {/* Opacité */}
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                 Opacité:
@@ -208,7 +190,6 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
               </span>
             </div>
 
-            {/* Dimensions */}
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -216,7 +197,6 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
               </span>
             </div>
 
-            {/* Bouton Lier au Produit */}
             {dataSource === 'data' && selectedProduct && (
               <>
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
@@ -250,7 +230,6 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
           </>
         )}
 
-        {/* Mode données - Champ de binding (Text, QRCode, Barcode) */}
         {dataSource === 'data' &&
           selectedProduct &&
           selectedElement.dataBinding &&
@@ -283,7 +262,6 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
             </>
           )}
 
-        {/* Bouton Effets - Toujours à droite */}
         {onOpenEffects && (
           <>
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 ml-auto" />

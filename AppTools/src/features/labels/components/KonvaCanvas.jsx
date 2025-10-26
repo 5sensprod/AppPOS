@@ -13,6 +13,7 @@ import QRCodeNode from './canvas/QRCodeNode';
 import ImageNode from './canvas/ImageNode';
 import BarcodeNode from './canvas/BarcodeNode';
 import { calculateSnapGuides } from '../utils/snapGuides.utils';
+import { resolvePropForElement } from '../utils/dataBinding';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -21,11 +22,13 @@ const KonvaCanvas = forwardRef(
     { viewportWidth = 0, viewportHeight = 0, docWidth = 800, docHeight = 600, zoom = 1, onDocNode },
     ref
   ) => {
-    const elements = useLabelStore((state) => state.elements);
-    const selectedId = useLabelStore((state) => state.selectedId);
-    const selectElement = useLabelStore((state) => state.selectElement);
-    const updateElement = useLabelStore((state) => state.updateElement);
-    const setZoom = useLabelStore((state) => state.setZoom);
+    const elements = useLabelStore((s) => s.elements);
+    const selectedId = useLabelStore((s) => s.selectedId);
+    const selectElement = useLabelStore((s) => s.selectElement);
+    const updateElement = useLabelStore((s) => s.updateElement);
+    const setZoom = useLabelStore((s) => s.setZoom);
+    const selectedProduct = useLabelStore((s) => s.selectedProduct);
+    const currentProductIndex = useLabelStore((s) => s.currentProductIndex);
 
     const stageRef = useRef(null);
     const transformerRef = useRef(null);
@@ -38,12 +41,12 @@ const KonvaCanvas = forwardRef(
     }, [onDocNode, zoom]);
 
     const [docPos, setDocPos] = useState({ x: 0, y: 0 });
-    const [isInitialized, setIsInitialized] = useState(false); // 🆕 Flag pour initialisation unique
+    const [isInitialized, setIsInitialized] = useState(false);
 
     const [snapGuides, setSnapGuides] = useState([]);
     const [isDraggingElement, setIsDraggingElement] = useState(false);
     const [isTransforming, setIsTransforming] = useState(false);
-    const [rotationAngle, setRotationAngle] = useState(null); // 🆕 Angle affiché pendant la rotation
+    const [rotationAngle, setRotationAngle] = useState(null);
 
     const findNodeById = useCallback((id) => {
       return stageRef.current?.findOne(`#${id}`);
@@ -53,7 +56,6 @@ const KonvaCanvas = forwardRef(
     const [isDragging, setIsDragging] = useState(false);
     const panLast = useRef({ x: 0, y: 0 });
 
-    // 🆕 Fonction de centrage initiale uniquement
     const centerDocument = useCallback(
       (scale = zoom) => {
         if (!viewportWidth || !viewportHeight) return;
@@ -65,7 +67,6 @@ const KonvaCanvas = forwardRef(
       [viewportWidth, viewportHeight, docWidth, docHeight, zoom]
     );
 
-    // 🆕 Centrage UNIQUEMENT au premier rendu
     useEffect(() => {
       if (!isInitialized && viewportWidth > 0 && viewportHeight > 0) {
         centerDocument();
@@ -73,12 +74,10 @@ const KonvaCanvas = forwardRef(
       }
     }, [viewportWidth, viewportHeight, isInitialized, centerDocument]);
 
-    // 🆕 Fonction pour recenter manuellement (à exposer si besoin)
     const recenterDocument = useCallback(() => {
       centerDocument(zoom);
     }, [centerDocument, zoom]);
 
-    // 🆕 Gestion du zoom SANS recentrage automatique
     const handleWheel = useCallback(
       (e) => {
         e.evt.preventDefault();
@@ -90,17 +89,14 @@ const KonvaCanvas = forwardRef(
         const oldZoom = zoom;
         const newZoom = clamp(direction > 0 ? oldZoom / scaleBy : oldZoom * scaleBy, 0.1, 3);
 
-        // 🎯 Zoom centré sur la position du curseur
         const pointer = stage.getPointerPosition();
         if (!pointer) return;
 
-        // Calculer le point sous le curseur avant le zoom
         const mousePointTo = {
           x: (pointer.x - docPos.x) / oldZoom,
           y: (pointer.y - docPos.y) / oldZoom,
         };
 
-        // Calculer la nouvelle position pour garder le point sous le curseur
         const newPos = {
           x: pointer.x - mousePointTo.x * newZoom,
           y: pointer.y - mousePointTo.y * newZoom,
@@ -215,12 +211,10 @@ const KonvaCanvas = forwardRef(
         const movingElement = elements.find((el) => el.id === id);
         if (!movingElement) return;
 
-        // 🎯 Arrondir la rotation à 1° (sauf si proche de 90° multiples)
         let rotation = node.rotation();
         const snapAngles = [0, 90, 180, 270, 360, -90, -180, -270];
         const snapTolerance = 5;
 
-        // Vérifier si proche d'un angle de snap (90°)
         let snapped = false;
         for (const snapAngle of snapAngles) {
           if (Math.abs(rotation - snapAngle) < snapTolerance) {
@@ -230,19 +224,14 @@ const KonvaCanvas = forwardRef(
           }
         }
 
-        // Si pas snappé à 90°, arrondir à 1°
         if (!snapped) {
           rotation = Math.round(rotation);
         }
 
-        // Normaliser entre -180 et 180
         if (rotation > 180) rotation -= 360;
         if (rotation < -180) rotation += 360;
 
-        // Appliquer la rotation arrondie
         node.rotation(rotation);
-
-        // 🆕 Afficher l'angle pendant la rotation
         setRotationAngle(rotation);
 
         const tempElement = {
@@ -273,13 +262,11 @@ const KonvaCanvas = forwardRef(
       (id, node) => {
         setIsTransforming(false);
         setSnapGuides([]);
-        setRotationAngle(null); // 🆕 Cacher l'indicateur d'angle
+        setRotationAngle(null);
 
-        // 🎯 Arrondir la rotation finale à 1°
         let rotation = node.rotation();
         rotation = Math.round(rotation);
 
-        // Normaliser entre -180 et 180
         if (rotation > 180) rotation -= 360;
         if (rotation < -180) rotation += 360;
 
@@ -294,7 +281,6 @@ const KonvaCanvas = forwardRef(
       [updateElement]
     );
 
-    // Ombres: helper (valeurs par défaut)
     const shadowPropsFrom = (el) => ({
       shadowEnabled: el.shadowEnabled ?? false,
       shadowColor: el.shadowColor ?? '#000000',
@@ -304,7 +290,6 @@ const KonvaCanvas = forwardRef(
       shadowOffsetY: el.shadowOffsetY ?? 2,
     });
 
-    // Transformer: toujours cibler l'élément par son id
     useEffect(() => {
       const tr = transformerRef.current;
       const stage = stageRef.current;
@@ -386,9 +371,9 @@ const KonvaCanvas = forwardRef(
               if (type === 'text') {
                 return (
                   <Text
-                    key={id}
+                    key={`${id}-${currentProductIndex}`}
                     {...commonProps}
-                    text={el.text}
+                    text={resolvePropForElement(el.text, el, selectedProduct)}
                     fontSize={el.fontSize}
                     fontStyle={el.bold ? 'bold' : 'normal'}
                     fill={el.color}
@@ -399,12 +384,12 @@ const KonvaCanvas = forwardRef(
               if (type === 'qrcode') {
                 return (
                   <QRCodeNode
-                    key={id}
+                    key={`${id}-${currentProductIndex}`}
                     {...commonProps}
                     size={el.size ?? 160}
                     color={el.color ?? '#000000'}
                     bgColor={el.bgColor ?? '#FFFFFF00'}
-                    qrValue={el.qrValue ?? ''}
+                    qrValue={resolvePropForElement(el.qrValue, el, selectedProduct) ?? ''}
                   />
                 );
               }
@@ -412,11 +397,11 @@ const KonvaCanvas = forwardRef(
               if (type === 'image') {
                 return (
                   <ImageNode
-                    key={id}
+                    key={`${id}-${currentProductIndex}`}
                     {...commonProps}
                     width={el.width ?? 160}
                     height={el.height ?? 160}
-                    src={el.src ?? ''}
+                    src={resolvePropForElement(el.src, el, selectedProduct) ?? ''}
                     opacity={el.opacity ?? 1}
                   />
                 );
@@ -425,11 +410,11 @@ const KonvaCanvas = forwardRef(
               if (type === 'barcode') {
                 return (
                   <BarcodeNode
-                    key={id}
+                    key={`${id}-${currentProductIndex}`}
                     {...commonProps}
                     width={el.width ?? 200}
                     height={el.height ?? 80}
-                    barcodeValue={el.barcodeValue ?? ''}
+                    barcodeValue={resolvePropForElement(el.barcodeValue, el, selectedProduct) ?? ''}
                     format={el.format ?? 'CODE128'}
                     displayValue={el.displayValue ?? true}
                     fontSize={el.fontSize ?? 14}
@@ -480,10 +465,8 @@ const KonvaCanvas = forwardRef(
               if (newBox.width < 5 || newBox.height < 5) return oldBox;
               return newBox;
             }}
-            // 🎯 Rotation snap : angles tous les 1° + snap fort à 0°, 90°, 180°, 270°
             rotationSnaps={[0, 90, 180, 270]}
-            rotationSnapTolerance={5} // Tolérance en degrés pour le snap à 90°
-            // 🆕 Arrondir la rotation à 1° pendant la transformation
+            rotationSnapTolerance={5}
             rotateAnchorOffset={30}
             enabledAnchors={[
               'top-left',
@@ -497,7 +480,6 @@ const KonvaCanvas = forwardRef(
             ]}
           />
 
-          {/* 🎯 Indicateur d'angle de rotation (style Figma/Polotno) */}
           {rotationAngle !== null && selectedId && (
             <Group>
               {(() => {
@@ -506,7 +488,7 @@ const KonvaCanvas = forwardRef(
 
                 const box = selectedNode.getClientRect();
                 const centerX = box.x + box.width / 2;
-                const centerY = box.y + box.y / 2 - 40; // Au-dessus de l'élément
+                const centerY = box.y + box.y / 2 - 40;
 
                 return (
                   <Group x={centerX} y={centerY}>
