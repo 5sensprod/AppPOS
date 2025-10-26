@@ -346,18 +346,20 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSaveModal(true)}
+              title="Enregistrer le modèle"
               className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition-colors"
             >
               <Save className="h-4 w-4" />
-              Sauvegarder
             </button>
+
             <button
               onClick={() => fileInputRef.current?.click()}
+              title="Importer un modèle (.json)"
               className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg text-sm transition-colors"
             >
               <Upload className="h-4 w-4" />
-              Importer
             </button>
+
             <input
               ref={fileInputRef}
               type="file"
