@@ -348,8 +348,7 @@ const KonvaCanvas = forwardRef(
             {elements.map((el) => {
               if (el.visible === false) return null;
 
-              // ⬇️ ajoutez dataBinding dans la liste
-              const { type, id, x, y, locked, scaleX, scaleY, rotation, dataBinding } = el;
+              const { type, id, x, y, locked, scaleX, scaleY, rotation } = el;
 
               const commonProps = {
                 id,
@@ -370,10 +369,9 @@ const KonvaCanvas = forwardRef(
               };
 
               if (type === 'text') {
-                const rerenderKey = dataBinding ? `${id}-${currentProductIndex}` : id;
                 return (
                   <Text
-                    key={rerenderKey}
+                    key={`${id}-${currentProductIndex}`}
                     {...commonProps}
                     text={resolvePropForElement(el.text, el, selectedProduct)}
                     fontSize={el.fontSize}
@@ -382,6 +380,7 @@ const KonvaCanvas = forwardRef(
                   />
                 );
               }
+
               if (type === 'qrcode') {
                 return (
                   <QRCodeNode
