@@ -1,4 +1,3 @@
-// src/features/labels/components/CanvasArea.jsx
 import React, { useRef, useEffect, useState, forwardRef } from 'react';
 import { Maximize2 } from 'lucide-react';
 import KonvaCanvas from './KonvaCanvas';
@@ -11,7 +10,6 @@ const CanvasArea = forwardRef(
     const zoomIn = useLabelStore((s) => s.zoomIn);
     const zoomOut = useLabelStore((s) => s.zoomOut);
     const resetZoom = useLabelStore((s) => s.resetZoom);
-    const selectedId = useLabelStore((s) => s.selectedId);
 
     const containerRef = useRef(null);
     const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -29,25 +27,19 @@ const CanvasArea = forwardRef(
       return () => ro.disconnect();
     }, []);
 
-    // Remonte le docNode vers le parent (LabelPage)
     const handleDocNodeReady = (node) => {
       if (onDocNodeReady) onDocNodeReady(node);
     };
 
-    // Recentrer manuellement (ici on réinitialise le zoom → recentre)
     const handleRecenter = () => {
       resetZoom();
-      // Si tu veux un vrai recentrage sans changer le zoom,
-      // expose une méthode depuis KonvaCanvas et appelle-la via `ref.current`
     };
 
     return (
       <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-900 relative overflow-hidden">
-        {/* Damier plein écran */}
         <div ref={containerRef} className="flex-1 checkerboard relative">
-          {/* Stage plein écran avec ref (relayé) */}
           <KonvaCanvas
-            ref={ref} // ⬅️ on RELAYE le ref reçu du parent
+            ref={ref}
             viewportWidth={viewport.width}
             viewportHeight={viewport.height}
             docWidth={canvasSize.width}
@@ -55,10 +47,8 @@ const CanvasArea = forwardRef(
             zoom={zoom}
             onDocNode={handleDocNodeReady}
           />
-          {/* PropertyPanel retiré - maintenant dans TopToolbar */}
         </div>
 
-        {/* Contrôles zoom avec bouton recentrer */}
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-lg shadow-lg px-3 py-2 flex items-center gap-3 border border-gray-200 dark:border-gray-700 z-30">
           <button
             onClick={zoomOut}
@@ -82,10 +72,8 @@ const CanvasArea = forwardRef(
             +
           </button>
 
-          {/* Séparateur */}
           <div className="w-px h-6 bg-gray-300 dark:bg-gray-600" />
 
-          {/* Bouton recentrer */}
           <button
             onClick={handleRecenter}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
@@ -95,7 +83,7 @@ const CanvasArea = forwardRef(
           </button>
 
           <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 select-none">
-            Molette : zoom • Espace : pan
+            Molette : zoom • Bouton milieu : déplacement
           </span>
         </div>
       </div>

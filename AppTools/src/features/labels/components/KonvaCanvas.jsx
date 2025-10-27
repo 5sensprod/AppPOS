@@ -52,7 +52,6 @@ const KonvaCanvas = forwardRef(
       return stageRef.current?.findOne(`#${id}`);
     }, []);
 
-    const [panEnabled, setPanEnabled] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const panLast = useRef({ x: 0, y: 0 });
 
@@ -109,44 +108,20 @@ const KonvaCanvas = forwardRef(
     );
 
     useEffect(() => {
-      const down = (e) => {
-        if (e.code === 'Space') {
-          e.preventDefault();
-          setPanEnabled(true);
-        }
-      };
-      const up = () => {
-        setPanEnabled(false);
-        setIsDragging(false);
-      };
-      window.addEventListener('keydown', down, { passive: false });
-      window.addEventListener('keyup', up);
-      return () => {
-        window.removeEventListener('keydown', down);
-        window.removeEventListener('keyup', up);
-      };
-    }, []);
-
-    useEffect(() => {
       const stage = stageRef.current;
       if (!stage) return;
       const c = stage.container();
-      if (isDragging) c.style.cursor = 'grabbing';
-      else if (panEnabled) c.style.cursor = 'grab';
-      else c.style.cursor = 'default';
-    }, [panEnabled, isDragging]);
+      c.style.cursor = isDragging ? 'grabbing' : 'default';
+    }, [isDragging]);
 
-    const onStageMouseDown = useCallback(
-      (e) => {
-        const isMiddle = e.evt.button === 1;
-        if (panEnabled || isMiddle) {
-          setIsDragging(true);
-          const pos = stageRef.current?.getPointerPosition() || { x: 0, y: 0 };
-          panLast.current = pos;
-        }
-      },
-      [panEnabled]
-    );
+    const onStageMouseDown = useCallback((e) => {
+      const isMiddle = e.evt?.button === 1;
+      if (isMiddle) {
+        setIsDragging(true);
+        const pos = stageRef.current?.getPointerPosition() || { x: 0, y: 0 };
+        panLast.current = pos;
+      }
+    }, []);
 
     const onStageMouseMove = useCallback(() => {
       if (!isDragging) return;
@@ -165,10 +140,10 @@ const KonvaCanvas = forwardRef(
 
     const handleSelect = useCallback(
       (id, locked) => {
-        if (panEnabled || isDragging) return;
+        if (isDragging) return;
         if (!locked) selectElement(id);
       },
-      [panEnabled, isDragging, selectElement]
+      [isDragging, selectElement]
     );
 
     const handleDragMove = useCallback(
@@ -322,11 +297,10 @@ const KonvaCanvas = forwardRef(
         onMouseMove={onStageMouseMove}
         onMouseUp={onStageMouseUp}
         onClick={(e) => {
-          if (panEnabled || isDragging) return;
+          if (isDragging) return;
           if (e.target === e.target.getStage()) selectElement(null);
         }}
       >
-        {/* Fond document */}
         <Layer listening={false} perfectDrawEnabled={false}>
           <Group x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom} listening={false}>
             <Rect
@@ -354,7 +328,7 @@ const KonvaCanvas = forwardRef(
                 id,
                 x,
                 y,
-                draggable: !locked && !panEnabled && !isDragging,
+                draggable: !locked && !isDragging,
                 onClick: () => handleSelect(id, locked),
                 onDragStart: handleDragStart,
                 onDragMove: (e) => !locked && handleDragMove(id, e.target),
