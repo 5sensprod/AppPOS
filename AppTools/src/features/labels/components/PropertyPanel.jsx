@@ -2,15 +2,12 @@
 import React from 'react';
 import { Palette, Link, Unlink, Sparkles } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
-import { resolvePropForElement } from '../utils/dataBinding';
 
 const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) => {
   const elements = useLabelStore((s) => s.elements);
   const selectedId = useLabelStore((s) => s.selectedId);
   const updateElement = useLabelStore((s) => s.updateElement);
   const dataSource = useLabelStore((s) => s.dataSource);
-  const unbindElementFromData = useLabelStore((s) => s.unbindElementFromData);
-  const rebindElementToField = useLabelStore((s) => s.rebindElementToField);
 
   const selectedElement = elements.find((el) => el.id === selectedId);
   if (!selectedElement) return null;
@@ -24,7 +21,6 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
 
   const dataFields = selectedProduct
     ? [
-        { key: 'FREE', label: 'Libre (valeur fixe)', value: '' }, // ⬅️ nouveau
         { key: 'name', label: 'Nom du produit', value: selectedProduct.name },
         { key: 'price', label: 'Prix', value: `${selectedProduct.price}€` },
         { key: 'brand', label: 'Marque', value: selectedProduct.brand_ref?.name ?? '' },
@@ -44,17 +40,12 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
   const handleFieldChange = (fieldKey) => {
     const field = dataFields.find((f) => f.key === fieldKey);
     if (!field) return;
-    const isBindable = isText || isQRCode || isBarcode || isImage;
-    if (!isBindable) return;
-
-    if (field.key === 'FREE') {
-      unbindElementFromData(selectedId); // ❄️ gèle + enlève dataBinding
-    } else {
-      rebindElementToField(selectedId, field.key); // 🔗 relie
+    if (isText || isQRCode || isBarcode) {
+      updateElement(selectedId, { dataBinding: field.key });
     }
   };
   const handleQRValueChange = (value) => updateElement(selectedId, { qrValue: value });
-  const handleUnbind = () => unbindElementFromData(selectedId);
+  const handleUnbind = () => updateElement(selectedId, { dataBinding: null });
   const getDefaultQRBindingKey = () => {
     const pref = ['website_url', 'barcode', 'sku'];
     for (const key of pref) {
@@ -202,46 +193,40 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
             </div>
           )}
 
-          {dataSource === 'data' &&
-            selectedProduct &&
-            (isText || isQRCode || isBarcode || isImage) && (
-              <>
-                <Divider />
-                <div className="flex items-center gap-2 min-w-0">
-                  {!isInline && (
-                    <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      Champ:
-                    </span>
-                  )}
-                  <select
-                    value={selectedElement.dataBinding ?? 'FREE'}
-                    onChange={(e) => handleFieldChange(e.target.value)}
-                    className={`${miniInput} border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white max-w-[160px]`}
-                    title="Champ lié"
-                  >
-                    {dataFields.map((field) => (
-                      <option key={field.key} value={field.key}>
-                        {field.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleUnbind}
-                    className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    title="Utiliser une valeur fixe"
-                  >
-                    Délier
-                  </button>
-                </div>
-              </>
-            )}
+          {dataSource === 'data' && selectedProduct && (
+            <>
+              <Divider />
+              <button
+                onClick={handleImageBinding}
+                className={`px-2 py-1 text-sm rounded flex items-center gap-1 transition-colors ${
+                  selectedElement.dataBinding
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                }`}
+                title={
+                  selectedElement.dataBinding
+                    ? 'Image liée au produit'
+                    : "Lier à l'image du produit"
+                }
+              >
+                {selectedElement.dataBinding ? (
+                  <Link className="h-4 w-4" />
+                ) : (
+                  <Unlink className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {selectedElement.dataBinding ? 'Liée' : 'Lier'}
+                </span>
+              </button>
+            </>
+          )}
         </>
       )}
 
       {dataSource === 'data' &&
         selectedProduct &&
         selectedElement.dataBinding &&
-        (isText || isQRCode || isBarcode || isImage) && (
+        (isText || isQRCode || isBarcode) && (
           <>
             <Divider />
             <div className="flex items-center gap-2 min-w-0">
@@ -251,9 +236,9 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
                 </span>
               )}
               <select
-                value={selectedElement.dataBinding ?? 'FREE'}
+                value={selectedElement.dataBinding}
                 onChange={(e) => handleFieldChange(e.target.value)}
-                className={`${miniInput} border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white max-w-[180px]`}
+                className={`${miniInput} border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white max-w-[160px]`}
                 title="Champ lié"
               >
                 {dataFields.map((field) => (
@@ -262,7 +247,13 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
                   </option>
                 ))}
               </select>
-              {/* 🔥 bouton "Délier" supprimé : l’option Libre couvre ce besoin */}
+              <button
+                onClick={handleUnbind}
+                className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Utiliser une valeur fixe"
+              >
+                Délier
+              </button>
             </div>
           </>
         )}
