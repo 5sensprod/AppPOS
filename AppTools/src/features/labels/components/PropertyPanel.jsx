@@ -1,6 +1,6 @@
 // src/features/labels/components/PropertyPanel.jsx
-import React from 'react';
-import { Palette, Link, Unlink, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Palette, Link, Unlink, Sparkles, Check, X } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
 
 const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) => {
@@ -10,6 +10,19 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
   const dataSource = useLabelStore((s) => s.dataSource);
 
   const selectedElement = elements.find((el) => el.id === selectedId);
+
+  // 🆕 État local pour l'édition du QR code
+  const [isEditingQR, setIsEditingQR] = useState(false);
+  const [qrEditValue, setQrEditValue] = useState('');
+
+  // Synchroniser l'état local quand l'élément change
+  useEffect(() => {
+    if (selectedElement?.type === 'qrcode') {
+      setQrEditValue(selectedElement.qrValue || '');
+      setIsEditingQR(false);
+    }
+  }, [selectedElement?.id]);
+
   if (!selectedElement) return null;
 
   const isInline = variant === 'inline';
@@ -44,8 +57,25 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
       updateElement(selectedId, { dataBinding: field.key });
     }
   };
-  const handleQRValueChange = (value) => updateElement(selectedId, { qrValue: value });
+
+  // 🆕 Gestion de l'édition du QR code
+  const handleStartEditQR = () => {
+    setQrEditValue(selectedElement.qrValue || '');
+    setIsEditingQR(true);
+  };
+
+  const handleConfirmQREdit = () => {
+    updateElement(selectedId, { qrValue: qrEditValue });
+    setIsEditingQR(false);
+  };
+
+  const handleCancelQREdit = () => {
+    setQrEditValue(selectedElement.qrValue || '');
+    setIsEditingQR(false);
+  };
+
   const handleUnbind = () => updateElement(selectedId, { dataBinding: null });
+
   const getDefaultQRBindingKey = () => {
     const pref = ['website_url', 'barcode', 'sku'];
     for (const key of pref) {
@@ -54,6 +84,7 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
     }
     return null;
   };
+
   const handleQRBinding = () => {
     if (!selectedProduct) return;
     if (selectedElement.dataBinding) {
@@ -63,10 +94,12 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
     const key = getDefaultQRBindingKey();
     if (key) updateElement(selectedId, { dataBinding: key });
   };
+
   const handleImageBinding = () => {
     if (selectedElement.dataBinding) updateElement(selectedId, { dataBinding: null });
     else updateElement(selectedId, { dataBinding: 'product_image' });
   };
+
   const handleBarcodeColorChange = (value) => updateElement(selectedId, { lineColor: value });
   const handleBarcodeBgChange = (value) => updateElement(selectedId, { background: value });
   const handleOpacityChange = (value) => updateElement(selectedId, { opacity: parseFloat(value) });
@@ -117,15 +150,56 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects, variant = 'panel' }) =>
                 Contenu:
               </span>
             )}
-            <input
-              type="text"
-              value={selectedElement.qrValue || ''}
-              onChange={(e) => handleQRValueChange(e.target.value)}
-              placeholder="Texte, URL, SKU..."
-              className={`${miniInput} border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${isInline ? 'w-[160px]' : 'w-[220px]'}`}
-              disabled={!!selectedElement.dataBinding}
-              title="Contenu du QR"
-            />
+
+            {/* 🆕 Mode édition avec boutons de validation */}
+            {isEditingQR ? (
+              <>
+                <input
+                  type="text"
+                  value={qrEditValue}
+                  onChange={(e) => setQrEditValue(e.target.value)}
+                  placeholder="Texte, URL, SKU..."
+                  className={`${miniInput} border border-blue-500 dark:border-blue-400 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${isInline ? 'w-[160px]' : 'w-[220px]'}`}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleConfirmQREdit();
+                    if (e.key === 'Escape') handleCancelQREdit();
+                  }}
+                  title="Contenu du QR - Appuyez sur Entrée pour valider"
+                />
+                <button
+                  onClick={handleConfirmQREdit}
+                  className="p-1 rounded bg-green-500 hover:bg-green-600 text-white transition-colors"
+                  title="Valider (Entrée)"
+                >
+                  <Check className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleCancelQREdit}
+                  className="p-1 rounded bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 transition-colors"
+                  title="Annuler (Échap)"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={selectedElement.qrValue || ''}
+                  onFocus={handleStartEditQR}
+                  placeholder="Cliquez pour éditer..."
+                  className={`${miniInput} border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${isInline ? 'w-[160px]' : 'w-[220px]'} cursor-pointer`}
+                  readOnly
+                  disabled={!!selectedElement.dataBinding}
+                  title={
+                    selectedElement.dataBinding
+                      ? 'Champ lié aux données'
+                      : 'Cliquez pour éditer le contenu'
+                  }
+                />
+              </>
+            )}
           </div>
         </>
       )}
