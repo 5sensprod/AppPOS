@@ -106,8 +106,8 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
   };
 
   return (
-    <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-      <div className="flex items-center gap-4 px-4 py-2.5">
+    <div className="">
+      <div className="flex items-center gap-4 px-4 ">
         {(isText || isQRCode) && (
           <div className="flex items-center gap-2">
             <Palette className="h-4 w-4 text-gray-500 dark:text-gray-400" />
