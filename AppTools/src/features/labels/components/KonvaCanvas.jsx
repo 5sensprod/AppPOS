@@ -1,4 +1,3 @@
-// src/features/labels/components/KonvaCanvas.jsx
 import React, {
   useRef,
   useEffect,
@@ -7,11 +6,12 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
-import { Stage, Layer, Group, Rect, Text, Transformer, Line } from 'react-konva';
+import { Stage, Layer, Group, Rect, Transformer, Line } from 'react-konva';
 import useLabelStore from '../store/useLabelStore';
 import QRCodeNode from './canvas/QRCodeNode';
 import ImageNode from './canvas/ImageNode';
 import BarcodeNode from './canvas/BarcodeNode';
+import TextNode from './canvas/TextNode';
 import { calculateSnapGuides } from '../utils/snapGuides.utils';
 import { resolvePropForElement } from '../utils/dataBinding';
 
@@ -199,10 +199,7 @@ const KonvaCanvas = forwardRef(
           }
         }
 
-        if (!snapped) {
-          rotation = Math.round(rotation);
-        }
-
+        if (!snapped) rotation = Math.round(rotation);
         if (rotation > 180) rotation -= 360;
         if (rotation < -180) rotation += 360;
 
@@ -241,7 +238,6 @@ const KonvaCanvas = forwardRef(
 
         let rotation = node.rotation();
         rotation = Math.round(rotation);
-
         if (rotation > 180) rotation -= 360;
         if (rotation < -180) rotation += 360;
 
@@ -316,14 +312,12 @@ const KonvaCanvas = forwardRef(
           </Group>
         </Layer>
 
-        {/* Éléments */}
         <Layer perfectDrawEnabled={false}>
           <Group ref={docGroupRef} x={docPos.x} y={docPos.y} scaleX={zoom} scaleY={zoom}>
             {elements.map((el) => {
               if (el.visible === false) return null;
 
               const { type, id, x, y, locked, scaleX, scaleY, rotation } = el;
-
               const commonProps = {
                 id,
                 x,
@@ -344,13 +338,15 @@ const KonvaCanvas = forwardRef(
 
               if (type === 'text') {
                 return (
-                  <Text
+                  <TextNode
                     key={`${id}-${currentProductIndex}`}
                     {...commonProps}
                     text={resolvePropForElement(el.text, el, selectedProduct)}
                     fontSize={el.fontSize}
                     fontStyle={el.bold ? 'bold' : 'normal'}
                     fill={el.color}
+                    locked={locked}
+                    dataBinding={el.dataBinding || null}
                   />
                 );
               }
@@ -476,19 +472,7 @@ const KonvaCanvas = forwardRef(
                       cornerRadius={4}
                       listening={false}
                     />
-                    <Text
-                      x={-30}
-                      y={-12}
-                      width={60}
-                      height={24}
-                      text={`${Math.round(rotationAngle)}°`}
-                      fontSize={14}
-                      fontFamily="sans-serif"
-                      fill="#FFFFFF"
-                      align="center"
-                      verticalAlign="middle"
-                      listening={false}
-                    />
+                    {/* Petit affichage de l'angle pendant la rotation */}
                   </Group>
                 );
               })()}
