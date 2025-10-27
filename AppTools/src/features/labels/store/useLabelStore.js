@@ -1,5 +1,6 @@
 // src/features/labels/store/useLabelStore.js
 import { create } from 'zustand';
+import { resolvePropForElement, getProductField, formatPriceEUR } from '../utils/dataBinding';
 
 const HISTORY_LIMIT = 100;
 
@@ -211,6 +212,80 @@ const useLabelStore = create((set, get) => ({
       selectedProducts: Array.isArray(products) ? products : [],
       selectedProduct: Array.isArray(products) && products.length > 0 ? products[0] : null,
       currentProductIndex: 0, // 🆕 Réinitialiser l'index
+    }),
+
+  /**
+   * 🔓 Délier (passer “Libre”) en gelant la valeur rendue à l’instant T
+   */
+  unbindElementFromData: (id) =>
+    set((state) => {
+      const el = state.elements.find((e) => e.id === id);
+      if (!el) return state;
+      state._pushHistory(snapshotOf(state));
+
+      const product = state.selectedProduct;
+      const rendered = resolvePropForElement(
+        el.type === 'text'
+          ? el.text
+          : el.type === 'qrcode'
+            ? el.qrValue
+            : el.type === 'barcode'
+              ? el.barcodeValue
+              : el.type === 'image'
+                ? el.src
+                : '',
+        el,
+        product
+      );
+
+      const freezePatch =
+        el.type === 'text'
+          ? { text: String(rendered ?? '') }
+          : el.type === 'qrcode'
+            ? { qrValue: String(rendered ?? '') }
+            : el.type === 'barcode'
+              ? { barcodeValue: String(rendered ?? '') }
+              : el.type === 'image'
+                ? { src: String(rendered ?? '') }
+                : {};
+
+      return {
+        elements: state.elements.map((e) =>
+          e.id === id ? { ...e, dataBinding: null, ...freezePatch } : e
+        ),
+      };
+    }),
+
+  /**
+   * 🔗 Relier un élément à un champ produit (ex: "name", "price", ...)
+   */
+  rebindElementToField: (id, field) =>
+    set((state) => {
+      const el = state.elements.find((e) => e.id === id);
+      if (!el) return state;
+      state._pushHistory(snapshotOf(state));
+
+      let previewPatch = {};
+      if (el.type === 'text') {
+        if (field === 'price') {
+          const raw = getProductField(state.selectedProduct, 'price');
+          previewPatch = { text: formatPriceEUR(raw) };
+        } else {
+          previewPatch = { text: '{{' + field + '}}' };
+        }
+      } else if (el.type === 'qrcode') {
+        previewPatch = { qrValue: '{{' + field + '}}' };
+      } else if (el.type === 'barcode') {
+        previewPatch = { barcodeValue: '{{' + field + '}}' };
+      } else if (el.type === 'image') {
+        previewPatch = { src: '{{' + field + '}}' };
+      }
+
+      return {
+        elements: state.elements.map((e) =>
+          e.id === id ? { ...e, dataBinding: field, ...previewPatch } : e
+        ),
+      };
     }),
 
   // 🆕 Navigation entre produits
