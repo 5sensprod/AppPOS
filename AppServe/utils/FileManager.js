@@ -1,9 +1,11 @@
-// src/utils/FileManager.js
+// src/utils/FileManager.js - VERSION CORRIGÉE AVEC PATHMANAGER
 const path = require('path');
 const fs = require('fs').promises;
+const pathManager = require('./PathManager');
 
 /**
  * Classe utilitaire pour la gestion des fichiers
+ * CORRIGÉ : Utilise PathManager pour la résolution des chemins
  */
 class FileManager {
   /**
@@ -39,10 +41,11 @@ class FileManager {
   }
 
   /**
-   * Construit un chemin dans le dossier public
+   * ✅ CORRIGÉ : Construit un chemin dans le dossier public
+   * Utilise PathManager au lieu de process.cwd()
    */
   static getPublicPath(...segments) {
-    return path.join(process.cwd(), 'public', ...segments);
+    return path.join(pathManager.getPublicPath(), ...segments);
   }
 
   /**

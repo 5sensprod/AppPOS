@@ -1,4 +1,4 @@
-// config/database.js - Version corrigée sans fallback problématique
+// config/database.js -
 const Datastore = require('nedb');
 const path = require('path');
 const fs = require('fs');
