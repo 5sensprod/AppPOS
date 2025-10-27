@@ -14,7 +14,8 @@ import {
   Upload,
   Barcode,
   Sparkles,
-  FolderOpen, // 🆕
+  FolderOpen,
+  Palette,
 } from 'lucide-react';
 
 import TextTemplates from './templates/TextTemplates';
@@ -28,7 +29,8 @@ import QRCodeTemplates from './templates/QRCodeTemplates';
 import UploadTemplate from './templates/UploadTemplate';
 import BarcodeTemplates from './templates/BarcodeTemplates';
 import EffectsTemplates from './templates/EffectsTemplates';
-import TemplateManager from './templates/TemplateManager'; // 🆕
+import TemplateManager from './templates/TemplateManager';
+import DesignTemplates from './templates/DesignTemplates';
 
 const ToolsSidebar = ({
   isCollapsed,
@@ -46,7 +48,8 @@ const ToolsSidebar = ({
     externalSelectedTool !== undefined ? externalSelectedTool : internalSelectedTool;
 
   const tools = [
-    { id: 'templates', label: 'Templates', icon: FolderOpen, component: TemplateManager }, // 🆕
+    { id: 'templates', label: 'Templates', icon: FolderOpen, component: TemplateManager },
+    { id: 'designs', label: 'Designs', icon: Palette, component: DesignTemplates }, // 🆕 NOUVELLE LIGNE
     { id: 'text', label: 'Texte', icon: Type, component: TextTemplates },
     { id: 'upload', label: 'Upload', icon: Upload, component: UploadTemplate },
     { id: 'image', label: 'Images', icon: ImageIcon, component: ImageTemplates },
@@ -148,8 +151,15 @@ const ToolsSidebar = ({
               {SelectedComponent && (
                 <>
                   {selectedTool === 'templates' ? (
-                    // 🆕 TemplateManager en mode sidebar (sans modal)
+                    // TemplateManager en mode sidebar (sans modal)
                     <TemplateManager
+                      stageRef={stageRef}
+                      docNode={docNode}
+                      onClose={() => handleToolClick(null)}
+                    />
+                  ) : selectedTool === 'designs' ? ( // 🆕 NOUVELLE CONDITION
+                    // DesignTemplates pour les factory templates
+                    <DesignTemplates
                       stageRef={stageRef}
                       docNode={docNode}
                       onClose={() => handleToolClick(null)}

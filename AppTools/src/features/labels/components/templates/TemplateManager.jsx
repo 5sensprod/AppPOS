@@ -63,7 +63,16 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
     setLoading(true);
     try {
       const allTemplates = await templateService.listTemplates();
-      setTemplates(allTemplates);
+
+      // 🆕 FILTRER : Exclure les factory templates
+      const userTemplates = allTemplates.filter((t) => t.is_factory !== true);
+
+      console.log(`📋 [TEMPLATES] Chargés: ${userTemplates.length} templates utilisateur`);
+      console.log(
+        `🏭 [TEMPLATES] Exclus: ${allTemplates.length - userTemplates.length} factory templates`
+      );
+
+      setTemplates(userTemplates);
     } catch (err) {
       console.error('❌ Erreur chargement templates:', err);
       error('Impossible de charger les templates', { title: 'Erreur' });
@@ -198,7 +207,7 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
 
       console.log('🎨 [APPLY TEMPLATE] Structure détectée:', {
         hasPresetData: !!template.preset_data,
-        canvasSize: templateData.canvasSize,
+        templateData: templateData,
       });
 
       // Vérifier que les données essentielles sont présentes
@@ -218,7 +227,7 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
         setLockCanvasToSheetCell(templateData.lockCanvasToSheetCell);
       }
 
-      // Restaurer le dataSource et les produits sélectionnés
+      // 🆕 Restaurer le dataSource et les produits sélectionnés
       if (templateData.dataSource) {
         setDataSource(templateData.dataSource);
       }
