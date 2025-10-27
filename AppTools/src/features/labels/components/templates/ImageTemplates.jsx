@@ -1,4 +1,4 @@
-// src/features/labels/components/templates/ImageTemplates.jsx
+// src/features/labels/components/templates/ImageTemplates.jsx - VERSION CORRIGÉE
 import React, { useState, useEffect } from 'react';
 import { Image as ImageIcon, Loader2, Link as LinkIcon, ArrowLeft } from 'lucide-react';
 import useLabelStore from '../../store/useLabelStore';
@@ -14,6 +14,12 @@ const ImageTemplates = ({ selectedProduct }) => {
   const isImageSelected = selectedElement?.type === 'image';
   const isImageLinked = isImageSelected && selectedElement?.dataBinding === 'product_image';
 
+  // ✅ NOUVEAU : Normaliser le produit sélectionné avec URLs complètes
+  const normalizedProduct = React.useMemo(() => {
+    if (!selectedProduct) return null;
+    return presetImageService.normalizeProductImages(selectedProduct);
+  }, [selectedProduct]);
+
   // Charger les images au montage
   useEffect(() => {
     loadImages();
@@ -21,10 +27,10 @@ const ImageTemplates = ({ selectedProduct }) => {
 
   // Auto-switch vers mode produit si une image liée est sélectionnée
   useEffect(() => {
-    if (isImageLinked && selectedProduct) {
+    if (isImageLinked && normalizedProduct) {
       setShowMode('product');
     }
-  }, [isImageLinked, selectedProduct]);
+  }, [isImageLinked, normalizedProduct]);
 
   const loadImages = async () => {
     setLoading(true);
@@ -53,6 +59,7 @@ const ImageTemplates = ({ selectedProduct }) => {
         });
       };
       img.onerror = () => {
+        console.error('❌ Erreur chargement dimensions:', src);
         resolve({
           naturalWidth: 160,
           naturalHeight: 160,
@@ -78,7 +85,7 @@ const ImageTemplates = ({ selectedProduct }) => {
       y: 50 + elements.length * 30,
       width: baseWidth,
       height: calculatedHeight,
-      src: image.src,
+      src: image.src, // ✅ URL déjà normalisée par presetImageService
       filename: image.filename,
       opacity: 1,
       rotation: 0,
@@ -89,30 +96,31 @@ const ImageTemplates = ({ selectedProduct }) => {
   };
 
   /**
-   * 🆕 Construire la liste des images du produit (image principale + galerie)
+   * ✅ CORRIGÉ : Construire la liste des images du produit (image principale + galerie)
+   * Utilise normalizedProduct avec URLs complètes
    */
   const getProductImages = () => {
-    if (!selectedProduct) return [];
+    if (!normalizedProduct) return [];
 
     const images = [];
 
     // Image principale
-    if (selectedProduct.image?.src) {
+    if (normalizedProduct.image?.src) {
       images.push({
         type: 'main',
-        src: selectedProduct.image.src,
+        src: normalizedProduct.image.src, // ✅ URL déjà normalisée
         filename: 'Image principale',
         id: 'main',
       });
     }
 
     // Images de la galerie
-    if (Array.isArray(selectedProduct.gallery_images)) {
-      selectedProduct.gallery_images.forEach((img, index) => {
+    if (Array.isArray(normalizedProduct.gallery_images)) {
+      normalizedProduct.gallery_images.forEach((img, index) => {
         if (img?.src) {
           images.push({
             type: 'gallery',
-            src: img.src,
+            src: img.src, // ✅ URL déjà normalisée
             filename: `Galerie ${index + 1}`,
             id: `gallery-${index}`,
           });
@@ -134,7 +142,7 @@ const ImageTemplates = ({ selectedProduct }) => {
     const calculatedHeight = Math.round(baseWidth / aspectRatio);
 
     updateElement(selectedId, {
-      src: productImage.src,
+      src: productImage.src, // ✅ URL déjà normalisée
       filename: productImage.filename,
       width: baseWidth,
       height: calculatedHeight,
@@ -155,7 +163,7 @@ const ImageTemplates = ({ selectedProduct }) => {
   ];
 
   // 🖼️ Mode : Images Produit
-  if (showMode === 'product' && selectedProduct) {
+  if (showMode === 'product' && normalizedProduct) {
     return (
       <div className="p-3 space-y-4">
         {/* Header avec bouton retour */}
@@ -178,7 +186,7 @@ const ImageTemplates = ({ selectedProduct }) => {
           <div className="flex items-start gap-2">
             <ImageIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs text-blue-800 dark:text-blue-200">
-              <div className="font-medium mb-1">Images de : {selectedProduct.name}</div>
+              <div className="font-medium mb-1">Images de : {normalizedProduct.name}</div>
               <div>Cliquez pour changer l'image de l'élément sélectionné</div>
             </div>
           </div>
@@ -208,6 +216,11 @@ const ImageTemplates = ({ selectedProduct }) => {
                     alt={image.filename}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    onError={(e) => {
+                      console.error('❌ Erreur chargement image:', image.src);
+                      e.target.src =
+                        'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3E?%3C/text%3E%3C/svg%3E';
+                    }}
                   />
 
                   {/* Badge type */}
@@ -268,7 +281,7 @@ const ImageTemplates = ({ selectedProduct }) => {
       </div>
 
       {/* Bouton pour voir les images produit */}
-      {selectedProduct && isImageLinked && (
+      {normalizedProduct && isImageLinked && (
         <button
           onClick={() => setShowMode('product')}
           className="w-full p-3 border-2 border-blue-400 dark:border-blue-600 rounded-lg bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all flex items-center justify-between"
@@ -326,6 +339,11 @@ const ImageTemplates = ({ selectedProduct }) => {
                   alt={image.filename}
                   className="w-full h-full object-cover"
                   loading="lazy"
+                  onError={(e) => {
+                    console.error('❌ Erreur chargement image:', image.src);
+                    e.target.src =
+                      'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3E?%3C/text%3E%3C/svg%3E';
+                  }}
                 />
 
                 {/* Overlay au hover */}
