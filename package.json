@@ -1,6 +1,6 @@
 {
   "name": "apppos-monorepo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Système de Point Vente",
   "private": false,
   "workspaces": [
