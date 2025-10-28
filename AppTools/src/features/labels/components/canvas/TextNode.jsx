@@ -5,6 +5,7 @@ import useLabelStore from '../../store/useLabelStore';
 /**
  * Text Konva avec édition inline au double-clic (overlay <textarea>).
  * - Désactivé si el.dataBinding est défini (car la valeur vient des données).
+ * - Support de width pour le redimensionnement et wrap="word"
  */
 const TextNode = ({
   id,
@@ -18,6 +19,7 @@ const TextNode = ({
   scaleX = 1,
   scaleY = 1,
   opacity = 1,
+  width, // Nouvelle prop pour supporter le redimensionnement
   draggable = true,
   locked = false,
   dataBinding = null,
@@ -32,6 +34,7 @@ const TextNode = ({
   onDragMove,
   onDragEnd,
   onTransform,
+  onTransformStart,
   onTransformEnd,
 }) => {
   const textRef = useRef(null);
@@ -141,6 +144,8 @@ const TextNode = ({
       scaleX={scaleX}
       scaleY={scaleY}
       opacity={opacity}
+      width={width} // Support du width pour redimensionnement
+      wrap="word" // Wrap automatique des mots
       draggable={draggable && !locked}
       shadowEnabled={shadowEnabled}
       shadowColor={shadowColor}
@@ -154,6 +159,7 @@ const TextNode = ({
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
+      onTransformStart={onTransformStart}
       onTransform={onTransform}
       onTransformEnd={onTransformEnd}
     />

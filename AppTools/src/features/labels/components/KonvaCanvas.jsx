@@ -6,7 +6,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
-import { Stage, Layer, Group, Rect, Transformer, Line } from 'react-konva';
+import { Stage, Layer, Group, Rect, Transformer, Line, Text } from 'react-konva';
 import useLabelStore from '../store/useLabelStore';
 import QRCodeNode from './canvas/QRCodeNode';
 import ImageNode from './canvas/ImageNode';
@@ -46,6 +46,9 @@ const KonvaCanvas = forwardRef(
     const [snapGuides, setSnapGuides] = useState([]);
     const [isDraggingElement, setIsDraggingElement] = useState(false);
     const [isTransforming, setIsTransforming] = useState(false);
+
+    // États pour la rotation
+    const [isRotating, setIsRotating] = useState(false);
     const [rotationAngle, setRotationAngle] = useState(null);
 
     const findNodeById = useCallback((id) => {
@@ -171,6 +174,7 @@ const KonvaCanvas = forwardRef(
     );
 
     const handleDragStart = useCallback(() => setIsDraggingElement(true), []);
+
     const handleDragEnd = useCallback(
       (id, node) => {
         setIsDraggingElement(false);
@@ -180,76 +184,179 @@ const KonvaCanvas = forwardRef(
       [updateElement]
     );
 
+    // 🎯 onTransformStart simple
+    const handleTransformStart = useCallback(() => {
+      setIsTransforming(true);
+    }, []);
+
+    // 🎯 REFACTORISÉ : onTransform avec approche Konva officielle
     const handleTransforming = useCallback(
       (id, node) => {
-        setIsTransforming(true);
-        const movingElement = elements.find((el) => el.id === id);
-        if (!movingElement) return;
+        const tr = transformerRef.current;
+        if (!tr) return;
 
-        let rotation = node.rotation();
-        const snapAngles = [0, 90, 180, 270, 360, -90, -180, -270];
-        const snapTolerance = 5;
+        const activeAnchor = tr.getActiveAnchor();
+        const element = elements.find((el) => el.id === id);
+        if (!element) return;
 
-        let snapped = false;
-        for (const snapAngle of snapAngles) {
-          if (Math.abs(rotation - snapAngle) < snapTolerance) {
-            rotation = snapAngle;
-            snapped = true;
-            break;
+        // 🔄 Détection rotation
+        if (activeAnchor === 'rotater') {
+          setIsRotating(true);
+
+          let rotation = node.rotation();
+          const snapAngles = [0, 90, 180, 270, 360, -90, -180, -270];
+          const snapTolerance = 5;
+
+          let snapped = false;
+          for (const snapAngle of snapAngles) {
+            if (Math.abs(rotation - snapAngle) < snapTolerance) {
+              rotation = snapAngle;
+              snapped = true;
+              break;
+            }
           }
+
+          if (!snapped) rotation = Math.round(rotation);
+          if (rotation > 180) rotation -= 360;
+          if (rotation < -180) rotation += 360;
+
+          node.rotation(rotation);
+          setRotationAngle(rotation);
+
+          // Snap guides en rotation
+          const tempElement = {
+            ...element,
+            x: node.x(),
+            y: node.y(),
+            scaleX: node.scaleX(),
+            scaleY: node.scaleY(),
+            rotation: node.rotation(),
+          };
+
+          const otherElements = elements.filter((el) => el.id !== id && el.visible !== false);
+          const { guides } = calculateSnapGuides(
+            tempElement,
+            node,
+            otherElements,
+            { width: docWidth, height: docHeight },
+            5,
+            findNodeById
+          );
+
+          setSnapGuides(guides);
+        } else {
+          // ✅ En resize
+          setIsRotating(false);
+          setRotationAngle(null);
+
+          // 🎯 APPROCHE KONVA OFFICIELLE pour les TEXTES
+          if (element.type === 'text') {
+            const scaleX = node.scaleX();
+            const scaleY = node.scaleY();
+
+            // ✅ Calculer nouvelles dimensions avec contraintes minimales strictes
+            const newWidth = Math.max(30, node.width() * scaleX);
+            const newFontSize = Math.max(10, node.fontSize() * scaleY);
+
+            // ⚡ Appliquer immédiatement avec setAttrs (méthode Konva)
+            node.setAttrs({
+              width: newWidth,
+              fontSize: newFontSize,
+              scaleX: 1,
+              scaleY: 1,
+            });
+          }
+
+          // ✅ Snap guides pour tous les éléments (maintenant que c'est fluide)
+          const tempElement = {
+            ...element,
+            x: node.x(),
+            y: node.y(),
+            scaleX: node.scaleX(),
+            scaleY: node.scaleY(),
+            rotation: node.rotation(),
+          };
+
+          const otherElements = elements.filter((el) => el.id !== id && el.visible !== false);
+          const { guides } = calculateSnapGuides(
+            tempElement,
+            node,
+            otherElements,
+            { width: docWidth, height: docHeight },
+            5,
+            findNodeById
+          );
+
+          setSnapGuides(guides);
         }
-
-        if (!snapped) rotation = Math.round(rotation);
-        if (rotation > 180) rotation -= 360;
-        if (rotation < -180) rotation += 360;
-
-        node.rotation(rotation);
-        setRotationAngle(rotation);
-
-        const tempElement = {
-          ...movingElement,
-          x: node.x(),
-          y: node.y(),
-          scaleX: node.scaleX(),
-          scaleY: node.scaleY(),
-          rotation: node.rotation(),
-        };
-
-        const otherElements = elements.filter((el) => el.id !== id && el.visible !== false);
-        const { guides } = calculateSnapGuides(
-          tempElement,
-          node,
-          otherElements,
-          { width: docWidth, height: docHeight },
-          5,
-          findNodeById
-        );
-
-        setSnapGuides(guides);
       },
       [elements, docWidth, docHeight, findNodeById]
     );
 
+    // 🎯 onTransformEnd - persistence finale
     const handleTransformEnd = useCallback(
       (id, node) => {
         setIsTransforming(false);
-        setSnapGuides([]);
+        setIsRotating(false);
         setRotationAngle(null);
+        setSnapGuides([]);
 
-        let rotation = node.rotation();
-        rotation = Math.round(rotation);
-        if (rotation > 180) rotation -= 360;
-        if (rotation < -180) rotation += 360;
+        const element = elements.find((el) => el.id === id);
+        if (!element) return;
 
-        updateElement(id, {
+        const updates = {
           x: node.x(),
           y: node.y(),
-          scaleX: node.scaleX(),
-          scaleY: node.scaleY(),
-          rotation,
-        });
+          rotation: node.rotation(),
+        };
+
+        // 🎯 Pour les TEXTES : persister width/fontSize avec scale = 1
+        if (element.type === 'text') {
+          updates.width = node.width();
+          updates.fontSize = node.fontSize();
+          updates.scaleX = 1;
+          updates.scaleY = 1;
+        } else {
+          // Pour les autres éléments : garder le scale
+          updates.scaleX = node.scaleX();
+          updates.scaleY = node.scaleY();
+        }
+
+        // ✅ Persister dans le store
+        updateElement(id, updates);
       },
-      [updateElement]
+      [elements, updateElement]
+    );
+
+    // 🎯 boundBoxFunc intelligent avec contraintes strictes
+    const boundBoxFunc = useCallback(
+      (oldBox, newBox) => {
+        // 🔥 Contraintes minimales strictes
+        const minWidth = 30; // Largeur minimale visible
+        const minHeight = 20; // Hauteur minimale visible
+
+        // Si on dépasse les limites, on garde l'ancienne box
+        if (newBox.width < minWidth) {
+          newBox.width = minWidth;
+        }
+
+        if (newBox.height < minHeight) {
+          newBox.height = minHeight;
+        }
+
+        // 🎯 Pour les textes : contrainte supplémentaire sur le ratio
+        const selectedElement = elements.find((el) => el.id === selectedId);
+        if (selectedElement?.type === 'text') {
+          // Empêcher un texte trop écrasé verticalement
+          const minTextHeight = 15;
+          if (newBox.height < minTextHeight) {
+            newBox.height = minTextHeight;
+          }
+        }
+
+        return newBox;
+      },
+      [elements, selectedId]
     );
 
     const shadowPropsFrom = (el) => ({
@@ -327,6 +434,7 @@ const KonvaCanvas = forwardRef(
                 onDragStart: handleDragStart,
                 onDragMove: (e) => !locked && handleDragMove(id, e.target),
                 onDragEnd: (e) => !locked && handleDragEnd(id, e.target),
+                onTransformStart: (e) => !locked && handleTransformStart(),
                 onTransform: (e) => !locked && handleTransforming(id, e.target),
                 onTransformEnd: (e) => !locked && handleTransformEnd(id, e.target),
                 scaleX: scaleX || 1,
@@ -345,6 +453,7 @@ const KonvaCanvas = forwardRef(
                     fontSize={el.fontSize}
                     fontStyle={el.bold ? 'bold' : 'normal'}
                     fill={el.color}
+                    width={el.width}
                     locked={locked}
                     dataBinding={el.dataBinding || null}
                   />
@@ -431,10 +540,7 @@ const KonvaCanvas = forwardRef(
 
           <Transformer
             ref={transformerRef}
-            boundBoxFunc={(oldBox, newBox) => {
-              if (newBox.width < 5 || newBox.height < 5) return oldBox;
-              return newBox;
-            }}
+            boundBoxFunc={boundBoxFunc}
             rotationSnaps={[0, 90, 180, 270]}
             rotationSnapTolerance={5}
             rotateAnchorOffset={30}
@@ -450,7 +556,8 @@ const KonvaCanvas = forwardRef(
             ]}
           />
 
-          {rotationAngle !== null && selectedId && (
+          {/* Badge de rotation : affiché UNIQUEMENT pendant la rotation */}
+          {isRotating && rotationAngle !== null && selectedId && (
             <Group>
               {(() => {
                 const selectedNode = stageRef.current?.findOne(`#${selectedId}`);
@@ -458,7 +565,7 @@ const KonvaCanvas = forwardRef(
 
                 const box = selectedNode.getClientRect();
                 const centerX = box.x + box.width / 2;
-                const centerY = box.y + box.y / 2 - 40;
+                const centerY = box.y + box.height / 2 - 40;
 
                 return (
                   <Group x={centerX} y={centerY}>
@@ -472,7 +579,19 @@ const KonvaCanvas = forwardRef(
                       cornerRadius={4}
                       listening={false}
                     />
-                    {/* Petit affichage de l'angle pendant la rotation */}
+                    <Text
+                      x={-30}
+                      y={-12}
+                      width={60}
+                      height={24}
+                      text={`${Math.round(rotationAngle)}°`}
+                      fontSize={12}
+                      fontFamily="sans-serif"
+                      fill="#FFFFFF"
+                      align="center"
+                      verticalAlign="middle"
+                      listening={false}
+                    />
                   </Group>
                 );
               })()}
