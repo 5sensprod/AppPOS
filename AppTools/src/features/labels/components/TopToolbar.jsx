@@ -18,6 +18,7 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEf
   const redo = useLabelStore((s) => s.redo);
   const canUndo = useLabelStore((s) => s.canUndo);
   const canRedo = useLabelStore((s) => s.canRedo);
+  const currentTemplateName = useLabelStore((s) => s.currentTemplateName);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -101,6 +102,11 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEf
                 </button>
 
                 <div className="truncate">
+                  {currentTemplateName && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate mb-0.5">
+                      {currentTemplateName}
+                    </div>
+                  )}
                   {selectedProduct ? (
                     <div className="leading-tight">
                       <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
@@ -128,6 +134,11 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEf
               </>
             ) : selectedProduct ? (
               <div className="leading-tight">
+                {currentTemplateName && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate mb-0.5">
+                    {currentTemplateName}
+                  </div>
+                )}
                 <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                   {selectedProduct.name}
                 </div>
@@ -137,7 +148,8 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEf
               </div>
             ) : (
               <h1 className="text-sm font-medium text-gray-800 dark:text-white shrink-0">
-                {dataSource === 'blank' ? 'Affiche vierge' : "Création d'affiche"}
+                {currentTemplateName ||
+                  (dataSource === 'blank' ? 'Affiche vierge' : "Création d'affiche")}
               </h1>
             )}
 

@@ -28,6 +28,7 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
   const sheetSettings = useLabelStore((s) => s.sheetSettings);
   const lockCanvasToSheetCell = useLabelStore((s) => s.lockCanvasToSheetCell);
   const dataSource = useLabelStore((s) => s.dataSource);
+  const setCurrentTemplateName = useLabelStore((s) => s.setCurrentTemplateName);
 
   // Actions du store
   const setCanvasSize = useLabelStore((s) => s.setCanvasSize);
@@ -197,9 +198,10 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
   const applyTemplate = async (template, selectedProducts = null) => {
     try {
       // Vider le canvas
+
       clearCanvas();
       await new Promise((resolve) => setTimeout(resolve, 100));
-
+      setCurrentTemplateName(template.name || 'Template sans nom');
       // 🆕 CORRECTION : Récupérer les données selon la source
       // - Factory templates API : template.preset_data
       // - Templates locaux : template directement
@@ -234,6 +236,8 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
       if (selectedProducts && selectedProducts.length > 0) {
         setSelectedProducts(selectedProducts);
       }
+
+      setCurrentTemplateName(template.name);
 
       // Restaurer les éléments
       const elements = templateData.elements || [];

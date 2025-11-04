@@ -250,6 +250,10 @@ const useLabelStore = create((set, get) => ({
       };
     }),
 
+  currentTemplateName: null,
+
+  setCurrentTemplateName: (name) => set({ currentTemplateName: name }),
+
   clearCanvas: () =>
     set((state) => {
       state._pushHistory(snapshotOf(state));
