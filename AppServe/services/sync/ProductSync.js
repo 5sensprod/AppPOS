@@ -17,6 +17,9 @@ class ProductSyncStrategy extends SyncStrategy {
       `[SYNC] 🔍 Début mapping produit ${product._id} (${product.name}) pour WooCommerce`
     );
 
+    // 🔥 Normaliser manage_stock en booléen AVANT de créer wcData
+    const manageStock = product.manage_stock === true || product.manage_stock === 'yes';
+
     const wcData = {
       name: product.name,
       sku: product.sku || '',
@@ -27,18 +30,8 @@ class ProductSyncStrategy extends SyncStrategy {
       sale_price: (product.sale_price || '').toString(),
       status: product.status === 'published' ? 'publish' : 'draft',
 
-      // Gestion du stock
-      manage_stock: product.manage_stock === true || product.manage_stock === 'yes',
-      stock_quantity: product.stock || 0,
-
-      // ✅ NOUVEAU: Ajouter stock_status
-      // Si manage_stock est false, on envoie le stock_status manuel
-      // Sinon WooCommerce le calculera automatiquement
-      ...(product.manage_stock === false && product.stock_status
-        ? {
-            stock_status: this._normalizeStockStatus(product.stock_status),
-          }
-        : {}),
+      // 🔥 CORRECTION : manage_stock sans stock_quantity par défaut
+      manage_stock: manageStock,
 
       meta_data: [...(product.meta_data || []), { key: 'brand_id', value: product.brand_id }],
       slug:
@@ -46,11 +39,18 @@ class ProductSyncStrategy extends SyncStrategy {
         this._generateSlug(product.name || product.designation || product.sku || ''),
     };
 
-    console.log(`[SYNC] 📦 Gestion du stock: ${wcData.manage_stock ? 'ACTIVÉE' : 'DÉSACTIVÉE'}`);
-    console.log(`[SYNC] 📊 Quantité en stock: ${wcData.stock_quantity}`);
-
-    if (wcData.stock_status) {
-      console.log(`[SYNC] 🏷️  Statut du stock (manuel): ${wcData.stock_status}`);
+    // ✅ N'envoyer stock_quantity QUE si manage_stock est true (mode automatique)
+    if (manageStock) {
+      wcData.stock_quantity = product.stock || 0;
+      console.log(`[SYNC] 📦 Gestion du stock: ACTIVÉE (automatique)`);
+      console.log(`[SYNC] 📊 Quantité en stock: ${wcData.stock_quantity}`);
+    } else {
+      // En mode manuel, envoyer le stock_status si présent
+      console.log(`[SYNC] 📦 Gestion du stock: DÉSACTIVÉE (manuel)`);
+      if (product.stock_status) {
+        wcData.stock_status = this._normalizeStockStatus(product.stock_status);
+        console.log(`[SYNC] 🏷️  Statut du stock (manuel): ${wcData.stock_status}`);
+      }
     }
 
     console.log(`[SYNC] 🔂 Récupération des catégories pour le produit ${product._id}`);
@@ -536,22 +536,29 @@ class ProductSyncStrategy extends SyncStrategy {
     );
     console.log(`[SYNC] 🏷️  stock_status depuis WooCommerce: ${stockStatus}`);
 
-    // Mise à jour du produit
-    await Product.update(productId, {
+    // 🔥 CORRECTION CRITIQUE : Préparer les données de mise à jour
+    const updateData = {
       woo_id: wcData.id,
       website_url: wcData.permalink || null,
       last_sync: new Date(),
       image,
       gallery_images: gallery,
       pending_sync: false,
-
-      // Stock management
       manage_stock: manageStock,
-      stock: wcData.stock_quantity || 0,
-
-      // ✅ NOUVEAU: Sauvegarder stock_status
       stock_status: stockStatus,
-    });
+    };
+
+    // ✅ NE mettre à jour le stock QUE si manage_stock est true (mode automatique)
+    if (manageStock) {
+      updateData.stock = wcData.stock_quantity || 0;
+      console.log(`[SYNC] 📊 Stock automatique mis à jour: ${updateData.stock}`);
+    } else {
+      // En mode manuel, garder le stock local actuel
+      console.log(`[SYNC] 📊 Stock manuel conservé: ${product.stock}`);
+    }
+
+    // Mise à jour du produit
+    await Product.update(productId, updateData);
 
     console.log(`[SYNC] ✅ Produit ${productId} mis à jour localement`);
     console.log(`[SYNC] 📸 Image principale: ${image ? 'présente' : 'absente'}`);
@@ -559,6 +566,7 @@ class ProductSyncStrategy extends SyncStrategy {
     console.log(`[SYNC] 📦 Gestion stock: ${manageStock ? 'ACTIVÉE' : 'DÉSACTIVÉE'}`);
     console.log(`[SYNC] 🏷️  Statut stock: ${stockStatus}`);
   }
+
   async handleFullSync(client, results = { created: 0, updated: 0, deleted: 0, errors: [] }) {
     const [local, wc] = await Promise.all([
       Product.findAll(),
