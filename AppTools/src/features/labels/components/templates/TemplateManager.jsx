@@ -57,6 +57,28 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 💾 Écouteur pour ouvrir le modal de sauvegarde depuis la toolbar
+  useEffect(() => {
+    const handleSaveRequest = () => {
+      setShowSaveModal(true);
+    };
+
+    window.addEventListener('request-template-save', handleSaveRequest);
+    return () => window.removeEventListener('request-template-save', handleSaveRequest);
+  }, []);
+
+  // 🔄 Écouteur pour rafraîchir la liste après une mise à jour
+  useEffect(() => {
+    const handleTemplateUpdated = (event) => {
+      console.log('🔄 Template mis à jour, rafraîchissement de la liste...', event.detail);
+      loadTemplates();
+    };
+
+    window.addEventListener('template-updated', handleTemplateUpdated);
+    return () => window.removeEventListener('template-updated', handleTemplateUpdated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /**
    * 📋 Charge tous les templates
    */
@@ -201,7 +223,11 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
 
       clearCanvas();
       await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // 💾 Stocker le nom ET l'ID du template
       setCurrentTemplateName(template.name || 'Template sans nom');
+      const setCurrentTemplateId = useLabelStore.getState().setCurrentTemplateId;
+      setCurrentTemplateId(template.id || null);
       // 🆕 CORRECTION : Récupérer les données selon la source
       // - Factory templates API : template.preset_data
       // - Templates locaux : template directement
@@ -246,6 +272,10 @@ const TemplateManager = ({ stageRef, docNode, onClose }) => {
       elements.forEach((el) => {
         useLabelStore.getState().addElement(el);
       });
+
+      // 🔄 Réinitialiser l'historique après le chargement
+      const resetHistory = useLabelStore.getState().resetHistory;
+      resetHistory();
 
       success('Template chargé ✅', { title: 'Succès' });
     } catch (err) {

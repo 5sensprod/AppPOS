@@ -6,6 +6,7 @@ import TopToolbar from '../features/labels/components/TopToolbar';
 import DataSourceSelector from '../features/labels/components/DataSourceSelector';
 import ProductSelector from '../features/labels/components/ProductSelector';
 import useLabelStore from '../features/labels/store/useLabelStore';
+import { useActionToasts } from '../components/common/EntityTable/components/BatchActions/hooks/useActionToasts';
 
 const LabelPage = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -20,6 +21,9 @@ const LabelPage = () => {
   // 🆕 État pour l'outil sélectionné dans la sidebar
   const [selectedTool, setSelectedTool] = useState(null);
 
+  // 📢 Toasts pour les notifications
+  const { success, error } = useActionToasts();
+
   const {
     dataSource,
     selectedProduct,
@@ -28,6 +32,81 @@ const LabelPage = () => {
     setSelectedProducts,
     clearCanvas,
   } = useLabelStore();
+
+  // 💾 Fonction pour sauvegarder les modifications du template actuel
+  const handleSaveTemplate = async () => {
+    const store = useLabelStore.getState();
+    const {
+      currentTemplateId,
+      currentTemplateName,
+      elements,
+      canvasSize,
+      sheetSettings,
+      lockCanvasToSheetCell,
+      dataSource: currentDataSource,
+      clearSelection,
+    } = store;
+
+    if (!currentTemplateId) {
+      console.warn(
+        'Aucun template chargé - ouverture de la sidebar pour créer un nouveau template'
+      );
+      if (isSidebarCollapsed) {
+        setIsSidebarCollapsed(false);
+      }
+      setSelectedTool('templates');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('request-template-save'));
+      }, 100);
+      return;
+    }
+
+    try {
+      // Importer dynamiquement le service
+      const { default: templateService } = await import('../services/templateService');
+
+      // Désélectionner avant de capturer la miniature
+      clearSelection();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Générer une nouvelle miniature
+      const thumbnail = await templateService.generateThumbnail(stageRef, {
+        width: 400,
+        height: 300,
+        docNode: docNode,
+        canvasWidth: canvasSize.width,
+        canvasHeight: canvasSize.height,
+      });
+
+      const updates = {
+        elements,
+        canvasSize,
+        sheetSettings,
+        lockCanvasToSheetCell,
+        dataSource: currentDataSource,
+        name: currentTemplateName,
+        thumbnail,
+      };
+
+      await templateService.updateTemplate(currentTemplateId, updates);
+
+      // 🔄 Réinitialiser l'historique après la sauvegarde
+      const resetHistory = useLabelStore.getState().resetHistory;
+      resetHistory();
+
+      // 📢 Notifier le TemplateManager pour rafraîchir la liste
+      window.dispatchEvent(
+        new CustomEvent('template-updated', {
+          detail: { templateId: currentTemplateId },
+        })
+      );
+
+      success('Template sauvegardé ✅', { title: 'Succès' });
+    } catch (err) {
+      console.error('❌ Erreur lors de la sauvegarde:', err);
+      error('Erreur lors de la sauvegarde ❌', { title: 'Erreur' });
+    }
+  };
 
   // ✅ Fonction pour ouvrir le panneau Effets
   const handleOpenEffects = () => {
@@ -95,6 +174,7 @@ const LabelPage = () => {
         docNode={docNode}
         selectedProduct={displayProduct}
         onOpenEffects={handleOpenEffects}
+        onSave={handleSaveTemplate}
       />
 
       <div className="flex flex-1 overflow-hidden">

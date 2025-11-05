@@ -1,11 +1,18 @@
 // src/features/labels/components/TopToolbar.jsx
 import React, { useEffect } from 'react';
-import { Undo, Redo, Download, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Undo, Redo, Download, Plus, ChevronLeft, ChevronRight, Save } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
 import { exportPdf } from '../utils/exportPdf';
 import PropertyPanel from './PropertyPanel';
 
-const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEffects }) => {
+const TopToolbar = ({
+  dataSource,
+  onNewLabel,
+  docNode,
+  selectedProduct,
+  onOpenEffects,
+  onSave,
+}) => {
   const zoom = useLabelStore((s) => s.zoom);
   const canvasSize = useLabelStore((s) => s.canvasSize);
   const selectedId = useLabelStore((s) => s.selectedId);
@@ -103,8 +110,21 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEf
 
                 <div className="truncate">
                   {currentTemplateName && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate mb-0.5">
-                      {currentTemplateName}
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 flex items-center gap-1.5">
+                      <span className="truncate">{currentTemplateName}</span>
+                      {canUndo && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            console.log('🔵 Bouton Save cliqué !');
+                            onSave?.();
+                          }}
+                          className="hover:scale-110 transition-transform flex-shrink-0"
+                          title="Sauvegarder les modifications"
+                        >
+                          <Save className="h-3 w-3 text-orange-500 dark:text-orange-400" />
+                        </button>
+                      )}
                     </div>
                   )}
                   {selectedProduct ? (
@@ -135,8 +155,21 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEf
             ) : selectedProduct ? (
               <div className="leading-tight">
                 {currentTemplateName && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate mb-0.5">
-                    {currentTemplateName}
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 flex items-center gap-1.5">
+                    <span className="truncate">{currentTemplateName}</span>
+                    {canUndo && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('🔵 Bouton Save cliqué !');
+                          onSave?.();
+                        }}
+                        className="hover:scale-110 transition-transform flex-shrink-0"
+                        title="Sauvegarder les modifications"
+                      >
+                        <Save className="h-3 w-3 text-orange-500 dark:text-orange-400" />
+                      </button>
+                    )}
                   </div>
                 )}
                 <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
@@ -147,9 +180,24 @@ const TopToolbar = ({ dataSource, onNewLabel, docNode, selectedProduct, onOpenEf
                 </div>
               </div>
             ) : (
-              <h1 className="text-sm font-medium text-gray-800 dark:text-white shrink-0">
-                {currentTemplateName ||
-                  (dataSource === 'blank' ? 'Affiche vierge' : "Création d'affiche")}
+              <h1 className="text-sm font-medium text-gray-800 dark:text-white shrink-0 flex items-center gap-2">
+                <span className="truncate">
+                  {currentTemplateName ||
+                    (dataSource === 'blank' ? 'Affiche vierge' : "Création d'affiche")}
+                </span>
+                {canUndo && currentTemplateName && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('🔵 Bouton Save cliqué !');
+                      onSave?.();
+                    }}
+                    className="hover:scale-110 transition-transform flex-shrink-0"
+                    title="Sauvegarder les modifications"
+                  >
+                    <Save className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                  </button>
+                )}
               </h1>
             )}
 

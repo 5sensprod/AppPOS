@@ -76,7 +76,10 @@ class TemplateApiService {
       const data = response.data?.data || response.data;
       return data;
     } catch (error) {
-      console.error('❌ [TEMPLATES-API] Erreur getTemplate:', error);
+      // Ne pas logger les 404 (templates locaux normaux en mode hybride)
+      if (error.response?.status !== 404) {
+        console.error('❌ [TEMPLATES-API] Erreur getTemplate:', error);
+      }
       return null;
     }
   }

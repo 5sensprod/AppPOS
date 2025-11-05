@@ -251,8 +251,10 @@ const useLabelStore = create((set, get) => ({
     }),
 
   currentTemplateName: null,
+  currentTemplateId: null, // 💾 ID du template chargé
 
   setCurrentTemplateName: (name) => set({ currentTemplateName: name }),
+  setCurrentTemplateId: (id) => set({ currentTemplateId: id }),
 
   clearCanvas: () =>
     set((state) => {
@@ -263,6 +265,15 @@ const useLabelStore = create((set, get) => ({
         selectedProducts: [],
         selectedProduct: null,
       };
+    }),
+
+  // 🔄 Réinitialise l'historique (pour chargement de template)
+  resetHistory: () =>
+    set({
+      historyPast: [],
+      historyFuture: [],
+      canUndo: false,
+      canRedo: false,
     }),
 
   // --- zoom & canvas
