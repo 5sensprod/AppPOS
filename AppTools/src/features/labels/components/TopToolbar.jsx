@@ -58,6 +58,8 @@ const TopToolbar = ({
     });
   };
 
+  const startNewDocument = useLabelStore((s) => s.startNewDocument);
+
   const isMultiProduct = Array.isArray(selectedProducts) && selectedProducts.length > 1;
 
   return (
@@ -66,7 +68,10 @@ const TopToolbar = ({
         {/* Gauche : actions + titre + (property inline si sélection) */}
         <div className="flex items-center gap-2 min-w-0">
           <button
-            onClick={onNewLabel}
+            onClick={() => {
+              startNewDocument();
+              onNewLabel?.();
+            }}
             className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
             title="Nouveau document"
           >

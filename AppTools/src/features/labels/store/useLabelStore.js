@@ -250,6 +250,24 @@ const useLabelStore = create((set, get) => ({
       };
     }),
 
+  startNewDocument: (source = 'blank') =>
+    set((state) => {
+      state._pushHistory(snapshotOf(state));
+      return {
+        elements: [],
+        selectedId: null,
+        selectedProducts: [],
+        selectedProduct: null,
+        dataSource: source,
+        currentTemplateName: 'Nouveau',
+        currentTemplateId: null,
+        historyPast: [],
+        historyFuture: [],
+        canUndo: false,
+        canRedo: false,
+      };
+    }),
+
   currentTemplateName: null,
   currentTemplateId: null, // 💾 ID du template chargé
 
