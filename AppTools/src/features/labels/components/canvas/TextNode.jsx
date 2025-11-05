@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import { Text } from 'react-konva';
 import useLabelStore from '../../store/useLabelStore';
+import { loadGoogleFont } from '../../utils/loadGoogleFont'; // 🎨 Import de la fonction de chargement
 
 /**
  * Text Konva avec édition inline au double-clic (overlay <textarea>).
@@ -41,6 +42,28 @@ const TextNode = ({
 }) => {
   const textRef = useRef(null);
   const updateElement = useLabelStore((s) => s.updateElement);
+
+  // 🎨 Charger la police Google Font et forcer le redraw quand elle change
+  useEffect(() => {
+    const loadAndDraw = async () => {
+      const node = textRef.current;
+      if (!node) return;
+
+      // Charger la police si c'est une Google Font (sans italic forcé)
+      await loadGoogleFont(fontFamily, { weights: '400;700' });
+
+      // Forcer le redraw du Layer après chargement
+      const layer = node.getLayer();
+      if (layer) {
+        // Petit délai pour s'assurer que la police est bien chargée
+        setTimeout(() => {
+          layer.batchDraw();
+        }, 50);
+      }
+    };
+
+    loadAndDraw();
+  }, [fontFamily]); // Se déclenche à chaque changement de fontFamily
 
   // Empêche la sélection de texte par le navigateur pendant le drag
   useEffect(() => {

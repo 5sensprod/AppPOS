@@ -57,11 +57,11 @@ export async function loadGoogleFont(fontFamily, opts = {}) {
   if (SYSTEM_FONTS.has(fontFamily)) return;
 
   const weights = opts.weights || '400;700';
-  const ital = opts.ital ? `ital,wght@0,${weights};1,${weights}` : `wght@${weights}`;
 
-  // encodeURIComponent gère espaces/accents
-  const familyParam = encodeURIComponent(fontFamily);
-  const href = `https://fonts.googleapis.com/css2?family=${familyParam}:${ital}&display=swap`;
+  // Ne pas inclure italic par défaut car toutes les polices ne l'ont pas
+  const href = opts.ital
+    ? `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily)}:ital,wght@0,${weights};1,${weights}&display=swap`
+    : `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily)}:wght@${weights}&display=swap`;
 
   if (!injected.has(href)) {
     const link = document.createElement('link');

@@ -384,7 +384,13 @@ const KonvaCanvas = forwardRef(
       }
       const node = stage.findOne(`#${selectedId}`);
       tr.nodes(node ? [node] : []);
-      tr.getLayer()?.batchDraw();
+
+      // Forcer la mise à jour du Transformer après un court délai
+      // pour que la police soit chargée et le texte redimensionné
+      setTimeout(() => {
+        tr.forceUpdate();
+        tr.getLayer()?.batchDraw();
+      }, 100);
     }, [selectedId, elements]);
 
     const stageW = Math.max(1, viewportWidth);
