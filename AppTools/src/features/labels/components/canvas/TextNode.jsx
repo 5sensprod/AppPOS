@@ -6,6 +6,7 @@ import useLabelStore from '../../store/useLabelStore';
  * Text Konva avec édition inline au double-clic (overlay <textarea>).
  * - Désactivé si el.dataBinding est défini (car la valeur vient des données).
  * - Support de width pour le redimensionnement et wrap="word"
+ * - Support de fontFamily pour Google Fonts
  */
 const TextNode = ({
   id,
@@ -14,6 +15,7 @@ const TextNode = ({
   text,
   fontSize = 16,
   fontStyle = 'normal',
+  fontFamily = 'Arial', // 🎨 Nouvelle prop pour la police
   fill = '#000000',
   rotation = 0,
   scaleX = 1,
@@ -87,12 +89,14 @@ const TextNode = ({
       textarea.style.background = 'white';
       textarea.style.opacity = '1';
       textarea.style.fontSize = `${fontSize * scale}px`;
-      textarea.style.fontFamily = 'sans-serif';
+      textarea.style.fontFamily = fontFamily; // 🎨 Appliquer la police
       textarea.style.lineHeight = '1.2';
       textarea.style.color = fill;
       textarea.style.transformOrigin = 'left top';
       textarea.style.transform = `rotate(${rotation}deg)`;
       textarea.style.zIndex = '9999';
+      textarea.style.fontWeight = fontStyle === 'bold' ? 'bold' : 'normal';
+      textarea.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
 
       // Largeur/hauteur approximatives : on peut partir de la bbox du node
       const nodeBox = node.getClientRect({ relativeTo: stage });
@@ -127,7 +131,7 @@ const TextNode = ({
       });
       textarea.addEventListener('blur', () => end(true));
     },
-    [commit, fill, fontSize, locked, rotation, dataBinding]
+    [commit, fill, fontSize, fontFamily, fontStyle, locked, rotation, dataBinding]
   );
 
   return (
@@ -139,6 +143,7 @@ const TextNode = ({
       text={text}
       fontSize={fontSize}
       fontStyle={fontStyle}
+      fontFamily={fontFamily} // 🎨 Appliquer la police Google Font
       fill={fill}
       rotation={rotation}
       scaleX={scaleX}

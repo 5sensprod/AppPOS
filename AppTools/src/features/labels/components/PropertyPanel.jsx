@@ -2,6 +2,7 @@
 import React from 'react';
 import { Palette, Link, Unlink, Sparkles } from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
+import FontSelector from './FontSelector';
 
 const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
   const elements = useLabelStore((s) => s.elements);
@@ -36,7 +37,7 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
 
   const handleColorChange = (color) => updateElement(selectedId, { color });
 
-  // ✅ Ne plus “figer” la valeur : on n’écrit que dataBinding
+  // ✅ Ne plus "figer" la valeur : on n'écrit que dataBinding
   const handleFieldChange = (fieldKey) => {
     const field = dataFields.find((f) => f.key === fieldKey);
     if (!field) return;
@@ -105,9 +106,26 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
     updateElement(selectedId, { opacity: parseFloat(value) });
   };
 
+  /** 🎨 Changement de police pour les textes */
+  const handleFontFamilyChange = (fontFamily) => {
+    updateElement(selectedId, { fontFamily });
+  };
+
   return (
     <div className="">
       <div className="flex items-center gap-4 px-4 ">
+        {/* 🎨 Sélecteur de police pour les textes */}
+        {isText && (
+          <>
+            <FontSelector
+              value={selectedElement.fontFamily || 'Arial'}
+              onChange={handleFontFamilyChange}
+              apiKey={import.meta.env.VITE_GOOGLE_FONTS_KEY} // optionnel si ton FontSelector lit déjà l'env
+            />
+            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+          </>
+        )}
+
         {(isText || isQRCode) && (
           <div className="flex items-center gap-2">
             <Palette className="h-4 w-4 text-gray-500 dark:text-gray-400" />

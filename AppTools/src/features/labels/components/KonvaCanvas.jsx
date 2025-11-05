@@ -452,6 +452,7 @@ const KonvaCanvas = forwardRef(
                     text={resolvePropForElement(el.text, el, selectedProduct)}
                     fontSize={el.fontSize}
                     fontStyle={el.bold ? 'bold' : 'normal'}
+                    fontFamily={el.fontFamily || 'Arial'} // 🎨 Ajouter le support de fontFamily
                     fill={el.color}
                     width={el.width}
                     locked={locked}
