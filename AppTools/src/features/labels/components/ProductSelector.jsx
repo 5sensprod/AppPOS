@@ -207,7 +207,13 @@ const ProductSelector = ({ onSelect, onClose, multiSelect = false, selectedProdu
                       <div className="text-right">
                         {product.price != null && (
                           <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                            {Number(product.price).toLocaleString('fr-FR')}€
+                            {Number(product.price) % 1 === 0
+                              ? Number(product.price).toLocaleString('fr-FR')
+                              : Number(product.price).toLocaleString('fr-FR', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{' '}
+                            €
                           </div>
                         )}
                         <div className="text-xs text-gray-500">

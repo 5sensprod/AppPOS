@@ -139,7 +139,15 @@ const TopToolbar = ({
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                         {selectedProduct.sku} •{' '}
-                        {selectedProduct.price?.toLocaleString('fr-FR') || '0'}€
+                        {selectedProduct.price != null
+                          ? Number(selectedProduct.price) % 1 === 0
+                            ? Number(selectedProduct.price).toLocaleString('fr-FR')
+                            : Number(selectedProduct.price).toLocaleString('fr-FR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                          : '0'}{' '}
+                        €
                       </div>
                     </div>
                   ) : (

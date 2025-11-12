@@ -4,18 +4,30 @@
 /** 🔢→💶 Formatte un prix en EUR pour affichage texte */
 export const formatPriceEUR = (val) => {
   if (val == null) return '';
+
+  let num;
   if (typeof val === 'number' && Number.isFinite(val)) {
-    return `${val.toLocaleString('fr-FR')}€`;
+    num = val;
+  } else {
+    // Essayez de parser une string "3990", "3 990", "3,990"...
+    num = Number(
+      String(val)
+        .replace(/[^\d,.-]/g, '')
+        .replace(',', '.')
+    );
   }
-  // Essayez de parser une string "3990", "3 990", "3,990"...
-  const num = Number(
-    String(val)
-      .replace(/[^\d,.-]/g, '')
-      .replace(',', '.')
-  );
-  if (Number.isFinite(num)) return `${num.toLocaleString('fr-FR')}€`;
+
+  if (Number.isFinite(num)) {
+    // Si le prix est rond (pas de décimales), afficher sans décimales
+    if (num % 1 === 0) {
+      return `${num.toLocaleString('fr-FR')} €`;
+    }
+    // Sinon, afficher avec 2 décimales
+    return `${num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  }
+
   const s = String(val);
-  return s.endsWith('€') ? s : `${s}€`;
+  return s.endsWith('€') ? s : `${s} €`;
 };
 
 /** Cherche une valeur “propre” dans meta_data [{key,value}, ...] */

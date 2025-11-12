@@ -125,7 +125,7 @@ const TextNode = ({
       const nodeBox = node.getClientRect({ relativeTo: stage });
       const minWidth = 50 * scale;
       textarea.style.width = `${Math.max(nodeBox.width, minWidth)}px`;
-      textarea.style.height = `${Math.max(nodeBox.height, fontSize * 1.4) * scale}px`;
+      textarea.style.height = `${Math.max(nodeBox.height, fontSize * 1.4)}px`;
 
       document.body.appendChild(textarea);
       textarea.focus();
