@@ -87,6 +87,7 @@ const InputField = ({
     icon: _icon,
     iconPosition: _iconPosition,
     error: _error,
+    onKeyDown,
     ...htmlInputProps
   } = inputProps;
 
@@ -108,6 +109,7 @@ const InputField = ({
         error={hasError}
         icon={Icon}
         iconPosition={iconPosition}
+        onKeyDown={onKeyDown}
         {...(register ? register(name, registerOptions) : {})}
         {...htmlInputProps}
       />
