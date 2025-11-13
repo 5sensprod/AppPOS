@@ -55,45 +55,14 @@ const NumberInput = ({
     return formatted;
   };
 
-  const handleKeyDown = (e) => {
-    if (allowDecimals && e.key === '.') {
-      e.preventDefault();
-      // Simuler l'insertion d'une virgule
-      const input = e.target;
-      const start = input.selectionStart;
-      const end = input.selectionEnd;
-      const value = input.value || '';
-
-      const newValue = value.substring(0, start) + ',' + value.substring(end);
-
-      // Mettre à jour directement la valeur
-      input.value = newValue;
-
-      // Repositionner le curseur
-      setTimeout(() => {
-        input.setSelectionRange(start + 1, start + 1);
-      }, 0);
-
-      // Déclencher l'événement input pour react-hook-form
-      const event = new Event('input', { bubbles: true });
-      input.dispatchEvent(event);
-    }
-
-    if (props.onKeyDown) {
-      props.onKeyDown(e);
-    }
-  };
-
   return (
     <InputField
-      type="text" // CHANGER de "number" à "text"
-      inputMode="decimal" // AJOUTER : affiche le clavier numérique sur mobile
-      pattern={allowNegative ? '[0-9,.\\-]*' : '[0-9,]*'}
+      type="number"
       min={adjustedMin}
       max={max}
       step={adjustedStep}
       validationRules={numberValidationRules}
-      onKeyDown={handleKeyDown}
+      // Override du formatage en mode lecture
       value={
         props.editable === false && props.value !== undefined
           ? formatValue(props.value)
