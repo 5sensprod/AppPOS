@@ -83,13 +83,22 @@ const CashierPage = () => {
 
   const handleProductFound = useCallback(
     async (product) => {
-      // Vérifications de stock (votre code existant)
-      if (product.manage_stock && product.stock <= 0) {
+      // ✅ CORRECTION : Autoriser les stocks 0 et négatifs
+      // Configuration
+      const ALLOW_NEGATIVE_STOCK = true; // Mettre à false pour bloquer
+
+      if (!ALLOW_NEGATIVE_STOCK && product.manage_stock && product.stock <= 0) {
         setError(`Produit "${product.name}" en rupture de stock`);
         return;
       }
 
+      // ✅ OPTIONNEL : Afficher un warning si stock 0
+      if (ALLOW_NEGATIVE_STOCK && product.manage_stock && product.stock <= 0) {
+        console.warn(`⚠️ Vente avec stock négatif: ${product.name} (stock: ${product.stock})`);
+      }
+
       try {
+        // Aj
         // Ajouter au panier
         addToCart(product, 1);
         setError(null);

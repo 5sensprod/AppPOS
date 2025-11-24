@@ -13,11 +13,6 @@ const ProductSearch = ({ onProductFound, disabled = false }) => {
   const { searchProduct, loading: isSearching } = useCashierStore();
   const searchType = 'auto'; // Toujours en auto-détection
 
-  const isBarcode = (term) => {
-    // Détecter si c'est un code-barres (généralement numérique et assez long)
-    return /^\d{8,}$/.test(term.trim()); // 8 chiffres ou plus
-  };
-
   const performSearch = async (term, type) => {
     if (!term.trim() || term.length < 2) {
       setSuggestions([]);
@@ -26,16 +21,26 @@ const ProductSearch = ({ onProductFound, disabled = false }) => {
 
     try {
       const response = await searchProduct(term.trim(), type);
-      const isBarcodeSearch = isBarcode(term) || response.search_info?.found_by === 'barcode';
 
+      // ✅ NOUVEAU : Gérer les résultats multiples
       if (response.multiple && response.results) {
+        // Plusieurs résultats → afficher tous en suggestions
         setSuggestions(response.results);
       } else if (response._id) {
-        // Si c'est un code-barres ET qu'on a un match exact, ajout direct
-        if (isBarcodeSearch) {
-          selectProduct(response);
-          return;
+        // Un seul résultat
+        if (
+          type === 'barcode' ||
+          (type === 'auto' && response.search_info?.found_by === 'barcode')
+        ) {
+          const barcode = response.meta_data?.find((m) => m.key === 'barcode')?.value;
+          if (barcode && barcode === term.trim()) {
+            // Match exact de code-barres → ajout direct
+            selectProduct(response);
+            return;
+          }
         }
+
+        // Sinon, afficher en suggestion
         setSuggestions([response]);
       } else {
         setSuggestions([]);
