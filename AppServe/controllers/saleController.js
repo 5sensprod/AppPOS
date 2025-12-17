@@ -160,7 +160,7 @@ class SaleController extends BaseController {
 
       const newSale = await Sale.create(saleData);
 
-      // ✅ GESTION DU FOND DE CAISSE (inchangée)
+      // ✅ GESTION DU FOND DE CAISSE - CORRIGÉ
       if (payment_method === 'cash' || payment_method === 'mixed') {
         try {
           const cashierSessionService = require('../services/cashierSessionService');
@@ -178,26 +178,24 @@ class SaleController extends BaseController {
             );
           }
 
-          if (cashAmount > 0) {
+          // ✅ NOUVEAU : Calculer le montant net cash (entrée - sortie)
+          const netCashAmount = cashAmount - changeAmount;
+
+          if (netCashAmount !== 0) {
+            // ✅ Ajouter UN SEUL mouvement net
             await cashierSessionService.addCashMovement(cashier.id, {
               type: 'in',
-              amount: cashAmount,
+              amount: netCashAmount,
               reason: `Vente ${newSale.transaction_id}`,
-              notes: `Paiement client - Total vente: ${saleData.total_amount}€`,
+              notes:
+                changeAmount > 0
+                  ? `Vente: ${saleData.total_amount}€ - Reçu: ${cashAmount}€ - Monnaie: ${changeAmount}€`
+                  : `Paiement client - Total vente: ${saleData.total_amount}€`,
             });
 
-            console.log(`✅ [SALE] +${cashAmount}€ ajoutés au fond de caisse`);
-          }
-
-          if (changeAmount > 0) {
-            await cashierSessionService.addCashMovement(cashier.id, {
-              type: 'out',
-              amount: changeAmount,
-              reason: `Monnaie rendue ${newSale.transaction_id}`,
-              notes: `Monnaie client - Reçu: ${cashAmount}€, Vente: ${saleData.total_amount}€`,
-            });
-
-            console.log(`✅ [SALE] -${changeAmount}€ déduits du fond de caisse (monnaie)`);
+            console.log(
+              `✅ [SALE] Fond de caisse: ${netCashAmount > 0 ? '+' : ''}${netCashAmount}€`
+            );
           }
         } catch (drawerError) {
           console.warn('⚠️ [SALE] Erreur mise à jour fond de caisse:', drawerError.message);
@@ -218,19 +216,16 @@ class SaleController extends BaseController {
               notes: `Partie cash - Total: ${saleData.total_amount}€ (Cash: ${cash_amount}€, Carte: ${card_amount}€)`,
             });
 
-            console.log(`✅ [SALE] Paiement mixte: +${cash_amount}€ en espèces ajoutés au fond`);
+            console.log(`✅ [SALE] +${cash_amount}€ cash ajoutés au fond`);
           }
-        } catch (mixedError) {
-          console.warn('⚠️ [SALE] Erreur paiement mixte fond de caisse:', mixedError.message);
+        } catch (drawerError) {
+          console.warn('⚠️ [SALE] Erreur mise à jour fond (mixte):', drawerError.message);
         }
       }
 
-      // ✅ ÉVÉNEMENT CRÉATION DE VENTE
-      this.eventService.created(newSale);
-
-      // ✅ MISE À JOUR STATISTIQUES SESSION CAISSIER
-      const cashierSessionService = require('../services/cashierSessionService');
+      // ✅ METTRE À JOUR STATS SESSION
       try {
+        const cashierSessionService = require('../services/cashierSessionService');
         const updatedStats = cashierSessionService.updateSaleStats(
           cashier.id,
           saleData.total_amount
@@ -251,7 +246,7 @@ class SaleController extends BaseController {
         console.debug('Erreur mise à jour stats session:', error.message);
       }
 
-      // ✅ DÉCRÉMENTER LES STOCKS ET METTRE À JOUR STATS PRODUITS (inchangé)
+      // ✅ DÉCRÉMENTER LES STOCKS ET METTRE À JOUR STATS PRODUITS
       for (const item of enrichedItems) {
         const product = await Product.findById(item.product_id);
 
@@ -261,13 +256,13 @@ class SaleController extends BaseController {
         if (product.type !== 'service') {
           updateData.stock = (product.stock || 0) - item.quantity;
           console.log(
-            `📦 [STOCK] ${product.name}: ${product.stock || 0} → ${updateData.stock} (${item.quantity} vendus)`
+            `📦 [STOCK] ${product.name}: ${product.stock || 0} → ${updateData.stock} (-${item.quantity})`
           );
         } else {
-          console.log(`🚫 [SERVICE] ${product.name}: Stock non décrémenter (service)`);
+          console.log(`🚫 [SERVICE] ${product.name}: Stock non décrémenté (service)`);
         }
 
-        // ✅ MISE À JOUR DES STATISTIQUES (basé sur prix original, pas réduit)
+        // ✅ MISE À JOUR DES STATISTIQUES
         updateData.total_sold = (product.total_sold || 0) + item.quantity;
         updateData.sales_count = (product.sales_count || 0) + 1;
         updateData.last_sold_at = new Date();
@@ -281,7 +276,7 @@ class SaleController extends BaseController {
         this.productEventService.updated(item.product_id, updatedProduct);
 
         console.log(
-          `📊 Stats produit mises à jour via WebSocket: ${product.name} (${updateData.total_sold} vendus, ${updateData.revenue_total}€ CA)`
+          `📊 Stats produit mises à jour: ${product.name} (${updateData.total_sold} vendus, ${updateData.revenue_total}€ CA)`
         );
       }
 
