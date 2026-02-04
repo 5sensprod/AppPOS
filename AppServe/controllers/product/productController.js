@@ -221,6 +221,9 @@ class ProductController extends BaseController {
       const updatedProduct = await this.model.findById(id);
       console.log(`✅ [Stock] ${product.name}: ${currentStock} → ${newStock} (-${quantity})`);
 
+      // 🔔 Notification WebSocket via eventService (même pattern que saleController)
+      this.eventService.updated(id, updatedProduct);
+
       return ResponseHandler.success(res, updatedProduct);
     } catch (error) {
       console.error('❌ [decrementStock] Erreur:', error);
