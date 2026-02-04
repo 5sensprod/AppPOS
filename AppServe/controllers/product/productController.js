@@ -195,6 +195,38 @@ class ProductController extends BaseController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  async decrementStock(req, res) {
+    try {
+      const { id } = req.params;
+      const { quantity } = req.body;
+
+      if (!quantity || typeof quantity !== 'number' || quantity < 0) {
+        return ResponseHandler.badRequest(res, 'Quantité invalide');
+      }
+
+      const product = await this.model.findById(id);
+      if (!product) {
+        return ResponseHandler.notFound(res, 'Resource not found');
+      }
+
+      const currentStock = product.stock || 0;
+      const newStock = Math.max(0, currentStock - quantity);
+
+      await this.model.update(id, {
+        stock: newStock,
+        updated_at: new Date(),
+      });
+
+      const updatedProduct = await this.model.findById(id);
+      console.log(`✅ [Stock] ${product.name}: ${currentStock} → ${newStock} (-${quantity})`);
+
+      return ResponseHandler.success(res, updatedProduct);
+    } catch (error) {
+      console.error('❌ [decrementStock] Erreur:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
 }
 
 const productController = new ProductController();
@@ -207,4 +239,5 @@ module.exports = exportController(productController, [
   'delete',
   'filter',
   'duplicate',
+  'decrementStock',
 ]);

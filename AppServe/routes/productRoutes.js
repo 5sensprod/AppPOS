@@ -39,6 +39,8 @@ router.post('/', validateSchema(createProductSchema), productController.create);
 
 router.post('/:id/duplicate', productController.duplicate);
 
+router.post('/:id/decrement-stock', productController.decrementStock.bind(productController));
+
 // Middleware de synchronisation pour les routes de mise à jour
 router.put(
   '/:id',
