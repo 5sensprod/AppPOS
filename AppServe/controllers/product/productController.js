@@ -1,4 +1,6 @@
 // ===== controllers/product/productController.js =====
+const fs = require('fs');
+const path = require('path');
 const BaseController = require('../base/BaseController');
 const Product = require('../../models/Product');
 const productWooCommerceService = require('../../services/ProductWooCommerceService');
@@ -84,15 +86,12 @@ class ProductController extends BaseController {
     try {
       const query = {};
 
-      // 🔍 Filtre pour produits avec au moins une image
       if (req.query.has_image === 'true') {
         query.$or = [
           { 'image.src': { $exists: true, $ne: '', $ne: null } },
           { 'gallery_images.0.src': { $exists: true, $ne: '', $ne: null } },
         ];
       }
-
-      // ➕ Tu peux ajouter d'autres filtres ici (brand_id, price, etc.)
 
       const products = await this.model.find(query);
       return ResponseHandler.success(res, products);
@@ -101,84 +100,130 @@ class ProductController extends BaseController {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────
+  // DUPLICATION
+  // Corrections apportées :
+  //   1. Le produit est créé SANS images pour obtenir le newId d'abord
+  //   2. Les fichiers images sont copiés PHYSIQUEMENT dans /public/products/{newId}/
+  //   3. src et local_path sont remappés vers le nouveau dossier
+  //   4. wp_id, woo_media_id et _id sont purgés de chaque image copiée
+  // ─────────────────────────────────────────────────────────────────
   async duplicate(req, res) {
     try {
       const originalId = req.params.id;
 
-      // Récupérer le produit original avec ses informations de catégorie
+      // 1. Récupérer le produit original
       const originalProduct = await this.model.findByIdWithCategoryInfo(originalId);
-
       if (!originalProduct) {
         return ResponseHandler.notFound(res, 'Produit à dupliquer non trouvé');
       }
 
-      // Créer une copie en excluant _id et woo_id
+      // Aplatir le document Mongoose si nécessaire
+      const raw = originalProduct.toObject ? originalProduct.toObject() : originalProduct;
+
       const {
         _id,
         woo_id,
         last_sync,
         pending_sync,
-        category_info, // On exclut category_info car il sera regénéré
+        category_info,
+        image: originalImage,
+        gallery_images: originalGallery,
         ...productData
-      } = originalProduct;
+      } = raw;
 
-      // Modifier certains champs pour la duplication
+      // 2. Créer le produit SANS images pour obtenir le newId
       const duplicatedData = {
         ...productData,
-        // Ajouter un suffixe au nom/designation pour différencier
         name: productData.name ? `${productData.name} (Copie)` : 'Produit copié',
         designation: productData.designation
           ? `${productData.designation} (Copie)`
           : 'Produit copié',
-
-        // Modifier le SKU pour éviter les doublons
         sku: productData.sku ? `${productData.sku}_COPY_${Date.now()}` : `COPY_${Date.now()}`,
 
-        // Réinitialiser les statistiques de vente
+        // Statistiques de vente réinitialisées
         total_sold: 0,
         sales_count: 0,
         last_sold_at: null,
         revenue_total: 0,
 
-        // Réinitialiser les données WooCommerce
+        // Données WooCommerce réinitialisées
         woo_id: null,
         last_sync: null,
         pending_sync: false,
         website_url: null,
 
-        // Copier les images mais sans les IDs uniques
-        image: productData.image
-          ? {
-              ...productData.image,
-              _id: undefined, // Laissera le système générer un nouvel ID
-            }
-          : null,
+        // Images volontairement vides — remplies après copie physique
+        image: null,
+        gallery_images: [],
 
-        gallery_images: productData.gallery_images
-          ? productData.gallery_images.map((img) => ({
-              ...img,
-              _id: undefined, // Laissera le système générer de nouveaux IDs
-            }))
-          : [],
-
-        // Ajouter la date de soumission actuelle
         dateSoumission: new Date().toISOString(),
       };
 
-      // Créer le nouveau produit
       const duplicatedProduct = await this.model.create(duplicatedData);
+      const newId = duplicatedProduct._id.toString();
 
-      // Récupérer le produit créé avec ses informations de catégorie
-      const result = await this.model.findByIdWithCategoryInfo(duplicatedProduct._id);
+      // 3. Copie physique des fichiers images et remappage des références
+      const srcDir = path.join(__dirname, '../../public/products', originalId);
+      const destDir = path.join(__dirname, '../../public/products', newId);
 
-      // CORRECTION : Émettre l'événement seulement si eventService est disponible
+      // Purge tous les identifiants liés à l'original et repointe vers newId
+      const remapImage = (img) => {
+        if (!img?.src) return null;
+
+        const filename = path.basename(img.src);
+        const srcFile = path.join(srcDir, filename);
+        const destFile = path.join(destDir, filename);
+
+        // Copie physique du fichier si disponible
+        if (fs.existsSync(srcFile)) {
+          fs.copyFileSync(srcFile, destFile);
+        } else {
+          console.warn(`[duplicate] Fichier source introuvable : ${srcFile}`);
+        }
+
+        // Reconstruction propre — aucun ID de l'original conservé
+        const { _id, wp_id, woo_media_id, local_path, src, ...rest } = img;
+        return {
+          ...rest,
+          src: `/public/products/${newId}/${filename}`,
+          local_path: destFile,
+          wp_id: null,
+          woo_media_id: null,
+          // _id omis → Mongoose en génère un nouveau
+          status: 'active',
+        };
+      };
+
+      let newImage = null;
+      let newGallery = [];
+
+      const hasImages =
+        (originalImage?.src || (originalGallery && originalGallery.length > 0)) &&
+        fs.existsSync(srcDir);
+
+      if (hasImages) {
+        fs.mkdirSync(destDir, { recursive: true });
+
+        newImage = remapImage(originalImage);
+        newGallery = (originalGallery || []).map(remapImage).filter(Boolean);
+      }
+
+      // 4. Mettre à jour le produit avec les nouvelles références d'images
+      await this.model.update(newId, {
+        image: newImage,
+        gallery_images: newGallery,
+      });
+
+      // 5. Récupérer le résultat final avec les infos de catégorie
+      const result = await this.model.findByIdWithCategoryInfo(newId);
+
+      // 6. Émettre l'événement si le service est disponible
       if (this.eventService && typeof this.eventService.emit === 'function') {
         this.eventService.emit('created', {
           id: result._id,
           data: result,
         });
-      } else {
-        console.log('EventService non disponible pour la duplication, continuons sans événement');
       }
 
       return ResponseHandler.created(res, {
@@ -221,7 +266,6 @@ class ProductController extends BaseController {
       const updatedProduct = await this.model.findById(id);
       console.log(`✅ [Stock] ${product.name}: ${currentStock} → ${newStock} (-${quantity})`);
 
-      // 🔔 Notification WebSocket via eventService (même pattern que saleController)
       this.eventService.updated(id, updatedProduct);
 
       return ResponseHandler.success(res, updatedProduct);
