@@ -274,6 +274,49 @@ class ProductController extends BaseController {
       return ResponseHandler.error(res, error);
     }
   }
+
+  async incrementStock(req, res) {
+    try {
+      const { id } = req.params;
+      const { quantity, destination, reason } = req.body;
+
+      if (!quantity || typeof quantity !== 'number' || quantity <= 0) {
+        return ResponseHandler.badRequest(res, 'Quantité invalide (doit être > 0)');
+      }
+
+      const product = await this.model.findById(id);
+      if (!product) {
+        return ResponseHandler.notFound(res, 'Produit introuvable');
+      }
+
+      if (destination === 'sav' || destination === 'stock_b') {
+        console.log(
+          `📋 [Stock] ${product.name}: retour ${destination} x${quantity}` +
+            (reason ? ` — "${reason}"` : '')
+        );
+        return ResponseHandler.success(res, {
+          ...product,
+          _returnDestination: destination,
+          _returnQuantity: quantity,
+        });
+      }
+
+      const currentStock = product.stock || 0;
+      const newStock = currentStock + quantity;
+
+      await this.model.update(id, { stock: newStock, updated_at: new Date() });
+
+      const updatedProduct = await this.model.findById(id);
+      console.log(`✅ [Stock] ${product.name}: ${currentStock} → ${newStock} (+${quantity})`);
+
+      this.eventService.updated(id, updatedProduct);
+
+      return ResponseHandler.success(res, updatedProduct);
+    } catch (error) {
+      console.error('❌ [incrementStock] Erreur:', error);
+      return ResponseHandler.error(res, error);
+    }
+  }
 }
 
 const productController = new ProductController();
@@ -287,4 +330,5 @@ module.exports = exportController(productController, [
   'filter',
   'duplicate',
   'decrementStock',
+  'incrementStock',
 ]);
