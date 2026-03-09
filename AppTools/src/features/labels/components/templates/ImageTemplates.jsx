@@ -132,25 +132,90 @@ const ImageTemplates = ({ selectedProduct }) => {
   };
 
   /**
-   * 🆕 Mettre à jour l'image sélectionnée avec une image produit
+   * 🆕 Ajouter une image produit liée dynamiquement (dataBinding)
+   * → Se met à jour automatiquement quand on change de produit
    */
-  const handleSelectProductImage = async (productImage) => {
-    if (!selectedId || !isImageSelected) return;
+  const handleAddProductImageBound = async () => {
+    const src =
+      normalizedProduct?.image?.src ||
+      normalizedProduct?.image?.url ||
+      normalizedProduct?.image_url ||
+      '';
+    const fallbackSrc = src || '';
 
+    const { aspectRatio } = fallbackSrc
+      ? await loadImageDimensions(fallbackSrc)
+      : { aspectRatio: 1 };
+
+    const baseWidth = 160;
+
+    addElement({
+      type: 'image',
+      x: 50,
+      y: 50 + elements.length * 30,
+      width: baseWidth,
+      height: Math.round(baseWidth / aspectRatio),
+      src: '{{product_image}}', // résolu dynamiquement via resolveTemplate
+      dataBinding: 'product_image_src', // prioritaire, résolu via resolvePropForElement
+      opacity: 1,
+      rotation: 0,
+      visible: true,
+      locked: false,
+      aspectRatio,
+    });
+  };
+
+  /**
+   * 🆕 Mettre à jour l'image sélectionnée avec une image produit (statique ou liée)
+   */
+  const handleSelectProductImage = async (productImage, bound = false) => {
+    if (bound) {
+      // Mise à jour de l'élément sélectionné en mode lié dynamiquement
+      if (!selectedId || !isImageSelected) {
+        // Aucun élément sélectionné → on crée un nouveau élément lié
+        await handleAddProductImageBound();
+        return;
+      }
+      const { aspectRatio } = await loadImageDimensions(productImage.src);
+      const baseWidth = selectedElement.width || 160;
+      updateElement(selectedId, {
+        src: '{{product_image}}',
+        dataBinding: 'product_image_src',
+        filename: productImage.filename,
+        width: baseWidth,
+        height: Math.round(baseWidth / aspectRatio),
+        aspectRatio,
+      });
+      return;
+    }
+
+    // Mode statique : URL figée
+    if (!selectedId || !isImageSelected) {
+      // Aucun élément sélectionné → créer un nouvel élément statique
+      await handleAddImage(productImage);
+      return;
+    }
     const { aspectRatio } = await loadImageDimensions(productImage.src);
     const baseWidth = selectedElement.width || 160;
-    const calculatedHeight = Math.round(baseWidth / aspectRatio);
-
     updateElement(selectedId, {
-      src: productImage.src, // ✅ URL déjà normalisée
+      src: productImage.src,
+      dataBinding: undefined, // supprimer le binding si existant
       filename: productImage.filename,
       width: baseWidth,
-      height: calculatedHeight,
-      aspectRatio: aspectRatio,
+      height: Math.round(baseWidth / aspectRatio),
+      aspectRatio,
     });
   };
 
   const productImages = getProductImages();
+
+  // 🔍 Diagnostic : à retirer une fois le flux validé
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[ImageTemplates] normalizedProduct:', normalizedProduct);
+      console.log('[ImageTemplates] productImages:', productImages);
+    }
+  }, [normalizedProduct, productImages]);
 
   /**
    * Presets de dimensions prédéfinies
@@ -181,13 +246,32 @@ const ImageTemplates = ({ selectedProduct }) => {
           </div>
         </div>
 
+        {/* Bouton insertion liée dynamiquement */}
+        <button
+          onClick={handleAddProductImageBound}
+          className="w-full p-3 border-2 border-green-400 dark:border-green-600 rounded-lg bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-all flex items-center gap-3"
+        >
+          <LinkIcon className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+          <div className="text-left">
+            <div className="text-sm font-medium text-green-700 dark:text-green-300">
+              Insérer la photo liée au produit
+            </div>
+            <div className="text-xs text-green-600 dark:text-green-400">
+              Se met à jour automatiquement selon le produit affiché
+            </div>
+          </div>
+        </button>
+
         {/* Info */}
         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
           <div className="flex items-start gap-2">
             <ImageIcon className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs text-blue-800 dark:text-blue-200">
               <div className="font-medium mb-1">Images de : {normalizedProduct.name}</div>
-              <div>Cliquez pour changer l'image de l'élément sélectionné</div>
+              <div>
+                Cliquez sur une image pour l'insérer. <span className="font-medium">Lier</span> =
+                dynamique, <span className="font-medium">Statique</span> = URL figée.
+              </div>
             </div>
           </div>
         </div>
@@ -206,56 +290,50 @@ const ImageTemplates = ({ selectedProduct }) => {
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {productImages.map((image) => (
-                <button
-                  key={image.id}
-                  onClick={() => handleSelectProductImage(image)}
-                  className="group relative aspect-square border-2 border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:border-blue-400 hover:shadow-lg transition-all"
-                >
-                  <img
-                    src={image.src}
-                    alt={image.filename}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      console.error('❌ Erreur chargement image:', image.src);
-                      e.target.src =
-                        'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3E?%3C/text%3E%3C/svg%3E';
-                    }}
-                  />
-
-                  {/* Badge type */}
-                  {image.type === 'main' && (
-                    <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
-                      Principale
-                    </div>
-                  )}
-
-                  {/* Overlay au hover */}
-                  <div className="absolute inset-0 bg-blue-600 bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg">
-                      <svg
-                        className="h-6 w-6 text-blue-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
+                <div key={image.id} className="flex flex-col gap-1">
+                  <div className="group relative aspect-square border-2 border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <img
+                      src={image.src}
+                      alt={image.filename}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        console.error('❌ Erreur chargement image:', image.src);
+                        e.target.src =
+                          'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3E?%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
+                    {image.type === 'main' && (
+                      <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                        Principale
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                      <p className="text-xs text-white truncate" title={image.filename}>
+                        {image.filename}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Nom */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                    <p className="text-xs text-white truncate" title={image.filename}>
-                      {image.filename}
-                    </p>
+                  {/* Deux boutons d'action */}
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      onClick={() => handleSelectProductImage(image, true)}
+                      className="text-xs py-1 px-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors flex items-center justify-center gap-1"
+                      title="Insérer liée dynamiquement"
+                    >
+                      <LinkIcon className="h-3 w-3" />
+                      Lier
+                    </button>
+                    <button
+                      onClick={() => handleSelectProductImage(image, false)}
+                      className="text-xs py-1 px-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      title="Insérer en URL statique"
+                    >
+                      Statique
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -280,8 +358,8 @@ const ImageTemplates = ({ selectedProduct }) => {
         </div>
       </div>
 
-      {/* Bouton pour voir les images produit */}
-      {normalizedProduct && isImageLinked && (
+      {/* Bouton pour voir les images produit — visible dès qu'un produit est sélectionné */}
+      {normalizedProduct && (
         <button
           onClick={() => setShowMode('product')}
           className="w-full p-3 border-2 border-blue-400 dark:border-blue-600 rounded-lg bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all flex items-center justify-between"
