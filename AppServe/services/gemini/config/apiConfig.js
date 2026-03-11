@@ -5,10 +5,10 @@
  */
 module.exports = {
   // URL de base de l'API
-  baseUrl: 'https://generativelanguage.googleapis.com/v1/models',
+  baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
 
   // ✅ Garder gemini-2.5-flash puisqu'il fonctionne pour la description
-  modelName: 'gemini-2.5-flash-lite',
+  modelName: 'gemini-3.1-flash-lite-preview',
 
   // Paramètres de sécurité pour toutes les requêtes
   safetySettings: [
@@ -23,6 +23,6 @@ module.exports = {
     temperature: 0.7,
     maxOutputTokens: 1500,
     topP: 0.95,
-    topK: 40,
+    thinkingLevel: 'minimal', // ← évite la surconsommation de tokens
   },
 };
