@@ -17,32 +17,52 @@ class GeminiDirectService {
     this.apiKey = process.env.GEMINI_API_KEY;
     this.apiBaseUrl = apiConfig.baseUrl;
     this.modelName = apiConfig.modelName;
+
+    // ── Reporting vers PocketApp SaaS ──────────────────────────────────────
+    this.pocketAppUrl = process.env.POCKETAPP_URL;
+    this.pocketAppApiKey = process.env.POCKETAPP_API_KEY;
   }
 
+  /**
+   * Envoie les stats de tokens au SaaS PocketApp (fire & forget)
+   * Ne bloque jamais l'appel principal en cas d'erreur
+   */
+  async _reportUsage(inputTokens, outputTokens, label = null) {
+    if (!this.pocketAppUrl || !this.pocketAppApiKey) return;
+
+    try {
+      const res = await axios.post(
+        `${this.pocketAppUrl}/api/usage.php`,
+        { input_tokens: inputTokens, output_tokens: outputTokens, label },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': this.pocketAppApiKey,
+          },
+          timeout: 5000,
+        }
+      );
+      console.log('[PocketApp] Reporting OK:', res.data); // ← AJOUT
+    } catch (err) {
+      console.warn('[PocketApp] Reporting usage échoué:', err.message);
+      console.warn('[PocketApp] Response:', err.response?.data); // ← AJOUT
+    }
+  }
   /**
    * Génère une réponse de chat avec format JSON → HTML
    */
   async generateChatResponse(productData, userMessage, conversation, filePaths) {
     try {
-      // Créer le contexte système pour l'IA
       const systemContext = this._createSystemContext(productData);
-
-      // Formatter la conversation
       const conversationFormatted = this._formatConversation(systemContext, conversation);
-
-      // Obtenir le prompt JSON optimisé
       const optimizedPrompt = getChatResponsePrompt(productData);
-
-      // Préparer le message utilisateur final avec images
       const userParts = this._prepareUserPartsWithImages(userMessage, optimizedPrompt, filePaths);
 
-      // Ajouter le message utilisateur à la conversation
       conversationFormatted.push({
         role: 'user',
         parts: userParts,
       });
 
-      // Créer la requête finale
       const requestData = {
         contents: conversationFormatted,
         generationConfig: {
@@ -54,24 +74,18 @@ class GeminiDirectService {
         safetySettings: apiConfig.safetySettings,
       };
 
-      // Appel à l'API Gemini
-      const response = await this._sendApiRequest(requestData);
+      const response = await this._sendApiRequest(requestData, 'chat response');
 
-      // Traitement de la réponse
       if (this._isValidResponse(response)) {
         const rawText = response.data.candidates[0].content.parts[0].text;
-
-        // Extraire et parser le JSON de la réponse
         const productSheet = extractJsonFromResponse(rawText);
-
-        // Convertir le JSON en HTML formaté
         const htmlDescription = formatProductSheetToHtml(productSheet);
 
         return {
-          message: rawText, // Le JSON brut pour debug/historique
-          description: htmlDescription, // Le HTML formaté pour la base
+          message: rawText,
+          description: htmlDescription,
           product_name: productData.name,
-          json: productSheet, // Le JSON structuré si besoin
+          json: productSheet,
         };
       } else {
         throw new Error('Format de réponse inattendu de Gemini');
@@ -92,12 +106,11 @@ class GeminiDirectService {
       const prompt = getProductTitlePrompt(productData);
       const requestData = this._prepareApiRequest(prompt, 0.7);
 
-      // Ajouter une image si fournie
       if (imagePath && fs.existsSync(imagePath)) {
         this._addImageToRequest(requestData, imagePath);
       }
 
-      const response = await this._sendApiRequest(requestData);
+      const response = await this._sendApiRequest(requestData, 'product title');
 
       if (this._isValidResponse(response)) {
         const rawTitle = response.data.candidates[0].content.parts[0].text;
@@ -132,12 +145,12 @@ class GeminiDirectService {
     ) {
       cleaned = cleaned.substring(1, cleaned.length - 1);
     }
-
     cleaned = cleaned.replace(/^(titre\s*:|title\s*:)/i, '').trim();
     return cleaned;
   }
 
-  // Méthodes privées d'aide
+  // ── Méthodes privées ────────────────────────────────────────────────────────
+
   _prepareApiRequest(textPrompt, temperature = 0.7) {
     return {
       contents: [
@@ -161,11 +174,9 @@ class GeminiDirectService {
       console.warn(`Image non trouvée: ${imagePath}`);
       return;
     }
-
     try {
       const imageData = fs.readFileSync(imagePath);
       const base64Image = imageData.toString('base64');
-
       requestData.contents[0].parts.push({
         inline_data: {
           mime_type: getMimeType(imagePath),
@@ -177,11 +188,24 @@ class GeminiDirectService {
     }
   }
 
-  async _sendApiRequest(requestData) {
+  /**
+   * Envoie la requête à Gemini et reporte l'usage au SaaS
+   * @param {object} requestData
+   * @param {string} label - Label pour l'historique PocketApp
+   */
+  async _sendApiRequest(requestData, label = null) {
     const apiUrl = `${this.apiBaseUrl}/${this.modelName}:generateContent?key=${this.apiKey}`;
-    return await axios.post(apiUrl, requestData, {
+    const response = await axios.post(apiUrl, requestData, {
       headers: { 'Content-Type': 'application/json' },
     });
+
+    // ── Reporting tokens (fire & forget) ──────────────────────────────────
+    const usage = response.data?.usageMetadata;
+    if (usage) {
+      this._reportUsage(usage.promptTokenCount || 0, usage.candidatesTokenCount || 0, label);
+    }
+
+    return response;
   }
 
   _isValidResponse(response) {
@@ -199,15 +223,9 @@ class GeminiDirectService {
     let systemContext = `Tu es un assistant spécialisé dans la création de fiches produit e-commerce.
     Tu dois générer une fiche produit structurée en JSON pour "${productData.name || 'ce produit'}".`;
 
-    if (productData.category) {
-      systemContext += `\n- Catégorie: ${productData.category}`;
-    }
-    if (productData.brand) {
-      systemContext += `\n- Marque: ${productData.brand}`;
-    }
-    if (productData.price) {
-      systemContext += `\n- Prix: ${productData.price} €`;
-    }
+    if (productData.category) systemContext += `\n- Catégorie: ${productData.category}`;
+    if (productData.brand) systemContext += `\n- Marque: ${productData.brand}`;
+    if (productData.price) systemContext += `\n- Prix: ${productData.price} €`;
 
     return systemContext;
   }
@@ -223,15 +241,9 @@ class GeminiDirectService {
     if (conversation && conversation.length > 0) {
       for (const message of conversation) {
         if (message.type === 'user') {
-          conversationFormatted.push({
-            role: 'user',
-            parts: [{ text: message.content }],
-          });
+          conversationFormatted.push({ role: 'user', parts: [{ text: message.content }] });
         } else if (message.type === 'assistant') {
-          conversationFormatted.push({
-            role: 'model',
-            parts: [{ text: message.content }],
-          });
+          conversationFormatted.push({ role: 'model', parts: [{ text: message.content }] });
         }
       }
     }
@@ -240,21 +252,15 @@ class GeminiDirectService {
   }
 
   _prepareUserPartsWithImages(userMessage, optimizedPrompt, filePaths) {
-    const userParts = [
-      {
-        text: userMessage + '\n\n' + optimizedPrompt,
-      },
-    ];
+    const userParts = [{ text: userMessage + '\n\n' + optimizedPrompt }];
 
     if (filePaths && filePaths.length > 0) {
       console.log(`📸 Ajout de ${filePaths.length} image(s) à la requête`);
-
       for (const filePath of filePaths) {
         if (fs.existsSync(filePath)) {
           try {
             const imageData = fs.readFileSync(filePath);
             const base64Image = imageData.toString('base64');
-
             userParts.push({
               inline_data: {
                 mime_type: getMimeType(filePath),
