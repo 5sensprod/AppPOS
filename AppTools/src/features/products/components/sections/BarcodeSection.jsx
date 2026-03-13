@@ -252,11 +252,7 @@ const EditableView = ({ product }) => {
   const handleGenerateBarcode = () => {
     setIsGenerating(true);
     try {
-      const newBarcode = generateEAN13({
-        prefix: '200',
-        productId: product?._id || product?.id,
-        includeTimestamp: true,
-      });
+      const newBarcode = generateEAN13({ prefix: '200' });
 
       setLocalBarcode(newBarcode);
       updateBarcodeInMetaData(newBarcode);
