@@ -184,13 +184,24 @@ async function createDocumentImage(elements, docWidth, docHeight, scale, pixelRa
 
     // 📝 TEXT
     if (el?.type === 'text') {
+      // fontStyle combine bold et italic comme Konva l'attend ("bold", "italic", "bold italic")
+      const fontStyle =
+        [el.bold ? 'bold' : '', el.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal';
+
       return new Konva.Text({
         x: (el.x ?? 0) * scale,
         y: (el.y ?? 0) * scale,
         text: el.text ?? '',
         fontSize: (el.fontSize ?? 12) * scale,
-        fontStyle: el.bold ? 'bold' : 'normal',
+        fontFamily: el.fontFamily ?? 'Arial',
+        fontStyle,
         fill: el.color ?? '#000000',
+        align: el.align ?? 'left',
+        // ⬇️ width permet le word-wrap automatique (comme dans le canvas)
+        width: el.width != null ? el.width * scale : undefined,
+        height: el.height != null ? el.height * scale : undefined,
+        wrap: el.wrap ?? 'word',
+        lineHeight: el.lineHeight ?? 1.2,
         scaleX: el.scaleX ?? 1,
         scaleY: el.scaleY ?? 1,
         rotation: el.rotation ?? 0,
