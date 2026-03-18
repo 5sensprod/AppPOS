@@ -7,7 +7,7 @@ module.exports = {
   // URL de base de l'API
   baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
 
-  // ✅ Garder gemini-2.5-flash puisqu'il fonctionne pour la description
+  // Modèle à utiliser pour les requêtes de génération
   modelName: 'gemini-3.1-flash-lite-preview',
 
   // Paramètres de sécurité pour toutes les requêtes

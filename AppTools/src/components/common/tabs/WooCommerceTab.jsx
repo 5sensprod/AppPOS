@@ -379,7 +379,7 @@ const WooCommerceTab = ({
 
             <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
               💡 Si le suivi automatique est activé et que le stock atteint 0, le produit passera
-              automatiquement en "Rupture de stock" (indisponible)
+              automatiquement en "En cours de réapprovisionnement"
             </p>
           </div>
         )}
