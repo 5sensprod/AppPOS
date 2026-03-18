@@ -25,7 +25,16 @@ const EntityTable = ({
   baseRoute = '',
   defaultSort = { field: 'name', direction: 'asc' },
   actions = ['view', 'edit', 'delete', 'sync'],
-  batchActions = ['delete', 'sync', 'export', 'labels', 'status', 'category', 'createSheet'],
+  batchActions = [
+    'delete',
+    'sync',
+    'export',
+    'labels',
+    'status',
+    'category',
+    'createSheet',
+    'labelEditor',
+  ],
   showBatchActions = true,
   showActions = true,
 
@@ -50,6 +59,7 @@ const EntityTable = ({
   onBatchCategoryChange,
   onBatchStockChange,
   onCreateSheet,
+  onOpenInLabelEditor,
   categoryOptions = [],
   onBatchDelete,
   onBatchSync,
@@ -408,6 +418,7 @@ const EntityTable = ({
       return typeof onBatchCategoryChange === 'function' && categoryOptions.length > 0;
     if (action === 'stock') return hasBatchStockChange;
     if (action === 'createSheet') return hasCreateSheet;
+    if (action === 'labelEditor') return typeof onOpenInLabelEditor === 'function';
     return true;
   });
 
@@ -455,6 +466,9 @@ const EntityTable = ({
           onBatchCategoryChange={handleBatchCategoryChange}
           onBatchStockChange={hasBatchStockChange ? handleBatchStockChange : undefined}
           onCreateSheet={hasCreateSheet ? onCreateSheet : undefined}
+          onOpenInLabelEditor={
+            typeof onOpenInLabelEditor === 'function' ? onOpenInLabelEditor : undefined
+          }
           categoryOptions={categoryOptions}
           syncStats={syncStats}
           onDuplicate={onDuplicate}

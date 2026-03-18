@@ -8,6 +8,7 @@ import {
   Package,
   Tags,
   Copy,
+  LayoutTemplate,
 } from 'lucide-react';
 import SyncButton from '../components/SyncButton';
 
@@ -53,6 +54,14 @@ export const STOCK_OPTIONS = [
 ];
 
 export const createActionsConfig = (callbacks, hierarchicalCategories, syncStats) => ({
+  // 🏷️ Ouvrir dans l'éditeur d'étiquettes (navigue vers /labels avec les produits sélectionnés)
+  labelEditor: {
+    available: typeof callbacks.onOpenInLabelEditor === 'function',
+    icon: LayoutTemplate,
+    label: 'Éditeur étiquettes',
+    buttonClass: 'bg-violet-100 hover:bg-violet-200 text-violet-800',
+    onAction: () => callbacks.onOpenInLabelEditor(callbacks.selectedItems),
+  },
   createSheet: {
     available: typeof callbacks.onCreateSheet === 'function',
     icon: FileOutput,

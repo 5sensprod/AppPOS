@@ -1,7 +1,9 @@
 // ProductTable.jsx - INTÉGRATION fabricExportService
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProduct, useProductDataStore } from '../stores/productStore';
+import useLabelStore from '../../labels/store/useLabelStore';
 import { EntityTable } from '../../../components/common/';
 import { ENTITY_CONFIG } from '../constants';
 import { usePaginationStore } from '@/stores/usePaginationStore';
@@ -19,6 +21,10 @@ import { productSearchProcessor } from '../../../utils/productSearchProcessor';
 
 function ProductTable(props) {
   const { deleteProduct, syncProduct, updateProduct, duplicateProduct } = useProduct();
+
+  const navigate = useNavigate();
+  const setDataSource = useLabelStore((s) => s.setDataSource);
+
   const {
     products,
     loading: productsLoading,
@@ -341,6 +347,17 @@ function ProductTable(props) {
     [duplicateProduct, toastActions, removeToast, fetchProducts, enrichedProducts]
   );
 
+  // 🏷️ Ouvrir les produits sélectionnés dans l'éditeur d'étiquettes
+  const handleOpenInLabelEditor = useCallback(
+    (selectedItems) => {
+      if (!selectedItems?.length) return;
+      const products = enrichedProducts.filter((p) => selectedItems.includes(p._id));
+      setDataSource('data', products);
+      navigate('/tools/labels');
+    },
+    [enrichedProducts, setDataSource, navigate]
+  );
+
   return (
     <>
       <ToastContainer />
@@ -372,6 +389,7 @@ function ProductTable(props) {
           'category',
           'duplicate',
           'createSheet',
+          'labelEditor',
           'export',
           'labels',
           ...(syncEnabled ? ['sync'] : []),
@@ -387,6 +405,7 @@ function ProductTable(props) {
         onBatchCategoryChange={handleBatchCategoryChange}
         onBatchStockChange={handleStockAction}
         onCreateSheet={handleCreateSheet}
+        onOpenInLabelEditor={handleOpenInLabelEditor}
         categoryOptions={categorySelectOptions}
         onDuplicate={handleDuplicate}
         pagination={{

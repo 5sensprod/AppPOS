@@ -27,6 +27,7 @@ export const BatchActions = ({
   onBatchStockChange,
   onCreateSheet,
   onDuplicate,
+  onOpenInLabelEditor,
   categoryOptions = [],
   syncStats,
 }) => {
@@ -73,6 +74,7 @@ export const BatchActions = ({
     onBatchStockChange,
     onCreateSheet,
     onDuplicate,
+    onOpenInLabelEditor,
     setOpenDropdown,
   };
 

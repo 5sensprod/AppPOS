@@ -10,20 +10,6 @@ import { useActionToasts } from '../components/common/EntityTable/components/Bat
 
 const LabelPage = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [showDataSourceSelector, setShowDataSourceSelector] = useState(true);
-  const [showProductSelector, setShowProductSelector] = useState(false);
-  const [multiSelectProducts, setMultiSelectProducts] = useState(false);
-
-  // État pour stocker le docNode du canvas
-  const [docNode, setDocNode] = useState(null);
-  const stageRef = useRef(null); // 🆕 Ref pour le Stage (pour TemplateManager)
-
-  // 🆕 État pour l'outil sélectionné dans la sidebar
-  const [selectedTool, setSelectedTool] = useState(null);
-
-  // 📢 Toasts pour les notifications
-  const { success, error } = useActionToasts();
-
   const {
     dataSource,
     selectedProduct,
@@ -32,6 +18,23 @@ const LabelPage = () => {
     setSelectedProducts,
     clearCanvas,
   } = useLabelStore();
+
+  // Si des produits arrivent déjà depuis ProductTable, on saute le sélecteur
+  const [showDataSourceSelector, setShowDataSourceSelector] = useState(
+    () => !(useLabelStore.getState().selectedProducts?.length > 0)
+  );
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [multiSelectProducts, setMultiSelectProducts] = useState(false);
+
+  // État pour stocker le docNode du canvas
+  const [docNode, setDocNode] = useState(null);
+  const stageRef = useRef(null);
+
+  // État pour l'outil sélectionné dans la sidebar
+  const [selectedTool, setSelectedTool] = useState(null);
+
+  // 📢 Toasts pour les notifications
+  const { success, error } = useActionToasts();
 
   // 💾 Fonction pour sauvegarder les modifications du template actuel
   const handleSaveTemplate = async () => {
@@ -137,6 +140,7 @@ const LabelPage = () => {
 
   const handleNewLabel = () => {
     clearCanvas();
+    setDataSource(null, null); // 🧹 vider aussi les produits du store
     setShowDataSourceSelector(true);
     setMultiSelectProducts(false);
   };
