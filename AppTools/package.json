@@ -1,6 +1,6 @@
 {
   "name": "apppos-desktop",
-  "version": "2.2.68",
+  "version": "2.2.69",
   "description": "AppPOS - Système de Point de Vente",
   "main": "main.js",
   "private": false,
