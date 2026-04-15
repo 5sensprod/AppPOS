@@ -190,22 +190,52 @@ class GeminiDirectService {
 
   /**
    * Envoie la requête à Gemini et reporte l'usage au SaaS
+   * Tente d'abord le modèle principal, puis le fallback en cas de 503/429
    * @param {object} requestData
    * @param {string} label - Label pour l'historique PocketApp
    */
   async _sendApiRequest(requestData, label = null) {
-    const apiUrl = `${this.apiBaseUrl}/${this.modelName}:generateContent?key=${this.apiKey}`;
-    const response = await axios.post(apiUrl, requestData, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const models = [
+      this.modelName, // gemini-3.1-flash-lite-preview (principal)
+      'gemini-2.5-flash', // fallback si le principal est indisponible
+    ];
 
-    // ── Reporting tokens (fire & forget) ──────────────────────────────────
-    const usage = response.data?.usageMetadata;
-    if (usage) {
-      this._reportUsage(usage.promptTokenCount || 0, usage.candidatesTokenCount || 0, label);
+    let lastError = null;
+
+    for (const model of models) {
+      const apiUrl = `${this.apiBaseUrl}/${model}:generateContent?key=${this.apiKey}`;
+      try {
+        console.log(`🔄 Tentative avec ${model}...`);
+        const response = await axios.post(apiUrl, requestData, {
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (model !== this.modelName) {
+          console.warn(`⚠️ Réponse obtenue via le modèle fallback: ${model}`);
+        } else {
+          console.log(`✅ Réponse obtenue avec le modèle principal: ${model}`);
+        }
+
+        // ── Reporting tokens (fire & forget) ────────────────────────────
+        const usage = response.data?.usageMetadata;
+        if (usage) {
+          this._reportUsage(usage.promptTokenCount || 0, usage.candidatesTokenCount || 0, label);
+        }
+
+        return response;
+      } catch (err) {
+        const status = err.response?.status;
+        if (status === 503 || status === 429) {
+          console.warn(`⚠️ ${model} indisponible (${status}), passage au modèle suivant...`);
+          lastError = err;
+          continue; // essaie le modèle suivant
+        }
+        throw err; // autre erreur → on remonte immédiatement
+      }
     }
 
-    return response;
+    // Tous les modèles ont échoué
+    throw lastError || new Error('Tous les modèles Gemini sont indisponibles');
   }
 
   _isValidResponse(response) {

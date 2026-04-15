@@ -67,14 +67,6 @@ export const ENTITY_CONFIG = {
       label: 'TVA',
       sortable: true,
       render: (product) => {
-        console.log('🔍 Champs TVA:', {
-          tva: product.tva,
-          tax_rate: product.tax_rate,
-          vat: product.vat,
-          tax_class: product.tax_class,
-          // log complet si besoin :
-          // all: product
-        });
         const tva = product.tva ?? product.tax_rate ?? product.vat ?? null;
         if (tva === null) return <span className="text-gray-400">-</span>;
         return <span>{tva} %</span>;
