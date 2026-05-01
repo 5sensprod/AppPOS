@@ -30,7 +30,6 @@ function CategoriesTable(props) {
   const [expandedCategories, setExpandedCategories] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Initialisation conditionnelle (gardée identique)
   useEffect(() => {
     if (hierarchy) {
       const cleanup = sync ? initWebSocketListeners() : undefined;
@@ -81,7 +80,6 @@ function CategoriesTable(props) {
     setSearchTerm(value);
   }, []);
 
-  // ✅ SIMPLIFICATION - Utiliser flattenHierarchy du hook avec rendu custom
   const flattenHierarchy = useCallback(
     (categories) => {
       const renderName = (category, level, isExpanded, hasChildren) => (
@@ -113,12 +111,18 @@ function CategoriesTable(props) {
         </div>
       );
 
-      return flattenHierarchyBase(expandedCategories, { renderName });
+      const flattened = flattenHierarchyBase(expandedCategories, { renderName });
+
+      // ✅ CORRECTION : mapper product_count et totalProductCount depuis les données brutes
+      return flattened.map((cat) => ({
+        ...cat,
+        product_count: cat.productCount || 0,
+        totalProductCount: cat.totalProductCount ?? cat.productCount ?? 0,
+      }));
     },
     [flattenHierarchyBase, expandedCategories, toggleCategory]
   );
 
-  // ✅ SIMPLIFICATION - Utiliser searchInHierarchy du hook
   const searchProcessor = useCallback(
     (items, term) => {
       if (!term) return items;
@@ -135,6 +139,7 @@ function CategoriesTable(props) {
         _originalName: cat.name,
         _level: 0,
         product_count: cat.productCount || 0,
+        totalProductCount: cat.totalProductCount ?? cat.productCount ?? 0,
       }));
     },
     [searchInHierarchy]
@@ -152,11 +157,9 @@ function CategoriesTable(props) {
 
   const isLoading = hierarchicalLoading || operationLoading;
 
-  // ✅ SIMPLIFICATION - Filtrage avec getAllChildrenIds du hook
   const filteredData = useMemo(() => {
     let data = processedData;
 
-    // Filtre par synchronisation WooCommerce (gardé identique)
     const wooFilter = selectedFilters.find((f) => f.type === 'woo')?.value;
     if (wooFilter === 'woo_synced') {
       data = data.filter((cat) => cat.woo_id != null);
@@ -164,12 +167,10 @@ function CategoriesTable(props) {
       data = data.filter((cat) => cat.woo_id == null);
     }
 
-    // ✅ SIMPLIFICATION - Filtre par catégorie avec getAllChildrenIds
     const categoryFilters = selectedFilters.filter((f) => f.type === 'category');
     if (categoryFilters.length > 0) {
       const categoryIds = categoryFilters.map((f) => f.value.replace('category_', ''));
 
-      // ✅ UTILISER LA FONCTION DU HOOK
       const allCategoryIds = [];
       categoryIds.forEach((catId) => {
         allCategoryIds.push(catId, ...getAllChildrenIds(catId));
@@ -177,10 +178,6 @@ function CategoriesTable(props) {
 
       const uniqueCategoryIds = [...new Set(allCategoryIds)];
 
-      console.log('IDs de catégories sélectionnées:', categoryIds);
-      console.log('IDs de catégories y compris enfants:', uniqueCategoryIds);
-
-      // Fonction pour vérifier si un produit appartient à une catégorie (gardée identique)
       const productInCategory = (product, categoryId) => {
         if (product.category_id === categoryId) return true;
         if (Array.isArray(product.categories) && product.categories.includes(categoryId))

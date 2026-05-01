@@ -37,6 +37,19 @@ async function removeCategoryFromProducts(categoryId) {
   }
 }
 
+// ✅ Calcule récursivement totalProductCount = propres produits + tous les enfants
+function calculateCumulativeProductCount(categories) {
+  for (const cat of categories) {
+    if (cat.children?.length > 0) {
+      calculateCumulativeProductCount(cat.children);
+      cat.totalProductCount =
+        cat.productCount + cat.children.reduce((sum, child) => sum + child.totalProductCount, 0);
+    } else {
+      cat.totalProductCount = cat.productCount;
+    }
+  }
+}
+
 function buildCategoryTree(allCategories, allProducts) {
   const rootCategories = [];
   const categoriesMap = new Map();
@@ -90,6 +103,9 @@ function buildCategoryTree(allCategories, allProducts) {
   rootCategories.sort((a, b) => a.name.localeCompare(b.name));
   sortChildren(rootCategories);
 
+  // ✅ Calcul des totaux cumulés après construction et tri de l'arbre
+  calculateCumulativeProductCount(rootCategories);
+
   return rootCategories;
 }
 
@@ -127,8 +143,6 @@ async function updateCategory(id, data) {
 async function deleteCategory(category) {
   const { _id, woo_id } = category;
   const categoryEvents = getEntityEventService('categories');
-
-  // ✅ Plus besoin de vérifier - fait par le middleware
 
   await removeCategoryFromProducts(_id);
   await Category.delete(_id);

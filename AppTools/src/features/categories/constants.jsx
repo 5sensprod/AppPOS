@@ -41,13 +41,22 @@ export const ENTITY_CONFIG = {
       key: 'product_count',
       label: 'Articles',
       sortable: true,
-      render: (category) => (
-        <div className="text-center">
-          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-            {category.product_count || 0}
-          </span>
-        </div>
-      ),
+      render: (category) => {
+        const total = category.totalProductCount ?? category.product_count ?? 0;
+        const own = category.product_count || 0;
+        const hasChildren = (category._childrenCount || 0) > 0;
+
+        return (
+          <div className="text-center">
+            <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+              {total}
+            </span>
+            {hasChildren && own > 0 && own !== total && (
+              <span className="ml-1 text-xs text-gray-400">({own})</span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'woo_status',
@@ -75,7 +84,6 @@ export const ENTITY_CONFIG = {
   formFields: [
     { name: 'name', label: 'Nom', type: 'text', required: true },
     { name: 'description', label: 'Description', type: 'textarea', rows: 4 },
-    // { name: 'slug', label: 'Slug', type: 'text' },
     { name: 'parent_id', label: 'Catégorie parente', type: 'select', options: [] },
   ],
   defaultSort: {

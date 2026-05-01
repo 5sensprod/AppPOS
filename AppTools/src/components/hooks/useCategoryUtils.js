@@ -183,6 +183,8 @@ export function useCategoryUtils() {
               _parentId: null, // Sera défini par le parent
               _isExpanded: isExpanded,
               _hasChildren: hasChildren,
+              product_count: category.productCount || 0,
+              totalProductCount: category.totalProductCount ?? category.productCount ?? 0,
               _fullPath: getCategoryPath(category._id),
             };
 
