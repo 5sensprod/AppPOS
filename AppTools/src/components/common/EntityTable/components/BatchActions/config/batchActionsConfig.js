@@ -58,7 +58,7 @@ export const createActionsConfig = (callbacks, hierarchicalCategories, syncStats
   labelEditor: {
     available: typeof callbacks.onOpenInLabelEditor === 'function',
     icon: LayoutTemplate,
-    label: 'Éditeur étiquettes',
+    label: 'Affiches',
     buttonClass: 'bg-violet-100 hover:bg-violet-200 text-violet-800',
     onAction: () => callbacks.onOpenInLabelEditor(callbacks.selectedItems),
   },
