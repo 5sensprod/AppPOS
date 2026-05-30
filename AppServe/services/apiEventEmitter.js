@@ -25,6 +25,18 @@ class ApiEventEmitter extends EventEmitter {
     this.emit('entity.updated', { entityType: normalized, id, data });
   }
 
+  /**
+   * Variante de entityUpdated avec source explicite.
+   * Permet au front de distinguer vente / retour / ajustement / modif produit.
+   * source : 'sale' | 'return' | 'manual_adjustment' | 'update'
+   */
+  entityUpdatedWithSource(entityType, id, data, source) {
+    const normalized = standardizeEntityType(entityType);
+    console.log(`[EVENT] Émission de ${normalized}.updated (source: ${source})`);
+    this.emit(`${normalized}.updated`, { id, data, source });
+    this.emit('entity.updated', { entityType: normalized, id, data, source });
+  }
+
   entityDeleted(entityType, id) {
     const normalized = standardizeEntityType(entityType);
     console.log(`[EVENT] Émission de ${normalized}.deleted`);

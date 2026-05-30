@@ -8,6 +8,7 @@ const ResponseHandler = require('../../handlers/ResponseHandler');
 const { getEntityEventService } = require('../../services/events/entityEvents');
 const { createProduct, updateProduct, deleteProduct } = require('../../services/productService');
 const exportController = require('../../utils/exportController');
+const apiEventEmitter = require('../../services/apiEventEmitter');
 
 class ProductController extends BaseController {
   constructor() {
@@ -266,7 +267,9 @@ class ProductController extends BaseController {
       const updatedProduct = await this.model.findById(id);
       console.log(`✅ [Stock] ${product.name}: ${currentStock} → ${newStock} (-${quantity})`);
 
-      this.eventService.updated(id, updatedProduct);
+      // Émet products.updated avec source='sale' pour que le front puisse
+      // distinguer une vente d'une modification produit classique
+      apiEventEmitter.entityUpdatedWithSource('products', id, updatedProduct, 'sale');
 
       return ResponseHandler.success(res, updatedProduct);
     } catch (error) {
@@ -309,7 +312,9 @@ class ProductController extends BaseController {
       const updatedProduct = await this.model.findById(id);
       console.log(`✅ [Stock] ${product.name}: ${currentStock} → ${newStock} (+${quantity})`);
 
-      this.eventService.updated(id, updatedProduct);
+      // Émet products.updated avec source='return' pour que le front puisse
+      // distinguer un retour d'une modification produit classique
+      apiEventEmitter.entityUpdatedWithSource('products', id, updatedProduct, 'return');
 
       return ResponseHandler.success(res, updatedProduct);
     } catch (error) {
