@@ -16,7 +16,9 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
     handleFieldChange,
     getCalculatedValues,
   } = usePriceCalculations({ watch, setValue, product });
-
+  const [priceInput, setPriceInput] = React.useState(() =>
+    typeof watch === 'function' ? watch('price') || '' : ''
+  );
   // Options pour le taux de TVA
   const taxRateOptions = [
     { value: '', label: 'Sélectionner un taux' },
@@ -282,15 +284,17 @@ const ProductPriceSection = ({ product, editable = false, register, errors, watc
               label="Prix vente TTC (€)"
               placeholder="0.00"
               editable={true}
-              required={true}
               allowDecimals={true}
               currency={true}
-              value={watch('price') || ''}
+              value={priceInput}
               onChange={(e) => {
-                setValue('price', e.target.value);
-                handleFieldChange('price', e.target.value);
+                setPriceInput(e.target.value); // garde la string brute "12."
+                const parsed = parseFloat(e.target.value);
+                if (!isNaN(parsed)) {
+                  setValue('price', parsed); // envoie à RHF seulement si valide
+                  handleFieldChange('price', e.target.value);
+                }
               }}
-              error={errors?.price?.message}
             />
 
             <SelectField
