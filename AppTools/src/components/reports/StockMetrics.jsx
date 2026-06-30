@@ -1,103 +1,143 @@
-// src/components/reports/StockMetrics.jsx - VERSION CORRIGÉE
+// src/components/reports/StockMetrics.jsx
 
 import React from 'react';
-import { Package, Calculator, TrendingUp, PieChart } from 'lucide-react';
+import { Package, ShoppingCart, TrendingUp, Euro } from 'lucide-react';
 import { formatCurrency, formatNumber, formatPercentage } from '../../utils/formatters';
 
-/**
- * Composant individuel pour une métrique - VERSION CORRIGÉE
- */
-const MetricCard = ({ icon: Icon, title, value, subtitle, extra, color, extraColor = 'red' }) => {
+const MetricCard = ({ icon: Icon, title, badge, value, rows, color }) => {
   const colorClasses = {
-    blue: 'text-blue-600',
-    green: 'text-green-600',
-    purple: 'text-purple-600',
-    orange: 'text-orange-600',
+    blue: {
+      icon: 'text-blue-600',
+      badge: 'bg-blue-100 text-blue-700',
+      border: 'border-l-4 border-blue-500',
+    },
+    green: {
+      icon: 'text-green-600',
+      badge: 'bg-green-100 text-green-700',
+      border: 'border-l-4 border-green-500',
+    },
+    purple: {
+      icon: 'text-purple-600',
+      badge: 'bg-purple-100 text-purple-700',
+      border: 'border-l-4 border-purple-500',
+    },
+    orange: {
+      icon: 'text-orange-500',
+      badge: 'bg-orange-100 text-orange-700',
+      border: 'border-l-4 border-orange-500',
+    },
   };
 
-  const extraColorClasses = {
-    red: 'text-red-600',
-    gray: 'text-gray-500',
-  };
+  const c = colorClasses[color];
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-gray-700 min-h-[140px] flex flex-col">
-      {/* En-tête avec icône et titre */}
-      <div className="flex items-center gap-3 mb-3 flex-shrink-0">
-        <Icon className={`w-6 h-6 sm:w-8 sm:h-8 ${colorClasses[color]} flex-shrink-0`} />
-        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight">
-          {title}
-        </h3>
+    <div
+      className={`bg-white dark:bg-gray-800 rounded-xl p-5 shadow-md border border-gray-200 dark:border-gray-700 ${c.border} flex flex-col gap-3`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className={`w-5 h-5 ${c.icon}`} />
+          <span className="font-semibold text-gray-800 dark:text-white text-sm">{title}</span>
+        </div>
+        {badge && (
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.badge}`}>{badge}</span>
+        )}
       </div>
 
-      {/* Valeur principale - RESPONSIVE ET SANS DÉBORDEMENT */}
-      <div
-        className={`text-xl sm:text-2xl lg:text-3xl font-bold ${colorClasses[color]} mb-2 break-words leading-tight flex-shrink-0`}
-      >
+      <div className={`text-2xl lg:text-3xl font-bold ${c.icon} leading-tight break-words`}>
         {value}
       </div>
 
-      {/* Sous-titre */}
-      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-tight flex-shrink-0">
-        {subtitle}
+      <div className="flex flex-col gap-1 mt-auto">
+        {rows.map((row, i) => (
+          <div
+            key={i}
+            className={`flex justify-between items-center text-xs ${row.border ? 'border-t border-gray-200 dark:border-gray-600 pt-1 mt-1' : ''} ${row.highlight ? 'font-semibold text-gray-800 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+          >
+            <span>{row.label}</span>
+            <span className={row.valueColor || ''}>{row.value}</span>
+          </div>
+        ))}
       </div>
-
-      {/* Information supplémentaire */}
-      {extra && (
-        <div
-          className={`text-xs ${extraColorClasses[extraColor]} mt-1 leading-tight flex-shrink-0`}
-        >
-          {extra}
-        </div>
-      )}
     </div>
   );
 };
 
-/**
- * Composant principal pour afficher les 4 métriques de stock - VERSION CORRIGÉE
- */
 const StockMetrics = ({ stats }) => {
-  if (!stats) {
-    return null;
-  }
+  if (!stats) return null;
+
+  const { summary, financial, performance } = stats;
+
+  const tvaEstimee = financial.retail_value_ttc
+    ? financial.retail_value_ttc - financial.retail_value
+    : financial.tax_amount;
+
+  const retailTTC = financial.retail_value_ttc || financial.retail_value + tvaEstimee;
+
+  // Taux de marque = Marge / Vente HT
+  const tauxDeMarque =
+    financial.retail_value > 0 ? (financial.potential_margin / financial.retail_value) * 100 : 0;
 
   const metrics = [
     {
       icon: Package,
-      title: 'Produits en Stock',
-      value: formatNumber(stats.summary.products_in_stock),
-      subtitle: `sur ${formatNumber(stats.summary.simple_products)} produits physiques`,
-      extra: `${formatNumber(stats.summary.excluded_products)} exclus (stock ≤ 0)`,
       color: 'blue',
-      extraColor: 'red',
+      title: 'Produits en stock',
+      badge: `${formatNumber(summary.simple_products)} au total`,
+      value: formatNumber(summary.products_in_stock),
+      rows: [
+        { label: 'Produits valorisés (stock > 0)', value: formatNumber(summary.products_in_stock) },
+        {
+          label: 'Sans stock (exclus)',
+          value: formatNumber(summary.excluded_products),
+          valueColor: 'text-red-500',
+        },
+      ],
     },
     {
-      icon: Calculator,
-      title: 'Valeur Stock',
-      value: formatCurrency(stats.financial.inventory_value),
-      subtitle: "Prix d'achat total",
-      extra: `Moy. ${formatCurrency(stats.performance.avg_inventory_per_product)}/produit`,
+      icon: ShoppingCart,
       color: 'green',
-      extraColor: 'gray',
+      title: "Coût d'achat du stock (HT)",
+      badge: 'Prix achat HT',
+      value: formatCurrency(financial.inventory_value),
+      rows: [
+        {
+          label: 'Moyenne par produit',
+          value: formatCurrency(performance.avg_inventory_per_product),
+        },
+        { label: 'Base de calcul de la marge', value: 'Prix achat fournisseur HT' },
+      ],
     },
     {
       icon: TrendingUp,
-      title: 'Valeur de Vente',
-      value: formatCurrency(stats.financial.retail_value),
-      subtitle: 'Prix de vente total',
-      extra: `Moy. ${formatCurrency(stats.performance.avg_retail_per_product)}/produit`,
       color: 'purple',
-      extraColor: 'gray',
+      title: 'Valeur de vente du stock (HT)',
+      badge: 'Prix vente HT',
+      value: formatCurrency(financial.retail_value),
+      rows: [
+        { label: 'Moyenne par produit', value: formatCurrency(performance.avg_retail_per_product) },
+        { label: 'Valeur TTC (avec TVA)', value: formatCurrency(retailTTC), border: true },
+      ],
     },
     {
-      icon: PieChart,
-      title: 'Marge Potentielle',
-      value: formatCurrency(stats.financial.potential_margin),
-      subtitle: `${formatPercentage(stats.financial.margin_percentage)} de marge`,
-      extra: `TVA: ${formatCurrency(stats.financial.tax_amount)}`,
+      icon: Euro,
       color: 'orange',
-      extraColor: 'gray',
+      title: 'Marge commerciale brute (HT)',
+      badge: `Marque : ${formatPercentage(tauxDeMarque)}`,
+      value: formatCurrency(financial.potential_margin),
+      rows: [
+        {
+          label: 'Taux de marque (marge / vente HT)',
+          value: formatPercentage(tauxDeMarque),
+          valueColor: 'text-orange-500 font-bold',
+        },
+        {
+          label: 'Taux de marge (marge / achat HT)',
+          value: formatPercentage(financial.margin_percentage),
+          valueColor: 'text-gray-400',
+        },
+        { label: 'TVA collectée estimée', value: formatCurrency(tvaEstimee), border: true },
+      ],
     },
   ];
 

@@ -1,18 +1,14 @@
-// src/hooks/useAdvancedPDFExport.js - VERSION FINALE OPTIMISÉE
+// src/hooks/useAdvancedPDFExport.js - VERSION CORRIGÉE (sans preFilteredData)
 import { useState, useCallback } from 'react';
-import { useCategoryTree } from './useCategoryTree';
 import apiService from '../services/api';
 
 export const useAdvancedPDFExport = () => {
   const [exportState, setExportState] = useState({
-    status: 'idle', // idle, exporting, success, error
+    status: 'idle',
     error: null,
     fileName: null,
     downloadUrl: null,
   });
-
-  // 🚀 DONNÉES OPTIMISÉES depuis stores (pour preFilteredData)
-  const { rawData } = useCategoryTree();
 
   const resetState = useCallback(() => {
     setExportState({
@@ -59,10 +55,8 @@ export const useAdvancedPDFExport = () => {
           error: null,
         }));
 
-        const endpoint = '/api/products/stock/statistics/export-pdf';
-
-        // 🚀 OPTIMISATION : Préparer preFilteredData si disponible
-        let requestData = {
+        // ✅ Uniquement les paramètres légers — pas de données produits
+        const requestData = {
           companyInfo,
           reportType,
           includeCharts,
@@ -75,38 +69,14 @@ export const useAdvancedPDFExport = () => {
           isSimplified,
         };
 
-        // 🎯 AJOUT CONDITIONNEL : preFilteredData si stores disponibles
-        if (rawData.products && rawData.products.length > 0) {
-          console.log('🚀 Optimisation: Envoi preFilteredData au backend');
-
-          // Filtrer les produits selon les options
-          let filteredProducts =
-            rawData.productsInStock || rawData.products.filter((p) => (p.stock || 0) > 0);
-
-          // Appliquer filtrage catégories si nécessaire
-          if (selectedCategories.length > 0) {
-            filteredProducts = filteredProducts.filter((product) => {
-              const productCategories = product.categories || [product.categoryId].filter(Boolean);
-              const hasSelectedCategory = productCategories.some((catId) =>
-                selectedCategories.includes(catId)
-              );
-              const isUncategorized = productCategories.length === 0;
-              return hasSelectedCategory || (includeUncategorized && isUncategorized);
-            });
+        const response = await apiService.post(
+          '/api/products/stock/statistics/export-pdf',
+          requestData,
+          {
+            responseType: 'blob',
+            timeout: 30000,
           }
-
-          requestData.preFilteredData = {
-            products: filteredProducts,
-            categories: rawData.hierarchicalCategories || [],
-            dataSource: 'frontend_stores_optimized',
-            timestamp: new Date().toISOString(),
-          };
-        }
-
-        const response = await apiService.post(endpoint, requestData, {
-          responseType: 'blob',
-          timeout: 30000,
-        });
+        );
 
         const fileName =
           customFileName ||
@@ -134,7 +104,6 @@ export const useAdvancedPDFExport = () => {
           downloadUrl,
           blob,
           size: blob.size,
-          dataSource: requestData.preFilteredData ? 'hybrid_optimized' : 'backend_classic',
         };
       } catch (error) {
         console.error('❌ Erreur export:', error);
@@ -145,6 +114,8 @@ export const useAdvancedPDFExport = () => {
           errorMessage = "L'export a pris trop de temps";
         } else if (error.response?.status === 404) {
           errorMessage = "Service d'export indisponible";
+        } else if (error.response?.status === 413) {
+          errorMessage = 'Requête trop volumineuse';
         } else if (error.response?.status >= 500) {
           errorMessage = 'Erreur serveur';
         } else if (error.message) {
@@ -161,7 +132,7 @@ export const useAdvancedPDFExport = () => {
         throw new Error(errorMessage);
       }
     },
-    [downloadFile, rawData]
+    [downloadFile] // ✅ rawData supprimé des dépendances
   );
 
   const manualDownload = useCallback(() => {
@@ -209,20 +180,17 @@ export const useAdvancedPDFExport = () => {
   );
 
   return {
-    // État
     exportState,
     isExporting: exportState.status === 'exporting',
     isSuccess: exportState.status === 'success',
     isError: exportState.status === 'error',
     isIdle: exportState.status === 'idle',
 
-    // Actions
     exportStockStatisticsToPDF,
     printAfterExport,
     manualDownload,
     resetState,
 
-    // Helpers
     getStatusText: () => {
       switch (exportState.status) {
         case 'exporting':

@@ -3,81 +3,97 @@
 import React from 'react';
 import { formatCurrency, formatNumber, getTaxRateLabel } from '../../utils/formatters';
 
-/**
- * Composant pour une carte de taux de TVA
- */
-const TaxRateCard = ({ taxKey, data }) => {
+const TaxRateCard = ({ data }) => {
+  const retailValueTTC = data.retail_value_ttc || data.retail_value + data.tax_amount;
+
   return (
     <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-      <div className="flex justify-between items-center mb-3">
-        <h4 className="font-semibold text-gray-900 dark:text-white">
+      {/* En-tête */}
+      <div className="flex justify-between items-center mb-4">
+        <h4 className="font-bold text-gray-900 dark:text-white text-base">
           {getTaxRateLabel(data.rate)}
         </h4>
-        <span className="text-sm bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
-          {formatNumber(data.product_count)} produits
+        <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full font-medium">
+          {formatNumber(data.product_count)} produit{data.product_count > 1 ? 's' : ''}
         </span>
       </div>
 
+      {/* Tableau des valeurs */}
       <div className="space-y-2">
-        <div className="flex justify-between">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Valeur achat HT:</span>
-          <span className="font-medium text-gray-900 dark:text-white">
+        <div className="flex justify-between items-center py-1">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Coût d'achat HT</span>
+          <span className="text-sm font-semibold text-gray-800 dark:text-white">
             {formatCurrency(data.inventory_value)}
           </span>
         </div>
 
-        {/* Affichage conditionnel selon les données disponibles */}
-        {data.retail_value_ht !== undefined && (
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Valeur vente HT:</span>
-            <span className="font-medium text-gray-900 dark:text-white">
-              {formatCurrency(data.retail_value_ht)}
-            </span>
-          </div>
-        )}
-
-        <div className="flex justify-between">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Valeur vente HT:</span>
-          <span className="font-medium text-gray-900 dark:text-white">
+        <div className="flex justify-between items-center py-1">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Prix de vente HT</span>
+          <span className="text-sm font-semibold text-gray-800 dark:text-white">
             {formatCurrency(data.retail_value)}
           </span>
         </div>
 
         {data.rate > 0 && (
-          <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
-            <span className="text-sm text-gray-600 dark:text-gray-400">TVA collectée:</span>
-            <span className="font-medium text-green-600">{formatCurrency(data.tax_amount)}</span>
-          </div>
+          <>
+            <div className="flex justify-between items-center py-1 border-t border-dashed border-gray-300 dark:border-gray-500 mt-1 pt-2">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                TVA {data.rate}% sur vente HT
+              </span>
+              <span className="text-sm font-semibold text-amber-600">
+                + {formatCurrency(data.tax_amount)}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center py-1 bg-white dark:bg-gray-600 rounded px-2">
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Prix de vente TTC
+              </span>
+              <span className="text-sm font-bold text-gray-900 dark:text-white">
+                {formatCurrency(retailValueTTC)}
+              </span>
+            </div>
+          </>
         )}
+
+        {/* Marge brute */}
+        <div className="flex justify-between items-center py-1 border-t border-gray-200 dark:border-gray-500 mt-1 pt-2">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Marge brute HT</span>
+          <span className="text-sm font-bold text-green-600">
+            {formatCurrency(data.retail_value - data.inventory_value)}
+          </span>
+        </div>
       </div>
     </div>
   );
 };
 
-/**
- * Composant principal pour la répartition par taux de TVA
- */
 const TaxBreakdown = ({ breakdown }) => {
-  if (!breakdown || Object.keys(breakdown).length === 0) {
-    return null;
-  }
+  if (!breakdown || Object.keys(breakdown).length === 0) return null;
+
+  const totalTVA = Object.values(breakdown).reduce((sum, d) => sum + d.tax_amount, 0);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 mb-8">
-      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-        Répartition par Taux de TVA
-      </h3>
-
-      {/* Note explicative */}
-      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-        <p className="text-sm text-blue-700 dark:text-blue-300">
-          💡 <strong>TVA collectée</strong> = calculée sur le prix de vente HT × taux de TVA
-        </p>
+      {/* En-tête */}
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+          Répartition par taux de TVA
+        </h3>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          TVA totale estimée :{' '}
+          <strong className="text-amber-600">{formatCurrency(totalTVA)}</strong>
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+        Tous les montants sont en <strong>Hors Taxes (HT)</strong>. La TVA est calculée sur la base
+        du prix de vente HT × taux.
+      </p>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {Object.entries(breakdown).map(([key, data]) => (
-          <TaxRateCard key={key} taxKey={key} data={data} />
+          <TaxRateCard key={key} data={data} />
         ))}
       </div>
     </div>

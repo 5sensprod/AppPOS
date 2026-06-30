@@ -95,6 +95,17 @@ class ProductStockController extends BaseController {
 
     productsInStock.forEach((product) => {
       const { stock = 0, purchase_price = 0, price = 0, tax_rate = 0 } = product;
+      if (stock * price > 100000) {
+        console.log('🚨 PRODUIT ABERRANT:', {
+          name: product.name,
+          sku: product.sku,
+          stock,
+          price,
+          regular_price,
+          tax_rate,
+          valeur: stock * price,
+        });
+      }
       const productInventoryValue = stock * purchase_price;
       const productRetailValue = stock * price;
 
@@ -249,29 +260,6 @@ class ProductStockController extends BaseController {
 
   // 🚀 NOUVELLE MÉTHODE : Support hybride optimisé avec filtrage catégorie
   async getOptimizedProductsForPDF(body) {
-    const { preFilteredData } = body;
-
-    // 🔥 MODE OPTIMISÉ : Utiliser données depuis front-end stores
-    if (preFilteredData && preFilteredData.products && preFilteredData.statistics) {
-      console.log('🚀 OPTIMISATION: Utilisation données pré-filtrées depuis stores front-end');
-      console.log(
-        `📊 Produits: ${preFilteredData.products.length}, Source: ${preFilteredData.dataSource}`
-      );
-
-      // Validation des données reçues
-      if (preFilteredData.products.length === 0) {
-        throw new Error('Aucun produit dans les données pré-filtrées');
-      }
-
-      return {
-        productsInStock: preFilteredData.products,
-        stockStats: preFilteredData.statistics,
-        dataSource: 'frontend_stores_optimized',
-      };
-    }
-
-    // 🔄 MODE FALLBACK : Logique backend avec filtrage catégorie
-    console.log('📊 FALLBACK: Utilisation logique backend classique');
     return this.getProductsForPDFWithFiltering(body);
   }
 

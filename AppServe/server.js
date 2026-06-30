@@ -105,13 +105,6 @@ app.use(
 
 app.use('/public', express.static(pathManager.getPublicPath()));
 
-app.use(
-  '/api/products/stock/statistics/export-pdf',
-  express.json({
-    limit: '15mb', // Limite encore plus élevée pour cette route spécifique
-  })
-);
-
 // Routes...
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
