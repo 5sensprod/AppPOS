@@ -22,6 +22,15 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
     ? [
         { key: 'name', label: 'Nom du produit', value: selectedProduct.name },
         { key: 'price', label: 'Prix', value: `${selectedProduct.price}€` },
+        {
+          key: 'sale_price',
+          label: 'Prix promo',
+          value:
+            selectedProduct.sale_price != null && selectedProduct.sale_price !== ''
+              ? `${selectedProduct.sale_price}€`
+              : `${selectedProduct.price}€`,
+        },
+        { key: 'description', label: 'Description', value: selectedProduct.description ?? '' },
         { key: 'brand', label: 'Marque', value: selectedProduct.brand_ref?.name ?? '' },
         { key: 'sku', label: 'Référence', value: selectedProduct.sku },
         { key: 'stock', label: 'Stock', value: `Stock: ${selectedProduct.stock}` },
