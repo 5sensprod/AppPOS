@@ -115,6 +115,12 @@ export const useProductFilters = (products = []) => {
       { label: 'Code barre invalide', value: 'invalid_barcode', type: 'barcode' },
     ];
 
+    // 🏷️ Options de filtre Prix promo
+    const promoOptions = [
+      { label: 'En promotion', value: 'has_promo', type: 'promo' },
+      { label: 'Sans promotion', value: 'no_promo', type: 'promo' },
+    ];
+
     // Extraction des options de marque depuis les produits
     const brandOptions = Array.from(
       new Map(
@@ -141,6 +147,7 @@ export const useProductFilters = (products = []) => {
       ...imageOptions,
       ...descriptionOptions,
       ...barcodeOptions, // ✅ NOUVEAU - Ajout des options code barre
+      ...promoOptions,   // 🏷️ Ajout des options promo
       ...brandOptions,
       ...supplierOptions,
     ];
@@ -159,6 +166,7 @@ export const useProductFilters = (products = []) => {
     const statusFilter = selectedFilters.find((f) => f.type === 'status')?.value;
     const barcodeFilter = selectedFilters.find((f) => f.type === 'barcode')?.value;
     const stockFilters = selectedFilters.filter((f) => f.type === 'stock');
+    const promoFilter = selectedFilters.find((f) => f.type === 'promo')?.value;
 
     // Filtre par statut de synchronisation WooCommerce
     if (wooFilter === 'woo_synced') {
@@ -332,6 +340,18 @@ export const useProductFilters = (products = []) => {
               return productStock === parseInt(filter.value, 10);
           }
         });
+      });
+    }
+
+    // 🏷️ Filtre par prix promotionnel
+    if (promoFilter) {
+      data = data.filter((p) => {
+        const hasPromo =
+          p.sale_price != null &&
+          p.sale_price !== '' &&
+          Number(p.sale_price) > 0 &&
+          Number(p.sale_price) < Number(p.price);
+        return promoFilter === 'has_promo' ? hasPromo : !hasPromo;
       });
     }
 

@@ -62,7 +62,8 @@ const UnifiedFilterBar = ({
     brand: 'Marque',
     category: 'Catégorie',
     barcode: 'Code barre',
-    stock: 'Stock', // ✅ NOUVEAU
+    stock: 'Stock',
+    promo: 'Promotion', // 🏷️ NOUVEAU
   };
 
   const selectedTypes = new Set(selectedFilters.map((f) => f.type));
@@ -106,7 +107,8 @@ const UnifiedFilterBar = ({
         'brand',
         'supplier',
         'barcode',
-        'stock', // ✅ Ajout stock
+        'stock',
+        'promo', // 🏷️ NOUVEAU
       ];
       return order.indexOf(a.value) - order.indexOf(b.value);
     });

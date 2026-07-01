@@ -56,13 +56,30 @@ export const transformToOptions = (categories, currentId, isNew, prefix = '') =>
 
 // Formattage des données pour API (création / mise à jour)
 export const formatCategoryData = (data) => {
-  const formattedData = { ...data };
+  const allowedFields = [
+    'name',
+    'description',
+    'parent_id',
+    'is_featured',
+    'meta_title',
+    'meta_description',
+    'meta_keywords',
+  ];
+  const formattedData = {};
+  allowedFields.forEach((field) => {
+    if (data[field] !== undefined && data[field] !== '') {
+      formattedData[field] = data[field];
+    }
+  });
+  if (formattedData.parent_id === '') formattedData.parent_id = null;
+  return formattedData;
 
   // Supprimer explicitement les champs problématiques
   delete formattedData.status;
   delete formattedData.children;
   delete formattedData.productCount;
   delete formattedData.path;
+  delete formattedData.totalProductCount;
   delete formattedData.path_ids;
   delete formattedData.path_string;
   delete formattedData.products;
