@@ -1,5 +1,5 @@
-import React, { useRef, useCallback, useEffect } from 'react';
-import { Text } from 'react-konva';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { Text, Rect } from 'react-konva';
 import useLabelStore from '../../store/useLabelStore';
 import { loadGoogleFont } from '../../utils/loadGoogleFont'; // 🎨 Import de la fonction de chargement
 
@@ -8,6 +8,8 @@ import { loadGoogleFont } from '../../utils/loadGoogleFont'; // 🎨 Import de l
  * - Désactivé si el.dataBinding est défini (car la valeur vient des données).
  * - Support de width pour le redimensionnement et wrap="word"
  * - Support de fontFamily pour Google Fonts
+ * - Support gras/italique (fontStyle), souligné/barré (textDecoration),
+ *   et surlignage type stabilo (highlightEnabled + highlightColor)
  */
 const TextNode = ({
   id,
@@ -17,6 +19,10 @@ const TextNode = ({
   fontSize = 16,
   fontStyle = 'normal',
   fontFamily = 'Arial', // 🎨 Nouvelle prop pour la police
+  textDecoration = '', // '' | 'underline' | 'line-through' | 'underline line-through'
+  highlightEnabled = false, // 🖍️ Surlignage type stabilo
+  highlightColor = '#FFFF00',
+  highlightOpacity = 0.5,
   fill = '#000000',
   rotation = 0,
   scaleX = 1,
@@ -42,6 +48,19 @@ const TextNode = ({
 }) => {
   const textRef = useRef(null);
   const updateElement = useLabelStore((s) => s.updateElement);
+
+  // 🖍️ Dimensions mesurées du texte, pour positionner le rectangle de surlignage
+  const [box, setBox] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const node = textRef.current;
+    if (!node || !highlightEnabled) return;
+
+    const raf = requestAnimationFrame(() => {
+      setBox({ width: node.width(), height: node.height() });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [text, fontSize, fontFamily, fontStyle, width, highlightEnabled]);
 
   // 🎨 Charger la police Google Font et forcer le redraw quand elle change
   useEffect(() => {
@@ -118,8 +137,12 @@ const TextNode = ({
       textarea.style.transformOrigin = 'left top';
       textarea.style.transform = `rotate(${rotation}deg)`;
       textarea.style.zIndex = '9999';
-      textarea.style.fontWeight = fontStyle === 'bold' ? 'bold' : 'normal';
-      textarea.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
+      textarea.style.fontWeight =
+        fontStyle === 'bold' || fontStyle?.includes('bold') ? 'bold' : 'normal';
+      textarea.style.fontStyle =
+        fontStyle === 'italic' || fontStyle?.includes('italic') ? 'italic' : 'normal';
+      textarea.style.textDecoration = textDecoration || 'none';
+      textarea.style.backgroundColor = highlightEnabled ? highlightColor : 'white';
 
       // Largeur/hauteur approximatives : on peut partir de la bbox du node
       const nodeBox = node.getClientRect({ relativeTo: stage });
@@ -154,43 +177,73 @@ const TextNode = ({
       });
       textarea.addEventListener('blur', () => end(true));
     },
-    [commit, fill, fontSize, fontFamily, fontStyle, locked, rotation, dataBinding]
+    [
+      commit,
+      fill,
+      fontSize,
+      fontFamily,
+      fontStyle,
+      textDecoration,
+      highlightEnabled,
+      highlightColor,
+      locked,
+      rotation,
+      dataBinding,
+    ]
   );
 
   return (
-    <Text
-      ref={textRef}
-      id={id}
-      x={x}
-      y={y}
-      text={text}
-      fontSize={fontSize}
-      fontStyle={fontStyle}
-      fontFamily={fontFamily} // 🎨 Appliquer la police Google Font
-      fill={fill}
-      rotation={rotation}
-      scaleX={scaleX}
-      scaleY={scaleY}
-      opacity={opacity}
-      width={width} // Support du width pour redimensionnement
-      wrap="word" // Wrap automatique des mots
-      draggable={draggable && !locked}
-      shadowEnabled={shadowEnabled}
-      shadowColor={shadowColor}
-      shadowOpacity={shadowOpacity}
-      shadowBlur={shadowBlur}
-      shadowOffsetX={shadowOffsetX}
-      shadowOffsetY={shadowOffsetY}
-      onDblClick={startEditing}
-      onClick={onClick}
-      onTap={startEditing} // bonus mobile (tap prolongé non géré ici)
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      onTransformStart={onTransformStart}
-      onTransform={onTransform}
-      onTransformEnd={onTransformEnd}
-    />
+    <>
+      {/* 🖍️ Rectangle de surlignage (stabilo), positionné derrière le texte */}
+      {highlightEnabled && box.width > 0 && box.height > 0 && (
+        <Rect
+          x={x}
+          y={y}
+          width={box.width}
+          height={box.height}
+          rotation={rotation}
+          scaleX={scaleX}
+          scaleY={scaleY}
+          fill={highlightColor}
+          opacity={highlightOpacity * opacity}
+          listening={false}
+        />
+      )}
+      <Text
+        ref={textRef}
+        id={id}
+        x={x}
+        y={y}
+        text={text}
+        fontSize={fontSize}
+        fontStyle={fontStyle}
+        fontFamily={fontFamily} // 🎨 Appliquer la police Google Font
+        textDecoration={textDecoration} // souligné / barré
+        fill={fill}
+        rotation={rotation}
+        scaleX={scaleX}
+        scaleY={scaleY}
+        opacity={opacity}
+        width={width} // Support du width pour redimensionnement
+        wrap="word" // Wrap automatique des mots
+        draggable={draggable && !locked}
+        shadowEnabled={shadowEnabled}
+        shadowColor={shadowColor}
+        shadowOpacity={shadowOpacity}
+        shadowBlur={shadowBlur}
+        shadowOffsetX={shadowOffsetX}
+        shadowOffsetY={shadowOffsetY}
+        onDblClick={startEditing}
+        onClick={onClick}
+        onTap={startEditing} // bonus mobile (tap prolongé non géré ici)
+        onDragStart={onDragStart}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
+        onTransformStart={onTransformStart}
+        onTransform={onTransform}
+        onTransformEnd={onTransformEnd}
+      />
+    </>
   );
 };
 

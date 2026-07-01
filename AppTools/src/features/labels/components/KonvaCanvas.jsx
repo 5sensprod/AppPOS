@@ -457,8 +457,11 @@ const KonvaCanvas = forwardRef(
                     {...commonProps}
                     text={resolvePropForElement(el.text, el, selectedProduct)}
                     fontSize={el.fontSize}
-                    fontStyle={el.bold ? 'bold' : 'normal'}
+                    fontStyle={el.fontStyle || (el.bold ? 'bold' : 'normal')} // ✅ supporte gras+italique combinés, fallback ancien champ "bold"
                     fontFamily={el.fontFamily || 'Arial'} // 🎨 Ajouter le support de fontFamily
+                    textDecoration={el.textDecoration || ''} // souligné / barré
+                    highlightEnabled={!!el.highlightEnabled} // 🖍️ surlignage stabilo
+                    highlightColor={el.highlightColor || '#FFFF00'}
                     fill={el.color}
                     width={el.width}
                     locked={locked}

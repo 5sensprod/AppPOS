@@ -1,6 +1,16 @@
 // src/features/labels/components/PropertyPanel.jsx
 import React from 'react';
-import { Palette, Link, Unlink, Sparkles } from 'lucide-react';
+import {
+  Palette,
+  Link,
+  Unlink,
+  Sparkles,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  Highlighter,
+} from 'lucide-react';
 import useLabelStore from '../store/useLabelStore';
 import FontSelector from './FontSelector';
 
@@ -120,6 +130,48 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
     updateElement(selectedId, { fontFamily });
   };
 
+  // --- Gras / Italique (fontStyle Konva: 'normal' | 'bold' | 'italic' | 'italic bold')
+  const isBold = (selectedElement.fontStyle || '').includes('bold');
+  const isItalic = (selectedElement.fontStyle || '').includes('italic');
+
+  const setFontStyle = (bold, italic) => {
+    let value = 'normal';
+    if (bold && italic) value = 'italic bold';
+    else if (bold) value = 'bold';
+    else if (italic) value = 'italic';
+    updateElement(selectedId, { fontStyle: value });
+  };
+
+  const toggleBold = () => setFontStyle(!isBold, isItalic);
+  const toggleItalic = () => setFontStyle(isBold, !isItalic);
+
+  // --- Souligné / Barré (textDecoration Konva: '' | 'underline' | 'line-through' | 'underline line-through')
+  const decoTokens = (selectedElement.textDecoration || '').split(' ').filter(Boolean);
+  const isUnderline = decoTokens.includes('underline');
+  const isStrike = decoTokens.includes('line-through');
+
+  const setTextDecoration = (underline, strike) => {
+    const tokens = [];
+    if (underline) tokens.push('underline');
+    if (strike) tokens.push('line-through');
+    updateElement(selectedId, { textDecoration: tokens.join(' ') });
+  };
+
+  const toggleUnderline = () => setTextDecoration(!isUnderline, isStrike);
+  const toggleStrike = () => setTextDecoration(isUnderline, !isStrike);
+
+  // --- Surlignage type stabilo
+  const isHighlighted = !!selectedElement.highlightEnabled;
+  const toggleHighlight = () => {
+    updateElement(selectedId, {
+      highlightEnabled: !isHighlighted,
+      highlightColor: selectedElement.highlightColor || '#FFFF00',
+    });
+  };
+  const handleHighlightColorChange = (color) => {
+    updateElement(selectedId, { highlightColor: color, highlightEnabled: true });
+  };
+
   return (
     <div className="">
       <div className="flex items-center gap-4 px-4 ">
@@ -131,6 +183,82 @@ const PropertyPanel = ({ selectedProduct, onOpenEffects }) => {
               onChange={handleFontFamilyChange}
               apiKey={import.meta.env.VITE_GOOGLE_FONTS_KEY} // optionnel si ton FontSelector lit déjà l'env
             />
+            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+
+            {/* Gras / Italique / Souligné / Barré */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleBold}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isBold
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                }`}
+                title="Gras"
+              >
+                <Bold className="h-4 w-4" />
+              </button>
+              <button
+                onClick={toggleItalic}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isItalic
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                }`}
+                title="Italique"
+              >
+                <Italic className="h-4 w-4" />
+              </button>
+              <button
+                onClick={toggleUnderline}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isUnderline
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                }`}
+                title="Souligné"
+              >
+                <Underline className="h-4 w-4" />
+              </button>
+              <button
+                onClick={toggleStrike}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isStrike
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                }`}
+                title="Barré"
+              >
+                <Strikethrough className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+
+            {/* Surlignage type stabilo */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleHighlight}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isHighlighted
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                }`}
+                title="Surligner"
+              >
+                <Highlighter className="h-4 w-4" />
+              </button>
+              {isHighlighted && (
+                <input
+                  type="color"
+                  value={selectedElement.highlightColor || '#FFFF00'}
+                  onChange={(e) => handleHighlightColorChange(e.target.value)}
+                  className="w-8 h-8 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
+                  title="Couleur du surlignage"
+                />
+              )}
+            </div>
+
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
           </>
         )}
